@@ -1,4 +1,5 @@
 {
+  "scheme": "paksho",
   "android": {
     "package": "com.anonymous.cleaningmobile"
   }

@@ -13,40 +13,43 @@ export interface PaymentResult {
   error?: string;
 }
 
-// Mock payment gateway (ZarinPal-like behavior)
+const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+
 export const requestPayment = async (payload: PaymentRequest): Promise<PaymentResult> => {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 700));
-
-  // Simulate ~90% success rate for demo
-  const success = Math.random() > 0.1;
-
-  if (success) {
-    const authority = `AUTH-${Date.now().toString(36).toUpperCase()}`;
-    return {
-      success: true,
-      authority,
-      payUrl: `https://gateway.example.com/pay/${authority}?amount=${payload.amount}`,
-    };
+  if (!API_URL) {
+    return { success: false, error: 'آدرس سرویس پرداخت تنظیم نشده است.' };
   }
 
-  return {
-    success: false,
-    error: 'درخواست پرداخت با خطا مواجه شد. لطفاً مجدداً تلاش کنید.',
-  };
+  try {
+    const response = await fetch(`${API_URL}/payments/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = (await response.json()) as PaymentResult;
+    return response.ok ? result : { success: false, error: result.error || 'درخواست پرداخت انجام نشد.' };
+  } catch {
+    return { success: false, error: 'ارتباط با سرویس پرداخت برقرار نشد.' };
+  }
 };
 
 export const verifyPayment = async (
-  _authority: string,
-  _amount: number,
+  authority: string,
+  amount: number,
 ): Promise<{ success: boolean; refId?: string; error?: string }> => {
-  await new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 400));
-
-  const success = Math.random() > 0.15;
-
-  if (success) {
-    return { success: true, refId: `REF-${Date.now().toString(36).toUpperCase()}` };
+  if (!API_URL) {
+    return { success: false, error: 'آدرس سرویس پرداخت تنظیم نشده است.' };
   }
 
-  return { success: false, error: 'پرداخت تایید نشد. مبلغ به حساب شما بازگردانده شد.' };
+  try {
+    const response = await fetch(`${API_URL}/payments/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authority, amount }),
+    });
+    const result = (await response.json()) as { success: boolean; refId?: string; error?: string };
+    return response.ok ? result : { success: false, error: result.error || 'پرداخت تایید نشد.' };
+  } catch {
+    return { success: false, error: 'ارتباط با سرویس تایید پرداخت برقرار نشد.' };
+  }
 };

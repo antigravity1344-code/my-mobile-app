@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
 import { Calendar, Clock, FileText } from 'lucide-react';
+import { JalaliDateOption, TimeSlot } from '../../types/booking';
 
 interface DateTimeSelectorProps {
-  selectedDate: any;
-  selectedTimeSlot: any;
+  selectedDate: JalaliDateOption | null;
+  selectedTimeSlot: TimeSlot | null;
   durationHours: number;
   genderPreference: 'FEMALE' | 'MALE' | 'NO_PREFERENCE';
   notes: string;
-  onSelectDate: (date: any) => void;
-  onSelectTimeSlot: (slot: any) => void;
+  onSelectDate: (date: JalaliDateOption) => void;
+  onSelectTimeSlot: (slot: TimeSlot) => void;
   onChangeDuration: (hours: number) => void;
   onChangeGender: (gender: 'FEMALE' | 'MALE' | 'NO_PREFERENCE') => void;
   onChangeNotes: (notes: string) => void;
@@ -20,20 +21,25 @@ const generateDateOptions = () => {
   const today = new Date();
   const options = [];
   const dayNames = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-  const monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+  const persianDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const normalizeDigits = (value: string) =>
+    value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
 
   for (let i = 0; i < 14; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
-    const dayOfWeek = date.getDay();
-    const persianDayIndex = (dayOfWeek + 1) % 7;
-    const adjustedDayName = dayNames[persianDayIndex];
+    const dateParts = persianDateFormatter.formatToParts(date);
+    const getPart = (type: string) => dateParts.find((part) => part.type === type)?.value ?? '';
 
     options.push({
-      dateString: date.toISOString().split('T')[0],
-      dayOfWeek: adjustedDayName,
-      dayOfMonth: date.getDate(),
-      monthName: monthNames[date.getMonth()] + ' ' + date.getFullYear(),
+      dateString: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dayOfWeek: dayNames[date.getDay()],
+      dayOfMonth: Number(normalizeDigits(getPart('day'))),
+      monthName: `${getPart('month')} ${getPart('year')}`,
       isToday: i === 0,
       isTomorrow: i === 1,
     });
@@ -271,7 +277,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
         <button
           type="button"
           onClick={onNext}
-          disabled={!selectedDate}
+          disabled={!selectedDate || !selectedTimeSlot}
           className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm cursor-pointer"
         >
           تایید و حرکت به مرحله بعد ↑

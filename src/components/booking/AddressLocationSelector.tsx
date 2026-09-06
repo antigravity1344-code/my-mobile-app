@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { AddressDetails } from '../../types/booking';
 import { getCurrentPosition } from '../../services/location';
+import { isValidAddress } from '../../utils/bookingValidation';
 import {
   MapPin,
   Phone,
@@ -41,7 +42,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
   onNext,
   onPrev,
 }) => {
-  const [districtSearch, _setDistrictSearch] = useState('');
+  const [districtSearch, setDistrictSearch] = useState('');
   const [, setTouched] = useState({
     fullAddress: false,
     plaque: false,
@@ -71,12 +72,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
     }
   }, [onUpdateField]);
 
-  const isPhoneValid = /^09[0-9]{9}$/.test(addressDetails.contactPhone.trim());
-  const isAddressValid = addressDetails.fullAddress.trim().length >= 8;
-  const isPlaqueValid = addressDetails.plaque.trim().length >= 1;
-  const isRecipientValid = addressDetails.recipientName.trim().length >= 3;
-
-  const isFormValid = isPhoneValid && isAddressValid && isPlaqueValid && isRecipientValid;
+  const isFormValid = isValidAddress(addressDetails);
 
   const filteredDistricts = POPULAR_DISTRICTS.filter((d) =>
     d.includes(districtSearch.trim())
@@ -173,6 +169,13 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
         <label className="text-xs font-bold text-slate-700 block">
           انتخاب یا جستجوی محله:
         </label>
+        <input
+          type="search"
+          value={districtSearch}
+          onChange={(e) => setDistrictSearch(e.target.value)}
+          placeholder="جستجوی محله"
+          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+        />
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
           {filteredDistricts.map((d) => (
             <button

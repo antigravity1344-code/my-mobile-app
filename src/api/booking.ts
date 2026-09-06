@@ -1,5 +1,14 @@
 import type { CleaningService } from '../types/service';
 import { SERVICES_CATALOG } from '../config/servicesData';
+import type { BookingScheduleData } from '../types/booking';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+
+export interface BookingResponse {
+  success: boolean;
+  orderId?: string;
+  error?: string;
+}
 
 export const getServices = (): CleaningService[] => SERVICES_CATALOG;
 
@@ -16,8 +25,23 @@ export const calculatePrice = (
   return service.basePrice;
 };
 
-// Placeholder for future backend integration
-export const submitBooking = async (payload: unknown): Promise<{ success: boolean; orderId?: string }> => {
-  console.log('[API] Submit booking (mock):', payload);
-  return { success: true, orderId: `ORDER-${Date.now()}` };
+export const submitBooking = async (payload: BookingScheduleData): Promise<BookingResponse> => {
+  if (!API_URL) {
+    return { success: false, error: 'آدرس سرویس ثبت سفارش تنظیم نشده است.' };
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/bookings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = (await response.json()) as BookingResponse;
+    if (!response.ok) {
+      return { success: false, error: result.error || 'ثبت سفارش انجام نشد.' };
+    }
+    return result;
+  } catch {
+    return { success: false, error: 'ارتباط با سرویس ثبت سفارش برقرار نشد.' };
+  }
 };

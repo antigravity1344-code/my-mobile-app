@@ -5,6 +5,7 @@ import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { requestPayment, verifyPayment, type PaymentRequest } from '../../api/payment';
+import { calculatePrice } from '../../api/booking';
 import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const STEPS = [
@@ -36,11 +37,9 @@ export const BookingWizardContainer: React.FC = () => {
     prevStep,
   } = useBooking();
 
-  const baseRate = selectedService?.basePrice || 150000;
-  const isHourly = selectedService?.pricingType === 'hourly';
-  const totalPrice = isHourly
-    ? baseRate * durationHours
-    : baseRate;
+  const totalPrice = selectedService
+    ? calculatePrice(selectedService, durationHours) + (selectedTimeSlot?.extraFee ?? 0)
+    : 0;
   const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
 
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');

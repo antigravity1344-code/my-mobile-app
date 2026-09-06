@@ -9,8 +9,9 @@ import {
 } from 'lucide-react';
 import { BookingProvider, useBooking } from './src/context/BookingContext';
 import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
+import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
 
-function MainDashboard() {
+export function MainDashboard() {
   const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard'>('Wizard');
   const [viewMode, setViewMode] = useState<'wizard' | 'simulator'>('wizard');
 
@@ -193,7 +194,7 @@ function MainDashboard() {
 export default function App() {
   return (
     <BookingProvider>
-      <MainDashboard />
+      <NativeBookingWizard />
     </BookingProvider>
   );
 }

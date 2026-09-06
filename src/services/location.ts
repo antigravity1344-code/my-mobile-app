@@ -40,11 +40,11 @@ export const getCurrentPosition = async (): Promise<AddressCoordinates | null> =
   }
 };
 
-export const watchUserLocation = (
+export const watchUserLocation = async (
   onUpdate: (coords: AddressCoordinates) => void,
   onStop: () => void,
-): Location.LocationSubscription => {
-  const subscription = Location.watchPositionAsync(
+): Promise<Location.LocationSubscription> => {
+  const subscription = await Location.watchPositionAsync(
     {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: 5000,

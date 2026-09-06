@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CleaningService } from '../../types/service';
+import { SERVICES_CATALOG } from '../../config/servicesData';
 import { Sparkles, Clock, ChevronDown } from 'lucide-react';
 
 interface ServiceSelectorProps {
@@ -21,82 +22,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     setExpandedId(prev => (prev === id ? null : id));
   };
 
-  const services: CleaningService[] = [
-    {
-      id: 'general_cleaning',
-      title: 'نظافت منزل و محل کار',
-      subtitle: 'خدمت استاندارد',
-      description: 'نظافت راه پله، سالن، آشپزخانه و اتاق‌ها با نیروهای آموزش‌دیده و تجهیزات حرفه‌ای.',
-      iconName: 'home-outline',
-      pricingType: 'hourly',
-      basePrice: 150000,
-      estimatedDurationHours: 4,
-      badge: 'پرفروش',
-      isVisible: true,
-    },
-    {
-      id: 'deep_cleaning',
-      title: 'نظافت عمیق و تخصصی',
-      subtitle: 'پاکیزگی عمیق',
-      description: 'نظافت عمیق با مواد شیمیایی تخصصی برای منازل دست‌دوم و پس از تعمیرات.',
-      iconName: 'sparkles',
-      pricingType: 'hourly',
-      basePrice: 220000,
-      estimatedDurationHours: 5,
-      badge: 'تخصصی',
-      isVisible: true,
-    },
-    {
-      id: 'sofa_washing',
-      title: 'مبل‌شویی تخصصی در محل',
-      subtitle: 'شستشوی مبلمان',
-      description: 'شستشوی انواع مبلمان، فرش و قالی با دستگاه مکانیزه و خشک‌کن تولیدی.',
-      iconName: 'color-palette-outline',
-      pricingType: 'count_based',
-      basePrice: 250000,
-      estimatedDurationHours: 3,
-      badge: 'در دسترس',
-      isVisible: true,
-    },
-    {
-      id: 'end_of_tenant',
-      title: 'نظافت پایان اجاره',
-      subtitle: 'برگشتی کامل',
-      description: 'نظافت کامل و نهایی واحد برای ترخیص و اخذ ضمانت بازگشت.',
-      iconName: 'home-outline',
-      pricingType: 'fixed',
-      basePrice: 850000,
-      estimatedDurationHours: 8,
-      badge: 'تخفیف',
-      isVisible: true,
-    },
-    {
-      id: 'office_cleaning',
-      title: 'نظافت شرکت و دفتر کار',
-      subtitle: 'خدمت سازمانی',
-      description: 'نظافت منظم دفاتر، سیستم‌های هوافضا و مسیرهای عمومی.',
-      iconName: 'briefcase-outline',
-      pricingType: 'hourly',
-      basePrice: 180000,
-      estimatedDurationHours: 4,
-      badge: 'سازمانی',
-      isVisible: true,
-    },
-    {
-      id: 'construction_cleanup',
-      title: 'پاکسازی سایت‌های ساختمانی',
-      subtitle: 'پاکسازی سازه‌ای',
-      description: 'جداسازی و دفع مواد ساختمانی، پاکسازی دوره‌ای سایت‌ها.',
-      iconName: 'hard-hat',
-      pricingType: 'fixed',
-      basePrice: 400000,
-      estimatedDurationHours: 6,
-      badge: 'صنعتی',
-      isVisible: true,
-    },
-  ];
-
-  const visibleServices = services.filter(s => s.isVisible);
+  const visibleServices = SERVICES_CATALOG.filter((service) => service.isVisible);
 
   const renderIcon = (_iconName: string) => {
     // For now all icons render as Sparkles since we don't have the actual icon mapping
@@ -120,8 +46,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           const isSelected = selectedService?.id === svc.id;
           const isExpanded = expandedId === svc.id;
           const priceLabel = svc.pricingType === 'hourly'
-            ? `${svc.basePrice.toLocaleString('fa-IR')} یلا/ساعت`
-            : `${svc.basePrice.toLocaleString('fa-IR')} یلا`;
+            ? `${svc.basePrice.toLocaleString('fa-IR')} تومان/ساعت`
+            : `${svc.basePrice.toLocaleString('fa-IR')} تومان`;
 
           return (
             <div
