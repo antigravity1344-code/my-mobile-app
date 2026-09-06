@@ -5,7 +5,7 @@ import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { requestPayment, verifyPayment, type PaymentRequest } from '../../api/payment';
-import { calculatePrice } from '../../api/booking';
+import { calculateFinalPrice, type RecurringFrequency } from '../../utils/pricing';
 import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const STEPS = [
@@ -31,15 +31,27 @@ export const BookingWizardContainer: React.FC = () => {
     setGenderPreference,
     notes,
     setNotes,
+    recurringFrequency,
+    setRecurringFrequency,
+    customerTier,
     addressDetails,
+    serviceOptions,
     updateAddressField,
     nextStep,
     prevStep,
   } = useBooking();
 
-  const totalPrice = selectedService
-    ? calculatePrice(selectedService, durationHours) + (selectedTimeSlot?.extraFee ?? 0)
-    : 0;
+  const pricing = selectedService && selectedDate
+    ? calculateFinalPrice(
+      selectedService,
+      durationHours,
+      serviceOptions,
+      selectedDate.dateString,
+      selectedTimeSlot?.extraFee ?? 0,
+      { recurringFrequency, isFirstRecurringInvoice: true, customerTier },
+    )
+    : null;
+  const totalPrice = pricing?.total ?? 0;
   const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
 
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');
@@ -162,20 +174,51 @@ export const BookingWizardContainer: React.FC = () => {
         )}
 
         {step === 2 && (
-          <DateTimeSelector
-            selectedDate={selectedDate}
-            selectedTimeSlot={selectedTimeSlot}
-            durationHours={durationHours}
-            genderPreference={genderPreference}
-            notes={notes}
-            onSelectDate={setSelectedDate}
-            onSelectTimeSlot={setSelectedTimeSlot}
-            onChangeDuration={setDurationHours}
-            onChangeGender={setGenderPreference}
-            onChangeNotes={setNotes}
-            onNext={nextStep}
-            onPrev={prevStep}
-          />
+          <>
+            <DateTimeSelector
+              selectedDate={selectedDate}
+              selectedTimeSlot={selectedTimeSlot}
+              durationHours={durationHours}
+              genderPreference={genderPreference}
+              notes={notes}
+              onSelectDate={setSelectedDate}
+              onSelectTimeSlot={setSelectedTimeSlot}
+              onChangeDuration={setDurationHours}
+              onChangeGender={setGenderPreference}
+              onChangeNotes={setNotes}
+              onNext={nextStep}
+              onPrev={prevStep}
+            />
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
+              <div className="mb-3 text-sm font-bold text-slate-700">تکرار سفارش</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  ['ONE_TIME', 'یک‌باره'],
+                  ['WEEKLY', 'هفتگی'],
+                  ['BIWEEKLY', 'چندهفته‌ای'],
+                  ['MONTHLY', 'ماهانه'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setRecurringFrequency(value as RecurringFrequency)}
+                    className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                      recurringFrequency === value
+                        ? 'border-sky-500 bg-sky-600 text-white'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {recurringFrequency !== 'ONE_TIME' && (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-800">
+                  فاکتور جلسه اول عادی محاسبه شد، تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {step === 3 && (
@@ -250,6 +293,17 @@ export const BookingWizardContainer: React.FC = () => {
                   {formattedTotalPrice} تومان
                 </span>
               </div>
+              {pricing && pricing.discountAmount > 0 && (
+                <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-emerald-700">
+                  {pricing.earlyBirdDiscountAmount > 0 && <span>تخفیف زودهنگام: {pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</span>}
+                  {pricing.tierDiscountAmount > 0 && <span>تخفیف باشگاه مشتریان: {pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</span>}
+                </div>
+              )}
+              {pricing?.recurringDiscountDeferred && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-800">
+                  فاکتور جلسه اول عادی محاسبه شد، تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 bg-emerald-50/70 border border-emerald-200/70 p-3.5 rounded-2xl text-emerald-800 text-xs leading-relaxed">

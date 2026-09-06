@@ -12,8 +12,10 @@ import {
 import { Check, Clock, CreditCard, MapPin, Sparkles, Wallet } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
 import { PaymentReceiptScreen } from './PaymentReceiptScreen';
+import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { calculatePrice, submitBooking } from '../../api/booking';
+import { submitBooking } from '../../api/booking';
+import { calculateFinalPrice, type FinalPrice } from '../../utils/pricing';
 import { requestPayment, verifyPayment } from '../../api/payment';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
@@ -30,14 +32,17 @@ const TIME_SLOTS: TimeSlot[] = [
 const makeDates = (): JalaliDateOption[] => {
   const today = new Date();
   const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: 'long', day: 'numeric' });
+  const keyFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-  return Array.from({ length: 14 }, (_, index) => {
+  return Array.from({ length: 35 }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() + index);
     const parts = formatter.formatToParts(date);
+    const keyParts = keyFormatter.formatToParts(date);
     const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+    const keyValue = (type: string) => keyParts.find((part) => part.type === type)?.value ?? '';
     return {
-      dateString: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dateString: `${keyValue('year')}-${keyValue('month')}-${keyValue('day')}`.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))),
       dayOfWeek: days[date.getDay()],
       dayOfMonth: Number(value('day').replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))),
       monthName: `${value('month')} ${value('year')}`,
@@ -73,9 +78,36 @@ export const NativeBookingWizard = () => {
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'CASH'>('ONLINE');
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [districtSearch, setDistrictSearch] = useState('');
+  const [pricingVisible, setPricingVisible] = useState(false);
   const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
   const filteredDistricts = districts.filter((district) => district.includes(districtSearch.trim()));
-  const total = booking.selectedService ? calculatePrice(booking.selectedService, booking.durationHours) + (booking.selectedTimeSlot?.extraFee ?? 0) : 0;
+  const pricing: FinalPrice = booking.selectedService && booking.selectedDate
+    ? calculateFinalPrice(
+      booking.selectedService,
+      booking.durationHours,
+      booking.serviceOptions,
+      booking.selectedDate.dateString,
+      booking.selectedTimeSlot?.extraFee ?? 0,
+      {
+        recurringFrequency: booking.recurringFrequency,
+        isFirstRecurringInvoice: true,
+        customerTier: booking.customerTier,
+      },
+    )
+    : {
+      subtotal: 0,
+      earlyBirdDiscountRate: 0,
+      earlyBirdDiscountAmount: 0,
+      tierDiscountRate: 0,
+      tierDiscountAmount: 0,
+      recurringDiscountRate: 0,
+      recurringDiscountAmount: 0,
+      discountRate: 0,
+      discountAmount: 0,
+      recurringDiscountDeferred: false,
+      total: 0,
+    };
+  const total = pricing.total;
   const totalInRials = total * 10;
 
   useEffect(() => {
@@ -111,8 +143,10 @@ export const NativeBookingWizard = () => {
     return () => subscription.remove();
   }, [pendingOrderId, setPaymentReceipt, totalInRials]);
 
-  const selectService = (service: CleaningService) => {
+  const selectService = (service: CleaningService, options: Record<string, string | number | boolean> = {}) => {
     booking.setSelectedService(service);
+    Object.entries(options).forEach(([id, value]) => booking.setServiceOption(id, value));
+    if (typeof options.durationHours === 'number') booking.setDurationHours(options.durationHours);
     booking.setStep(2);
   };
 
@@ -134,6 +168,18 @@ export const NativeBookingWizard = () => {
       durationHours: booking.durationHours,
       genderPreference: booking.genderPreference,
       notes: booking.notes,
+      serviceOptions: booking.serviceOptions,
+      recurringFrequency: booking.recurringFrequency,
+      customerTier: booking.customerTier,
+      customer_rating: booking.customerRating,
+      cleaner_rating: booking.cleanerRating,
+      metadata: {
+        customer_tier: booking.customerTier,
+        recurring_frequency: booking.recurringFrequency,
+        customer_rating: booking.customerRating,
+        cleaner_rating: booking.cleanerRating,
+      },
+      pricing,
       addressDetails: {
         ...booking.addressDetails,
         plaque: normalizePersianDigits(booking.addressDetails.plaque),
@@ -212,33 +258,69 @@ export const NativeBookingWizard = () => {
 
         {booking.step === 1 && <View style={styles.section}>
           <Text style={styles.heading}>نوع سرویس را انتخاب کنید</Text>
+          <Pressable onPress={() => setPricingVisible(true)} style={styles.pricingButton}><Text style={styles.pricingButtonText}>مشاهده جدول شفاف تعرفه‌ها</Text></Pressable>
           {SERVICES_CATALOG.filter((service) => service.isVisible).map((service) => (
             <Pressable key={service.id} onPress={() => selectService(service)} style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}>
               <View style={styles.cardIcon}><Sparkles size={20} color="#0284c7" /></View>
-              <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text></View>
-              <Text style={styles.price}>{service.basePrice.toLocaleString('fa-IR')} تومان{service.pricingType === 'hourly' ? '/ساعت' : ''}</Text>
+              <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text></View>
+              <Text style={styles.price}>{service.pricingType === 'hourly' ? `کف ۴ ساعت: ${(service.basePrice * 4).toLocaleString('fa-IR')} تومان` : service.basePrice ? `شروع از ${service.basePrice.toLocaleString('fa-IR')} تومان` : 'استعلام قیمت'}</Text>
             </Pressable>
           ))}
+          <PricingTable visible={pricingVisible} onClose={() => setPricingVisible(false)} onSelect={selectService} />
         </View>}
 
         {booking.step === 2 && <View style={styles.section}>
           <Text style={styles.heading}>تاریخ و ساعت</Text>
+          <Text style={styles.earlyBirdHint}>با رزرو برای ۷ روز آینده یا بیشتر، تا ۱۰٪ تخفیف برنامه‌ریزی زودهنگام بگیرید.</Text>
           <Text style={styles.label}>تاریخ اعزام</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
             {dates.map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{date.dayOfMonth}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
           <Text style={styles.label}>بازه زمانی</Text>
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color="#0284c7" /><Text style={styles.flex}>{slot.label} ({slot.startTime} تا {slot.endTime})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color="#059669" />}</Pressable>)}
-          <Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{[2, 3, 4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{hours} ساعت</Text></Pressable>)}</View>
+          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان (حداقل ۴ ساعت)</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{hours} ساعت</Text></Pressable>)}</View></>}
+          <Text style={styles.label}>تکرار سفارش</Text>
+          <View style={styles.choiceRow}>
+            {[
+              ['ONE_TIME', 'یک‌باره'],
+              ['WEEKLY', 'هفتگی'],
+              ['BIWEEKLY', 'چندهفته‌ای'],
+              ['MONTHLY', 'ماهانه'],
+            ].map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => booking.setRecurringFrequency(value as typeof booking.recurringFrequency)}
+                style={[styles.choice, booking.recurringFrequency === value && styles.choiceSelected]}
+              >
+                <Text style={booking.recurringFrequency === value ? styles.choiceTextSelected : styles.choiceText}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {booking.recurringFrequency !== 'ONE_TIME' && (
+            <Text style={styles.recurringHint}>
+              فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
+            </Text>
+          )}
+          {booking.selectedService?.configuration.inputs?.map((input) => (
+            <View key={input.id} style={styles.optionBlock}>
+              <Text style={styles.label}>{input.label}{input.price ? ` (+${input.price.toLocaleString('fa-IR')} تومان)` : ''}</Text>
+              {input.type === 'number' && <TextInput keyboardType="numeric" placeholder={input.id === 'floors' ? 'مثال: ۴' : 'مثال: ۰'} placeholderTextColor="#94a3b8" value={String(booking.serviceOptions[input.id] ?? '')} onChangeText={(value) => booking.setServiceOption(input.id, Number(value.replace(/[^0-9]/g, '')) || 0)} style={styles.input} />}
+              {input.type === 'select' && <View style={styles.choiceRow}>{input.options?.map((option) => <Pressable key={option} onPress={() => booking.setServiceOption(input.id, option)} style={[styles.choice, booking.serviceOptions[input.id] === option && styles.choiceSelected]}><Text style={booking.serviceOptions[input.id] === option ? styles.choiceTextSelected : styles.choiceText}>{option}</Text></Pressable>)}</View>}
+              {input.type === 'boolean' && <Pressable onPress={() => booking.setServiceOption(input.id, !booking.serviceOptions[input.id])} style={[styles.toggle, booking.serviceOptions[input.id] === true && styles.toggleSelected]}><Text style={booking.serviceOptions[input.id] === true ? styles.choiceTextSelected : styles.choiceText}>{booking.serviceOptions[input.id] === true ? 'بله' : 'خیر'}</Text></Pressable>}
+            </View>
+          ))}
         </View>}
 
         {booking.step === 3 && <View style={styles.section}>
           <Text style={styles.heading}>آدرس و تحویل‌گیرنده</Text>
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color="#0284c7" /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color="#0284c7" />}</Pressable>
-          <TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="جستجوی محله" style={styles.input} /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => booking.updateAddressField('district', district)} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
-          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => booking.updateAddressField('fullAddress', value)} placeholder="خیابان، کوچه، بن‌بست" style={[styles.input, styles.textArea]} />
-          <View style={styles.choiceRow}><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => booking.updateAddressField('plaque', value)} placeholder="پلاک" style={[styles.input, styles.smallInput]} /><TextInput value={booking.addressDetails.unit} onChangeText={(value) => booking.updateAddressField('unit', value)} placeholder="واحد" style={[styles.input, styles.smallInput]} /></View>
-          <TextInput value={booking.addressDetails.recipientName} onChangeText={(value) => booking.updateAddressField('recipientName', value)} placeholder="نام تحویل‌گیرنده" style={styles.input} /><TextInput value={booking.addressDetails.contactPhone} onChangeText={(value) => booking.updateAddressField('contactPhone', value)} placeholder="09123456789" keyboardType="phone-pad" style={styles.input} />
+          <TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={styles.input} /><ScrollView horizontal showsHorizontalScrollIndicator={false}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => booking.updateAddressField('district', district)} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
+          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => booking.updateAddressField('fullAddress', value)} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea]} />
+          <View style={styles.choiceRow}>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => booking.updateAddressField('plaque', value)} placeholder="مثال: ۲۴" placeholderTextColor="#94a3b8" style={[styles.input, styles.smallInput]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => booking.updateAddressField('unit', value)} placeholder="مثال: ۳" placeholderTextColor="#94a3b8" style={[styles.input, styles.smallInput]} /></View>
+          </View>
+          <Text style={styles.label}>نام و نام خانوادگی</Text><TextInput value={booking.addressDetails.recipientName} onChangeText={(value) => booking.updateAddressField('recipientName', value)} placeholder="مثال: علی رضایی" placeholderTextColor="#94a3b8" style={styles.input} /><Text style={styles.label}>شماره موبایل</Text><TextInput value={booking.addressDetails.contactPhone} onChangeText={(value) => booking.updateAddressField('contactPhone', value)} placeholder="مثال: ۰۹۱۲۳۴۵۶۷۸۹" placeholderTextColor="#94a3b8" keyboardType="phone-pad" style={styles.input} />
         </View>}
 
         {booking.step === 4 && <View style={styles.section}>
@@ -249,6 +331,10 @@ export const NativeBookingWizard = () => {
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
             {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
+            {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({Math.round(pricing.earlyBirdDiscountRate * 100)}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
+            {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان ({booking.customerTier})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
+            {pricing.recurringDiscountDeferred && <Text style={styles.recurringHint}>فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.</Text>}
+            {pricing.recurringDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text><Text style={styles.discountAmount}>-{pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل پرداخت</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
           </View>
           {submissionState === 'idle' && <View style={styles.paymentBox}>
@@ -271,5 +357,10 @@ export const NativeBookingWizard = () => {
 
 const styles = StyleSheet.create({
   successMessage: { color: '#166534', backgroundColor: '#dcfce7', padding: 12, borderRadius: 12, textAlign: 'right' },
-  screen: { flex: 1, backgroundColor: '#f8fafc' }, content: { padding: 20, paddingTop: 56, paddingBottom: 40 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7' }, title: { textAlign: 'right', color: '#0f172a', fontSize: 22, fontWeight: '800' }, subtitle: { textAlign: 'right', color: '#64748b', fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: '#0284c7' }, stepNumber: { color: '#64748b', fontWeight: '700' }, stepNumberActive: { color: '#fff' }, stepLabel: { color: '#94a3b8', fontSize: 11 }, stepLabelActive: { color: '#0284c7', fontWeight: '700' }, section: { gap: 12 }, heading: { textAlign: 'right', color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 6 }, label: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 8 }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, padding: 15 }, cardSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 14 }, muted: { color: '#64748b', fontSize: 11, textAlign: 'right' }, price: { color: '#059669', fontSize: 11, fontWeight: '700', textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' }, dateDay: { color: '#475569', fontSize: 11 }, dateNumber: { color: '#0f172a', fontSize: 20, fontWeight: '800' }, slot: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, choiceText: { color: '#475569', fontSize: 12 }, choiceTextSelected: { color: '#fff', fontWeight: '700', fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#e0f2fe' }, gpsText: { color: '#0369a1', fontWeight: '700' }, input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: '#0f172a', textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { flex: 1 }, chip: { paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' }, chipSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
+  earlyBirdHint: { color: '#047857', backgroundColor: '#ecfdf5', padding: 11, borderRadius: 12, textAlign: 'right', fontSize: 12, lineHeight: 19 },
+  recurringHint: { color: '#047857', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, padding: 11, borderRadius: 12, textAlign: 'right', fontSize: 12, lineHeight: 19 },
+  discountLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ecfdf5', borderRadius: 10, padding: 10 },
+  discountLabel: { color: '#047857', fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  discountAmount: { color: '#059669', fontSize: 13, fontWeight: '800' },
+  screen: { flex: 1, backgroundColor: '#f8fafc' }, content: { padding: 20, paddingTop: 56, paddingBottom: 40 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7' }, title: { textAlign: 'right', color: '#0f172a', fontSize: 22, fontWeight: '800' }, subtitle: { textAlign: 'right', color: '#64748b', fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: '#0284c7' }, stepNumber: { color: '#64748b', fontWeight: '700' }, stepNumberActive: { color: '#fff' }, stepLabel: { color: '#94a3b8', fontSize: 11 }, stepLabelActive: { color: '#0284c7', fontWeight: '700' }, section: { gap: 12 }, pricingButton: { alignItems: 'center', padding: 13, borderRadius: 13, backgroundColor: '#e0f2fe' }, pricingButtonText: { color: '#0369a1', fontWeight: '800' }, optionBlock: { gap: 8 }, toggle: { alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }, toggleSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, heading: { textAlign: 'right', color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 6 }, label: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 8 }, labeledInput: { flex: 1, gap: 6 }, inputLabel: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, padding: 15 }, cardSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 14 }, muted: { color: '#64748b', fontSize: 11, textAlign: 'right' }, configuration: { color: '#0369a1', fontSize: 10, textAlign: 'right', marginTop: 3 }, price: { color: '#059669', fontSize: 11, fontWeight: '700', textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' }, dateDay: { color: '#475569', fontSize: 11 }, dateNumber: { color: '#0f172a', fontWeight: '800' }, slot: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, choiceText: { color: '#475569', fontSize: 12 }, choiceTextSelected: { color: '#fff', fontWeight: '700', fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#e0f2fe' }, gpsText: { color: '#0369a1', fontWeight: '700' }, input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: '#0f172a', textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { flex: 1 }, chip: { paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' }, chipSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
 });

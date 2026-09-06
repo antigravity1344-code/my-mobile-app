@@ -211,8 +211,9 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">پلاک: *</label>
+            <label htmlFor="address-plaque" className="text-xs font-bold text-slate-700 block">پلاک: *</label>
             <input
+              id="address-plaque"
               type="text"
               value={addressDetails.plaque}
               onChange={(e) => onUpdateField('plaque', e.target.value)}
@@ -222,8 +223,9 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">واحد:</label>
+            <label htmlFor="address-unit" className="text-xs font-bold text-slate-700 block">واحد:</label>
             <input
+              id="address-unit"
               type="text"
               value={addressDetails.unit}
               onChange={(e) => onUpdateField('unit', e.target.value)}
@@ -265,7 +267,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
             <User className="w-3.5 h-3.5 text-sky-600" />
-            <span>نام تحویل‌گیرنده: *</span>
+            <span>نام و نام خانوادگی: *</span>
           </label>
           <input
             type="text"
@@ -279,14 +281,14 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
         <div className="space-y-1.5">
           <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
             <Phone className="w-3.5 h-3.5 text-sky-600" />
-            <span>شماره موبایل هماهنگی: *</span>
+            <span>شماره موبایل: *</span>
           </label>
           <input
             type="tel"
             maxLength={11}
             value={addressDetails.contactPhone}
             onChange={(e) => onUpdateField('contactPhone', e.target.value)}
-            placeholder="09123456789"
+            placeholder="مثال: ۰۹۱۲۳۴۵۶۷۸۹"
             dir="ltr"
             className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-right"
           />

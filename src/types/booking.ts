@@ -1,4 +1,5 @@
 import { CleaningService } from './service';
+import type { CustomerTier, RecurringFrequency, FinalPrice } from '../utils/pricing';
 
 export interface TimeSlot {
   id: string;
@@ -47,6 +48,20 @@ export interface BookingScheduleData {
   genderPreference: 'FEMALE' | 'MALE' | 'NO_PREFERENCE';
   notes?: string;
   addressDetails: AddressDetails | null;
+  serviceOptions?: Record<string, string | number | boolean>;
+  recurringFrequency: RecurringFrequency;
+  customerTier: CustomerTier;
+  customer_rating: number | null;
+  cleaner_rating: number | null;
+  metadata: OrderMetadata;
+  pricing?: FinalPrice;
+}
+
+export interface OrderMetadata {
+  customer_tier: CustomerTier;
+  recurring_frequency: RecurringFrequency;
+  customer_rating: number | null;
+  cleaner_rating: number | null;
 }
 
 export type OrderPaymentStatus = 'PENDING' | 'PAID' | 'FAILED';

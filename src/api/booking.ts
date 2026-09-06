@@ -1,7 +1,7 @@
 import type { CleaningService } from '../types/service';
 import { SERVICES_CATALOG } from '../config/servicesData';
 import type { BookingScheduleData } from '../types/booking';
-
+import { calculatePrice } from '../utils/pricing';
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -16,15 +16,7 @@ export const getServices = (): CleaningService[] => SERVICES_CATALOG;
 export const getServiceById = (id: string): CleaningService | undefined =>
   SERVICES_CATALOG.find(s => s.id === id);
 
-export const calculatePrice = (
-  service: CleaningService,
-  durationHours: number,
-): number => {
-  if (service.pricingType === 'hourly') {
-    return service.basePrice * durationHours;
-  }
-  return service.basePrice;
-};
+export { calculatePrice };
 
 export const submitBooking = async (payload: BookingScheduleData): Promise<BookingResponse> => {
   if (!API_URL) {

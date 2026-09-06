@@ -26,17 +26,24 @@ const generateDateOptions = () => {
     month: 'long',
     day: 'numeric',
   });
+  const persianDateKeyFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
   const normalizeDigits = (value: string) =>
     value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
 
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 35; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
     const dateParts = persianDateFormatter.formatToParts(date);
+    const dateKeyParts = persianDateKeyFormatter.formatToParts(date);
     const getPart = (type: string) => dateParts.find((part) => part.type === type)?.value ?? '';
+    const getKeyPart = (type: string) => dateKeyParts.find((part) => part.type === type)?.value ?? '';
 
     options.push({
-      dateString: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dateString: `${normalizeDigits(getKeyPart('year'))}-${normalizeDigits(getKeyPart('month')).padStart(2, '0')}-${normalizeDigits(getKeyPart('day')).padStart(2, '0')}`,
       dayOfWeek: dayNames[date.getDay()],
       dayOfMonth: Number(normalizeDigits(getPart('day'))),
       monthName: `${getPart('month')} ${getPart('year')}`,
@@ -212,7 +219,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
           مدت زمان نظافت (ساعت):
         </label>
         <div className="flex gap-2">
-          {[2, 3, 4, 5, 6, 8].map((hours) => (
+          {[4, 5, 6, 8].map((hours) => (
             <button
               key={hours}
               type="button"
