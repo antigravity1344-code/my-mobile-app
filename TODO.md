@@ -1,0 +1,39 @@
+# روند کار پروژه پاکشو
+
+## وضعیت فعلی
+
+- [x] نصب و بررسی `.NET 8`
+- [x] نصب و بررسی `CS-Script` با فرمان `css`
+- [x] نصب وابستگی‌های JavaScript با `npm ci`
+- [x] اجرای موفق بررسی TypeScript با `npm run typecheck`
+- [x] اجرای موفق ESLint با `npm run lint`
+- [x] اجرای موفق خروجی Web با `npx expo export --platform web`
+- [x] اجرای پیش‌نمایش Expo Web روی `http://localhost:8081`
+- [x] رفع صفحه سفید با ثبت ریشه برنامه در `index.ts`
+- [x] بررسی نمایش صحیح صفحه رزرو در مرورگر
+- [x] ثبت اصلاح صفحه سفید در کامیت `7c34e4e`
+- [x] پیاده‌سازی UI مرحله ۲ پرداخت: پیش‌فاکتور، روش‌های پرداخت و وضعیت پردازش
+- [x] اتصال جریان پرداخت به Mock Payment Service در نبود `EXPO_PUBLIC_API_URL`
+- [x] آزمایش کامل مسیر رزرو تا تایید پرداخت آزمایشی در مرورگر
+
+## ادامه کار
+
+- [ ] بررسی کامل مراحل ویزارد رزرو در مرورگر: سرویس، زمان، آدرس و بازبینی
+- [ ] بررسی اعتبارسنجی فرم آدرس و دکمه ادامه
+- [x] بررسی جریان پرداخت آزمایشی و پیام‌های خطا
+- [ ] در صورت نیاز، ساخت نسخه Android و آزمایش روی دستگاه یا شبیه‌ساز
+- [ ] پس از هر تغییر کد، اجرای `npm run typecheck` و `npm run lint`
+- [ ] پس از تغییرات قابل انتشار، اجرای `npx expo export --platform web`
+
+## دستورات شروع دوباره
+
+```powershell
+cd C:\Users\mohammad\Desktop\cleaning-mobile.worktrees\terminal-reopen-continue-task
+npm run web -- --port 8081
+```
+
+سپس مرورگر را روی `http://localhost:8081` باز کنید.
+
+## نکته مهم
+
+فایل `.expo/dev/logs/start.log` لاگ محلی Expo است و نباید کامیت شود.

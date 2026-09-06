@@ -3,6 +3,7 @@ import { SERVICES_CATALOG } from '../config/servicesData';
 import type { BookingScheduleData } from '../types/booking';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export interface BookingResponse {
   success: boolean;
@@ -27,7 +28,8 @@ export const calculatePrice = (
 
 export const submitBooking = async (payload: BookingScheduleData): Promise<BookingResponse> => {
   if (!API_URL) {
-    return { success: false, error: 'آدرس سرویس ثبت سفارش تنظیم نشده است.' };
+    await wait(700);
+    return { success: true, orderId: `MOCK-${Date.now()}` };
   }
 
   try {

@@ -3,6 +3,7 @@ export interface PaymentRequest {
   amount: number; // IRR
   description: string;
   mobile: string;
+  paymentMethod?: 'ONLINE' | 'CASH';
   callbackUrl?: string;
 }
 
@@ -10,14 +11,17 @@ export interface PaymentResult {
   success: boolean;
   authority?: string;
   payUrl?: string;
+  isMock?: boolean;
   error?: string;
 }
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export const requestPayment = async (payload: PaymentRequest): Promise<PaymentResult> => {
   if (!API_URL) {
-    return { success: false, error: 'آدرس سرویس پرداخت تنظیم نشده است.' };
+    await wait(700);
+    return { success: true, authority: `mock-${Date.now()}`, isMock: true };
   }
 
   try {
@@ -38,7 +42,8 @@ export const verifyPayment = async (
   amount: number,
 ): Promise<{ success: boolean; refId?: string; error?: string }> => {
   if (!API_URL) {
-    return { success: false, error: 'آدرس سرویس پرداخت تنظیم نشده است.' };
+    await wait(500);
+    return { success: authority.startsWith('mock-'), refId: `MOCK-${amount}-${Date.now()}` };
   }
 
   try {
