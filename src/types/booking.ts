@@ -48,3 +48,14 @@ export interface BookingScheduleData {
   notes?: string;
   addressDetails: AddressDetails | null;
 }
+
+export type OrderPaymentStatus = 'PENDING' | 'PAID' | 'FAILED';
+
+export interface PaymentReceipt {
+  orderId: string;
+  status: OrderPaymentStatus;
+  amountInRials: number;
+  refId?: string;
+  paidAt: string;
+  error?: string;
+}

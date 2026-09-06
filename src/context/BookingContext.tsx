@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { CleaningService } from '../types/service';
-import { JalaliDateOption, TimeSlot, AddressDetails } from '../types/booking';
+import { JalaliDateOption, TimeSlot, AddressDetails, PaymentReceipt, OrderPaymentStatus } from '../types/booking';
 
 interface BookingState {
   // Step 1
@@ -15,6 +15,8 @@ interface BookingState {
   
   // Step 3
   addressDetails: AddressDetails;
+  orderStatus: OrderPaymentStatus;
+  paymentReceipt: PaymentReceipt | null;
   
   // Navigation & Actions
   step: number;
@@ -30,6 +32,8 @@ interface BookingState {
   nextStep: () => void;
   prevStep: () => void;
   resetBooking: () => void;
+  setPaymentReceipt: (receipt: PaymentReceipt) => void;
+  clearPaymentReceipt: () => void;
 }
 
 const DEFAULT_ADDRESS: AddressDetails = {
@@ -60,6 +64,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [notes, setNotes] = useState<string>('');
   const [addressDetails, setAddressDetails] = useState<AddressDetails>(DEFAULT_ADDRESS);
   const [step, setStep] = useState<number>(1);
+  const [paymentReceipt, setPaymentReceiptState] = useState<PaymentReceipt | null>(null);
+  const orderStatus = paymentReceipt?.status ?? 'PENDING';
 
   const updateAddressField = <K extends keyof AddressDetails>(field: K, value: AddressDetails[K]) => {
     setAddressDetails((prev) => ({
@@ -80,7 +86,11 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setNotes('');
     setAddressDetails(DEFAULT_ADDRESS);
     setStep(1);
+    setPaymentReceiptState(null);
   };
+
+  const setPaymentReceipt = (receipt: PaymentReceipt) => setPaymentReceiptState(receipt);
+  const clearPaymentReceipt = () => setPaymentReceiptState(null);
 
   return (
     <BookingContext.Provider
@@ -92,6 +102,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         genderPreference,
         notes,
         addressDetails,
+        orderStatus,
+        paymentReceipt,
         step,
         setSelectedService,
         setSelectedDate,
@@ -105,6 +117,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         nextStep,
         prevStep,
         resetBooking,
+        setPaymentReceipt,
+        clearPaymentReceipt,
       }}
     >
       {children}

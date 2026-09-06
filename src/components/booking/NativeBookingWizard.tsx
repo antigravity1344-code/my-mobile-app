@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Check, Clock, CreditCard, MapPin, Sparkles, Wallet } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
+import { PaymentReceiptScreen } from './PaymentReceiptScreen';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { calculatePrice, submitBooking } from '../../api/booking';
 import { requestPayment, verifyPayment } from '../../api/payment';
@@ -64,11 +65,13 @@ const StepHeader = ({ step }: { step: number }) => (
 
 export const NativeBookingWizard = () => {
   const booking = useBooking();
+  const { setPaymentReceipt } = booking;
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'pending' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'CASH'>('ONLINE');
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [districtSearch, setDistrictSearch] = useState('');
   const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
   const filteredDistricts = districts.filter((district) => district.includes(districtSearch.trim()));
@@ -87,8 +90,16 @@ export const NativeBookingWizard = () => {
       }
       setSubmissionState('submitting');
       const result = await verifyPayment(authority, totalInRials);
-      setSubmissionState(result.success ? 'success' : 'error');
-      setSubmissionMessage(result.success ? `پرداخت تایید شد. شناسه پیگیری: ${result.refId || 'نامشخص'}` : result.error || 'پرداخت تایید نشد.');
+      const success = result.success;
+      setSubmissionState(success ? 'success' : 'error');
+      setPaymentReceipt({
+        orderId: pendingOrderId || 'UNKNOWN',
+        status: success ? 'PAID' : 'FAILED',
+        amountInRials: totalInRials,
+        refId: result.refId,
+        paidAt: new Date().toISOString(),
+        error: success ? undefined : result.error || 'پرداخت تایید نشد.',
+      });
     };
 
     const subscription = Linking.addEventListener('url', ({ url }) => {
@@ -98,7 +109,7 @@ export const NativeBookingWizard = () => {
       if (url) void handlePaymentCallback(url);
     });
     return () => subscription.remove();
-  }, [totalInRials]);
+  }, [pendingOrderId, setPaymentReceipt, totalInRials]);
 
   const selectService = (service: CleaningService) => {
     booking.setSelectedService(service);
@@ -136,6 +147,7 @@ export const NativeBookingWizard = () => {
         setSubmissionMessage('سفارش ثبت شد اما شناسه سفارش برای پرداخت دریافت نشد.');
         return;
       }
+      setPendingOrderId(result.orderId);
       const payment = await requestPayment({
         orderId: result.orderId,
         amount: totalInRials,
@@ -147,16 +159,28 @@ export const NativeBookingWizard = () => {
       if (!payment.success) {
         setSubmissionState('error');
         setSubmissionMessage(payment.error || 'لینک پرداخت دریافت نشد.');
+        booking.setPaymentReceipt({
+          orderId: result.orderId,
+          status: 'FAILED',
+          amountInRials: totalInRials,
+          paidAt: new Date().toISOString(),
+          error: payment.error || 'لینک پرداخت دریافت نشد.',
+        });
         return;
       }
       if (payment.isMock && payment.authority) {
         const verification = await verifyPayment(payment.authority, totalInRials);
-        setSubmissionState(verification.success ? 'success' : 'error');
-        setSubmissionMessage(
-          verification.success
-            ? `پرداخت آزمایشی تایید شد. شناسه پیگیری: ${verification.refId || 'نامشخص'}`
-            : verification.error || 'پرداخت تایید نشد.',
-        );
+        const success = verification.success;
+        setSubmissionState(success ? 'success' : 'error');
+        setSubmissionMessage(success ? `پرداخت آزمایشی تایید شد. شناسه پیگیری: ${verification.refId || 'نامشخص'}` : verification.error || 'پرداخت تایید نشد.');
+        booking.setPaymentReceipt({
+          orderId: result.orderId,
+          status: success ? 'PAID' : 'FAILED',
+          amountInRials: totalInRials,
+          refId: verification.refId,
+          paidAt: new Date().toISOString(),
+          error: success ? undefined : verification.error || 'پرداخت تایید نشد.',
+        });
         return;
       }
       if (!payment.payUrl) {
@@ -172,6 +196,8 @@ export const NativeBookingWizard = () => {
       setSubmissionMessage(result.error || 'ثبت سفارش انجام نشد.');
     }
   };
+
+  if (booking.paymentReceipt) return <PaymentReceiptScreen />;
 
   const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
 
