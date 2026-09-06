@@ -10,6 +10,7 @@ import {
 import { BookingProvider, useBooking } from './src/context/BookingContext';
 import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
 import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
+import { OrdersProvider, OrdersScreen } from './src/features/orders';
 
 export function MainDashboard() {
   const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard'>('Wizard');
@@ -148,7 +149,11 @@ export function MainDashboard() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3">
-                  <BookingWizardContainer />
+                  {activeTab === 'Orders' ? (
+                    <OrdersScreen onNavigateToBooking={() => setActiveTab('Home')} />
+                  ) : (
+                    <BookingWizardContainer />
+                  )}
                 </div>
 
                 {/* نوار پایین اپلیکیشن */}
@@ -194,7 +199,9 @@ export function MainDashboard() {
 export default function App() {
   return (
     <BookingProvider>
-      <NativeBookingWizard />
+      <OrdersProvider>
+        <NativeBookingWizard />
+      </OrdersProvider>
     </BookingProvider>
   );
 }
