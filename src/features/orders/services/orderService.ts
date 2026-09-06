@@ -1,0 +1,168 @@
+import type {
+  OrderItem,
+  OrderFilterTab,
+  OrderSortOption,
+  OrderStats,
+  OrderStatus,
+} from '../types/order';
+import { INITIAL_MOCK_ORDERS } from './mockOrdersData';
+
+// Memory store for runtime mutations
+let ordersMemoryStore: OrderItem[] = [...INITIAL_MOCK_ORDERS];
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const orderService = {
+  async getOrders(
+    filterTab: OrderFilterTab = 'ALL',
+    searchQuery: string = '',
+    sortOption: OrderSortOption = 'NEWEST',
+  ): Promise<OrderItem[]> {
+    await wait(200);
+
+    let result = [...ordersMemoryStore];
+
+    // Filter by tab
+    if (filterTab === 'ACTIVE') {
+      const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+      result = result.filter((item) => activeStatuses.includes(item.status));
+    } else if (filterTab === 'COMPLETED') {
+      result = result.filter((item) => item.status === 'COMPLETED');
+    } else if (filterTab === 'CANCELLED') {
+      result = result.filter((item) => item.status === 'CANCELLED');
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.orderNumber.toLowerCase().includes(q) ||
+          item.serviceTitle.toLowerCase().includes(q) ||
+          item.address.district.toLowerCase().includes(q) ||
+          item.address.fullAddress.toLowerCase().includes(q) ||
+          (item.cleaner?.name && item.cleaner.name.toLowerCase().includes(q)),
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortOption === 'NEWEST') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortOption === 'OLDEST') {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (sortOption === 'PRICE_HIGH') {
+        return b.pricing.total - a.pricing.total;
+      }
+      if (sortOption === 'PRICE_LOW') {
+        return a.pricing.total - b.pricing.total;
+      }
+      return 0;
+    });
+
+    return result;
+  },
+
+  async getOrderById(orderId: string): Promise<OrderItem | undefined> {
+    await wait(100);
+    return ordersMemoryStore.find((item) => item.id === orderId);
+  },
+
+  async cancelOrder(
+    orderId: string,
+    reason: string = 'لغو توسط کاربر',
+  ): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+    await wait(300);
+    const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
+    if (index === -1) {
+      return { success: false, error: 'سفارش مورد نظر یافت نشد.' };
+    }
+
+    const currentOrder = ordersMemoryStore[index];
+    if (currentOrder.status === 'COMPLETED' || currentOrder.status === 'CANCELLED') {
+      return { success: false, error: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' };
+    }
+
+    const updatedOrder: OrderItem = {
+      ...currentOrder,
+      status: 'CANCELLED',
+      updatedAt: new Date().toISOString(),
+      timeline: [
+        ...currentOrder.timeline.map((event) => ({ ...event, isCurrent: false })),
+        {
+          step: 'CANCELLED',
+          title: 'لغو سفارش',
+          timestamp: 'هم‌اکنون',
+          description: reason,
+          isCompleted: true,
+          isCurrent: true,
+        },
+      ],
+    };
+
+    ordersMemoryStore[index] = updatedOrder;
+    return { success: true, order: updatedOrder };
+  },
+
+  async rateOrder(
+    orderId: string,
+    customerRating: number,
+    comment?: string,
+    tags?: string[],
+  ): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+    await wait(300);
+    const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
+    if (index === -1) {
+      return { success: false, error: 'سفارش یافت نشد.' };
+    }
+
+    const currentOrder = ordersMemoryStore[index];
+    const updatedOrder: OrderItem = {
+      ...currentOrder,
+      ratings: {
+        customerRating,
+        customerComment: comment,
+        customerTags: tags,
+        cleanerRating: currentOrder.ratings?.cleanerRating ?? 5,
+        ratedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    ordersMemoryStore[index] = updatedOrder;
+    return { success: true, order: updatedOrder };
+  },
+
+  calculateStats(orders: OrderItem[]): OrderStats {
+    const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+    let activeCount = 0;
+    let completedCount = 0;
+    let cancelledCount = 0;
+    let totalSpent = 0;
+
+    for (const order of orders) {
+      if (activeStatuses.includes(order.status)) {
+        activeCount++;
+      } else if (order.status === 'COMPLETED') {
+        completedCount++;
+        totalSpent += order.pricing.total;
+      } else if (order.status === 'CANCELLED') {
+        cancelledCount++;
+      }
+    }
+
+    return {
+      totalCount: orders.length,
+      activeCount,
+      completedCount,
+      cancelledCount,
+      totalSpent,
+    };
+  },
+
+  addOrder(newOrder: OrderItem): void {
+    ordersMemoryStore = [newOrder, ...ordersMemoryStore];
+  },
+};
