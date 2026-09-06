@@ -1,0 +1,3 @@
+[submodule "cleaning-mobile"]
+	path = cleaning-mobile
+	url = https://github.com/myrealismstory-wq/cleaning-mobile.git
