@@ -12,6 +12,10 @@ let ordersMemoryStore: OrderItem[] = [...INITIAL_MOCK_ORDERS];
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** بازه استاندارد امتیازدهی (۱ تا ۵ ستاره) */
+const MIN_RATING = 1;
+const MAX_RATING = 5;
+
 export const orderService = {
   async getOrders(
     filterTab: OrderFilterTab = 'ALL',
@@ -73,7 +77,7 @@ export const orderService = {
   async cancelOrder(
     orderId: string,
     reason: string = 'لغو توسط کاربر',
-  ): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+  ): Promise<{ success: boolean; error?: string; order?: OrderItem; refundAmount?: number }> {
     await wait(300);
     const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
     if (index === -1) {
@@ -85,9 +89,16 @@ export const orderService = {
       return { success: false, error: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' };
     }
 
+    // اصلاح وضعیت مالی: سفارش لغوشده نباید PAID بماند.
+    // با سیاست عدم دریافت پیش‌پرداخت، اگر مبلغی پرداخت شده باشد باید استرداد شود؛
+    // در نبود درگاه واقعی، وضعیت به FAILED تغییر می‌کند و مبلغ استرداد گزارش می‌شود.
+    const wasPaid = currentOrder.paymentStatus === 'PAID';
+    const refundAmount = wasPaid ? currentOrder.pricing.total : 0;
+
     const updatedOrder: OrderItem = {
       ...currentOrder,
       status: 'CANCELLED',
+      paymentStatus: wasPaid ? 'FAILED' : currentOrder.paymentStatus,
       updatedAt: new Date().toISOString(),
       timeline: [
         ...currentOrder.timeline.map((event) => ({ ...event, isCurrent: false })),
@@ -95,7 +106,9 @@ export const orderService = {
           step: 'CANCELLED',
           title: 'لغو سفارش',
           timestamp: 'هم‌اکنون',
-          description: reason,
+          description: refundAmount > 0
+            ? `${reason} — استرداد مبلغ ${refundAmount.toLocaleString('fa-IR')} تومان آغاز شد.`
+            : reason,
           isCompleted: true,
           isCurrent: true,
         },
@@ -103,7 +116,7 @@ export const orderService = {
     };
 
     ordersMemoryStore[index] = updatedOrder;
-    return { success: true, order: updatedOrder };
+    return { success: true, order: updatedOrder, refundAmount };
   },
 
   async rateOrder(
@@ -119,6 +132,29 @@ export const orderService = {
     }
 
     const currentOrder = ordersMemoryStore[index];
+
+    // اعتبارسنجی ۱: سفارش باید در وضعیت مجاز برای امتیازدهی باشد (تکمیل‌شده)
+    if (currentOrder.status !== 'COMPLETED') {
+      return { success: false, error: 'امتیازدهی تنها برای سفارش‌های تکمیل‌شده مجاز است.' };
+    }
+
+    // اعتبارسنجی ۲: مقدار امتیاز باید در بازه استاندارد ۱ تا ۵ باشد
+    if (
+      !Number.isInteger(customerRating) ||
+      customerRating < MIN_RATING ||
+      customerRating > MAX_RATING
+    ) {
+      return {
+        success: false,
+        error: `امتیاز باید عدد صحیحی بین ${MIN_RATING} تا ${MAX_RATING} باشد.`,
+      };
+    }
+
+    // اعتبارسنجی ۳: جلوگیری از ثبت امتیاز تکراری برای یک سفارش
+    if (currentOrder.ratings?.customerRating) {
+      return { success: false, error: 'برای این سفارش قبلاً امتیاز ثبت شده است.' };
+    }
+
     const updatedOrder: OrderItem = {
       ...currentOrder,
       ratings: {
