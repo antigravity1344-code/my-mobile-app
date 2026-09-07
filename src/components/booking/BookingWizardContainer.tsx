@@ -168,7 +168,6 @@ export const BookingWizardContainer: React.FC = () => {
             selectedService={selectedService}
             onSelectService={(svc: CleaningService) => {
               setSelectedService(svc);
-              nextStep();
             }}
             onNext={nextStep}
           />
