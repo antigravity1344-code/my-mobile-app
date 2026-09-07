@@ -152,9 +152,12 @@ export const NativeBookingWizard = () => {
 
   const useGps = async () => {
     setGpsLoading(true);
-    const coordinates = await getCurrentPosition();
-    if (coordinates) booking.updateAddressField('coordinates', coordinates);
-    setGpsLoading(false);
+    try {
+      const coordinates = await getCurrentPosition();
+      if (coordinates) booking.updateAddressField('coordinates', coordinates);
+    } finally {
+      setGpsLoading(false);
+    }
   };
 
   const submitCurrentBooking = async () => {
