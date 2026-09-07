@@ -29,26 +29,49 @@ const normalizeDigits = (value: string) =>
   value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
 
 const jalaliToGregorian = (year: number, month: number, day: number): [number, number, number] => {
-  const breaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2294, 2342, 2382, 2394, 2403, 2407, 2409, 2411];
-  const gy = year + 621;
-  let leapJ = -14;
-  let jp = breaks[0];
-  let jump = 0;
-  for (const breakpoint of breaks.slice(1)) {
-    jump = breakpoint - jp;
-    if (year < breakpoint) break;
-    leapJ += Math.floor(jump / 33) * 8 + Math.floor((jump % 33) / 4);
-    jp = breakpoint;
+  let jalaliYear = year - 979;
+  const jalaliMonth = month - 1;
+  const jalaliDay = day - 1;
+  let dayNumber = 365 * jalaliYear
+    + Math.floor(jalaliYear / 33) * 8
+    + Math.floor((jalaliYear % 33 + 3) / 4);
+
+  for (let index = 0; index < jalaliMonth; index += 1) {
+    dayNumber += index < 6 ? 31 : 30;
   }
-  const n = year - jp;
-  leapJ += Math.floor(n / 33) * 8 + Math.floor(((n % 33) + 3) / 4);
-  if (jump % 33 === 4 && jump - n === 4) leapJ += 1;
-  const leapG = Math.floor(gy / 4) - Math.floor((Math.floor(gy / 100) + 1) * 3 / 4) - 150;
-  const march = 20 + leapJ - leapG;
-  const ordinal = month <= 6 ? (month - 1) * 31 + day : (month - 1) * 30 + day + 6;
-  const date = new Date(Date.UTC(gy, 2, march));
-  date.setUTCDate(date.getUTCDate() + ordinal - 80);
-  return [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
+  dayNumber += jalaliDay;
+
+  let gregorianDayNumber = dayNumber + 79;
+  let gregorianYear = 1600 + 400 * Math.floor(gregorianDayNumber / 146097);
+  gregorianDayNumber %= 146097;
+  let leapYear = true;
+
+  if (gregorianDayNumber >= 36525) {
+    gregorianDayNumber -= 1;
+    gregorianYear += 100 * Math.floor(gregorianDayNumber / 36524);
+    gregorianDayNumber %= 36524;
+    if (gregorianDayNumber >= 365) gregorianDayNumber += 1;
+    else leapYear = false;
+  }
+
+  gregorianYear += 4 * Math.floor(gregorianDayNumber / 1461);
+  gregorianDayNumber %= 1461;
+  if (gregorianDayNumber >= 366) {
+    leapYear = false;
+    gregorianDayNumber -= 1;
+    gregorianYear += Math.floor(gregorianDayNumber / 365);
+    gregorianDayNumber %= 365;
+  }
+
+  let gregorianDay = gregorianDayNumber + 1;
+  const monthLengths = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gregorianMonth = 0;
+  while (gregorianDay > monthLengths[gregorianMonth]) {
+    gregorianDay -= monthLengths[gregorianMonth];
+    gregorianMonth += 1;
+  }
+
+  return [gregorianYear, gregorianMonth + 1, gregorianDay];
 };
 
 const parseDateOnly = (value: string): Date => {

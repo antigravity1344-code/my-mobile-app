@@ -329,7 +329,7 @@ export const NativeBookingWizard = () => {
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {booking.selectedDate?.dayOfMonth} {booking.selectedTimeSlot?.label}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
-            <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
+            <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(pricing.subtotal - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
             {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({Math.round(pricing.earlyBirdDiscountRate * 100)}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان ({booking.customerTier})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
