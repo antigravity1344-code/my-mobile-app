@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
+import { isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 
@@ -56,10 +57,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   if (!order) return null;
 
-  const isCancellable =
-    order.status === 'PENDING' ||
-    order.status === 'CONFIRMED' ||
-    order.status === 'ASSIGNED';
+  const isCancellable = isOrderCancellable(order.status);
   const isCompleted = order.status === 'COMPLETED';
 
   const handleCallCleaner = () => {

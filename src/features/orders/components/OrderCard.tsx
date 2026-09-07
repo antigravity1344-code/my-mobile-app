@@ -10,6 +10,7 @@ import {
   Repeat,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
+import { isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 
 interface OrderCardProps {
@@ -31,10 +32,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onPressRate,
   onPressCancel,
 }) => {
-  const isCancellable =
-    order.status === 'PENDING' ||
-    order.status === 'CONFIRMED' ||
-    order.status === 'ASSIGNED';
+  const isCancellable = isOrderCancellable(order.status);
   const isCompleted = order.status === 'COMPLETED';
   const hasRated = Boolean(order.ratings?.customerRating);
   const isRecurring = order.recurringFrequency !== 'ONE_TIME';

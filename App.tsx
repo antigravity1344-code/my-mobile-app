@@ -1,4 +1,5 @@
 ﻿import { useState } from 'react';
+import { Platform } from 'react-native';
 import {
   Sparkles,
   Home,
@@ -200,7 +201,7 @@ export default function App() {
   return (
     <BookingProvider>
       <OrdersProvider>
-        <NativeBookingWizard />
+        {Platform.OS === 'web' ? <MainDashboard /> : <NativeBookingWizard />}
       </OrdersProvider>
     </BookingProvider>
   );

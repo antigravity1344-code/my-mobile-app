@@ -16,6 +16,16 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MIN_RATING = 1;
 const MAX_RATING = 5;
 
+export const CANCELLABLE_ORDER_STATUSES: OrderStatus[] = [
+  'PENDING',
+  'CONFIRMED',
+  'ASSIGNED',
+  'IN_PROGRESS',
+];
+
+export const isOrderCancellable = (status: OrderStatus): boolean =>
+  CANCELLABLE_ORDER_STATUSES.includes(status);
+
 export const orderService = {
   async getOrders(
     filterTab: OrderFilterTab = 'ALL',
@@ -85,7 +95,7 @@ export const orderService = {
     }
 
     const currentOrder = ordersMemoryStore[index];
-    if (currentOrder.status === 'COMPLETED' || currentOrder.status === 'CANCELLED') {
+    if (!isOrderCancellable(currentOrder.status)) {
       return { success: false, error: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' };
     }
 

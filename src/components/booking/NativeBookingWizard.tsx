@@ -16,7 +16,7 @@ import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { submitBooking } from '../../api/booking';
 import { calculateFinalPrice, type FinalPrice } from '../../utils/pricing';
-import { requestPayment, verifyPayment } from '../../api/payment';
+import { requestPayment, toPaymentAmountInRials, verifyPayment } from '../../api/payment';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
@@ -108,7 +108,7 @@ export const NativeBookingWizard = () => {
       total: 0,
     };
   const total = pricing.total;
-  const totalInRials = total * 10;
+  const totalInRials = toPaymentAmountInRials(total);
 
   useEffect(() => {
     const handlePaymentCallback = async (url: string) => {
