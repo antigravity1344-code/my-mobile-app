@@ -52,6 +52,7 @@ export const BookingWizardContainer: React.FC = () => {
     )
     : null;
   const totalPrice = pricing?.total ?? 0;
+  const totalPriceInRials = totalPrice * 10;
   const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
 
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');
@@ -67,7 +68,7 @@ export const BookingWizardContainer: React.FC = () => {
     const orderId = `ORDER-${Date.now()}`;
     const req: PaymentRequest = {
       orderId,
-      amount: totalPrice,
+      amount: totalPriceInRials,
       description: `${selectedService.title} — ${addressDetails.district}، پلاک ${addressDetails.plaque}`,
       mobile: addressDetails.contactPhone,
     };
@@ -93,7 +94,7 @@ export const BookingWizardContainer: React.FC = () => {
     setPaymentStatus('requesting');
     setPaymentMsg(null);
     try {
-      const verifyResult = await verifyPayment(paymentAuthority, totalPrice);
+      const verifyResult = await verifyPayment(paymentAuthority, totalPriceInRials);
       if (verifyResult.success) {
         setPaymentMsg(`پرداخت تایید شد! شناسه: ${verifyResult.refId}`);
         setPaymentStatus('success');
