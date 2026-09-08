@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { AddressDetails } from '../../types/booking';
 import { getCurrentPosition } from '../../services/location';
-import { isValidAddress } from '../../utils/bookingValidation';
+import { getAddressValidationErrors, isValidAddress } from '../../utils/bookingValidation';
 import {
   MapPin,
   Phone,
@@ -53,6 +53,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
 
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [, setGpsError] = useState<string | null>(null);
+  const validationErrors = getAddressValidationErrors(addressDetails);
 
   const handleGetCurrentLocation = useCallback(async () => {
     setGpsStatus('loading');
@@ -97,7 +98,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
             <span>تعیین پین موقعیت روی نقشه:</span>
           </span>
           <span className="text-[11px] text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full font-medium">
-            منطقه فعال: {addressDetails.district}
+            منطقه فعال: {addressDetails.district || 'انتخاب نشده'}
           </span>
         </div>
 
@@ -174,8 +175,11 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
           value={districtSearch}
           onChange={(e) => setDistrictSearch(e.target.value)}
           placeholder="جستجوی محله"
-          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+          className={`w-full rounded-xl border bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${validationErrors.district ? 'border-red-300' : 'border-slate-200'}`}
         />
+        {validationErrors.district && (
+          <p className="text-[11px] text-red-600 font-medium">{validationErrors.district}</p>
+        )}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
           {filteredDistricts.map((d) => (
             <button
@@ -205,8 +209,11 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
             onChange={(e) => onUpdateField('fullAddress', e.target.value)}
             onBlur={() => setTouched((prev) => ({ ...prev, fullAddress: true }))}
             placeholder="مثال: خیابان سرو غربی، خیابان بخشایش، کوچه پانزدهم شرقی"
-            className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-none leading-relaxed"
+            className={`w-full rounded-xl border bg-white p-3 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-none leading-relaxed ${validationErrors.fullAddress ? 'border-red-300' : 'border-slate-200'}`}
           />
+          {validationErrors.fullAddress && (
+            <p className="text-[11px] text-red-600 font-medium">{validationErrors.fullAddress}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -218,8 +225,11 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
               value={addressDetails.plaque}
               onChange={(e) => onUpdateField('plaque', e.target.value)}
               placeholder="مثال: ۲۴"
-              className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-center"
+              className={`w-full rounded-xl border bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-center ${validationErrors.plaque ? 'border-red-300' : 'border-slate-200'}`}
             />
+            {validationErrors.plaque && (
+              <p className="text-[10px] text-red-600 font-medium mt-1">{validationErrors.plaque}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -274,8 +284,11 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
             value={addressDetails.recipientName}
             onChange={(e) => onUpdateField('recipientName', e.target.value)}
             placeholder="مثال: علی رضایی"
-            className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+            className={`w-full rounded-xl border bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${validationErrors.recipientName ? 'border-red-300' : 'border-slate-200'}`}
           />
+          {validationErrors.recipientName && (
+            <p className="text-[11px] text-red-600 font-medium">{validationErrors.recipientName}</p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -290,8 +303,11 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
             onChange={(e) => onUpdateField('contactPhone', e.target.value)}
             placeholder="مثال: ۰۹۱۲۳۴۵۶۷۸۹"
             dir="ltr"
-            className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-right"
+            className={`w-full rounded-xl border bg-white p-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 text-right ${validationErrors.contactPhone ? 'border-red-300' : 'border-slate-200'}`}
           />
+          {validationErrors.contactPhone && (
+            <p className="text-[11px] text-red-600 font-medium">{validationErrors.contactPhone}</p>
+          )}
         </div>
       </div>
 

@@ -7,6 +7,7 @@ export const isValidIranianMobile = (value: string): boolean =>
   /^09[0-9]{9}$/.test(normalizePersianDigits(value.trim()));
 
 export interface AddressValidationErrors {
+  district?: string;
   fullAddress?: string;
   plaque?: string;
   recipientName?: string;
@@ -15,10 +16,12 @@ export interface AddressValidationErrors {
 
 export const getAddressValidationErrors = (address: AddressDetails): AddressValidationErrors => {
   const errors: AddressValidationErrors = {};
+  const district = address.district.trim();
   const fullAddress = address.fullAddress.trim();
   const recipientName = address.recipientName.trim();
   const contactPhone = address.contactPhone.trim();
 
+  if (!district) errors.district = 'محله را انتخاب کنید.';
   if (!fullAddress) errors.fullAddress = 'نشانی دقیق را وارد کنید.';
   else if (fullAddress.length < 8) errors.fullAddress = 'نشانی دقیق باید حداقل ۸ کاراکتر باشد.';
   if (!address.plaque.trim()) errors.plaque = 'پلاک را وارد کنید.';
