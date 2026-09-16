@@ -7,6 +7,7 @@ import {
   Smartphone,
   BookOpen,
   CalendarCheck,
+  ShieldCheck,
 } from 'lucide-react';
 import { BookingProvider, useBooking } from './src/context/BookingContext';
 import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
@@ -14,9 +15,10 @@ import { NativeBookingWizard } from './src/components/booking/NativeBookingWizar
 import { HomeScreen } from './src/components/dashboard/HomeScreen';
 import { OrdersScreen } from './src/components/dashboard/OrdersScreen';
 import { ProfileScreen } from './src/components/dashboard/ProfileScreen';
+import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
 
 export function MainDashboard() {
-  const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard'>('Wizard');
+  const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin'>('Wizard');
   const [viewMode, setViewMode] = useState<'wizard' | 'simulator'>('wizard');
 
   const { addressDetails, step } = useBooking();
@@ -104,10 +106,10 @@ export function MainDashboard() {
 
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex flex-col gap-2">
                 <span className="text-xs font-semibold text-slate-400">تست تب‌های پایین:</span>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-5 gap-1 text-[10px]">
                   <button
                     onClick={() => setActiveTab('Home')}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
                       activeTab === 'Home' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
@@ -115,7 +117,7 @@ export function MainDashboard() {
                   </button>
                   <button
                     onClick={() => setActiveTab('Wizard')}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
                       activeTab === 'Wizard' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
@@ -123,7 +125,7 @@ export function MainDashboard() {
                   </button>
                   <button
                     onClick={() => setActiveTab('Orders')}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
                       activeTab === 'Orders' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
@@ -131,11 +133,19 @@ export function MainDashboard() {
                   </button>
                   <button
                     onClick={() => setActiveTab('Profile')}
-                    className={`py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
                       activeTab === 'Profile' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     پروفایل
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('Admin')}
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                      activeTab === 'Admin' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    مدیریت
                   </button>
                 </div>
               </div>
@@ -164,10 +174,11 @@ export function MainDashboard() {
                   {activeTab === 'Wizard' && <BookingWizardContainer />}
                   {activeTab === 'Orders' && <OrdersScreen onStartBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Profile' && <ProfileScreen />}
+                  {activeTab === 'Admin' && <AdminPanelScreen />}
                 </div>
 
                 {/* نوار پایین اپلیکیشن */}
-                <div className="h-14 bg-white border-t border-slate-200/90 px-4 flex items-center justify-between shadow-lg z-30 select-none">
+                <div className="h-14 bg-white border-t border-slate-200/90 px-3 flex items-center justify-between shadow-lg z-30 select-none">
                   <button
                     onClick={() => setActiveTab('Home')}
                     className={`flex flex-col items-center gap-0.5 transition ${
@@ -175,7 +186,7 @@ export function MainDashboard() {
                     }`}
                   >
                     <Home className="w-4 h-4" />
-                    <span className="text-[10px]">خانه</span>
+                    <span className="text-[9px]">خانه</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Wizard')}
@@ -184,7 +195,7 @@ export function MainDashboard() {
                     }`}
                   >
                     <CalendarCheck className="w-4 h-4" />
-                    <span className="text-[10px]">رزرو</span>
+                    <span className="text-[9px]">رزرو</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Orders')}
@@ -193,7 +204,7 @@ export function MainDashboard() {
                     }`}
                   >
                     <Receipt className="w-4 h-4" />
-                    <span className="text-[10px]">سفارش‌ها</span>
+                    <span className="text-[9px]">سفارش‌ها</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Profile')}
@@ -202,7 +213,16 @@ export function MainDashboard() {
                     }`}
                   >
                     <User className="w-4 h-4" />
-                    <span className="text-[10px]">پروفایل</span>
+                    <span className="text-[9px]">پروفایل</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('Admin')}
+                    className={`flex flex-col items-center gap-0.5 transition ${
+                      activeTab === 'Admin' ? 'text-amber-600 font-bold' : 'text-slate-400'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span className="text-[9px]">مدیریت</span>
                   </button>
                 </div>
                 <div className="w-32 h-1 bg-slate-300 rounded-full mx-auto my-1"></div>
