@@ -97,16 +97,19 @@ export const calculatePrice = (
   durationHours: number,
   options: PricingOptions = {},
 ): number => {
-  if (service.id === 'staircase_common_areas') {
-    const floors = Math.max(1, Number(options.floors) || 1);
-    const ageMultiplier = options.buildingAge === 'بالای ۲۵ سال' ? 1.35 : options.buildingAge === '۱۰ تا ۲۵ سال' ? 1.15 : 1;
-    const extras = options.glass ? 150000 : 0;
-    return Math.round((300000 + floors * 100000 + (options.parking ? 100000 : 0) + (options.yard ? 100000 : 0) + extras) * ageMultiplier);
+  if (service.id === 'hourly_labor') {
+    const hours = Math.max(3, Number(options.hours) || service.estimatedDurationHours || 3);
+    const workerCount = options.workerCount === '۳ نفر' ? 3 : options.workerCount === '۲ نفر' ? 2 : 1;
+    const toolsFee = options.tools ? 80000 : 0;
+    return service.basePrice * hours * workerCount + toolsFee;
   }
-  if (service.id === 'sofa_carpet_washing') {
-    const seats = options.sofaSeats === '۹ نفره' ? 450000 : 350000;
-    const mattresses = Math.max(0, Number(options.mattresses) || 0);
-    return seats + mattresses * 100000;
+  if (service.id === 'building_painting') {
+    const area = Math.max(1, Number(options.area) || 50);
+    const paintMultiplier = options.paintType === 'رنگ اپوکسی' ? 1.4 : options.paintType === 'رنگ وینیل ضدآب' ? 1.2 : 1;
+    const locationMultiplier = options.location === 'خارجی / نما' ? 1.25 : 1;
+    const paintSupplyFee = options.providePaint ? 200000 : 0;
+    const puttyFee = options.fullPutty ? 150000 : 0;
+    return Math.round(service.basePrice * area * paintMultiplier * locationMultiplier + paintSupplyFee + puttyFee);
   }
   const hourlyMinimum = Math.max(4, durationHours);
   const hourlyTotal = service.basePrice * hourlyMinimum;

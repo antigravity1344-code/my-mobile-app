@@ -8,17 +8,18 @@ import {
   BookOpen,
   CalendarCheck,
   ShieldCheck,
+  Briefcase,
 } from 'lucide-react';
 import { BookingProvider, useBooking } from './src/context/BookingContext';
 import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
-import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
 import { HomeScreen } from './src/components/dashboard/HomeScreen';
 import { OrdersScreen } from './src/components/dashboard/OrdersScreen';
 import { ProfileScreen } from './src/components/dashboard/ProfileScreen';
 import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
+import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPortalScreen';
 
 export function MainDashboard() {
-  const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin'>('Wizard');
+  const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin' | 'Specialist'>('Wizard');
   const [viewMode, setViewMode] = useState<'wizard' | 'simulator'>('wizard');
 
   const { addressDetails, step } = useBooking();
@@ -106,7 +107,7 @@ export function MainDashboard() {
 
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 flex flex-col gap-2">
                 <span className="text-xs font-semibold text-slate-400">تست تب‌های پایین:</span>
-                <div className="grid grid-cols-5 gap-1 text-[10px]">
+                <div className="grid grid-cols-6 gap-1 text-[9px]">
                   <button
                     onClick={() => setActiveTab('Home')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
@@ -121,7 +122,7 @@ export function MainDashboard() {
                       activeTab === 'Wizard' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    ویزارد
+                    رزرو
                   </button>
                   <button
                     onClick={() => setActiveTab('Orders')}
@@ -130,6 +131,14 @@ export function MainDashboard() {
                     }`}
                   >
                     سفارش‌ها
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('Specialist')}
+                    className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                      activeTab === 'Specialist' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    متخصصین
                   </button>
                   <button
                     onClick={() => setActiveTab('Profile')}
@@ -173,20 +182,21 @@ export function MainDashboard() {
                   {activeTab === 'Home' && <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Wizard' && <BookingWizardContainer />}
                   {activeTab === 'Orders' && <OrdersScreen onStartBooking={() => setActiveTab('Wizard')} />}
+                  {activeTab === 'Specialist' && <SpecialistPortalScreen />}
                   {activeTab === 'Profile' && <ProfileScreen />}
                   {activeTab === 'Admin' && <AdminPanelScreen />}
                 </div>
 
                 {/* نوار پایین اپلیکیشن */}
-                <div className="h-14 bg-white border-t border-slate-200/90 px-3 flex items-center justify-between shadow-lg z-30 select-none">
+                <div className="h-14 bg-white border-t border-slate-200/90 px-2 flex items-center justify-between shadow-lg z-30 select-none">
                   <button
                     onClick={() => setActiveTab('Home')}
                     className={`flex flex-col items-center gap-0.5 transition ${
                       activeTab === 'Home' ? 'text-sky-600 font-bold' : 'text-slate-400'
                     }`}
                   >
-                    <Home className="w-4 h-4" />
-                    <span className="text-[9px]">خانه</span>
+                    <Home className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">خانه</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Wizard')}
@@ -194,8 +204,17 @@ export function MainDashboard() {
                       activeTab === 'Wizard' ? 'text-sky-600 font-bold' : 'text-slate-400'
                     }`}
                   >
-                    <CalendarCheck className="w-4 h-4" />
-                    <span className="text-[9px]">رزرو</span>
+                    <CalendarCheck className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">رزرو</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('Specialist')}
+                    className={`flex flex-col items-center gap-0.5 transition ${
+                      activeTab === 'Specialist' ? 'text-emerald-600 font-bold' : 'text-slate-400'
+                    }`}
+                  >
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">متخصصین</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Orders')}
@@ -203,8 +222,8 @@ export function MainDashboard() {
                       activeTab === 'Orders' ? 'text-sky-600 font-bold' : 'text-slate-400'
                     }`}
                   >
-                    <Receipt className="w-4 h-4" />
-                    <span className="text-[9px]">سفارش‌ها</span>
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">سفارش‌ها</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Profile')}
@@ -212,8 +231,8 @@ export function MainDashboard() {
                       activeTab === 'Profile' ? 'text-sky-600 font-bold' : 'text-slate-400'
                     }`}
                   >
-                    <User className="w-4 h-4" />
-                    <span className="text-[9px]">پروفایل</span>
+                    <User className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">پروفایل</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('Admin')}
@@ -221,8 +240,8 @@ export function MainDashboard() {
                       activeTab === 'Admin' ? 'text-amber-600 font-bold' : 'text-slate-400'
                     }`}
                   >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span className="text-[9px]">مدیریت</span>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span className="text-[8px]">مدیریت</span>
                   </button>
                 </div>
                 <div className="w-32 h-1 bg-slate-300 rounded-full mx-auto my-1"></div>
@@ -238,7 +257,7 @@ export function MainDashboard() {
 export default function App() {
   return (
     <BookingProvider>
-      <NativeBookingWizard />
+      <MainDashboard />
     </BookingProvider>
   );
 }
