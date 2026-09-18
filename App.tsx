@@ -16,7 +16,7 @@ import { BookingWizardContainer } from './src/components/booking/BookingWizardCo
 import { HomeScreen } from './src/components/dashboard/HomeScreen';
 import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
 import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPortalScreen';
-import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
+import { NativeAppContainer } from './src/components/native/NativeAppContainer';
 import { OrdersProvider, OrdersScreen } from './src/features/orders';
 import { ProfileProvider, ProfileScreen } from './src/features/profile';
 import { CleanersProvider } from './src/features/cleaners';
@@ -349,13 +349,19 @@ export function MainDashboard() {
   );
 }
 
-export default function App() {
+export default function App(props?: Record<string, unknown>) {
+  const rawFlavor = (props?.appFlavor || props?.exp?.initialProps?.appFlavor) as string | undefined;
+  const flavor = rawFlavor?.toLowerCase() === 'worker' ? 'WORKER' : 'CUSTOMER';
   return (
     <BookingProvider>
       <OrdersProvider>
         <ProfileProvider>
           <CleanersProvider>
-            {Platform.OS === 'web' ? <MainDashboard /> : <NativeBookingWizard />}
+            {Platform.OS === 'web' ? (
+              <MainDashboard />
+            ) : (
+              <NativeAppContainer initialFlavor={flavor} />
+            )}
           </CleanersProvider>
         </ProfileProvider>
       </OrdersProvider>

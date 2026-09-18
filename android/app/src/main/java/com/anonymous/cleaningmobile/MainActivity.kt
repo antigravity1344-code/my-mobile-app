@@ -37,7 +37,13 @@ class MainActivity : ReactActivity() {
               this,
               mainComponentName,
               fabricEnabled
-          ){})
+          ){
+              override fun getLaunchOptions(): Bundle {
+                  val initialProps = Bundle()
+                  initialProps.putString("appFlavor", BuildConfig.FLAVOR)
+                  return initialProps
+              }
+          })
   }
 
   /**
