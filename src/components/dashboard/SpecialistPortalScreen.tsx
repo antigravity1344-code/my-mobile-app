@@ -14,6 +14,7 @@ import {
   Sofa,
 } from 'lucide-react';
 import { useBooking } from '../../context/BookingContext';
+import { CleanersScreen } from '../../features/cleaners';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -39,6 +40,7 @@ export const SpecialistPortalScreen: React.FC = () => {
   const { paymentReceipt, selectedService, addressDetails, selectedDate, selectedTimeSlot } = useBooking();
   const [activeRole, setActiveRole] = useState<SpecialistRole>('cleaner');
   const [acceptedOrders, setAcceptedOrders] = useState<string[]>([]);
+  const [portalView, setPortalView] = useState<'orders' | 'cleaners'>('orders');
 
   const dateLabel = selectedDate
     ? `${selectedDate.dayOfWeek} ${selectedDate.dayOfMonth} ${selectedDate.monthName}`
@@ -184,8 +186,36 @@ export const SpecialistPortalScreen: React.FC = () => {
         <p className="text-xs text-slate-300">مشاهده مشخصات کامل درخواست‌ها و انتخاب سفارشات مرتبط با تخصص شما</p>
       </div>
 
-      {/* انتخاب نقش/تخصص کاری */}
-      <div className="bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+      {/* سوییچ حالت: سفارش‌های در انتظار پذیرش / بازارگاه متخصصین */}
+      <div className="bg-slate-100 p-1 rounded-xl border border-slate-200 flex gap-1">
+        <button
+          onClick={() => setPortalView('orders')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            portalView === 'orders' ? 'bg-sky-600 text-white shadow' : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          <span>سفارش‌های در انتظار پذیرش</span>
+        </button>
+        <button
+          onClick={() => setPortalView('cleaners')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            portalView === 'cleaners' ? 'bg-sky-600 text-white shadow' : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>فهرست و بازارگاه متخصصین</span>
+        </button>
+      </div>
+
+      {portalView === 'cleaners' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <CleanersScreen />
+        </div>
+      ) : (
+        <>
+          {/* انتخاب نقش/تخصص کاری */}
+          <div className="bg-slate-100 p-1.5 rounded-xl border border-slate-200">
         <p className="text-[11px] font-bold text-slate-600 mb-1.5 px-1">تخصص شما چیست؟ (نقش کاری)</p>
         <div className="grid grid-cols-4 gap-1">
           <button
@@ -355,6 +385,8 @@ export const SpecialistPortalScreen: React.FC = () => {
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -19,6 +19,7 @@ import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPor
 import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
 import { OrdersProvider, OrdersScreen } from './src/features/orders';
 import { ProfileProvider, ProfileScreen } from './src/features/profile';
+import { CleanersProvider } from './src/features/cleaners';
 import { MobileAuthModal } from './src/features/auth';
 
 
@@ -271,7 +272,9 @@ export default function App() {
     <BookingProvider>
       <OrdersProvider>
         <ProfileProvider>
-          {Platform.OS === 'web' ? <MainDashboard /> : <NativeBookingWizard />}
+          <CleanersProvider>
+            {Platform.OS === 'web' ? <MainDashboard /> : <NativeBookingWizard />}
+          </CleanersProvider>
         </ProfileProvider>
       </OrdersProvider>
     </BookingProvider>
