@@ -4,7 +4,7 @@ import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
-import { requestPayment, verifyPayment, type PaymentRequest } from '../../api/payment';
+import { requestPayment, toPaymentAmountInRials, verifyPayment, type PaymentRequest } from '../../api/payment';
 import { calculateFinalPrice, type RecurringFrequency } from '../../utils/pricing';
 import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
@@ -52,6 +52,7 @@ export const BookingWizardContainer: React.FC = () => {
     )
     : null;
   const totalPrice = pricing?.total ?? 0;
+  const paymentAmountInRials = toPaymentAmountInRials(totalPrice);
   const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
 
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');
@@ -67,7 +68,7 @@ export const BookingWizardContainer: React.FC = () => {
     const orderId = `ORDER-${Date.now()}`;
     const req: PaymentRequest = {
       orderId,
-      amount: totalPrice,
+      amount: paymentAmountInRials,
       description: `${selectedService.title} — ${addressDetails.district}، پلاک ${addressDetails.plaque}`,
       mobile: addressDetails.contactPhone,
     };
@@ -93,7 +94,7 @@ export const BookingWizardContainer: React.FC = () => {
     setPaymentStatus('requesting');
     setPaymentMsg(null);
     try {
-      const verifyResult = await verifyPayment(paymentAuthority, totalPrice);
+      const verifyResult = await verifyPayment(paymentAuthority, paymentAmountInRials);
       if (verifyResult.success) {
         setPaymentMsg(`پرداخت تایید شد! شناسه: ${verifyResult.refId}`);
         setPaymentStatus('success');
@@ -167,7 +168,6 @@ export const BookingWizardContainer: React.FC = () => {
             selectedService={selectedService}
             onSelectService={(svc: CleaningService) => {
               setSelectedService(svc);
-              nextStep();
             }}
             onNext={nextStep}
           />
@@ -412,7 +412,7 @@ export const BookingWizardContainer: React.FC = () => {
                   className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/20 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>تایید済み — برگشت</span>
+                  <span>پرداخت شد — بازگشت</span>
                 </button>
               ) : (
                 <button

@@ -7,3 +7,4 @@ ios
 .vscode
 .env
 dist
+android/.kotlin

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Platform } from 'react-native';
 import {
   Sparkles,
   Home,
@@ -13,14 +14,19 @@ import {
 import { BookingProvider, useBooking } from './src/context/BookingContext';
 import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
 import { HomeScreen } from './src/components/dashboard/HomeScreen';
-import { OrdersScreen } from './src/components/dashboard/OrdersScreen';
-import { ProfileScreen } from './src/components/dashboard/ProfileScreen';
 import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
 import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPortalScreen';
+import { NativeBookingWizard } from './src/components/booking/NativeBookingWizard';
+import { OrdersProvider, OrdersScreen } from './src/features/orders';
+import { ProfileProvider, ProfileScreen } from './src/features/profile';
+import { MobileAuthModal } from './src/features/auth';
 
+
+// داشبورد اصلی وب با قابلیت سوئیچ بین حالت ویزارد و شبیه‌ساز موبایل
 export function MainDashboard() {
   const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin' | 'Specialist'>('Wizard');
   const [viewMode, setViewMode] = useState<'wizard' | 'simulator'>('wizard');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const { addressDetails, step } = useBooking();
 
@@ -36,10 +42,10 @@ export function MainDashboard() {
             <div className="flex items-center gap-2">
               <span className="font-bold text-white text-base">پاکشو (سرویس نظافت آنلاین)</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
-                اسپرینت ۴: تایید نهایی
+                اسپرینت ۵: ماژول پروفایل و احراز هویت
               </span>
             </div>
-            <p className="text-xs text-slate-400">ویزارد رزرو ۴ مرحله‌ای با موقعیت مکانی و پیش‌فاکتور</p>
+            <p className="text-xs text-slate-400">سیستم رزرو آنلاین به همراه مدیریت سفارش‌ها و پروفایل کاربر</p>
           </div>
         </div>
 
@@ -181,9 +187,9 @@ export function MainDashboard() {
                 <div className="flex-1 overflow-y-auto p-3">
                   {activeTab === 'Home' && <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Wizard' && <BookingWizardContainer />}
-                  {activeTab === 'Orders' && <OrdersScreen onStartBooking={() => setActiveTab('Wizard')} />}
+                  {activeTab === 'Orders' && <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Specialist' && <SpecialistPortalScreen />}
-                  {activeTab === 'Profile' && <ProfileScreen />}
+                  {activeTab === 'Profile' && <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />}
                   {activeTab === 'Admin' && <AdminPanelScreen />}
                 </div>
 
@@ -250,6 +256,12 @@ export function MainDashboard() {
           </div>
         )}
       </main>
+
+      {/* مدال ورود پیامکی */}
+      <MobileAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </div>
   );
 }
@@ -257,7 +269,11 @@ export function MainDashboard() {
 export default function App() {
   return (
     <BookingProvider>
-      <MainDashboard />
+      <OrdersProvider>
+        <ProfileProvider>
+          {Platform.OS === 'web' ? <MainDashboard /> : <NativeBookingWizard />}
+        </ProfileProvider>
+      </OrdersProvider>
     </BookingProvider>
   );
 }

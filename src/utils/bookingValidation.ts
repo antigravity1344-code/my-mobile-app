@@ -36,18 +36,43 @@ export const isValidIranianMobile = (value: string | null | undefined): boolean 
   return /^09\d{9}$/.test(withoutCountryCode);
 };
 
-export const isValidAddress = (address: Partial<AddressDetails> | null | undefined): boolean => {
-  if (!address) return false;
+export interface AddressValidationErrors {
+  district?: string;
+  fullAddress?: string;
+  plaque?: string;
+  recipientName?: string;
+  contactPhone?: string;
+}
 
+export const getAddressValidationErrors = (address: Partial<AddressDetails> | null | undefined): AddressValidationErrors => {
+  const errors: AddressValidationErrors = {};
+  if (!address) {
+    return {
+      district: 'محله را انتخاب کنید.',
+      fullAddress: 'نشانی دقیق را وارد کنید.',
+      plaque: 'پلاک را وارد کنید.',
+      recipientName: 'نام و نام خانوادگی را وارد کنید.',
+      contactPhone: 'شماره موبایل را وارد کنید.',
+    };
+  }
+
+  const district = typeof address.district === 'string' ? address.district.trim() : '';
   const fullAddress = typeof address.fullAddress === 'string' ? address.fullAddress.trim() : '';
   const plaque = typeof address.plaque === 'string' ? address.plaque.trim() : '';
   const recipientName = typeof address.recipientName === 'string' ? address.recipientName.trim() : '';
   const contactPhone = typeof address.contactPhone === 'string' ? address.contactPhone : '';
 
-  return (
-    fullAddress.length >= 8 &&
-    plaque.length > 0 &&
-    recipientName.length >= 3 &&
-    isValidIranianMobile(contactPhone)
-  );
+  if (!district) errors.district = 'محله را انتخاب کنید.';
+  if (!fullAddress) errors.fullAddress = 'نشانی دقیق را وارد کنید.';
+  else if (fullAddress.length < 8) errors.fullAddress = 'نشانی دقیق باید حداقل ۸ کاراکتر باشد.';
+  if (!plaque) errors.plaque = 'پلاک را وارد کنید.';
+  if (!recipientName) errors.recipientName = 'نام و نام خانوادگی را وارد کنید.';
+  else if (recipientName.length < 3) errors.recipientName = 'نام و نام خانوادگی باید حداقل ۳ کاراکتر باشد.';
+  if (!contactPhone) errors.contactPhone = 'شماره موبایل را وارد کنید.';
+  else if (!isValidIranianMobile(contactPhone)) errors.contactPhone = 'شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود.';
+
+  return errors;
 };
+
+export const isValidAddress = (address: Partial<AddressDetails> | null | undefined): boolean =>
+  Object.keys(getAddressValidationErrors(address)).length === 0;

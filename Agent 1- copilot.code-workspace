@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "cleaning-mobile",
+			"path": "."
+		}
+	],
+	"settings": {
+		"CodeGPT.apiKey": "CodeGPT Plus Beta"
+	}
+}
