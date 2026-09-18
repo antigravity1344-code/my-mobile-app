@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, SavedAddress, WalletTransaction } from '../types/profile';
+import { appStorage } from '../../../utils/storage';
 
 // مقادیر اولیه فرضی برای پروفایل کاربر
 const INITIAL_PROFILE: UserProfile = {
@@ -70,6 +71,7 @@ interface ProfileContextType {
   removeSavedAddress: (addressId: string) => void; // حذف آدرس
   setDefaultAddress: (addressId: string) => void; // تنظیم آدرس به عنوان پیش‌فرض
   chargeWallet: (amount: number) => void; // شارژ کیف پول
+  deductWallet: (amount: number, description: string) => boolean; // کسر از کیف پول جهت پرداخت سفارش
   logout: () => void; // خروج از حساب
   login: (phoneNumber: string) => void; // ورود کاربر
 }
@@ -79,6 +81,30 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(INITIAL_TRANSACTIONS);
+
+  // بارگذاری داده‌های ذخیره شده محلی در آغاز
+  useEffect(() => {
+    void appStorage.getItem<UserProfile>('paksho_user_profile', INITIAL_PROFILE).then((savedProfile) => {
+      if (savedProfile) {
+        setProfile(savedProfile);
+      }
+    });
+    void appStorage.getItem<WalletTransaction[]>('paksho_wallet_txs', INITIAL_TRANSACTIONS).then((savedTxs) => {
+      if (savedTxs) {
+        setTransactions(savedTxs);
+      }
+    });
+  }, []);
+
+  // ذخیره خودکار تغییرات پروفایل
+  useEffect(() => {
+    void appStorage.setItem('paksho_user_profile', profile);
+  }, [profile]);
+
+  // ذخیره خودکار تراکنش‌ها
+  useEffect(() => {
+    void appStorage.setItem('paksho_wallet_txs', transactions);
+  }, [transactions]);
 
   // افزودن آدرس جدید به لیست آدرس‌های کاربر
   const addSavedAddress = (newAddr: Omit<SavedAddress, 'id'>) => {
@@ -132,6 +158,29 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
+  // کسر از موجودی کیف پول و ثبت تراکنش پرداخت
+  const deductWallet = (amount: number, description: string): boolean => {
+    if (amount <= 0 || profile.walletBalance < amount) {
+      return false;
+    }
+
+    const newTx: WalletTransaction = {
+      id: `tx_${Date.now()}`,
+      amount,
+      type: 'WITHDRAW',
+      description: description || 'پرداخت هزینه سفارش نظافت',
+      date: new Date().toLocaleDateString('fa-IR'),
+      status: 'SUCCESS',
+    };
+
+    setTransactions((prev) => [newTx, ...prev]);
+    setProfile((prev) => ({
+      ...prev,
+      walletBalance: prev.walletBalance - amount,
+    }));
+    return true;
+  };
+
   // خروج از حساب کاربری
   const logout = () => {
     setProfile((prev) => ({
@@ -158,6 +207,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removeSavedAddress,
         setDefaultAddress,
         chargeWallet,
+        deductWallet,
         logout,
         login,
       }}

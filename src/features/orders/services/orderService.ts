@@ -6,9 +6,21 @@ import type {
   OrderStatus,
 } from '../types/order';
 import { INITIAL_MOCK_ORDERS } from './mockOrdersData';
+import { appStorage } from '../../../utils/storage';
 
 // Memory store for runtime mutations
 let ordersMemoryStore: OrderItem[] = [...INITIAL_MOCK_ORDERS];
+
+// بازیابی خودکار از حافظه محلی در صورت وجود
+void appStorage.getItem<OrderItem[]>('paksho_orders_list', INITIAL_MOCK_ORDERS).then((stored) => {
+  if (stored && stored.length > 0) {
+    ordersMemoryStore = stored;
+  }
+});
+
+const persistOrders = () => {
+  void appStorage.setItem('paksho_orders_list', ordersMemoryStore);
+};
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -126,6 +138,7 @@ export const orderService = {
     };
 
     ordersMemoryStore[index] = updatedOrder;
+    persistOrders();
     return { success: true, order: updatedOrder, refundAmount };
   },
 
@@ -178,6 +191,7 @@ export const orderService = {
     };
 
     ordersMemoryStore[index] = updatedOrder;
+    persistOrders();
     return { success: true, order: updatedOrder };
   },
 
@@ -187,7 +201,6 @@ export const orderService = {
     let completedCount = 0;
     let cancelledCount = 0;
     let totalSpent = 0;
-
     for (const order of orders) {
       if (activeStatuses.includes(order.status)) {
         activeCount++;
@@ -210,5 +223,43 @@ export const orderService = {
 
   addOrder(newOrder: OrderItem): void {
     ordersMemoryStore = [newOrder, ...ordersMemoryStore];
+    persistOrders();
+  },
+
+  updateOrderStatus(orderId: string, status: OrderStatus, cleanerName?: string): boolean {
+    const index = ordersMemoryStore.findIndex((item) => item.id === orderId || item.orderNumber === orderId);
+    if (index === -1) return false;
+
+    const currentOrder = ordersMemoryStore[index];
+    const updatedOrder: OrderItem = {
+      ...currentOrder,
+      status,
+      cleaner: cleanerName
+        ? {
+            id: 'cln_assigned',
+            name: cleanerName,
+            phone: '09123456789',
+            rating: 4.9,
+            completedJobsCount: 154,
+          }
+        : currentOrder.cleaner,
+      updatedAt: new Date().toISOString(),
+      timeline: [
+        ...currentOrder.timeline.map((event) => ({ ...event, isCurrent: false })),
+        {
+          step: status === 'IN_PROGRESS' ? 'STARTED' : status === 'COMPLETED' ? 'FINISHED' : status === 'ASSIGNED' ? 'ASSIGNED' : status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRMED',
+          title: status === 'IN_PROGRESS' ? 'شروع فرآیند خدمت توسط متخصص' : 'به‌روزرسانی سفارش',
+          timestamp: 'هم‌اکنون',
+          description: cleanerName ? `سفارش توسط ${cleanerName} پذیرفته شد.` : undefined,
+          isCompleted: true,
+          isCurrent: true,
+        },
+      ],
+    };
+
+    ordersMemoryStore[index] = updatedOrder;
+    persistOrders();
+    return true;
   },
 };
+

@@ -6,7 +6,8 @@ import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { requestPayment, toPaymentAmountInRials, verifyPayment, type PaymentRequest } from '../../api/payment';
 import { calculateFinalPrice, type RecurringFrequency } from '../../utils/pricing';
-import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useProfile } from '../../features/profile';
+import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle, Wallet, Banknote } from 'lucide-react';
 
 const STEPS = [
   { id: 1, title: 'نوع سرویس', icon: Sparkles },
@@ -37,6 +38,7 @@ export const BookingWizardContainer: React.FC = () => {
     addressDetails,
     serviceOptions,
     updateAddressField,
+    setPaymentReceipt,
     nextStep,
     prevStep,
   } = useBooking();
@@ -55,9 +57,46 @@ export const BookingWizardContainer: React.FC = () => {
   const paymentAmountInRials = toPaymentAmountInRials(totalPrice);
   const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
 
+  const { profile, deductWallet } = useProfile();
+  const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'WALLET' | 'CASH'>('ONLINE');
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');
   const [paymentMsg, setPaymentMsg] = useState<string | null>(null);
   const [paymentAuthority, setPaymentAuthority] = useState<string | null>(null);
+
+  const handleWalletPayment = () => {
+    if (!selectedService || !addressDetails.contactPhone) return;
+    if (profile.walletBalance < totalPrice) {
+      setPaymentMsg('موجودی کیف پول شما کافی نیست. لطفاً کیف پول خود را در تب پروفایل شارژ نمایید.');
+      setPaymentStatus('failed');
+      return;
+    }
+
+    const deducted = deductWallet(totalPrice, `پرداخت سفارش رزرو ${selectedService.title}`);
+    if (deducted) {
+      setPaymentStatus('success');
+      setPaymentMsg('مبلغ با موفقیت از کیف پول شما کسر و سفارش قطعی شد.');
+      setPaymentReceipt({
+        orderId: `ORD-${Date.now().toString().slice(-6)}`,
+        status: 'PAID',
+        amountInRials: totalPrice * 10,
+        paidAt: new Date().toISOString(),
+        refId: `WAL-${Date.now().toString().slice(-8)}`,
+      });
+    }
+  };
+
+  const handleCashPayment = () => {
+    if (!selectedService || !addressDetails.contactPhone) return;
+    setPaymentStatus('success');
+    setPaymentMsg('سفارش شما با شیوه پرداخت نقدی ثبت شد. تسویه حساب پس از اتمام خدمت انجام خواهد شد.');
+    setPaymentReceipt({
+      orderId: `ORD-${Date.now().toString().slice(-6)}`,
+      status: 'PAID',
+      amountInRials: totalPrice * 10,
+      paidAt: new Date().toISOString(),
+      refId: `CASH-${Date.now().toString().slice(-8)}`,
+    });
+  };
 
   const handlePayment = async () => {
     if (!selectedService || !addressDetails.contactPhone) return;
@@ -313,6 +352,62 @@ export const BookingWizardContainer: React.FC = () => {
               </span>
             </div>
 
+            {/* انتخاب شیوه پرداخت */}
+            <div className="space-y-2 pt-1">
+              <label className="text-xs font-bold text-slate-700">انتخاب روش تسویه و پرداخت:</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('ONLINE')}
+                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    paymentMethod === 'ONLINE'
+                      ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold">درگاه آنلاین</span>
+                    <CreditCard className="w-4 h-4 text-sky-600" />
+                  </div>
+                  <span className="text-[10px] text-slate-500">کارت‌های شتابی</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('WALLET')}
+                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    paymentMethod === 'WALLET'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold">کیف پول</span>
+                    <Wallet className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    موجودی: {profile.walletBalance.toLocaleString('fa-IR')} ت
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CASH')}
+                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    paymentMethod === 'CASH'
+                      ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs font-bold">نقدی در محل</span>
+                    <Banknote className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <span className="text-[10px] text-slate-500">تسویه پس از خدمت</span>
+                </button>
+              </div>
+            </div>
+
             {/* Payment Status Panel */}
             {(paymentStatus === 'requesting' || paymentStatus === 'success' || paymentStatus === 'failed') && (
               <div className={`rounded-2xl border p-4 space-y-2 text-sm ${
@@ -333,7 +428,7 @@ export const BookingWizardContainer: React.FC = () => {
                   <>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span className="text-emerald-800 font-bold">پرداخت با موفقیت انجام شد</span>
+                      <span className="text-emerald-800 font-bold">پرداخت و ثبت سفارش با موفقیت انجام شد</span>
                     </div>
                     {paymentMsg && (
                       <div className="text-xs text-emerald-700 bg-emerald-100/50 rounded-lg p-2">{paymentMsg}</div>
@@ -341,7 +436,7 @@ export const BookingWizardContainer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-1"
+                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-1 cursor-pointer"
                     >
                       بازگشت
                     </button>
@@ -368,7 +463,7 @@ export const BookingWizardContainer: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-2"
+                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-2 cursor-pointer"
                     >
                       رها کردن و بازگشت
                     </button>
@@ -387,15 +482,37 @@ export const BookingWizardContainer: React.FC = () => {
               </button>
 
               {paymentStatus === 'idle' ? (
-                <button
-                  type="button"
-                  onClick={handlePayment}
-                  disabled={!selectedService || !addressDetails.contactPhone}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-emerald-600/20 cursor-pointer"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>اتصال به درگاه و پرداخت آنلاین</span>
-                </button>
+                paymentMethod === 'ONLINE' ? (
+                  <button
+                    type="button"
+                    onClick={handlePayment}
+                    disabled={!selectedService || !addressDetails.contactPhone}
+                    className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-sky-600/20 cursor-pointer"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>اتصال به درگاه و پرداخت آنلاین</span>
+                  </button>
+                ) : paymentMethod === 'WALLET' ? (
+                  <button
+                    type="button"
+                    onClick={handleWalletPayment}
+                    disabled={!selectedService || !addressDetails.contactPhone || profile.walletBalance < totalPrice}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-emerald-600/20 cursor-pointer"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span>پرداخت با کیف پول ({formattedTotalPrice} تومان)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleCashPayment}
+                    disabled={!selectedService || !addressDetails.contactPhone}
+                    className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-amber-600/20 cursor-pointer"
+                  >
+                    <Banknote className="w-4 h-4" />
+                    <span>ثبت سفارش با پرداخت نقدی</span>
+                  </button>
+                )
               ) : paymentStatus === 'requesting' ? (
                 <button
                   type="button"

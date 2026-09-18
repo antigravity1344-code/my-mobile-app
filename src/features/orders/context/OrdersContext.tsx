@@ -4,6 +4,7 @@ import type {
   OrderFilterTab,
   OrderSortOption,
   OrderStats,
+  OrderStatus,
 } from '../types/order';
 import { orderService } from '../services/orderService';
 
@@ -34,6 +35,7 @@ interface OrdersContextValue {
     tags?: string[],
   ) => Promise<{ success: boolean; error?: string }>;
   addNewOrder: (order: OrderItem) => void;
+  updateOrderStatus: (orderId: string, status: OrderStatus, cleanerName?: string) => boolean;
 }
 
 const OrdersContext = createContext<OrdersContextValue | undefined>(undefined);
@@ -122,6 +124,17 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [fetchOrders],
   );
 
+  const updateOrderStatus = useCallback(
+    (orderId: string, status: OrderStatus, cleanerName?: string) => {
+      const ok = orderService.updateOrderStatus(orderId, status, cleanerName);
+      if (ok) {
+        void fetchOrders();
+      }
+      return ok;
+    },
+    [fetchOrders],
+  );
+
   return (
     <OrdersContext.Provider
       value={{
@@ -146,6 +159,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         cancelOrder,
         rateOrder,
         addNewOrder,
+        updateOrderStatus,
       }}
     >
       {children}

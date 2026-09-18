@@ -14,6 +14,7 @@ import {
   Sofa,
 } from 'lucide-react';
 import { useBooking } from '../../context/BookingContext';
+import { useOrders } from '../../features/orders';
 import { CleanersScreen } from '../../features/cleaners';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
@@ -164,9 +165,18 @@ export const SpecialistPortalScreen: React.FC = () => {
 
   const filteredOrders = mockOrders.filter((order) => order.roleRequired === activeRole);
 
+  const { updateOrderStatus } = useOrders();
+
   const handleAcceptOrder = (orderId: string) => {
     if (!acceptedOrders.includes(orderId)) {
       setAcceptedOrders([...acceptedOrders, orderId]);
+      const roleNames: Record<SpecialistRole, string> = {
+        cleaner: 'مریم حسینی (نظافتچی ویژه)',
+        hourly_laborer: 'علی اکبری (کارگر ساعتی)',
+        painter: 'حسین جعفری (نقاش ساختمانی)',
+        sofa_cleaner: 'مهدی مرادی (متخصص شستشوی مبل)',
+      };
+      updateOrderStatus(orderId, 'IN_PROGRESS', roleNames[activeRole]);
     }
   };
 
