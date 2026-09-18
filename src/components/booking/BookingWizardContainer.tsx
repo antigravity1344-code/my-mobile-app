@@ -16,7 +16,11 @@ const STEPS = [
   { id: 4, title: 'تایید و فاکتور', icon: CreditCard },
 ];
 
-export const BookingWizardContainer: React.FC = () => {
+export interface BookingWizardContainerProps {
+  onNavigateHome?: () => void;
+}
+
+export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ onNavigateHome }) => {
   const {
     step,
     setStep,
@@ -209,6 +213,7 @@ export const BookingWizardContainer: React.FC = () => {
               setSelectedService(svc);
             }}
             onNext={nextStep}
+            onPrev={onNavigateHome || prevStep}
           />
         )}
 

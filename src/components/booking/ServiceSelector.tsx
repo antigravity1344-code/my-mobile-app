@@ -7,6 +7,7 @@ interface ServiceSelectorProps {
   selectedService: CleaningService | null;
   onSelectService: (svc: CleaningService) => void;
   onNext: () => void;
+  onPrev?: () => void;
 }
 
 const FALLBACK_ICON = <Sparkles className="w-5 h-5" />;
@@ -15,6 +16,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedService,
   onSelectService,
   onNext,
+  onPrev,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -118,7 +120,9 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+          onClick={onPrev}
+          disabled={!onPrev}
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
         >
           ← مرحله قبل
         </button>

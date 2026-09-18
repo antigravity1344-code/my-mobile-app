@@ -50,6 +50,66 @@ export function MainDashboard() {
           </div>
         </div>
 
+        {/* تب‌های ناوبری در حالت وب */}
+        {viewMode === 'wizard' && (
+          <div className="bg-slate-900 p-1 rounded-lg border border-slate-800 flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('Home')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Home' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>خانه</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('Wizard')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Wizard' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <CalendarCheck className="w-3.5 h-3.5" />
+              <span>رزرو</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('Orders')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Orders' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>سفارش‌ها</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('Specialist')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Specialist' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>متخصصین</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('Profile')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Profile' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>پروفایل</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('Admin')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'Admin' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>مدیریت</span>
+            </button>
+          </div>
+        )}
+
         {/* سوییچ حالت نمایش */}
         <div className="bg-slate-900 p-1 rounded-lg border border-slate-800 flex items-center gap-1">
           <button
@@ -78,7 +138,29 @@ export function MainDashboard() {
         {/* حالت اول: ویزارد تمام‌صفحه */}
         {viewMode === 'wizard' && (
           <div className="w-full max-w-4xl">
-            <BookingWizardContainer />
+            {activeTab === 'Home' ? (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
+                <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />
+              </div>
+            ) : activeTab === 'Orders' ? (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
+                <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />
+              </div>
+            ) : activeTab === 'Specialist' ? (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
+                <SpecialistPortalScreen />
+              </div>
+            ) : activeTab === 'Profile' ? (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
+                <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />
+              </div>
+            ) : activeTab === 'Admin' ? (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
+                <AdminPanelScreen />
+              </div>
+            ) : (
+              <BookingWizardContainer onNavigateHome={() => setActiveTab('Home')} />
+            )}
           </div>
         )}
 
@@ -187,7 +269,7 @@ export function MainDashboard() {
 
                 <div className="flex-1 overflow-y-auto p-3">
                   {activeTab === 'Home' && <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />}
-                  {activeTab === 'Wizard' && <BookingWizardContainer />}
+                  {activeTab === 'Wizard' && <BookingWizardContainer onNavigateHome={() => setActiveTab('Home')} />}
                   {activeTab === 'Orders' && <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Specialist' && <SpecialistPortalScreen />}
                   {activeTab === 'Profile' && <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />}
