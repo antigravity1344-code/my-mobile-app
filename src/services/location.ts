@@ -34,8 +34,7 @@ export const getCurrentPosition = async (): Promise<AddressCoordinates | null> =
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
     };
-  } catch (error) {
-    console.warn('[Location] getCurrentPosition failed:', error);
+  } catch {
     return null;
   }
 };

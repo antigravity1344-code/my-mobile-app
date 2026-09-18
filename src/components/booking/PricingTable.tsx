@@ -15,6 +15,10 @@ const SCENARIOS: Array<{ title: string; serviceId: string; options: PricingOptio
   { title: 'راه‌پله، ۳ طبقه', serviceId: 'staircase_common_areas', options: { floors: 3, buildingAge: 'نوساز تا ۱۰ سال' } },
   { title: 'راه‌پله، ۵ طبقه با پارکینگ', serviceId: 'staircase_common_areas', options: { floors: 5, parking: true, buildingAge: 'نوساز تا ۱۰ سال' } },
   { title: 'مبل‌شویی، ۷ نفره', serviceId: 'sofa_carpet_washing', options: { sofaSeats: '۷ نفره', mattresses: 0 } },
+  { title: 'کارگر ساعتی، ۳ ساعت (۱ نفر)', serviceId: 'hourly_labor', options: { hours: 3, workerCount: '۱ نفر' } },
+  { title: 'کارگر ساعتی، ۴ ساعت (۲ نفر)', serviceId: 'hourly_labor', options: { hours: 4, workerCount: '۲ نفر', tools: true } },
+  { title: 'نقاشی، ۵۰ متر (رنگ معمولی)', serviceId: 'building_painting', options: { area: 50, paintType: 'رنگ معمولی', location: 'داخلی' } },
+  { title: 'نقاشی، ۸۰ متر (وینیل، تهیه رنگ)', serviceId: 'building_painting', options: { area: 80, paintType: 'رنگ وینیل ضدآب', location: 'داخلی', providePaint: true } },
 ];
 
 export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) => (

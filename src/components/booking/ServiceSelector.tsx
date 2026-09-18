@@ -34,7 +34,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       <div>
         <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-sky-600" />
-          <span>۱. انتخاب نوع سرویس نظافت</span>
+          <span>۱. انتخاب نوع سرویس</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
           خدمتی که نیاز دارید را انتخاب کنید. قیمت‌ها به‌صورت ساعتی یا ثابت محاسبه می‌شوند.

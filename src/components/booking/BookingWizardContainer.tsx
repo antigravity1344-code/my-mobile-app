@@ -269,7 +269,12 @@ export const BookingWizardContainer: React.FC = () => {
                   <span className="text-xs font-bold text-slate-700">مدت زمان و تخصص:</span>
                 </div>
                 <span className="text-xs font-bold text-slate-900">
-                  {durationHours} ساعت نظافت (متخصص {genderPreference === 'FEMALE' ? 'خانم' : genderPreference === 'MALE' ? 'آقا' : 'بدون ترجیح'})
+                  {selectedService?.pricingType === 'per_sqm'
+                    ? `متراژ تخمینی: ${serviceOptions['area'] || '۵۰'} متر مربع`
+                    : selectedService?.id === 'hourly_labor'
+                    ? `${serviceOptions['workerCount'] || '۱ نفر'} کارگر ساعتی — ${serviceOptions['hours'] || durationHours} ساعت`
+                    : `${durationHours} ساعت (متخصص ${genderPreference === 'FEMALE' ? 'خانم' : genderPreference === 'MALE' ? 'آقا' : 'بدون ترجیح'})`
+                  }
                 </span>
               </div>
 
@@ -412,7 +417,7 @@ export const BookingWizardContainer: React.FC = () => {
                   className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/20 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>تایید済み — برگشت</span>
+                  <span>پرداخت انجام شد — بازگشت</span>
                 </button>
               ) : (
                 <button
