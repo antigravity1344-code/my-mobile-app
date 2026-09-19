@@ -350,7 +350,8 @@ export function MainDashboard() {
 }
 
 export default function App(props?: Record<string, unknown>) {
-  const rawFlavor = (props?.appFlavor || props?.exp?.initialProps?.appFlavor) as string | undefined;
+  const expObj = props?.exp as Record<string, any> | undefined;
+  const rawFlavor = (props?.appFlavor || expObj?.initialProps?.appFlavor) as string | undefined;
   const flavor = rawFlavor?.toLowerCase() === 'worker' ? 'WORKER' : 'CUSTOMER';
   return (
     <BookingProvider>

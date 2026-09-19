@@ -16,7 +16,7 @@ import {
   User,
 } from 'lucide-react-native';
 import { useOrders } from '../../features/orders';
-import { useBooking } from '../../context/BookingContext';
+import { useBooking } from '../../context/WorkerBookingContext';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
