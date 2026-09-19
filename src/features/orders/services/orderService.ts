@@ -7,6 +7,7 @@ import type {
 } from '../types/order';
 import { INITIAL_MOCK_ORDERS } from './mockOrdersData';
 import { appStorage } from '../../../utils/storage';
+import { apiFetch } from '../../../api/apiClient';
 
 // Memory store for runtime mutations
 let ordersMemoryStore: OrderItem[] = [...INITIAL_MOCK_ORDERS];
@@ -221,9 +222,47 @@ export const orderService = {
     };
   },
 
-  addOrder(newOrder: OrderItem): void {
-    ordersMemoryStore = [newOrder, ...ordersMemoryStore];
-    persistOrders();
+  async addOrder(newOrder: OrderItem): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+    try {
+      const payload = {
+        userId: 'USER-101',
+        customerName: newOrder.address?.recipientName || 'کاربر مشتری',
+        customerPhone: newOrder.address?.contactPhone || '09121111111',
+        serviceTitle: newOrder.serviceTitle,
+        address: newOrder.address?.fullAddress || `${newOrder.address?.district || ''} پلاک ${newOrder.address?.plaque || ''}`,
+        date: `${newOrder.date?.monthName || ''} ${newOrder.date?.dayOfMonth || ''}`,
+        time: newOrder.timeSlot?.label || `${newOrder.timeSlot?.startTime || ''} - ${newOrder.timeSlot?.endTime || ''}`,
+        price: newOrder.pricing?.total || 350000,
+        notes: newOrder.address?.addressNotes || '',
+      };
+
+      const res = await apiFetch('/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.success) {
+        return {
+          success: false,
+          error: res.message || 'خطا در ثبت سفارش در سرور مرکزی. سفارش ثبت نشد.'
+        };
+      }
+
+      if (res.order && res.order.id) {
+        newOrder.id = res.order.id;
+        newOrder.orderNumber = res.order.id;
+      }
+
+      ordersMemoryStore = [newOrder, ...ordersMemoryStore];
+      persistOrders();
+
+      return { success: true, order: newOrder };
+    } catch (err) {
+      return {
+        success: false,
+        error: 'برقرار نشدن ارتباط با سرور. لطفاً اتصال شبکه را بررسی فرمایید.'
+      };
+    }
   },
 
   updateOrderStatus(orderId: string, status: OrderStatus, cleanerName?: string): boolean {

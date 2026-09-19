@@ -16,7 +16,7 @@ export const PaymentReceiptScreen = () => {
   const isPaid = receipt.status === 'PAID';
 
   // ثبت سفارش جدید در ماژول مدیریت سفارش‌ها پس از تایید موفقیت در پرداخت
-  const handleReturnHome = () => {
+  const handleReturnHome = async () => {
     if (isPaid && receipt) {
       const newOrder: OrderItem = {
         id: receipt.orderId,
@@ -77,7 +77,7 @@ export const PaymentReceiptScreen = () => {
         updatedAt: receipt.paidAt,
       };
 
-      addNewOrder(newOrder);
+      await addNewOrder(newOrder);
     }
     booking.resetBooking();
   };

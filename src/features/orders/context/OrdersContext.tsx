@@ -34,7 +34,7 @@ interface OrdersContextValue {
     comment?: string,
     tags?: string[],
   ) => Promise<{ success: boolean; error?: string }>;
-  addNewOrder: (order: OrderItem) => void;
+  addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string }>;
   updateOrderStatus: (orderId: string, status: OrderStatus, cleanerName?: string) => boolean;
 }
 
@@ -117,9 +117,12 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const addNewOrder = useCallback(
-    (order: OrderItem) => {
-      orderService.addOrder(order);
-      void fetchOrders();
+    async (order: OrderItem) => {
+      const res = await orderService.addOrder(order);
+      if (res.success) {
+        void fetchOrders();
+      }
+      return res;
     },
     [fetchOrders],
   );
