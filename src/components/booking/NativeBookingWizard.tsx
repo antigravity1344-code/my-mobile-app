@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -85,6 +85,12 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
   };
   const [pricingVisible, setPricingVisible] = useState(false);
+
+  useEffect(() => {
+    if (submissionState === 'success') {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    }
+  }, [submissionState]);
   const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
   const filteredDistricts = districts.filter((district) => district.includes(districtSearch.trim()));
   const pricing: FinalPrice = booking.selectedService && booking.selectedDate
@@ -315,30 +321,40 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ برآوردی</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
           </View>
           <Text style={styles.mockHint}>پرداخت بعد از انجام کار انجام می‌شود. الان فقط درخواست ثبت می‌شود.</Text>
-          {submissionMessage && <Text style={submissionState === 'success' ? styles.successMessage : styles.errorMessage}>{submissionMessage}</Text>}
           {submissionState === 'success' ? (
-            <Pressable
-              onPress={() => {
-                const orderId = createdOrderId;
-                booking.resetBooking();
-                setSubmissionState('idle');
-                setSubmissionMessage(null);
-                setCreatedOrderId(null);
-                if (orderId) onOrderCreated?.(orderId);
-              }}
-              style={styles.primary}
-            >
-              <Text style={styles.primaryText}>مشاهده سفارش‌ها</Text>
-            </Pressable>
+            <View style={styles.successCard}>
+              <Text style={styles.successTitle}>سفارش ثبت شد</Text>
+              {createdOrderId ? (
+                <Text style={styles.successOrderId}>شماره سفارش: {createdOrderId}</Text>
+              ) : null}
+              {submissionMessage ? <Text style={styles.successMessage}>{submissionMessage}</Text> : null}
+              <Text style={styles.successHint}>پرداخت بعد از انجام کار است. جزئیات را در فهرست سفارش‌ها ببینید.</Text>
+              <Pressable
+                onPress={() => {
+                  const orderId = createdOrderId;
+                  booking.resetBooking();
+                  setSubmissionState('idle');
+                  setSubmissionMessage(null);
+                  setCreatedOrderId(null);
+                  if (orderId) onOrderCreated?.(orderId);
+                }}
+                style={styles.successCta}
+              >
+                <Text style={styles.successCtaText}>مشاهده سفارش‌ها</Text>
+              </Pressable>
+            </View>
           ) : (
-            <Pressable
-              disabled={submissionState === 'submitting'}
-              onPress={submitCurrentBooking}
-              style={[styles.primary, submissionState === 'submitting' && styles.disabled]}
-            >
-              {submissionState === 'submitting' && <ActivityIndicator color="#fff" />}
-              <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'ثبت سفارش'}</Text>
-            </Pressable>
+            <>
+              {submissionMessage ? <Text style={styles.errorMessage}>{submissionMessage}</Text> : null}
+              <Pressable
+                disabled={submissionState === 'submitting'}
+                onPress={submitCurrentBooking}
+                style={[styles.primary, submissionState === 'submitting' && styles.disabled]}
+              >
+                {submissionState === 'submitting' && <ActivityIndicator color="#fff" />}
+                <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'ثبت سفارش'}</Text>
+              </Pressable>
+            </>
           )}
         </View>}
 
@@ -350,6 +366,12 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
 
 const styles = StyleSheet.create({
   successMessage: { color: '#166534', backgroundColor: '#dcfce7', padding: 12, borderRadius: 12, textAlign: 'right' },
+  successCard: { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#86efac', borderRadius: 16, padding: 16, gap: 10 },
+  successTitle: { textAlign: 'right', color: '#166534', fontWeight: '900', fontSize: 18 },
+  successOrderId: { textAlign: 'right', color: '#15803d', fontWeight: '700', fontSize: 13 },
+  successHint: { textAlign: 'right', color: '#166534', fontSize: 12, lineHeight: 19 },
+  successCta: { marginTop: 4, backgroundColor: '#059669', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  successCtaText: { color: '#fff', fontWeight: '900', fontSize: 15 },
   earlyBirdHint: { color: '#047857', backgroundColor: '#ecfdf5', padding: 11, borderRadius: 12, textAlign: 'right', fontSize: 12, lineHeight: 19 },
   recurringHint: { color: '#047857', backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, padding: 11, borderRadius: 12, textAlign: 'right', fontSize: 12, lineHeight: 19 },
   discountLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ecfdf5', borderRadius: 10, padding: 10 },
