@@ -8,10 +8,11 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, LogOut } from 'lucide-react-native';
+import { User, LogOut, ClipboardList } from 'lucide-react-native';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
+import { OrdersScreen } from '../../features/orders';
 import { useProfile } from '../../features/profile';
 import { appStorage } from '../../utils/storage';
 
@@ -34,6 +35,8 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [mainView, setMainView] = useState<'wizard' | 'orders'>('wizard');
+  const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -132,15 +135,35 @@ export const NativeCustomerApp: React.FC = () => {
         </View>
 
         <View style={styles.bannerActions}>
+          <Pressable
+            onPress={() => setMainView(mainView === 'orders' ? 'wizard' : 'orders')}
+            style={[styles.logoutIconButton, mainView === 'orders' && styles.ordersActiveButton]}
+          >
+            <ClipboardList size={16} color={mainView === 'orders' ? '#fff' : '#94a3b8'} />
+          </Pressable>
           <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
             <LogOut size={16} color="#94a3b8" />
           </Pressable>
         </View>
       </View>
 
-      {/* محتوای رزرو مشتری */}
       <View style={styles.content}>
-        <NativeBookingWizard />
+        {mainView === 'orders' ? (
+          <OrdersScreen
+            initialOrderId={focusOrderId}
+            onNavigateToBooking={() => {
+              setFocusOrderId(null);
+              setMainView('wizard');
+            }}
+          />
+        ) : (
+          <NativeBookingWizard
+            onOrderCreated={(orderId) => {
+              setFocusOrderId(orderId);
+              setMainView('orders');
+            }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -210,6 +233,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 10,
     backgroundColor: '#0f172a',
+  },
+  ordersActiveButton: {
+    backgroundColor: '#0284c7',
   },
   content: {
     flex: 1,

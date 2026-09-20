@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -28,6 +28,7 @@ import { OrderRatingModal } from './OrderRatingModal';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
+  initialOrderId?: string | null;
 }
 
 const SORT_OPTIONS: { key: OrderSortOption; label: string }[] = [
@@ -37,7 +38,7 @@ const SORT_OPTIONS: { key: OrderSortOption; label: string }[] = [
   { key: 'PRICE_LOW', label: 'کمترین مبلغ' },
 ];
 
-export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking }) => {
+export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking, initialOrderId }) => {
   const {
     orders,
     loading,
@@ -61,6 +62,13 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking 
   } = useOrders();
 
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  useEffect(() => {
+    void refreshOrders();
+    if (initialOrderId) {
+      selectOrder(initialOrderId);
+    }
+  }, [initialOrderId]);
 
   const activeRatingOrder = ratingModalOrderId
     ? allOrders.find((item) => item.id === ratingModalOrderId)

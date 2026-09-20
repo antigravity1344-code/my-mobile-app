@@ -51,7 +51,7 @@ interface OrdersContextValue {
     comment?: string,
     tags?: string[],
   ) => Promise<{ success: boolean; error?: string }>;
-  addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string }>;
+  addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string; order?: OrderItem }>;
   updateOrderStatus: (orderId: string, status: OrderStatus, cleanerName?: string) => boolean;
 }
 

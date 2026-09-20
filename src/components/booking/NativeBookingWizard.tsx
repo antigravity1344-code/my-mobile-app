@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,18 +10,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Check, Clock, CreditCard, MapPin, Sparkles, Wallet } from 'lucide-react-native';
+import { Check, Clock, MapPin, Sparkles } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
-import { PaymentReceiptScreen } from './PaymentReceiptScreen';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { submitBooking } from '../../api/booking';
 import { calculateFinalPrice, type FinalPrice } from '../../utils/pricing';
-import { requestPayment, toPaymentAmountInRials, verifyPayment } from '../../api/payment';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
 import { isValidAddress, normalizePersianDigits, getAddressValidationErrors } from '../../utils/bookingValidation';
+import { useOrders, type OrderItem } from '../../features/orders';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -70,15 +67,18 @@ const StepHeader = ({ step }: { step: number }) => (
   </View>
 );
 
-export const NativeBookingWizard = () => {
+interface NativeBookingWizardProps {
+  onOrderCreated?: (orderId: string) => void;
+}
+
+export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps) => {
   const booking = useBooking();
-  const { setPaymentReceipt } = booking;
+  const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'pending' | 'success' | 'error'>('idle');
+  const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'CASH'>('ONLINE');
-  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [districtSearch, setDistrictSearch] = useState('');
   const [pricingVisible, setPricingVisible] = useState(false);
   const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
@@ -110,40 +110,6 @@ export const NativeBookingWizard = () => {
       total: 0,
     };
   const total = pricing.total;
-  const totalInRials = toPaymentAmountInRials(total);
-
-  useEffect(() => {
-    const handlePaymentCallback = async (url: string) => {
-      if (!url.startsWith('paksho://payment-result')) return;
-      const authorityMatch = url.match(/[?&]authority=([^&]+)/);
-      const authority = authorityMatch ? decodeURIComponent(authorityMatch[1]) : null;
-      if (!authority) {
-        setSubmissionState('error');
-        setSubmissionMessage('پاسخ درگاه فاقد کد پیگیری است.');
-        return;
-      }
-      setSubmissionState('submitting');
-      const result = await verifyPayment(authority, totalInRials);
-      const success = result.success;
-      setSubmissionState(success ? 'success' : 'error');
-      setPaymentReceipt({
-        orderId: pendingOrderId || 'UNKNOWN',
-        status: success ? 'PAID' : 'FAILED',
-        amountInRials: totalInRials,
-        refId: result.refId,
-        paidAt: new Date().toISOString(),
-        error: success ? undefined : result.error || 'پرداخت تایید نشد.',
-      });
-    };
-
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      void handlePaymentCallback(url);
-    });
-    void Linking.getInitialURL().then((url) => {
-      if (url) void handlePaymentCallback(url);
-    });
-    return () => subscription.remove();
-  }, [pendingOrderId, setPaymentReceipt, totalInRials]);
 
   const selectService = (service: CleaningService, options: Record<string, string | number | boolean> = {}) => {
     booking.setSelectedService(service);
@@ -174,94 +140,65 @@ export const NativeBookingWizard = () => {
     if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot) return;
     setSubmissionState('submitting');
     setSubmissionMessage(null);
-    const result = await submitBooking({
-      selectedService: booking.selectedService,
-      selectedDate: booking.selectedDate,
-      selectedTimeSlot: booking.selectedTimeSlot,
+
+    const now = new Date().toISOString();
+    const addressDetails = {
+      ...booking.addressDetails,
+      plaque: normalizePersianDigits(booking.addressDetails.plaque),
+      unit: normalizePersianDigits(booking.addressDetails.unit),
+      contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
+    };
+
+    const newOrder: OrderItem = {
+      id: `TEMP-${Date.now()}`,
+      orderNumber: `TEMP-${Date.now()}`,
+      serviceId: booking.selectedService.id,
+      serviceTitle: booking.selectedService.title,
+      serviceSubtitle: booking.selectedService.subtitle,
+      pricingType: booking.selectedService.pricingType,
+      status: 'PENDING',
+      paymentStatus: 'PENDING',
+      paymentMethod: 'CASH',
+      date: booking.selectedDate,
+      timeSlot: booking.selectedTimeSlot,
       durationHours: booking.durationHours,
       genderPreference: booking.genderPreference,
-      notes: booking.notes,
       serviceOptions: booking.serviceOptions,
       recurringFrequency: booking.recurringFrequency,
       customerTier: booking.customerTier,
-      customer_rating: booking.customerRating,
-      cleaner_rating: booking.cleanerRating,
-      metadata: {
-        customer_tier: booking.customerTier,
-        recurring_frequency: booking.recurringFrequency,
-        customer_rating: booking.customerRating,
-        cleaner_rating: booking.cleanerRating,
-      },
+      address: addressDetails,
       pricing,
-      addressDetails: {
-        ...booking.addressDetails,
-        plaque: normalizePersianDigits(booking.addressDetails.plaque),
-        unit: normalizePersianDigits(booking.addressDetails.unit),
-        contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
-      },
-    });
+      timeline: [
+        {
+          step: 'SUBMITTED',
+          title: 'ثبت درخواست',
+          timestamp: now,
+          description: 'درخواست شما ثبت شد و در انتظار تأیید است.',
+          isCompleted: true,
+          isCurrent: true,
+        },
+      ],
+      notes: booking.notes,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const result = await addNewOrder(newOrder);
     if (result.success) {
-      if (!result.orderId || !booking.selectedService) {
-        setSubmissionState('error');
-        setSubmissionMessage('سفارش ثبت شد اما شناسه سفارش برای پرداخت دریافت نشد.');
-        return;
-      }
-      setPendingOrderId(result.orderId);
-      const payment = await requestPayment({
-        orderId: result.orderId,
-        amount: totalInRials,
-        description: `رزرو ${booking.selectedService.title}`,
-        mobile: booking.addressDetails.contactPhone,
-        paymentMethod,
-        callbackUrl: 'paksho://payment-result',
-      });
-      if (!payment.success) {
-        setSubmissionState('error');
-        setSubmissionMessage(payment.error || 'لینک پرداخت دریافت نشد.');
-        booking.setPaymentReceipt({
-          orderId: result.orderId,
-          status: 'FAILED',
-          amountInRials: totalInRials,
-          paidAt: new Date().toISOString(),
-          error: payment.error || 'لینک پرداخت دریافت نشد.',
-        });
-        return;
-      }
-      if (payment.isMock && payment.authority) {
-        const verification = await verifyPayment(payment.authority, totalInRials);
-        const success = verification.success;
-        setSubmissionState(success ? 'success' : 'error');
-        setSubmissionMessage(success ? `پرداخت آزمایشی تایید شد. شناسه پیگیری: ${verification.refId || 'نامشخص'}` : verification.error || 'پرداخت تایید نشد.');
-        booking.setPaymentReceipt({
-          orderId: result.orderId,
-          status: success ? 'PAID' : 'FAILED',
-          amountInRials: totalInRials,
-          refId: verification.refId,
-          paidAt: new Date().toISOString(),
-          error: success ? undefined : verification.error || 'پرداخت تایید نشد.',
-        });
-        return;
-      }
-      if (!payment.payUrl) {
-        setSubmissionState('error');
-        setSubmissionMessage('لینک پرداخت دریافت نشد.');
-        return;
-      }
-      await Linking.openURL(payment.payUrl);
-      setSubmissionState('pending');
-      setSubmissionMessage(`سفارش ${result.orderId} ثبت شد. پرداخت در درگاه بازشده در انتظار تأیید است.`);
+      const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
+      setCreatedOrderId(orderId);
+      setSubmissionState('success');
+      setSubmissionMessage(`درخواست شما ثبت شد. شماره سفارش: ${orderId}`);
     } else {
       setSubmissionState('error');
       setSubmissionMessage(result.error || 'ثبت سفارش انجام نشد.');
     }
   };
 
-  if (booking.paymentReceipt) return <PaymentReceiptScreen />;
-
   const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}><Sparkles size={22} color="#fff" /></View>
@@ -337,7 +274,7 @@ export const NativeBookingWizard = () => {
         </View>}
 
         {booking.step === 4 && <View style={styles.section}>
-          <Text style={styles.heading}>بازبینی و پرداخت</Text>
+          <Text style={styles.heading}>بازبینی و ثبت سفارش</Text>
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {booking.selectedDate?.dayOfMonth} {booking.selectedTimeSlot?.label}</Text>
@@ -348,23 +285,39 @@ export const NativeBookingWizard = () => {
             {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان ({booking.customerTier})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.recurringDiscountDeferred && <Text style={styles.recurringHint}>فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.</Text>}
             {pricing.recurringDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text><Text style={styles.discountAmount}>-{pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
-            <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل پرداخت</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
+            <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ برآوردی</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
           </View>
-          {submissionState === 'idle' && <View style={styles.paymentBox}>
-            <Text style={styles.label}>روش پرداخت</Text>
-            <View style={styles.paymentMethods}>
-              <Pressable onPress={() => setPaymentMethod('ONLINE')} style={[styles.paymentMethod, paymentMethod === 'ONLINE' && styles.paymentMethodSelected]}><CreditCard size={19} color="#0284c7" /><View style={styles.flex}><Text style={styles.cardTitle}>پرداخت آنلاین</Text><Text style={styles.muted}>درگاه امن پرداخت</Text></View>{paymentMethod === 'ONLINE' && <Check size={18} color="#059669" />}</Pressable>
-              <Pressable onPress={() => setPaymentMethod('CASH')} style={[styles.paymentMethod, paymentMethod === 'CASH' && styles.paymentMethodSelected]}><Wallet size={19} color="#0284c7" /><View style={styles.flex}><Text style={styles.cardTitle}>پرداخت نقدی</Text><Text style={styles.muted}>هماهنگی با نیروی خدماتی</Text></View>{paymentMethod === 'CASH' && <Check size={18} color="#059669" />}</Pressable>
-            </View>
-            <Text style={styles.mockHint}>حالت آزمایشی فعال است؛ پرداخت بدون اتصال به سرور شبیه‌سازی می‌شود.</Text>
-          </View>}
-          {submissionMessage && <Text style={submissionState === 'pending' ? styles.pendingMessage : submissionState === 'success' ? styles.successMessage : styles.errorMessage}>{submissionMessage}</Text>}
-          {submissionState === 'pending' || submissionState === 'success' ? <Pressable onPress={() => { booking.resetBooking(); setSubmissionState('idle'); setSubmissionMessage(null); }} style={styles.primary}><Text style={styles.primaryText}>بازگشت به شروع</Text></Pressable> : <Pressable disabled={submissionState === 'submitting'} onPress={submitCurrentBooking} style={[styles.primary, submissionState === 'submitting' && styles.disabled]}>{submissionState === 'submitting' && <ActivityIndicator color="#fff" />}<Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال پردازش پرداخت...' : 'تایید و پرداخت'}</Text></Pressable>}
+          <Text style={styles.mockHint}>پرداخت بعد از انجام کار انجام می‌شود. الان فقط درخواست ثبت می‌شود.</Text>
+          {submissionMessage && <Text style={submissionState === 'success' ? styles.successMessage : styles.errorMessage}>{submissionMessage}</Text>}
+          {submissionState === 'success' ? (
+            <Pressable
+              onPress={() => {
+                const orderId = createdOrderId;
+                booking.resetBooking();
+                setSubmissionState('idle');
+                setSubmissionMessage(null);
+                setCreatedOrderId(null);
+                if (orderId) onOrderCreated?.(orderId);
+              }}
+              style={styles.primary}
+            >
+              <Text style={styles.primaryText}>مشاهده سفارش‌ها</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              disabled={submissionState === 'submitting'}
+              onPress={submitCurrentBooking}
+              style={[styles.primary, submissionState === 'submitting' && styles.disabled]}
+            >
+              {submissionState === 'submitting' && <ActivityIndicator color="#fff" />}
+              <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'ثبت سفارش'}</Text>
+            </Pressable>
+          )}
         </View>}
 
         {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} style={styles.back}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -377,3 +330,4 @@ const styles = StyleSheet.create({
   discountAmount: { color: '#059669', fontSize: 13, fontWeight: '800' },
   screen: { flex: 1, backgroundColor: '#f8fafc' }, content: { padding: 20, paddingTop: 56, paddingBottom: 40 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7' }, title: { textAlign: 'right', color: '#0f172a', fontSize: 22, fontWeight: '800' }, subtitle: { textAlign: 'right', color: '#64748b', fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: '#0284c7' }, stepNumber: { color: '#64748b', fontWeight: '700' }, stepNumberActive: { color: '#fff' }, stepLabel: { color: '#94a3b8', fontSize: 11 }, stepLabelActive: { color: '#0284c7', fontWeight: '700' }, section: { gap: 12 }, pricingButton: { alignItems: 'center', padding: 13, borderRadius: 13, backgroundColor: '#e0f2fe' }, pricingButtonText: { color: '#0369a1', fontWeight: '800' }, optionBlock: { gap: 8 }, toggle: { alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }, toggleSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, heading: { textAlign: 'right', color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 6 }, label: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 8 }, labeledInput: { flex: 1, gap: 6 }, inputLabel: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, padding: 15 }, cardSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 14 }, muted: { color: '#64748b', fontSize: 11, textAlign: 'right' }, configuration: { color: '#0369a1', fontSize: 10, textAlign: 'right', marginTop: 3 }, price: { color: '#059669', fontSize: 11, fontWeight: '700', textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' }, dateDay: { color: '#475569', fontSize: 11 }, dateNumber: { color: '#0f172a', fontWeight: '800' }, slot: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, choiceText: { color: '#475569', fontSize: 12 }, choiceTextSelected: { color: '#fff', fontWeight: '700', fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#e0f2fe' }, gpsText: { color: '#0369a1', fontWeight: '700' }, inputError: { borderColor: '#ef4444', borderWidth: 1 }, inputSuccess: { borderColor: '#10b981', borderWidth: 1 }, input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: '#0f172a', textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { flex: 1 }, chip: { paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' }, chipSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
 });
+
