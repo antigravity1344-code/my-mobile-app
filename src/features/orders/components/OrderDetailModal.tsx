@@ -10,6 +10,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import { SUPPORT_TEL_URL } from '../../support';
 import {
   X,
   Phone,
@@ -67,7 +68,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   const handleCallSupport = () => {
-    void Linking.openURL('tel:02191001234');
+    void Linking.openURL(SUPPORT_TEL_URL);
   };
 
   const handleConfirmCancel = async () => {

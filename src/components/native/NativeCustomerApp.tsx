@@ -8,12 +8,13 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, LogOut, ClipboardList, Settings } from 'lucide-react-native';
+import { User, LogOut, ClipboardList, Settings, HelpCircle } from 'lucide-react-native';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { OrdersScreen } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
+import { NativeSupportScreen } from '../../features/support';
 import { appStorage } from '../../utils/storage';
 
 const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
@@ -35,7 +36,7 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile'>('wizard');
+  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile' | 'support'>('wizard');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -154,6 +155,12 @@ export const NativeCustomerApp: React.FC = () => {
 
         <View style={styles.bannerActions}>
           <Pressable
+            onPress={() => setMainView(mainView === 'support' ? 'wizard' : 'support')}
+            style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
+          >
+            <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
+          </Pressable>
+          <Pressable
             onPress={() => setMainView(mainView === 'profile' ? 'wizard' : 'profile')}
             style={[styles.logoutIconButton, mainView === 'profile' && styles.ordersActiveButton]}
           >
@@ -182,6 +189,14 @@ export const NativeCustomerApp: React.FC = () => {
           />
         ) : mainView === 'profile' ? (
           <NativeProfileScreen onLogout={handleLogout} />
+        ) : mainView === 'support' ? (
+          <NativeSupportScreen
+            user={{
+              id: userData.id,
+              name: userData.name || '',
+              phone: userData.phone,
+            }}
+          />
         ) : (
           <NativeBookingWizard
             onOrderCreated={(orderId) => {
