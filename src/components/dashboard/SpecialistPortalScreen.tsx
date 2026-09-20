@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Briefcase,
   Hammer,
@@ -13,9 +13,11 @@ import {
   AlertCircle,
   Sofa,
 } from 'lucide-react';
-import { useBooking } from '../../context/BookingContext';
 import { useOrders } from '../../features/orders';
+import { useProfile } from '../../features/profile';
 import { CleanersScreen } from '../../features/cleaners';
+import { apiFetch } from '../../api/apiClient';
+import { appStorage } from '../../utils/storage';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -37,146 +39,158 @@ interface OpenOrder {
   status: 'OPEN' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
+function roleForService(serviceId: string): SpecialistRole {
+  if (serviceId === 'hourly_labor') return 'hourly_laborer';
+  if (serviceId === 'building_painting') return 'painter';
+  if (serviceId === 'sofa_carpet_washing') return 'sofa_cleaner';
+  return 'cleaner';
+}
+
+function mapApiOrderToOpenOrder(order: any): OpenOrder {
+  const serviceId = order.serviceId || 'home_unit_cleaning';
+  const addressText =
+    typeof order.address === 'string'
+      ? order.address
+      : order.address?.fullAddress || '';
+  const district =
+    (typeof order.address === 'object' && order.address?.district) ||
+    (typeof addressText === 'string'
+      ? addressText.split('،')[0] || addressText.split(' ')[0]
+      : '') ||
+    '—';
+
+  let status: OpenOrder['status'] = 'OPEN';
+  if (order.status === 'ACCEPTED' || order.status === 'ASSIGNED') status = 'ACCEPTED';
+  else if (order.status === 'IN_PROGRESS') status = 'IN_PROGRESS';
+  else if (order.status === 'COMPLETED') status = 'COMPLETED';
+  else status = 'OPEN';
+
+  const details: Record<string, string | number | boolean> = {};
+  if (order.serviceOptions && typeof order.serviceOptions === 'object') {
+    for (const [k, v] of Object.entries(order.serviceOptions)) {
+      if (v !== undefined && v !== null) details[k] = v as string | number | boolean;
+    }
+  } else if (order.notes) {
+    details['توضیحات'] = String(order.notes);
+  }
+
+  return {
+    id: order.id,
+    serviceId,
+    serviceTitle: order.serviceTitle || 'سفارش',
+    roleRequired: roleForService(serviceId),
+    badge:
+      order.pricingType === 'hourly'
+        ? 'ساعتی'
+        : order.pricingType === 'per_sqm'
+          ? 'متراژی'
+          : order.badge || 'سفارش',
+    customerName: order.customerName || order.address?.recipientName || '—',
+    phone: order.customerPhone || order.address?.contactPhone || '—',
+    district,
+    address: addressText || '—',
+    date: order.date || '—',
+    timeSlot: order.time || order.timeSlot?.label || '—',
+    priceTotal: order.price || order.pricing?.total || 0,
+    paymentMethod: order.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
+    details,
+    status,
+  };
+}
+
+function readStoredUserId(raw: unknown): string {
+  if (!raw) return '';
+  if (typeof raw === 'object' && raw !== null && 'id' in (raw as any)) {
+    return String((raw as any).id || '');
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed?.id ? String(parsed.id) : '';
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
 export const SpecialistPortalScreen: React.FC = () => {
-  const { paymentReceipt, selectedService, addressDetails, selectedDate, selectedTimeSlot } = useBooking();
+  const { refreshOrders } = useOrders();
+  const { profile } = useProfile();
   const [activeRole, setActiveRole] = useState<SpecialistRole>('cleaner');
-  const [acceptedOrders, setAcceptedOrders] = useState<string[]>([]);
   const [portalView, setPortalView] = useState<'orders' | 'cleaners'>('orders');
+  const [availableOrdersRaw, setAvailableOrdersRaw] = useState<any[]>([]);
+  const [loadingAvailable, setLoadingAvailable] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [workerUserId, setWorkerUserId] = useState<string>('');
 
-  const dateLabel = selectedDate
-    ? `${selectedDate.dayOfWeek} ${selectedDate.dayOfMonth} ${selectedDate.monthName}`
-    : 'امروز - ۲۷ شهریور';
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const workerRaw = await appStorage.getItem<unknown>('PAKSHO_USER_WORKER', null);
+      const customerRaw = await appStorage.getItem<unknown>('PAKSHO_USER_CUSTOMER', null);
+      let id = readStoredUserId(workerRaw);
+      if (!id) id = profile.id || '';
+      if (!id) id = readStoredUserId(customerRaw);
+      if (alive) setWorkerUserId(id);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [profile.id]);
 
-  // سفارش‌های نمونه پویا بر اساس تمام نقش‌ها
-  const mockOrders: OpenOrder[] = [
-    {
-      id: paymentReceipt ? paymentReceipt.orderId : 'ORD-2026-9041',
-      serviceId: selectedService?.id || 'home_unit_cleaning',
-      serviceTitle: selectedService?.title || 'نظافت داخل منزل / واحد',
-      roleRequired:
-        selectedService?.id === 'hourly_labor'
-          ? 'hourly_laborer'
-          : selectedService?.id === 'building_painting'
-          ? 'painter'
-          : selectedService?.id === 'sofa_carpet_washing'
-          ? 'sofa_cleaner'
-          : 'cleaner',
-      badge: selectedService?.badge || 'ساعتی',
-      customerName: addressDetails.recipientName || 'علی رضایی',
-      phone: addressDetails.contactPhone || '۰۹۱۲۳۴۵۶۷۸۹',
-      district: addressDetails.district || 'سعادت‌آباد',
-      address: addressDetails.fullAddress || 'خیابان سرو، پلاک ۲۴، واحد ۳',
-      date: dateLabel,
-      timeSlot: selectedTimeSlot?.label || '۱۰:۰۰ تا ۱۲:۰۰ (صبح)',
-      priceTotal: paymentReceipt ? Math.round(paymentReceipt.amountInRials / 10) : 600000,
-      paymentMethod: 'ONLINE',
-      details: {
-        'مدت کار': '۴ ساعت',
-        'ترجیح نیروی کار': 'خانم / آقا',
-      },
-      status: 'OPEN',
-    },
-    {
-      id: 'ORD-2026-8812',
-      serviceId: 'hourly_labor',
-      serviceTitle: 'کارگر ساعتی (جابجایی اثاثیه و تخلیه انبار)',
-      roleRequired: 'hourly_laborer',
-      badge: 'ساعتی',
-      customerName: 'محمد کاظمی',
-      phone: '۰۹۱۲۹۸۷۶۵۴۳',
-      district: 'شهرک غرب',
-      address: 'بلوار دادمان، خیابان درختی، پلاک ۱۲',
-      date: 'فردا - ۲۸ شهریور',
-      timeSlot: '۰۸:۰۰ تا ۱۱:۰۰ (صبح زود)',
-      priceTotal: 440000,
-      paymentMethod: 'ONLINE',
-      details: {
-        'تعداد نیرو': '۲ نفر کارگر',
-        'مدت کار': '۳ ساعت',
-        'تهیه ابزار': 'بله (+۸۰,۰۰۰ تومان)',
-      },
-      status: 'OPEN',
-    },
-    {
-      id: 'ORD-2026-7734',
-      serviceId: 'building_painting',
-      serviceTitle: 'نقاشی کامل ساختمان (پذیرایی و اتاق‌ها)',
-      roleRequired: 'painter',
-      badge: 'متراژی',
-      customerName: 'رضا حدادی',
-      phone: '۰۹۳۵۱۱۱۲۲۳۳',
-      district: 'نیاوران',
-      address: 'خیابان باهنر، کوچه یاس، پلاک ۸، واحد ۵',
-      date: 'شنبه - ۲۹ شهریور',
-      timeSlot: '۰۹:۰۰ تا ۱۷:۰۰ (تمام وقت)',
-      priceTotal: 5100000,
-      paymentMethod: 'CASH',
-      details: {
-        'متراژ تقریبی': '۶۰ متر مربع',
-        'نوع رنگ': 'رنگ وینیل ضدآب',
-        'تهیه رنگ': 'توسط پاکشو',
-        'بتونه‌کاری': 'بتونه‌کاری کامل دیوار',
-      },
-      status: 'OPEN',
-    },
-    {
-      id: 'ORD-2026-6651',
-      serviceId: 'sofa_carpet_washing',
-      serviceTitle: 'مبل‌شویی و شستشوی تشک در محل',
-      roleRequired: 'sofa_cleaner',
-      badge: 'تعدادی',
-      customerName: 'سارا نوری',
-      phone: '۰۹۱۲۷۷۷۸۸۹۹',
-      district: 'ونک',
-      address: 'خیابان ملاصدرا، پلاک ۴۵، واحد ۲',
-      date: 'یکشنبه - ۳۰ شهریور',
-      timeSlot: '۱۱:۰۰ تا ۱۴:۰۰ (ظهر)',
-      priceTotal: 850000,
-      paymentMethod: 'ONLINE',
-      details: {
-        'تعداد نشیمن مبل': '۷ نفره',
-        'تعداد تشک': '۲ عدد',
-        'دستگاه خشک‌کن': 'همراه با دستگاه نازل و تزریق',
-      },
-      status: 'OPEN',
-    },
-    {
-      id: 'ORD-2026-5522',
-      serviceId: 'home_unit_cleaning',
-      serviceTitle: 'نظافت کامل واحد ۱۲۰ متری',
-      roleRequired: 'cleaner',
-      badge: 'ساعتی',
-      customerName: 'مریم ابراهیمی',
-      phone: '۰۹۱۲۴۴۴۵۵۶۶',
-      district: 'پونک',
-      address: 'بلوار همیلا، خیابان استاد نظری، پلاک ۴',
-      date: 'امروز - ۲۷ شهریور',
-      timeSlot: '۱۴:۰۰ تا ۱۸:۰۰ (عصر)',
-      priceTotal: 720000,
-      paymentMethod: 'ONLINE',
-      details: {
-        'مدت کار': '۴ ساعت',
-        'دیوارشویی': 'بله',
-        'مواد شوینده': 'توسط مشتری',
-      },
-      status: 'OPEN',
-    },
-  ];
+  const loadAvailable = useCallback(async () => {
+    setLoadingAvailable(true);
+    setLoadError(null);
+    try {
+      const availRes = await apiFetch('/orders/available');
+      if (availRes.success && Array.isArray(availRes.orders)) {
+        setAvailableOrdersRaw(availRes.orders);
+      } else {
+        setAvailableOrdersRaw([]);
+        setLoadError(availRes.message || availRes.error || 'سفارش بازی از سرور دریافت نشد.');
+      }
+    } catch {
+      setAvailableOrdersRaw([]);
+      setLoadError('خطا در ارتباط با سرور برای سفارش‌های باز.');
+    } finally {
+      setLoadingAvailable(false);
+    }
+  }, []);
 
-  const filteredOrders = mockOrders.filter((order) => order.roleRequired === activeRole);
+  useEffect(() => {
+    void loadAvailable();
+  }, [loadAvailable]);
 
-  const { updateOrderStatus } = useOrders();
+  const filteredOrders = useMemo(() => {
+    return availableOrdersRaw
+      .map(mapApiOrderToOpenOrder)
+      .filter((order) => order.roleRequired === activeRole && order.status === 'OPEN');
+  }, [availableOrdersRaw, activeRole]);
 
-  const handleAcceptOrder = (orderId: string) => {
-    if (!acceptedOrders.includes(orderId)) {
-      setAcceptedOrders([...acceptedOrders, orderId]);
-      const roleNames: Record<SpecialistRole, string> = {
-        cleaner: 'مریم حسینی (نظافتچی ویژه)',
-        hourly_laborer: 'علی اکبری (کارگر ساعتی)',
-        painter: 'حسین جعفری (نقاش ساختمانی)',
-        sofa_cleaner: 'مهدی مرادی (متخصص شستشوی مبل)',
-      };
-      updateOrderStatus(orderId, 'IN_PROGRESS', roleNames[activeRole]);
+  const handleAcceptOrder = async (orderId: string) => {
+    if (!workerUserId) {
+      setLoadError('شناسه متخصص واقعی پیدا نشد. با حساب متخصص وارد شوید.');
+      return;
+    }
+    setAcceptingId(orderId);
+    setLoadError(null);
+    try {
+      const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/accept', {
+        method: 'PUT',
+        body: JSON.stringify({ cleanerId: workerUserId }),
+      });
+      if (res.success) {
+        await loadAvailable();
+        void refreshOrders();
+      } else {
+        setLoadError(res.message || res.error || 'پذیرش سفارش ناموفق بود.');
+      }
+    } catch {
+      setLoadError('خطا در پذیرش سفارش.');
+    } finally {
+      setAcceptingId(null);
     }
   };
 
@@ -285,14 +299,31 @@ export const SpecialistPortalScreen: React.FC = () => {
 
       {/* لیست سفارشات قابل انتخاب */}
       <div className="space-y-3">
-        {filteredOrders.length === 0 ? (
+        {loadingAvailable ? (
+          <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-slate-500 space-y-1">
+            <Briefcase className="w-8 h-8 text-slate-300 mx-auto animate-pulse" />
+            <p className="text-xs font-bold">در حال بارگذاری سفارش‌ها...</p>
+          </div>
+        ) : loadError ? (
+          <div className="bg-white border border-dashed border-rose-300 rounded-2xl p-6 text-center text-rose-600 space-y-2">
+            <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
+            <p className="text-xs font-bold">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void loadAvailable()}
+              className="text-[11px] font-bold text-sky-700 underline cursor-pointer"
+            >
+              تلاش مجدد
+            </button>
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-slate-500 space-y-1">
             <Briefcase className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-xs font-bold">سفارش جدیدی برای این تخصص ثبت نشده است</p>
+            <p className="text-xs font-bold">سفارش بازی برای این تخصص نیست.</p>
           </div>
         ) : (
           filteredOrders.map((order) => {
-            const isAccepted = acceptedOrders.includes(order.id);
+            const isAccepted = order.status === 'ACCEPTED' || order.status === 'IN_PROGRESS' || order.status === 'COMPLETED';
 
             return (
               <div
@@ -372,11 +403,13 @@ export const SpecialistPortalScreen: React.FC = () => {
                 <div className="pt-1 flex gap-2">
                   {!isAccepted ? (
                     <button
-                      onClick={() => handleAcceptOrder(order.id)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      type="button"
+                      onClick={() => void handleAcceptOrder(order.id)}
+                      disabled={acceptingId === order.id || !workerUserId}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs py-2.5 rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>قبول این سفارش</span>
+                      <span>{acceptingId === order.id ? 'در حال پذیرش...' : 'قبول این سفارش'}</span>
                     </button>
                   ) : (
                     <div className="w-full flex items-center justify-between bg-emerald-100 border border-emerald-300 rounded-xl p-2 text-xs text-emerald-900">
