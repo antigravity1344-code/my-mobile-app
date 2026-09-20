@@ -18,21 +18,21 @@ interface WorkerBookingState {
 }
 
 const DEFAULT_ADDRESS: AddressDetails = {
-  district: 'سعادت‌آباد',
-  fullAddress: 'خیابان سرو، پلاک ۲۴، واحد ۳',
-  plaque: '۲۴',
-  unit: '۳',
-  floor: '۲',
+  district: '',
+  fullAddress: '',
+  plaque: '',
+  unit: '',
+  floor: '',
   hasElevator: true,
-  contactPhone: '۰۹۱۲۳۴۵۶۷۸۹',
-  recipientName: 'علی رضایی',
+  contactPhone: '',
+  recipientName: '',
   addressNotes: '',
   coordinates: {
-    latitude: 35.7794,
-    longitude: 51.3756,
+    latitude: 0,
+    longitude: 0,
   },
-  isSaved: true,
-};
+  isSaved: false,
+}
 
 const WorkerBookingContext = createContext<WorkerBookingState | undefined>(undefined);
 

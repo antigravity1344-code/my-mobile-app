@@ -45,7 +45,7 @@ interface BookingState {
 }
 
 const DEFAULT_ADDRESS: AddressDetails = {
-  district: 'سعادت‌آباد',
+  district: '',
   fullAddress: '',
   plaque: '',
   unit: '',
@@ -55,11 +55,11 @@ const DEFAULT_ADDRESS: AddressDetails = {
   recipientName: '',
   addressNotes: '',
   coordinates: {
-    latitude: 35.7794,
-    longitude: 51.3756,
+    latitude: 0,
+    longitude: 0,
   },
-  isSaved: true,
-};
+  isSaved: false,
+}
 
 const BookingContext = createContext<BookingState | undefined>(undefined);
 
