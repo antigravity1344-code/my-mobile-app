@@ -4,16 +4,16 @@ import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
-import { requestPayment, toPaymentAmountInRials, verifyPayment, type PaymentRequest } from '../../api/payment';
 import { calculateFinalPrice, type RecurringFrequency } from '../../utils/pricing';
-import { useProfile } from '../../features/profile';
-import { Sparkles, Calendar, MapPin, CreditCard, Check, Clock, ShieldCheck, Loader2, CheckCircle, XCircle, AlertCircle, Wallet, Banknote } from 'lucide-react';
+import { useOrders, type OrderItem } from '../../features/orders';
+import { normalizePersianDigits } from '../../utils/bookingValidation';
+import { Sparkles, Calendar, MapPin, Check, Clock, ShieldCheck, Loader2, CheckCircle, AlertCircle, ClipboardList } from 'lucide-react';
 
 const STEPS = [
   { id: 1, title: 'نوع سرویس', icon: Sparkles },
   { id: 2, title: 'زمان و تاریخ', icon: Calendar },
   { id: 3, title: 'آدرس و نقشه', icon: MapPin },
-  { id: 4, title: 'تایید و فاکتور', icon: CreditCard },
+  { id: 4, title: 'تایید و ثبت', icon: ClipboardList },
 ];
 
 export interface BookingWizardContainerProps {
@@ -42,7 +42,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     addressDetails,
     serviceOptions,
     updateAddressField,
-    setPaymentReceipt,
+    resetBooking,
     nextStep,
     prevStep,
   } = useBooking();
@@ -58,96 +58,70 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     )
     : null;
   const totalPrice = pricing?.total ?? 0;
-  const paymentAmountInRials = toPaymentAmountInRials(totalPrice);
-  const formattedTotalPrice = totalPrice.toLocaleString('fa-IR');
+  const { addNewOrder } = useOrders();
+  const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
-  const { profile, deductWallet } = useProfile();
-  const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'WALLET' | 'CASH'>('ONLINE');
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'requesting' | 'success' | 'failed'>('idle');
-  const [paymentMsg, setPaymentMsg] = useState<string | null>(null);
-  const [paymentAuthority, setPaymentAuthority] = useState<string | null>(null);
+  const canSubmit =
+    Boolean(selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque);
 
-  const handleWalletPayment = () => {
-    if (!selectedService || !addressDetails.contactPhone) return;
-    if (profile.walletBalance < totalPrice) {
-      setPaymentMsg('موجودی کیف پول شما کافی نیست. لطفاً کیف پول خود را در تب پروفایل شارژ نمایید.');
-      setPaymentStatus('failed');
-      return;
-    }
+  const submitPendingOrder = async () => {
+    if (!selectedService || !selectedDate || !selectedTimeSlot || !pricing) return;
+    setSubmissionState('submitting');
+    setSubmissionMessage(null);
 
-    const deducted = deductWallet(totalPrice, `پرداخت سفارش رزرو ${selectedService.title}`);
-    if (deducted) {
-      setPaymentStatus('success');
-      setPaymentMsg('مبلغ با موفقیت از کیف پول شما کسر و سفارش قطعی شد.');
-      setPaymentReceipt({
-        orderId: `ORD-${Date.now().toString().slice(-6)}`,
-        status: 'PAID',
-        amountInRials: totalPrice * 10,
-        paidAt: new Date().toISOString(),
-        refId: `WAL-${Date.now().toString().slice(-8)}`,
-      });
-    }
-  };
-
-  const handleCashPayment = () => {
-    if (!selectedService || !addressDetails.contactPhone) return;
-    setPaymentStatus('success');
-    setPaymentMsg('سفارش شما با شیوه پرداخت نقدی ثبت شد. تسویه حساب پس از اتمام خدمت انجام خواهد شد.');
-    setPaymentReceipt({
-      orderId: `ORD-${Date.now().toString().slice(-6)}`,
-      status: 'PAID',
-      amountInRials: totalPrice * 10,
-      paidAt: new Date().toISOString(),
-      refId: `CASH-${Date.now().toString().slice(-8)}`,
-    });
-  };
-
-  const handlePayment = async () => {
-    if (!selectedService || !addressDetails.contactPhone) return;
-    setPaymentStatus('requesting');
-    setPaymentMsg(null);
-    setPaymentAuthority(null);
-
-    const orderId = `ORDER-${Date.now()}`;
-    const req: PaymentRequest = {
-      orderId,
-      amount: paymentAmountInRials,
-      description: `${selectedService.title} — ${addressDetails.district}، پلاک ${addressDetails.plaque}`,
-      mobile: addressDetails.contactPhone,
+    const now = new Date().toISOString();
+    const normalizedAddress = {
+      ...addressDetails,
+      plaque: normalizePersianDigits(addressDetails.plaque),
+      unit: normalizePersianDigits(addressDetails.unit),
+      contactPhone: normalizePersianDigits(addressDetails.contactPhone),
     };
 
-    try {
-      const payResult = await requestPayment(req);
-      if (payResult.success && payResult.authority) {
-        setPaymentAuthority(payResult.authority);
-        setPaymentMsg(`کد تأیید: ${payResult.authority} — برای تأیید نهایی به درگاه مراجعه کنید.`);
-        setPaymentStatus('success');
-      } else {
-        setPaymentMsg(payResult.error || 'خطا در درخواست پرداخت.');
-        setPaymentStatus('failed');
-      }
-    } catch {
-      setPaymentMsg('خطا در ارتباط با درگاه پرداخت.');
-      setPaymentStatus('failed');
-    }
-  };
+    const newOrder: OrderItem = {
+      id: `TEMP-${Date.now()}`,
+      orderNumber: `TEMP-${Date.now()}`,
+      serviceId: selectedService.id,
+      serviceTitle: selectedService.title,
+      serviceSubtitle: selectedService.subtitle,
+      pricingType: selectedService.pricingType,
+      status: 'PENDING',
+      paymentStatus: 'PENDING',
+      paymentMethod: 'CASH',
+      date: selectedDate,
+      timeSlot: selectedTimeSlot,
+      durationHours,
+      genderPreference,
+      serviceOptions,
+      recurringFrequency,
+      customerTier,
+      address: normalizedAddress,
+      pricing,
+      timeline: [
+        {
+          step: 'SUBMITTED',
+          title: 'ثبت درخواست',
+          timestamp: now,
+          description: 'درخواست شما ثبت شد و در انتظار تأیید است.',
+          isCompleted: true,
+          isCurrent: true,
+        },
+      ],
+      notes,
+      createdAt: now,
+      updatedAt: now,
+    };
 
-  const handleVerifyPayment = async () => {
-    if (!paymentAuthority) return;
-    setPaymentStatus('requesting');
-    setPaymentMsg(null);
-    try {
-      const verifyResult = await verifyPayment(paymentAuthority, paymentAmountInRials);
-      if (verifyResult.success) {
-        setPaymentMsg(`پرداخت تایید شد! شناسه: ${verifyResult.refId}`);
-        setPaymentStatus('success');
-      } else {
-        setPaymentMsg(verifyResult.error || 'پرداخت تایید نشد.');
-        setPaymentStatus('failed');
-      }
-    } catch {
-      setPaymentMsg('خطا در تایید پرداخت.');
-      setPaymentStatus('failed');
+    const result = await addNewOrder(newOrder);
+    if (result.success) {
+      const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
+      setCreatedOrderId(orderId);
+      setSubmissionState('success');
+      setSubmissionMessage('سفارش ثبت شد. پرداخت بعد از انجام کار انجام می‌شود.');
+    } else {
+      setSubmissionState('error');
+      setSubmissionMessage(result.error || 'ثبت سفارش ناموفق بود.');
     }
   };
 
@@ -278,11 +252,11 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
           <div className="space-y-6 text-right">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-600" />
-                <span>۴. پیش‌فاکتور و بازبینی نهایی سفارش</span>
+                <ClipboardList className="w-5 h-5 text-emerald-600" />
+                <span>۴. بازبینی و ثبت سفارش</span>
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                اطلاعات ثبت‌شده را بررسی نموده و شیوه پرداخت را انتخاب کنید.
+                اطلاعات را بررسی کنید. پرداخت بعد از انجام کار است؛ الان فقط درخواست ثبت می‌شود.
               </p>
             </div>
 
@@ -332,7 +306,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               </div>
 
               <div className="flex justify-between items-center pt-2">
-                <span className="text-sm font-extrabold text-slate-900">مبلغ نهایی قابل پرداخت:</span>
+                <span className="text-sm font-extrabold text-slate-900">مبلغ برآوردی:</span>
                 <span className="text-base sm:text-lg font-black text-emerald-600">
                   {formattedTotalPrice} تومان
                 </span>
@@ -357,123 +331,34 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               </span>
             </div>
 
-            {/* انتخاب شیوه پرداخت */}
-            <div className="space-y-2 pt-1">
-              <label className="text-xs font-bold text-slate-700">انتخاب روش تسویه و پرداخت:</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('ONLINE')}
-                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
-                    paymentMethod === 'ONLINE'
-                      ? 'border-sky-500 bg-sky-50 text-sky-900 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-bold">درگاه آنلاین</span>
-                    <CreditCard className="w-4 h-4 text-sky-600" />
-                  </div>
-                  <span className="text-[10px] text-slate-500">کارت‌های شتابی</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('WALLET')}
-                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
-                    paymentMethod === 'WALLET'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-bold">کیف پول</span>
-                    <Wallet className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    موجودی: {profile.walletBalance.toLocaleString('fa-IR')} ت
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('CASH')}
-                  className={`p-2.5 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between gap-1.5 ${
-                    paymentMethod === 'CASH'
-                      ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-xs'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-xs font-bold">نقدی در محل</span>
-                    <Banknote className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <span className="text-[10px] text-slate-500">تسویه پس از خدمت</span>
-                </button>
-              </div>
+            {/* ثبت بدون پرداخت اولیه */}
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3.5 text-xs leading-relaxed text-sky-900">
+              پرداخت بعد از انجام کار انجام می‌شود. با ثبت سفارش، وضعیت پرداخت <strong>در انتظار</strong> خواهد بود.
             </div>
 
-            {/* Payment Status Panel */}
-            {(paymentStatus === 'requesting' || paymentStatus === 'success' || paymentStatus === 'failed') && (
-              <div className={`rounded-2xl border p-4 space-y-2 text-sm ${
-                paymentStatus === 'requesting' ? 'bg-slate-50 border-slate-200' :
-                paymentStatus === 'success' ? 'bg-emerald-50 border-emerald-200' :
-                'bg-red-50 border-red-200'
-              }`}>
-                {paymentStatus === 'requesting' && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 text-sky-600 animate-spin shrink-0" />
-                      <span className="text-slate-700 font-medium">در حال اتصال به درگاه پرداخت...</span>
-                    </div>
-                    <div className="text-xs text-slate-500">لطفاً صبور باشید (شبیه‌سازی تأخیر شبکه)</div>
-                  </>
+            {submissionMessage && (
+              <div
+                className={`rounded-2xl border p-4 text-sm ${
+                  submissionState === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : submissionState === 'error'
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+              >
+                {submissionState === 'success' && (
+                  <div className="mb-2 flex items-center gap-2 font-bold">
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                    <span>سفارش ثبت شد{createdOrderId ? ` · ${createdOrderId}` : ''}</span>
+                  </div>
                 )}
-                {paymentStatus === 'success' && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span className="text-emerald-800 font-bold">پرداخت و ثبت سفارش با موفقیت انجام شد</span>
-                    </div>
-                    {paymentMsg && (
-                      <div className="text-xs text-emerald-700 bg-emerald-100/50 rounded-lg p-2">{paymentMsg}</div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-1 cursor-pointer"
-                    >
-                      بازگشت
-                    </button>
-                  </>
+                {submissionState === 'error' && (
+                  <div className="mb-2 flex items-center gap-2 font-bold">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <span>خطا در ثبت</span>
+                  </div>
                 )}
-                {paymentStatus === 'failed' && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-                      <span className="text-red-700 font-bold">پرداخت ناموفق</span>
-                    </div>
-                    {paymentMsg && (
-                      <div className="text-xs text-red-600 bg-red-100/50 rounded-lg p-2">{paymentMsg}</div>
-                    )}
-                    {paymentStatus === 'failed' && paymentAuthority && (
-                      <button
-                        type="button"
-                        onClick={handleVerifyPayment}
-                        className="mt-2 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg font-medium transition cursor-pointer"
-                      >
-                        تلاش برای تایید مجدد
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline mt-2 cursor-pointer"
-                    >
-                      رها کردن و بازگشت
-                    </button>
-                  </>
-                )}
+                <div>{submissionMessage}</div>
               </div>
             )}
 
@@ -481,71 +366,48 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               <button
                 type="button"
                 onClick={prevStep}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                disabled={submissionState === 'submitting'}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
               >
                 <span>مرحله قبل (اصلاح آدرس)</span>
               </button>
 
-              {paymentStatus === 'idle' ? (
-                paymentMethod === 'ONLINE' ? (
-                  <button
-                    type="button"
-                    onClick={handlePayment}
-                    disabled={!selectedService || !addressDetails.contactPhone}
-                    className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-sky-600/20 cursor-pointer"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>اتصال به درگاه و پرداخت آنلاین</span>
-                  </button>
-                ) : paymentMethod === 'WALLET' ? (
-                  <button
-                    type="button"
-                    onClick={handleWalletPayment}
-                    disabled={!selectedService || !addressDetails.contactPhone || profile.walletBalance < totalPrice}
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-emerald-600/20 cursor-pointer"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span>پرداخت با کیف پول ({formattedTotalPrice} تومان)</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleCashPayment}
-                    disabled={!selectedService || !addressDetails.contactPhone}
-                    className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-amber-600/20 cursor-pointer"
-                  >
-                    <Banknote className="w-4 h-4" />
-                    <span>ثبت سفارش با پرداخت نقدی</span>
-                  </button>
-                )
-              ) : paymentStatus === 'requesting' ? (
+              {submissionState === 'success' ? (
                 <button
                   type="button"
-                  disabled
-                  className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white cursor-not-allowed"
+                  onClick={() => {
+                    resetBooking();
+                    setSubmissionState('idle');
+                    setSubmissionMessage(null);
+                    setCreatedOrderId(null);
+                    onNavigateHome?.();
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 cursor-pointer"
                 >
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>در انتظار...</span>
-                </button>
-              ) : paymentStatus === 'success' ? (
-                <button
-                  type="button"
-                  onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/20 cursor-pointer"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  <span>پرداخت شد — بازگشت</span>
+                  <CheckCircle className="h-4 w-4" />
+                  <span>مشاهده سفارش‌ها / بازگشت</span>
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => { setPaymentStatus('idle'); setPaymentMsg(null); setPaymentAuthority(null); }}
-                  className="flex items-center gap-1.5 rounded-xl bg-red-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-red-700 transition shadow-md shadow-red-600/20 cursor-pointer"
+                  onClick={() => void submitPendingOrder()}
+                  disabled={!canSubmit || submissionState === 'submitting'}
+                  className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-sky-600/20 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                 >
-                  <AlertCircle className="w-4 h-4" />
-                  <span>خطا — مجدداً تلاش</span>
+                  {submissionState === 'submitting' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>در حال ثبت سفارش...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardList className="h-4 w-4" />
+                      <span>ثبت سفارش</span>
+                    </>
+                  )}
                 </button>
               )}
+            </div>
             </div>
           </div>
         )}
