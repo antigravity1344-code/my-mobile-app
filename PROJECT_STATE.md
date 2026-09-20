@@ -4,7 +4,8 @@
 **نقطه تحویل امن:** پس از Completion — آماده توقف / انتقال به چت یا مدل بعدی  
 **Repo:** `antigravity1344-code/my-mobile-app`  
 **Branch:** `say_hello`  
-**HEAD تأییدشده:** `490f9a6` — `feat(orders): ACCEPTED to COMPLETED via complete endpoint`  
+**HEAD فعلی:** `dd02e62` — `docs: add PROJECT_STATE handoff snapshot`
+**آخرین commit عملکردی:** `490f9a6` — `feat(orders): ACCEPTED to COMPLETED via complete endpoint`
 **مسیر کاری محلی:** `C:\app` (ماشین `DESKTOP-TI55VSP`)  
 **Package مشتری:** `com.paksho.customer`
 
