@@ -127,6 +127,7 @@ export const NativeAppContainer: React.FC<NativeAppContainerProps> = ({ initialF
           <NativeBookingWizard />
         ) : (
           <NativeWorkerPortal
+            user={{ id: '1', phone: '', name: '', avatar: '', role: 'WORKER', status: 'APPROVED' }}
             onSwitchToCustomer={() => setCurrentRole('CUSTOMER')}
             onLogout={handleLogout}
           />

@@ -125,7 +125,7 @@ export const NativeWorkerApp: React.FC = () => {
       {/* اگر تایید شده: کارتابل سفارش‌ها */}
       <View style={styles.content}>
         {isApproved ? (
-          <NativeWorkerPortal />
+          <NativeWorkerPortal user={userData} />
         ) : (
           <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
         )}

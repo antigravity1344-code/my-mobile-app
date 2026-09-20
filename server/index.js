@@ -226,14 +226,14 @@ app.put('/api/users/worker-onboarding', (req, res) => {
 
 // 5. سفارش جدید
 app.post('/api/orders', (req, res) => {
-  const { userId, serviceTitle, address, date, time, price, notes } = req.body;
+  const { userId, customerName, customerPhone, serviceTitle, address, date, time, price, notes } = req.body;
   const user = db.users.find(u => u.id === userId);
 
   const newOrder = {
     id: 'ORD-' + Math.floor(100 + Math.random() * 900),
     customerId: userId,
     customerName: user ? user.name : 'کاربر مشتری',
-    customerPhone: user ? user.phone : '09120000000',
+    customerPhone: customerPhone || (user ? user.phone : '09120000000'),
     customerAvatar: user ? user.avatar : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
     serviceTitle: serviceTitle || 'نظافت عادی منزل',
     address: address || 'تهران، خیابان ولیعصر',
@@ -255,6 +255,19 @@ app.post('/api/orders', (req, res) => {
 });
 
 // 6. سفارش‌های آماده (متخصصین تایید شده)
+app.get('/api/orders', (req, res) => {
+  const { userId, role } = req.query;
+  let userOrders = db.orders;
+  
+  if (role === 'CUSTOMER' && userId) {
+    userOrders = db.orders.filter(o => o.customerId === userId);
+  } else if (role === 'WORKER' && userId) {
+    userOrders = db.orders.filter(o => o.cleanerId === userId);
+  }
+
+  res.json({ success: true, orders: userOrders });
+});
+
 app.get('/api/orders/available', (req, res) => {
   const availableOrders = db.orders.filter(o => o.status === 'PENDING');
   res.json({ success: true, orders: availableOrders });

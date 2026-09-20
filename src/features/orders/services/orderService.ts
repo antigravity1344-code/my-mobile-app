@@ -45,51 +45,59 @@ export const orderService = {
     searchQuery: string = '',
     sortOption: OrderSortOption = 'NEWEST',
   ): Promise<OrderItem[]> {
-    await wait(200);
+    try {
+      const res = await apiFetch('/orders?userId=USER-101&role=CUSTOMER');
+      let result: OrderItem[] = [];
+      if (res.success && res.orders) {
+        result = res.orders.map((o: any) => ({
+          id: o.id,
+          orderNumber: o.id,
+          serviceTitle: o.serviceTitle,
+          status: o.status,
+          date: { dayOfWeek: 'روز', dayOfMonth: o.date ? o.date.split(' ')[1] : '1', monthName: o.date ? o.date.split(' ')[0] : 'ماه' },
+          timeSlot: { label: o.time },
+          address: { district: o.address ? o.address.split(' ')[0] : 'نامشخص', fullAddress: o.address || '' },
+          pricing: { total: o.price || 0 },
+          createdAt: o.createdAt || new Date().toISOString(),
+          cleaner: o.cleanerId ? { id: o.cleanerId, name: 'متخصص پاکشو', phone: '09120000000', rating: 4.8, completedJobsCount: 10 } : undefined,
+          timeline: []
+        }));
+      } else {
+        result = [...ordersMemoryStore];
+      }
 
-    let result = [...ordersMemoryStore];
+      if (filterTab === 'ACTIVE') {
+        const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+        result = result.filter((item) => activeStatuses.includes(item.status));
+      } else if (filterTab === 'COMPLETED') {
+        result = result.filter((item) => item.status === 'COMPLETED');
+      } else if (filterTab === 'CANCELLED') {
+        result = result.filter((item) => item.status === 'CANCELLED');
+      }
 
-    // Filter by tab
-    if (filterTab === 'ACTIVE') {
-      const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
-      result = result.filter((item) => activeStatuses.includes(item.status));
-    } else if (filterTab === 'COMPLETED') {
-      result = result.filter((item) => item.status === 'COMPLETED');
-    } else if (filterTab === 'CANCELLED') {
-      result = result.filter((item) => item.status === 'CANCELLED');
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        result = result.filter(
+          (item) =>
+            item.orderNumber.toLowerCase().includes(q) ||
+            item.serviceTitle.toLowerCase().includes(q) ||
+            item.address.district.toLowerCase().includes(q) ||
+            item.address.fullAddress.toLowerCase().includes(q)
+        );
+      }
+
+      result.sort((a, b) => {
+        if (sortOption === 'NEWEST') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (sortOption === 'OLDEST') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (sortOption === 'PRICE_HIGH') return b.pricing.total - a.pricing.total;
+        if (sortOption === 'PRICE_LOW') return a.pricing.total - b.pricing.total;
+        return 0;
+      });
+
+      return result;
+    } catch (e) {
+      return [...ordersMemoryStore];
     }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter(
-        (item) =>
-          item.orderNumber.toLowerCase().includes(q) ||
-          item.serviceTitle.toLowerCase().includes(q) ||
-          item.address.district.toLowerCase().includes(q) ||
-          item.address.fullAddress.toLowerCase().includes(q) ||
-          (item.cleaner?.name && item.cleaner.name.toLowerCase().includes(q)),
-      );
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      if (sortOption === 'NEWEST') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      if (sortOption === 'OLDEST') {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }
-      if (sortOption === 'PRICE_HIGH') {
-        return b.pricing.total - a.pricing.total;
-      }
-      if (sortOption === 'PRICE_LOW') {
-        return a.pricing.total - b.pricing.total;
-      }
-      return 0;
-    });
-
-    return result;
   },
 
   async getOrderById(orderId: string): Promise<OrderItem | undefined> {
