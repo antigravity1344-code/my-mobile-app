@@ -8,12 +8,12 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, LogOut, ClipboardList } from 'lucide-react-native';
+import { User, LogOut, ClipboardList, Settings } from 'lucide-react-native';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { OrdersScreen } from '../../features/orders';
-import { useProfile } from '../../features/profile';
+import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { appStorage } from '../../utils/storage';
 
 const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
@@ -30,12 +30,12 @@ interface UserData {
 }
 
 export const NativeCustomerApp: React.FC = () => {
-  const { login, logout: profileLogout } = useProfile();
+  const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<'wizard' | 'orders'>('wizard');
+  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile'>('wizard');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,6 +51,12 @@ export const NativeCustomerApp: React.FC = () => {
           const user = JSON.parse(savedUserStr);
           setUserData(user);
           setIsLoggedIn(true);
+          syncAuthenticatedUser({
+            id: user.id,
+            name: user.name || '',
+            phone: user.phone,
+            avatar: user.avatar,
+          });
           if (!user.name || !user.isProfileComplete) {
             setShowOnboarding(true);
           }
@@ -68,6 +74,12 @@ export const NativeCustomerApp: React.FC = () => {
 
   const handleLogin = (user: UserData) => {
     login(user.phone);
+    syncAuthenticatedUser({
+      id: user.id,
+      name: user.name || '',
+      phone: user.phone,
+      avatar: user.avatar,
+    });
     setUserData(user);
     setIsLoggedIn(true);
     appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'true');
@@ -83,6 +95,12 @@ export const NativeCustomerApp: React.FC = () => {
     setUserData(updatedUser);
     setShowOnboarding(false);
     appStorage.setItem(STORAGE_USER_DATA_KEY, JSON.stringify(updatedUser));
+    syncAuthenticatedUser({
+      id: updatedUser.id,
+      name: updatedUser.name || '',
+      phone: updatedUser.phone,
+      avatar: updatedUser.avatar,
+    });
   };
 
   const handleLogout = () => {
@@ -136,6 +154,12 @@ export const NativeCustomerApp: React.FC = () => {
 
         <View style={styles.bannerActions}>
           <Pressable
+            onPress={() => setMainView(mainView === 'profile' ? 'wizard' : 'profile')}
+            style={[styles.logoutIconButton, mainView === 'profile' && styles.ordersActiveButton]}
+          >
+            <Settings size={16} color={mainView === 'profile' ? '#fff' : '#94a3b8'} />
+          </Pressable>
+          <Pressable
             onPress={() => setMainView(mainView === 'orders' ? 'wizard' : 'orders')}
             style={[styles.logoutIconButton, mainView === 'orders' && styles.ordersActiveButton]}
           >
@@ -156,6 +180,8 @@ export const NativeCustomerApp: React.FC = () => {
               setMainView('wizard');
             }}
           />
+        ) : mainView === 'profile' ? (
+          <NativeProfileScreen onLogout={handleLogout} />
         ) : (
           <NativeBookingWizard
             onOrderCreated={(orderId) => {
