@@ -119,6 +119,25 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     }
   };
 
+  const handleCompleteOrder = async (order: NativeOrder) => {
+    if (!user?.id) return;
+    try {
+      const res = await apiFetch('/orders/' + order.id + '/complete', {
+        method: 'PUT',
+        body: JSON.stringify({ cleanerId: user.id }),
+      });
+      if (res.success) {
+        setSuccessAlert('سفارش شماره ' + order.id + ' تکمیل شد.');
+        setTimeout(() => setSuccessAlert(null), 5000);
+        fetchOrders();
+      } else {
+        alert(res.message || 'خطا در تکمیل سفارش');
+      }
+    } catch (e) {
+      alert('خطا در ارتباط با سرور');
+    }
+  };
+
   const handleCallCustomer = (phone: string) => {
     Linking.openURL('tel:' + phone);
   };
@@ -330,10 +349,25 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                     <Text style={styles.wageLabel}>مبلغ تسویه:</Text>
                     <Text style={styles.wageValue}>{order.wageTotal.toLocaleString('fa-IR')} تومان</Text>
                   </View>
-                  <View style={styles.acceptedTag}>
-                    <CheckCircle size={14} color="#059669" />
-                    <Text style={styles.acceptedTagText}>تایید شده توسط شما</Text>
-                  </View>
+                  {order.status === 'COMPLETED' ? (
+                    <View style={styles.acceptedTag}>
+                      <CheckCircle size={14} color="#0284c7" />
+                      <Text style={[styles.acceptedTagText, { color: '#0284c7' }]}>تکمیل شده</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                      <View style={styles.acceptedTag}>
+                        <CheckCircle size={14} color="#059669" />
+                        <Text style={styles.acceptedTagText}>پذیرفته شده</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleCompleteOrder(order)}
+                        style={styles.completeButton}
+                      >
+                        <Text style={styles.completeButtonText}>اتمام کار</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             ))
@@ -402,4 +436,6 @@ const styles = StyleSheet.create({
   acceptButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   acceptedTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
   acceptedTagText: { color: '#059669', fontSize: 11, fontWeight: '700' },
+  completeButton: { backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  completeButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
 });

@@ -294,10 +294,38 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   order.status = 'ACCEPTED';
   order.cleanerId = cleanerId;
   order.cleanerName = cleaner.name;
+    res.json({ success: true, order });
+});
+
+// تکمیل سفارش توسط متخصص پذیرنده (ACCEPTED → COMPLETED)
+app.put('/api/orders/:orderId/complete', (req, res) => {
+  const { orderId } = req.params;
+  const { cleanerId } = req.body;
+
+  const order = db.orders.find(o => o.id === orderId);
+  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
+
+  if (order.status !== 'ACCEPTED') {
+    return res.status(400).json({ success: false, message: 'فقط سفارش‌های پذیرفته‌شده قابل تکمیل هستند.' });
+  }
+
+  if (!cleanerId || order.cleanerId !== cleanerId) {
+    return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
+  }
+
+  const cleaner = db.users.find(u => u.id === cleanerId);
+  if (!cleaner || (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE')) {
+    return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
+  }
+
+  order.status = 'COMPLETED';
+  order.completedAt = new Date().toISOString();
+  // ثبت/تأیید متخصص انجام‌دهنده
+  order.cleanerId = cleanerId;
+  order.cleanerName = cleaner.name;
   order.cleanerAvatar = cleaner.avatar;
 
   saveDb();
-
   res.json({ success: true, order });
 });
 
@@ -374,14 +402,21 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
   const order = db.orders.find(o => o.id === orderId);
   if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
 
-  if (status) order.status = status;
   if (cleanerId) {
     const cleaner = db.users.find(u => u.id === cleanerId);
     if (cleaner) {
       order.cleanerId = cleanerId;
       order.cleanerName = cleaner.name;
       order.cleanerAvatar = cleaner.avatar;
-      order.status = 'ACCEPTED';
+      if (!status || status === 'ACCEPTED') {
+        order.status = 'ACCEPTED';
+      }
+    }
+  }
+  if (status) {
+    order.status = status;
+    if (status === 'COMPLETED' && !order.completedAt) {
+      order.completedAt = new Date().toISOString();
     }
   }
 

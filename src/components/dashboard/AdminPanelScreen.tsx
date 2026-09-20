@@ -39,6 +39,16 @@ export const AdminPanelScreen: React.FC = () => {
     loadData();
   }, []);
 
+  const handleCompleteOrder = async (orderId: string) => {
+    setLoading(true);
+    const res = await apiFetch('/admin/orders/' + orderId, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'COMPLETED' }),
+    });
+    setLoading(false);
+    if (res.success) loadData();
+  };
+
   const handleUpdateWorkerStatus = async (userId: string, status: string) => {
     setLoading(true);
     const res = await apiFetch(`/admin/users/${userId}/status`, {
@@ -134,9 +144,17 @@ export const AdminPanelScreen: React.FC = () => {
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-mono text-slate-500 font-bold">{ord.id}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    ord.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    ord.status === 'COMPLETED'
+                      ? 'bg-sky-100 text-sky-800'
+                      : ord.status === 'ACCEPTED'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {ord.status === 'ACCEPTED' ? 'پذیرفته شده' : 'در انتظار متخصص'}
+                    {ord.status === 'COMPLETED'
+                      ? 'تکمیل شده'
+                      : ord.status === 'ACCEPTED'
+                        ? 'پذیرفته شده'
+                        : 'در انتظار متخصص'}
                   </span>
                 </div>
 
@@ -147,7 +165,20 @@ export const AdminPanelScreen: React.FC = () => {
                   {ord.cleanerName && (
                     <p><span className="text-slate-400">متخصص:</span> {ord.cleanerName}</p>
                   )}
+                  {ord.completedAt && (
+                    <p><span className="text-slate-400">زمان تکمیل:</span> {ord.completedAt}</p>
+                  )}
                 </div>
+                {ord.status === 'ACCEPTED' && (
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteOrder(ord.id)}
+                    disabled={loading}
+                    className="w-full bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
+                  >
+                    اتمام سفارش
+                  </button>
+                )}
               </div>
             ))
           )}

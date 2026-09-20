@@ -123,6 +123,8 @@ export const SpecialistPortalScreen: React.FC = () => {
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [myActiveOrders, setMyActiveOrders] = useState<OpenOrder[]>([]);
   const [workerUserId, setWorkerUserId] = useState<string>('');
 
   useEffect(() => {
@@ -147,6 +149,19 @@ export const SpecialistPortalScreen: React.FC = () => {
       const availRes = await apiFetch('/orders/available');
       if (availRes.success && Array.isArray(availRes.orders)) {
         setAvailableOrdersRaw(availRes.orders);
+      if (workerUserId) {
+        const mineRes = await apiFetch('/orders?userId=' + encodeURIComponent(workerUserId) + '&role=WORKER');
+        if (mineRes.success && Array.isArray(mineRes.orders)) {
+          const active = mineRes.orders
+            .filter((o: any) => o.status === 'ACCEPTED')
+            .map(mapApiOrderToOpenOrder);
+          setMyActiveOrders(active);
+        } else {
+          setMyActiveOrders([]);
+        }
+      } else {
+        setMyActiveOrders([]);
+      }
       } else {
         setAvailableOrdersRaw([]);
         setLoadError(availRes.message || availRes.error || 'سفارش بازی از سرور دریافت نشد.');
@@ -157,7 +172,7 @@ export const SpecialistPortalScreen: React.FC = () => {
     } finally {
       setLoadingAvailable(false);
     }
-  }, []);
+  }, [workerUserId]);
 
   useEffect(() => {
     void loadAvailable();
@@ -168,6 +183,31 @@ export const SpecialistPortalScreen: React.FC = () => {
       .map(mapApiOrderToOpenOrder)
       .filter((order) => order.roleRequired === activeRole && order.status === 'OPEN');
   }, [availableOrdersRaw, activeRole]);
+
+  const handleCompleteOrder = async (orderId: string) => {
+    if (!workerUserId) {
+      setLoadError('شناسه متخصص واقعی پیدا نشد. با حساب متخصص وارد شوید.');
+      return;
+    }
+    setCompletingId(orderId);
+    setLoadError(null);
+    try {
+      const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/complete', {
+        method: 'PUT',
+        body: JSON.stringify({ cleanerId: workerUserId }),
+      });
+      if (res.success) {
+        await loadAvailable();
+        void refreshOrders();
+      } else {
+        setLoadError(res.message || res.error || 'تکمیل سفارش ناموفق بود.');
+      }
+    } catch {
+      setLoadError('خطا در تکمیل سفارش.');
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
   const handleAcceptOrder = async (orderId: string) => {
     if (!workerUserId) {
@@ -299,7 +339,30 @@ export const SpecialistPortalScreen: React.FC = () => {
 
       {/* لیست سفارشات قابل انتخاب */}
       <div className="space-y-3">
-        {loadingAvailable ? (
+        {myActiveOrders.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-bold text-slate-800">کارهای فعال من ({myActiveOrders.length})</h4>
+          {myActiveOrders.map((order) => (
+            <div key={'mine-' + order.id} className="bg-white border border-emerald-200 rounded-xl p-3 space-y-2 text-right">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-mono font-bold text-slate-500">{order.id}</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">پذیرفته شده</span>
+              </div>
+              <p className="text-xs text-slate-700">{order.serviceTitle}</p>
+              <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>
+              <button
+                type="button"
+                onClick={() => handleCompleteOrder(order.id)}
+                disabled={completingId === order.id || !workerUserId}
+                className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-[11px] font-bold py-2 rounded-lg"
+              >
+                {completingId === order.id ? 'در حال تکمیل...' : 'اتمام کار'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+{loadingAvailable ? (
           <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-6 text-center text-slate-500 space-y-1">
             <Briefcase className="w-8 h-8 text-slate-300 mx-auto animate-pulse" />
             <p className="text-xs font-bold">در حال بارگذاری سفارش‌ها...</p>
