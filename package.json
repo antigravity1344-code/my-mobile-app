@@ -1,7 +1,7 @@
 {
   "name": "cleaning-mobile",
   "version": "1.0.0",
-  "main": "index.worker.ts",
+  "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "dev": "expo start",
