@@ -44,9 +44,15 @@ export const orderService = {
     filterTab: OrderFilterTab = 'ALL',
     searchQuery: string = '',
     sortOption: OrderSortOption = 'NEWEST',
+    userId: string,
   ): Promise<OrderItem[]> {
     try {
-      const res = await apiFetch('/orders?userId=USER-101&role=CUSTOMER');
+      const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
+      if (!trimmedUserId) {
+        return [...ordersMemoryStore];
+      }
+
+      const res = await apiFetch('/orders?userId=' + encodeURIComponent(trimmedUserId) + '&role=CUSTOMER');
       let result: OrderItem[] = [];
       if (res.success && res.orders) {
         result = res.orders.map((o: any) => ({
@@ -230,10 +236,18 @@ export const orderService = {
     };
   },
 
-  async addOrder(newOrder: OrderItem): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+  async addOrder(newOrder: OrderItem, userId: string): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
     try {
+      const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
+      if (!trimmedUserId) {
+        return {
+          success: false,
+          error: 'شناسه کاربر احراز هویت‌شده برای ثبت سفارش موجود نیست.',
+        };
+      }
+
       const payload = {
-        userId: 'USER-101',
+        userId: trimmedUserId,
         customerName: newOrder.address?.recipientName || 'کاربر مشتری',
         customerPhone: newOrder.address?.contactPhone || '09121111111',
         serviceTitle: newOrder.serviceTitle,

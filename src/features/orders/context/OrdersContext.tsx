@@ -7,6 +7,23 @@ import type {
   OrderStatus,
 } from '../types/order';
 import { orderService } from '../services/orderService';
+import { appStorage } from '../../../utils/storage';
+
+const CUSTOMER_USER_STORAGE_KEY = 'PAKSHO_USER_CUSTOMER';
+
+async function resolveCustomerUserId(): Promise<string> {
+  const savedUserStr = await appStorage.getItem<string>(CUSTOMER_USER_STORAGE_KEY, '');
+  if (!savedUserStr) {
+    return '';
+  }
+  try {
+    const parsed = JSON.parse(savedUserStr) as { id?: unknown };
+    return typeof parsed?.id === 'string' ? parsed.id.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 
 interface OrdersContextValue {
   orders: OrderItem[];
@@ -53,9 +70,10 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const fetchOrders = useCallback(async () => {
     try {
+      const userId = await resolveCustomerUserId();
       const [filtered, full] = await Promise.all([
-        orderService.getOrders(filterTab, searchQuery, sortOption),
-        orderService.getOrders('ALL', '', 'NEWEST'),
+        orderService.getOrders(filterTab, searchQuery, sortOption, userId),
+        orderService.getOrders('ALL', '', 'NEWEST', userId),
       ]);
       setOrders(filtered);
       setAllOrders(full);
@@ -118,7 +136,15 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addNewOrder = useCallback(
     async (order: OrderItem) => {
-      const res = await orderService.addOrder(order);
+      const userId = await resolveCustomerUserId();
+      if (!userId) {
+        return {
+          success: false,
+          error: 'شناسه کاربر احراز هویت‌شده برای ثبت سفارش موجود نیست.',
+        };
+      }
+
+      const res = await orderService.addOrder(order, userId);
       if (res.success) {
         void fetchOrders();
       }
