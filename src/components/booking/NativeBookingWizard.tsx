@@ -86,10 +86,11 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
   };
   const [pricingVisible, setPricingVisible] = useState(false);
-  const { profile } = useProfile();
+  const { profile, addSavedAddress } = useProfile();
   const savedAddresses = profile.savedAddresses ?? [];
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
   const defaultSavedAddressAppliedRef = useRef(false);
+  const profileContactPrefillRef = useRef(false);
 
   const applySavedAddressToWizard = (address: SavedAddress) => {
     booking.setAddressDetails((prev) => ({
@@ -110,6 +111,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
     if (booking.step !== 3) {
       if (booking.step < 3) {
         defaultSavedAddressAppliedRef.current = false;
+        profileContactPrefillRef.current = false;
       }
       return;
     }
@@ -126,8 +128,47 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
     if (defaultAddress && formLooksEmpty) {
       applySavedAddressToWizard(defaultAddress);
       defaultSavedAddressAppliedRef.current = true;
+      return;
     }
-  }, [booking.step, savedAddresses, selectedSavedAddressId, booking.addressDetails]);
+
+    // Soft prefill contact fields from the real logged-in profile only (once per step-3 entry).
+    if (!profileContactPrefillRef.current && profile.id && profile.isLoggedIn) {
+      profileContactPrefillRef.current = true;
+      if (!details.recipientName?.trim() && profile.fullName?.trim()) {
+        booking.updateAddressField('recipientName', profile.fullName.trim());
+      }
+      if (!details.contactPhone?.trim() && profile.phoneNumber?.trim()) {
+        booking.updateAddressField('contactPhone', profile.phoneNumber.trim());
+      }
+    }
+  }, [booking.step, savedAddresses, selectedSavedAddressId, booking.addressDetails, profile.id, profile.isLoggedIn, profile.fullName, profile.phoneNumber]);
+
+  const [addressSaveMessage, setAddressSaveMessage] = useState<string | null>(null);
+
+  const saveCurrentAddressToProfile = () => {
+    const details = booking.addressDetails;
+    if (!profile.id || !profile.isLoggedIn) {
+      setAddressSaveMessage('برای ذخیره آدرس باید وارد حساب شده باشید.');
+      return;
+    }
+    if (!details.district?.trim() || !details.fullAddress?.trim() || !details.plaque?.trim() || !details.recipientName?.trim() || !details.contactPhone?.trim()) {
+      setAddressSaveMessage('برای ذخیره، محله، نشانی، پلاک، نام و موبایل را کامل کنید.');
+      return;
+    }
+    const title = details.district.trim();
+    addSavedAddress({
+      title,
+      district: details.district.trim(),
+      fullAddress: details.fullAddress.trim(),
+      plaque: details.plaque.trim(),
+      unit: details.unit || '',
+      recipientName: details.recipientName.trim(),
+      contactPhone: details.contactPhone.trim(),
+      isDefault: savedAddresses.length === 0,
+    });
+    setAddressSaveMessage('آدرس در پروفایل ذخیره شد.');
+    setSelectedSavedAddressId(null);
+  };
 
 
   useEffect(() => {
@@ -381,6 +422,10 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             keyboardType="phone-pad"
             style={[styles.input, getInputStyle('contactPhone')]}
           />
+          <Pressable onPress={saveCurrentAddressToProfile} style={styles.saveAddressButton}>
+            <Text style={styles.saveAddressButtonText}>ذخیره این آدرس در پروفایل</Text>
+          </Pressable>
+          {addressSaveMessage ? <Text style={styles.saveAddressMessage}>{addressSaveMessage}</Text> : null}
         </View>}
 
         {booking.step === 4 && <View style={styles.section}>
@@ -461,6 +506,9 @@ const styles = StyleSheet.create({
   savedAddressCardSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' },
   savedAddressTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 13 },
   savedAddressTitleSelected: { color: '#0369a1' },
-  savedAddressMeta: { textAlign: 'right', color: '#64748b', fontSize: 11, lineHeight: 16 }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
+  savedAddressMeta: { textAlign: 'right', color: '#64748b', fontSize: 11, lineHeight: 16 },
+  saveAddressButton: { alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff' },
+  saveAddressButtonText: { color: '#0369a1', fontWeight: '800', fontSize: 13 },
+  saveAddressMessage: { textAlign: 'right', color: '#0369a1', fontSize: 12 }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
 });
 
