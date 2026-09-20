@@ -30,7 +30,7 @@ export const getCancellationRuleByKey = (
 
 /** آیا مشتری مجاز به لغو است؟ (تا اتمام کار و تسویه‌حساب) */
 export const isCustomerCancellationAllowed = (
-  orderStatus: 'PENDING' | 'CONFIRMED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED',
+  orderStatus: 'PENDING' | 'ACCEPTED' | 'CONFIRMED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED',
   isSettled: boolean,
 ): boolean => orderStatus !== 'CANCELLED' && !isSettled && orderStatus !== 'COMPLETED' || (orderStatus === 'COMPLETED' && !isSettled);
 

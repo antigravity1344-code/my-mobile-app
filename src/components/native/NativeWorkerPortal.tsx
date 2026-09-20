@@ -70,7 +70,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     wageTotal: o.price ? Math.round(o.price * 0.8) : 500000,
     paymentMethod: 'ONLINE',
     detailsNote: o.notes || '',
-    status: o.status === 'PENDING' ? 'OPEN' : o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED',
+    status: o.status === 'PENDING' ? 'OPEN' : (o.status === 'ACCEPTED' || o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS') ? 'IN_PROGRESS' : o.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
   });
 
   const fetchOrders = async () => {
