@@ -9,13 +9,29 @@ import { INITIAL_MOCK_ORDERS } from './mockOrdersData';
 import { appStorage } from '../../../utils/storage';
 import { apiFetch } from '../../../api/apiClient';
 
-// Memory store for runtime mutations
-let ordersMemoryStore: OrderItem[] = [...INITIAL_MOCK_ORDERS];
+// Memory store for runtime mutations — start empty (no demo seed on boot).
+let ordersMemoryStore: OrderItem[] = [];
 
-// بازیابی خودکار از حافظه محلی در صورت وجود
-void appStorage.getItem<OrderItem[]>('paksho_orders_list', INITIAL_MOCK_ORDERS).then((stored) => {
-  if (stored && stored.length > 0) {
-    ordersMemoryStore = stored;
+const isDemoMockOrder = (item: OrderItem): boolean =>
+  INITIAL_MOCK_ORDERS.some((mock) => mock.id === item.id);
+
+/** Offline / API-failure fallback: prefer real cached orders; demos only if cache empty. */
+const offlineFallbackOrders = (): OrderItem[] => {
+  if (ordersMemoryStore.length > 0) {
+    return [...ordersMemoryStore];
+  }
+  return [...INITIAL_MOCK_ORDERS];
+};
+
+// بازیابی از حافظه محلی؛ دموهای INITIAL_MOCK_ORDERS را از storage پاک می‌کنیم
+void appStorage.getItem<OrderItem[]>('paksho_orders_list', []).then((stored) => {
+  if (!stored || stored.length === 0) {
+    return;
+  }
+  const cleaned = stored.filter((item) => !isDemoMockOrder(item));
+  ordersMemoryStore = cleaned;
+  if (cleaned.length !== stored.length) {
+    persistOrders();
   }
 });
 
@@ -31,6 +47,7 @@ const MAX_RATING = 5;
 
 export const CANCELLABLE_ORDER_STATUSES: OrderStatus[] = [
   'PENDING',
+  'ACCEPTED',
   'CONFIRMED',
   'ASSIGNED',
   'IN_PROGRESS',
@@ -49,13 +66,15 @@ export const orderService = {
     try {
       const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
       if (!trimmedUserId) {
-        return [...ordersMemoryStore];
+        // بدون userId نمی‌توان API زد؛ لیست خالی بهتر از دموهای جعلی است
+        return [];
       }
 
       const res = await apiFetch('/orders?userId=' + encodeURIComponent(trimmedUserId) + '&role=CUSTOMER');
       let result: OrderItem[] = [];
-      if (res.success && res.orders) {
-        result = res.orders.map((o: any) => ({
+      if (res.success && Array.isArray(res.orders)) {
+        // API موفق: لیست واقعی (حتی خالی) جایگزین ماک/کش می‌شود — UI با دمو آلوده نشود
+        const mapped: OrderItem[] = res.orders.map((o: any) => ({
           id: o.id,
           orderNumber: o.id,
           serviceTitle: o.serviceTitle,
@@ -68,12 +87,15 @@ export const orderService = {
           cleaner: o.cleanerId ? { id: o.cleanerId, name: 'متخصص پاکشو', phone: '09120000000', rating: 4.8, completedJobsCount: 10 } : undefined,
           timeline: []
         }));
+        ordersMemoryStore = mapped;
+        persistOrders();
+        result = mapped;
       } else {
-        result = [...ordersMemoryStore];
+        result = offlineFallbackOrders();
       }
 
       if (filterTab === 'ACTIVE') {
-        const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+        const activeStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
         result = result.filter((item) => activeStatuses.includes(item.status));
       } else if (filterTab === 'COMPLETED') {
         result = result.filter((item) => item.status === 'COMPLETED');
@@ -102,7 +124,7 @@ export const orderService = {
 
       return result;
     } catch (e) {
-      return [...ordersMemoryStore];
+      return offlineFallbackOrders();
     }
   },
 
@@ -211,7 +233,7 @@ export const orderService = {
   },
 
   calculateStats(orders: OrderItem[]): OrderStats {
-    const activeStatuses: OrderStatus[] = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+    const activeStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
     let activeCount = 0;
     let completedCount = 0;
     let cancelledCount = 0;
@@ -308,7 +330,7 @@ export const orderService = {
       timeline: [
         ...currentOrder.timeline.map((event) => ({ ...event, isCurrent: false })),
         {
-          step: status === 'IN_PROGRESS' ? 'STARTED' : status === 'COMPLETED' ? 'FINISHED' : status === 'ASSIGNED' ? 'ASSIGNED' : status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRMED',
+          step: status === 'IN_PROGRESS' ? 'STARTED' : status === 'COMPLETED' ? 'FINISHED' : status === 'ASSIGNED' || status === 'ACCEPTED' ? 'ASSIGNED' : status === 'CANCELLED' ? 'CANCELLED' : 'CONFIRMED',
           title: status === 'IN_PROGRESS' ? 'شروع فرآیند خدمت توسط متخصص' : 'به‌روزرسانی سفارش',
           timestamp: 'هم‌اکنون',
           description: cleanerName ? `سفارش توسط ${cleanerName} پذیرفته شد.` : undefined,

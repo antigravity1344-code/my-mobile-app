@@ -4,6 +4,7 @@ import type { PricingType } from '../../../types/service';
 
 export type OrderStatus =
   | 'PENDING'
+  | 'ACCEPTED'
   | 'CONFIRMED'
   | 'ASSIGNED'
   | 'IN_PROGRESS'
