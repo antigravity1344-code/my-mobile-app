@@ -42,6 +42,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
   const {
     orders,
     loading,
+    loadError,
     refreshing,
     filterTab,
     searchQuery,
@@ -223,6 +224,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0284c7" />
             <Text style={styles.loadingText}>در حال بارگذاری سفارش‌ها...</Text>
+          </View>
+        ) : loadError && orders.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>{loadError}</Text>
           </View>
         ) : orders.length === 0 ? (
           <EmptyOrdersState

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,11 @@ import {
   User,
 } from 'lucide-react-native';
 import { UserData } from '../../types/user';
+import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import type { ApiOrder } from '../../api/types';
+import { WORKER_TOKEN_KEY } from './workerLoginStorage';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -56,49 +60,52 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   const [loading, setLoading] = useState(false);
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
 
-  const mapBackendOrder = (o: any): NativeOrder => ({
+  const mapBackendOrder = (o: ApiOrder): NativeOrder => ({
     id: o.id,
     serviceTitle: o.serviceTitle || 'نظافت منزل',
     category: 'cleaner',
     badge: 'ساعتی',
     customerName: o.customerName || 'مشتری',
-    phone: o.customerPhone || '09120000000',
+    phone: o.customerPhone || '',
     district: o.address ? o.address.split(' ')[0] : 'تهران',
     address: o.address || 'بدون آدرس',
     date: o.date || 'امروز',
     timeSlot: o.time || 'نامشخص',
-    wageTotal: o.price ? Math.round(o.price * 0.8) : 500000,
-    paymentMethod: 'ONLINE',
+    wageTotal: o.price ? Math.round(o.price * 0.8) : 0,
+    paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
     detailsNote: o.notes || '',
     status: o.status === 'PENDING' ? 'OPEN' : (o.status === 'ACCEPTED' || o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS') ? 'IN_PROGRESS' : o.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
   });
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
       const availRes = await apiFetch('/orders/available');
-      if (availRes.success && availRes.orders) {
-        setAvailableOrders(availRes.orders.map(mapBackendOrder));
+      if (availRes.success && Array.isArray(availRes.orders)) {
+        setAvailableOrders((availRes.orders as ApiOrder[]).map(mapBackendOrder));
+      } else {
+        setAvailableOrders([]);
       }
 
       if (user?.id) {
-        const myRes = await apiFetch('/orders?userId=' + user.id + '&role=WORKER');
-        if (myRes.success && myRes.orders) {
-          setMyAcceptedOrders(myRes.orders.map(mapBackendOrder));
+        const myRes = await apiFetch('/orders');
+        if (myRes.success && Array.isArray(myRes.orders)) {
+          setMyAcceptedOrders((myRes.orders as ApiOrder[]).map(mapBackendOrder));
         }
       }
     } catch (e) {
-      console.log('Error fetching orders', e);
+      console.error('Error fetching orders', e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
+    void fetchOrders();
+    const interval = setInterval(() => void fetchOrders(), 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [fetchOrders]);
 
   const handleAcceptOrder = async (order: NativeOrder) => {
     if (!user?.id) return;
@@ -114,7 +121,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       } else {
         alert(res.message || 'خطا در پذیرش سفارش');
       }
-    } catch (e) {
+    } catch {
       alert('خطا در ارتباط با سرور');
     }
   };
@@ -133,7 +140,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       } else {
         alert(res.message || 'خطا در تکمیل سفارش');
       }
-    } catch (e) {
+    } catch {
       alert('خطا در ارتباط با سرور');
     }
   };
@@ -313,7 +320,9 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               <View key={order.id} style={[styles.orderCard, styles.myJobCard]}>
                 <View style={styles.cardTop}>
                   <View style={styles.inProgressBadge}>
-                    <Text style={styles.inProgressBadgeText}>در حال انجام</Text>
+                    <Text style={styles.inProgressBadgeText}>
+                      {order.status === 'COMPLETED' ? 'انجام شده' : 'در حال انجام'}
+                    </Text>
                   </View>
                   <View style={styles.titleArea}>
                     <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
@@ -360,12 +369,12 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                         <CheckCircle size={14} color="#059669" />
                         <Text style={styles.acceptedTagText}>پذیرفته شده</Text>
                       </View>
-                      <TouchableOpacity
+                      <Pressable
                         onPress={() => handleCompleteOrder(order)}
                         style={styles.completeButton}
                       >
                         <Text style={styles.completeButtonText}>اتمام کار</Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     </View>
                   )}
                 </View>

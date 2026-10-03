@@ -14,9 +14,11 @@ import {
   Sofa,
 } from 'lucide-react';
 import { useOrders } from '../../features/orders';
-import { useProfile } from '../../features/profile';
 import { CleanersScreen } from '../../features/cleaners';
 import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import type { ApiOrder } from '../../api/types';
+import { WORKER_TOKEN_KEY } from '../native/workerLoginStorage';
 import { appStorage } from '../../utils/storage';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
@@ -46,18 +48,19 @@ function roleForService(serviceId: string): SpecialistRole {
   return 'cleaner';
 }
 
-function mapApiOrderToOpenOrder(order: any): OpenOrder {
+/** سفارش سرور به‌علاوهٔ چند فیلد اختیاری که ممکن است در آینده از سرور بیایند. */
+type ServerOrderLike = ApiOrder & {
+  serviceId?: string;
+  pricingType?: string;
+  badge?: string;
+  serviceOptions?: Record<string, unknown>;
+};
+
+function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder {
   const serviceId = order.serviceId || 'home_unit_cleaning';
-  const addressText =
-    typeof order.address === 'string'
-      ? order.address
-      : order.address?.fullAddress || '';
+  const addressText = typeof order.address === 'string' ? order.address : '';
   const district =
-    (typeof order.address === 'object' && order.address?.district) ||
-    (typeof addressText === 'string'
-      ? addressText.split('،')[0] || addressText.split(' ')[0]
-      : '') ||
-    '—';
+    (addressText ? addressText.split('،')[0] || addressText.split(' ')[0] : '') || '—';
 
   let status: OpenOrder['status'] = 'OPEN';
   if (order.status === 'ACCEPTED' || order.status === 'ASSIGNED') status = 'ACCEPTED';
@@ -85,13 +88,13 @@ function mapApiOrderToOpenOrder(order: any): OpenOrder {
         : order.pricingType === 'per_sqm'
           ? 'متراژی'
           : order.badge || 'سفارش',
-    customerName: order.customerName || order.address?.recipientName || '—',
-    phone: order.customerPhone || order.address?.contactPhone || '—',
+    customerName: order.customerName || '—',
+    phone: order.customerPhone || '—',
     district,
     address: addressText || '—',
     date: order.date || '—',
-    timeSlot: order.time || order.timeSlot?.label || '—',
-    priceTotal: order.price || order.pricing?.total || 0,
+    timeSlot: order.time || '—',
+    priceTotal: order.price || 0,
     paymentMethod: order.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
     details,
     status,
@@ -100,8 +103,8 @@ function mapApiOrderToOpenOrder(order: any): OpenOrder {
 
 function readStoredUserId(raw: unknown): string {
   if (!raw) return '';
-  if (typeof raw === 'object' && raw !== null && 'id' in (raw as any)) {
-    return String((raw as any).id || '');
+  if (typeof raw === 'object' && raw !== null && 'id' in raw) {
+    return String((raw as { id?: unknown }).id || '');
   }
   if (typeof raw === 'string') {
     try {
@@ -116,10 +119,9 @@ function readStoredUserId(raw: unknown): string {
 
 export const SpecialistPortalScreen: React.FC = () => {
   const { refreshOrders } = useOrders();
-  const { profile } = useProfile();
   const [activeRole, setActiveRole] = useState<SpecialistRole>('cleaner');
   const [portalView, setPortalView] = useState<'orders' | 'cleaners'>('orders');
-  const [availableOrdersRaw, setAvailableOrdersRaw] = useState<any[]>([]);
+  const [availableOrdersRaw, setAvailableOrdersRaw] = useState<ApiOrder[]>([]);
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -130,17 +132,15 @@ export const SpecialistPortalScreen: React.FC = () => {
   useEffect(() => {
     let alive = true;
     void (async () => {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
       const workerRaw = await appStorage.getItem<unknown>('PAKSHO_USER_WORKER', null);
-      const customerRaw = await appStorage.getItem<unknown>('PAKSHO_USER_CUSTOMER', null);
-      let id = readStoredUserId(workerRaw);
-      if (!id) id = profile.id || '';
-      if (!id) id = readStoredUserId(customerRaw);
+      const id = readStoredUserId(workerRaw);
       if (alive) setWorkerUserId(id);
     })();
     return () => {
       alive = false;
     };
-  }, [profile.id]);
+  }, []);
 
   const loadAvailable = useCallback(async () => {
     setLoadingAvailable(true);
@@ -148,12 +148,12 @@ export const SpecialistPortalScreen: React.FC = () => {
     try {
       const availRes = await apiFetch('/orders/available');
       if (availRes.success && Array.isArray(availRes.orders)) {
-        setAvailableOrdersRaw(availRes.orders);
+        setAvailableOrdersRaw(availRes.orders as ApiOrder[]);
       if (workerUserId) {
-        const mineRes = await apiFetch('/orders?userId=' + encodeURIComponent(workerUserId) + '&role=WORKER');
+        const mineRes = await apiFetch('/orders');
         if (mineRes.success && Array.isArray(mineRes.orders)) {
-          const active = mineRes.orders
-            .filter((o: any) => o.status === 'ACCEPTED')
+          const active = (mineRes.orders as ApiOrder[])
+            .filter((o) => o.status === 'ACCEPTED')
             .map(mapApiOrderToOpenOrder);
           setMyActiveOrders(active);
         } else {

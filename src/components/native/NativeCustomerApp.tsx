@@ -16,19 +16,17 @@ import { OrdersScreen } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { NativeSupportScreen } from '../../features/support';
 import { appStorage } from '../../utils/storage';
+import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import {
+  clearCustomerSession,
+  CUSTOMER_TOKEN_KEY,
+  loadCustomerSession,
+  saveCustomerSession,
+  type CustomerSessionUser,
+} from './customerLoginStorage';
 
-const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
-const STORAGE_LOGGED_IN_KEY = 'PAKSHO_IS_LOGGED_IN';
-const STORAGE_USER_DATA_KEY = 'PAKSHO_USER_CUSTOMER';
-
-interface UserData {
-  id: string;
-  phone: string;
-  name: string;
-  avatar: string;
-  role: string;
-  isProfileComplete?: boolean;
-}
+type UserData = CustomerSessionUser;
 
 export const NativeCustomerApp: React.FC = () => {
   const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
@@ -42,27 +40,21 @@ export const NativeCustomerApp: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const restoreState = async () => {
-      const savedLogin = await appStorage.getItem(STORAGE_LOGGED_IN_KEY, 'false');
-      const savedUserStr = await appStorage.getItem(STORAGE_USER_DATA_KEY, '');
+      const user = await loadCustomerSession(appStorage);
 
       if (!isMounted) return;
 
-      if (savedLogin === 'true' && savedUserStr) {
-        try {
-          const user = JSON.parse(savedUserStr);
-          setUserData(user);
-          setIsLoggedIn(true);
-          syncAuthenticatedUser({
-            id: user.id,
-            name: user.name || '',
-            phone: user.phone,
-            avatar: user.avatar,
-          });
-          if (!user.name || !user.isProfileComplete) {
-            setShowOnboarding(true);
-          }
-        } catch (e) {
-          console.error(e);
+      if (user) {
+        setUserData(user);
+        setIsLoggedIn(true);
+        syncAuthenticatedUser({
+          id: user.id,
+          name: user.name || '',
+          phone: user.phone,
+          avatar: user.avatar,
+        });
+        if (!user.name || !user.isProfileComplete) {
+          setShowOnboarding(true);
         }
       }
       setIsLoading(false);
@@ -73,7 +65,7 @@ export const NativeCustomerApp: React.FC = () => {
     };
   }, []);
 
-  const handleLogin = (user: UserData) => {
+  const handleLogin = async (user: UserData, token: string) => {
     login(user.phone);
     syncAuthenticatedUser({
       id: user.id,
@@ -83,19 +75,17 @@ export const NativeCustomerApp: React.FC = () => {
     });
     setUserData(user);
     setIsLoggedIn(true);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'true');
-    appStorage.setItem(STORAGE_ROLE_KEY, 'CUSTOMER');
-    appStorage.setItem(STORAGE_USER_DATA_KEY, JSON.stringify(user));
+    await saveCustomerSession(appStorage, user, token);
 
     if (!user.name || !user.isProfileComplete) {
       setShowOnboarding(true);
     }
   };
 
-  const handleOnboardingComplete = (updatedUser: UserData) => {
+  const handleOnboardingComplete = async (updatedUser: UserData) => {
     setUserData(updatedUser);
     setShowOnboarding(false);
-    appStorage.setItem(STORAGE_USER_DATA_KEY, JSON.stringify(updatedUser));
+    await saveCustomerSession(appStorage, updatedUser);
     syncAuthenticatedUser({
       id: updatedUser.id,
       name: updatedUser.name || '',
@@ -104,13 +94,14 @@ export const NativeCustomerApp: React.FC = () => {
     });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    await apiFetch('/auth/logout', { method: 'POST' });
     profileLogout();
     setIsLoggedIn(false);
     setUserData(null);
     setShowOnboarding(false);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'false');
-    appStorage.removeItem(STORAGE_USER_DATA_KEY);
+    await clearCustomerSession(appStorage);
   };
 
   if (isLoading) {

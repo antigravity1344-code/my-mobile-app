@@ -8,3 +8,13 @@ ios
 .env
 dist
 android/.kotlin
+
+# داده و لاگ‌های محلی سرور توسعه
+server/db.json
+server/server.stdout.log
+server/server.stderr.log
+
+# خروجی‌ها و گزارش‌های محلی ابزارها
+customer-build.log
+AGENT-REPORT.txt
+android/apk-inspect/

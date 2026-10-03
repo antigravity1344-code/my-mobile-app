@@ -13,41 +13,54 @@ import { WorkerAuthScreen } from './WorkerAuthScreen';
 import { WorkerOnboardingScreen } from './WorkerOnboardingScreen';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
 import { appStorage } from '../../utils/storage';
+import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import {
+  clearWorkerSession,
+  loadWorkerSession,
+  saveWorkerSession,
+  WORKER_TOKEN_KEY,
+  type WorkerSessionUser,
+} from './workerLoginStorage';
 
-const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
-const STORAGE_LOGGED_IN_KEY = 'PAKSHO_IS_LOGGED_IN_WORKER';
-const STORAGE_USER_DATA_KEY = 'PAKSHO_USER_WORKER';
-
-interface UserData {
-  id: string;
-  phone: string;
-  name: string;
-  avatar: string;
-  role: string;
-  status: string; // REGISTERED, DOCS_SUBMITTED, PENDING_VERIFICATION, APPROVED, ACTIVE
-}
+type UserData = WorkerSessionUser;
 
 export const NativeWorkerApp: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const refreshWorkerFromServer = async (current: UserData) => {
+    await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+    const res = await apiFetch('/users/me');
+    if (res.success && res.user && res.user.role === 'WORKER') {
+      const next: UserData = {
+        ...current,
+        id: res.user.id,
+        phone: res.user.phone,
+        name: res.user.name || '',
+        avatar: res.user.avatar || '',
+        role: res.user.role,
+        status: res.user.status,
+      };
+      setUserData(next);
+      await saveWorkerSession(appStorage, next);
+      return next;
+    }
+    return current;
+  };
+
   useEffect(() => {
     let isMounted = true;
     const restoreState = async () => {
-      const savedLogin = await appStorage.getItem(STORAGE_LOGGED_IN_KEY, 'false');
-      const savedUserStr = await appStorage.getItem(STORAGE_USER_DATA_KEY, '');
+      const user = await loadWorkerSession(appStorage);
 
       if (!isMounted) return;
 
-      if (savedLogin === 'true' && savedUserStr) {
-        try {
-          const user = JSON.parse(savedUserStr);
-          setUserData(user);
-          setIsLoggedIn(true);
-        } catch (e) {
-          console.error(e);
-        }
+      if (user) {
+        setUserData(user);
+        setIsLoggedIn(true);
+        void refreshWorkerFromServer(user);
       }
       setIsLoading(false);
     };
@@ -57,24 +70,36 @@ export const NativeWorkerApp: React.FC = () => {
     };
   }, []);
 
-  const handleLogin = (user: UserData) => {
+  useEffect(() => {
+    if (!isLoggedIn || !userData) return;
+    if (userData.status === 'APPROVED' || userData.status === 'ACTIVE') return;
+    const current = userData;
+    const timer = setInterval(() => {
+      void refreshWorkerFromServer(current);
+    }, 15000);
+    return () => clearInterval(timer);
+    // فقط شناسه و وضعیت مهم‌اند؛ خودِ شیء userData هر بار تغییر می‌کند.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, userData?.id, userData?.status]);
+
+  const handleLogin = async (user: UserData, token: string) => {
     setUserData(user);
     setIsLoggedIn(true);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'true');
-    appStorage.setItem(STORAGE_ROLE_KEY, 'WORKER');
-    appStorage.setItem(STORAGE_USER_DATA_KEY, JSON.stringify(user));
+    await saveWorkerSession(appStorage, user, token);
+    await refreshWorkerFromServer(user);
   };
 
-  const handleUpdateUser = (updatedUser: UserData) => {
+  const handleUpdateUser = async (updatedUser: UserData) => {
     setUserData(updatedUser);
-    appStorage.setItem(STORAGE_USER_DATA_KEY, JSON.stringify(updatedUser));
+    await saveWorkerSession(appStorage, updatedUser);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+    await apiFetch('/auth/logout', { method: 'POST' });
     setIsLoggedIn(false);
     setUserData(null);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'false');
-    appStorage.removeItem(STORAGE_USER_DATA_KEY);
+    await clearWorkerSession(appStorage);
   };
 
   if (isLoading) {

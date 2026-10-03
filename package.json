@@ -1,5 +1,5 @@
 {
-  "name": "cleaning-mobile",
+  "name": "my-mobile-app",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
@@ -7,18 +7,20 @@
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "android:customer": "expo run:android --variant customerDebug",
-    "android:worker": "expo run:android --variant workerDebug",
+    "android:customer": "expo run:android --variant customerDebug --app-id com.paksho.customer",
+    "android:worker": "expo run:android --variant workerDebug --app-id com.paksho.worker",
     "ios:customer": "expo run:ios --scheme customer",
     "ios:worker": "expo run:ios --scheme worker",
     "web": "expo start --web",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,css,md}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "^57.0.19",
     "expo-location": "^57.0.16",
     "expo-updates": "~57.0.21",
@@ -44,6 +46,7 @@
     "eslint-plugin-react": "^7.*",
     "eslint-plugin-react-hooks": "^5.*",
     "prettier": "^3.*",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.7"
   }
 }

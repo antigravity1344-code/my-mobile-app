@@ -1,19 +1,60 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { Wallet, Crown, MapPin, Plus, Trash2, LogOut } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
 import { NativeAddressManagerModal } from './NativeAddressManagerModal';
+import { apiFetch } from '../../../api/apiClient';
+import { attachStoredAuthToken } from '../../../api/authToken';
+import { appStorage } from '../../../utils/storage';
+import { CUSTOMER_TOKEN_KEY, saveCustomerSession } from '../../../components/native/customerLoginStorage';
 
 interface Props {
   onLogout: () => void;
 }
 
 export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
-  const { profile, removeSavedAddress, setDefaultAddress } = useProfile();
+  const { profile, removeSavedAddress, setDefaultAddress, syncAuthenticatedUser } = useProfile();
   const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [editName, setEditName] = useState(profile.fullName || '');
+  const [editBirthDate, setEditBirthDate] = useState('');
+  const [editNationalId, setEditNationalId] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fa-IR').format(amount) + ' تومان';
+
+  const saveIdentity = async () => {
+    if (!editName.trim()) {
+      setProfileMessage('نام الزامی است.');
+      return;
+    }
+    setSavingProfile(true);
+    setProfileMessage(null);
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/users/customer-profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: editName.trim(),
+        birthDate: editBirthDate.trim() || undefined,
+        nationalId: editNationalId.trim() || undefined,
+      }),
+    });
+    setSavingProfile(false);
+    if (!res.success || !res.user) {
+      setProfileMessage(res.message || 'ذخیره پروفایل ناموفق بود.');
+      return;
+    }
+    syncAuthenticatedUser({
+      id: res.user.id,
+      name: res.user.name || '',
+      phone: res.user.phone,
+      avatar: res.user.avatar,
+    });
+    await saveCustomerSession(appStorage, res.user);
+    setEditName(res.user.name || '');
+    setProfileMessage('اطلاعات هویتی روی سرور ذخیره شد.');
+  };
 
   return (
     <View style={styles.root}>
@@ -31,14 +72,45 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
+            <UserRound size={16} color="#0284c7" />
+            <Text style={styles.sectionTitle}>ویرایش اطلاعات هویتی</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            value={editName}
+            onChangeText={setEditName}
+            placeholder="نام و نام خانوادگی"
+            placeholderTextColor="#94a3b8"
+          />
+          <TextInput
+            style={styles.input}
+            value={editNationalId}
+            onChangeText={setEditNationalId}
+            placeholder="کد ملی (۱۰ رقم، اختیاری اگر قبلاً ثبت شده)"
+            placeholderTextColor="#94a3b8"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          <TextInput
+            style={styles.input}
+            value={editBirthDate}
+            onChangeText={setEditBirthDate}
+            placeholder="تاریخ تولد (اختیاری)"
+            placeholderTextColor="#94a3b8"
+          />
+          {profileMessage ? <Text style={styles.muted}>{profileMessage}</Text> : null}
+          <Pressable onPress={() => void saveIdentity()} disabled={savingProfile} style={styles.saveBtn}>
+            {savingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>ذخیره روی سرور</Text>}
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Crown size={16} color="#0284c7" />
             <Text style={styles.sectionTitle}>باشگاه مشتریان</Text>
           </View>
-          <Text style={styles.sectionBody}>
-            {profile.loyalty?.title || 'عضو جدید'} · تخفیف {profile.loyalty?.discountPercentage ?? 0}٪
-          </Text>
           <Text style={styles.muted}>
-            سفارش‌های تکمیل‌شده: {profile.loyalty?.completedOrdersCount ?? 0}
+            باشگاه مشتریان فعلاً فقط روی همین دستگاه نگه‌داری می‌شود و به سرور وصل نیست.
           </Text>
         </View>
 
@@ -48,6 +120,9 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             <Text style={styles.sectionTitle}>کیف پول</Text>
           </View>
           <Text style={styles.wallet}>{formatCurrency(profile.walletBalance || 0)}</Text>
+          <Text style={styles.muted}>
+            موجودی کیف پول محلی است و پرداخت واقعی محسوب نمی‌شود.
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -115,9 +190,25 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   sectionTitle: { color: '#0f172a', fontWeight: '800', fontSize: 14 },
-  sectionBody: { textAlign: 'right', color: '#334155', fontSize: 13 },
   muted: { textAlign: 'right', color: '#64748b', fontSize: 12 },
   wallet: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 20 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: 'right',
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+  },
+  saveBtn: {
+    backgroundColor: '#0284c7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  saveBtnText: { color: '#fff', fontWeight: '800' },
   addBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#0284c7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   addressCard: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#e2e8f0' },

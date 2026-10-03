@@ -23,24 +23,15 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
 }) => {
   const [name, setName] = useState(user.name || '');
   const [nationalId, setNationalId] = useState('');
-  const [birthDate, setBirthDate] = useState('۱۳۶۸/۰۵/۱۲');
-  const [address, setAddress] = useState('تهران، خیابان شریعتی، خیابان ملک');
+  const [birthDate, setBirthDate] = useState('');
+  const [address, setAddress] = useState('');
   const [city, setCity] = useState('تهران');
-  const [bankSheba, setBankSheba] = useState('IR120000000000000000000000');
+  const [bankSheba, setBankSheba] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // اگر مدارک ارسال شده و در انتظار بررسی است:
   if (user.status === 'PENDING_VERIFICATION') {
-    const handleQuickApproveForTest = async () => {
-      setLoading(true);
-      const res = await apiFetch(`/admin/approve-worker/${user.id}`, { method: 'PUT' });
-      setLoading(false);
-      if (res.success && res.user) {
-        onUpdateUser(res.user);
-      }
-    };
-
     return (
       <ScrollView contentContainerStyle={styles.statusContainer}>
         <View style={styles.statusCard}>
@@ -71,14 +62,6 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             </View>
           </View>
 
-          {/* دکمه تست تایید سریع برای توسعه‌دهنده/تست‌کننده */}
-          <Pressable onPress={handleQuickApproveForTest} disabled={loading} style={styles.testApproveBtn}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.testApproveBtnText}>تایید فوری حساب متخصص (تست سریع)</Text>
-            )}
-          </Pressable>
         </View>
       </ScrollView>
     );
@@ -414,17 +397,5 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
     fontWeight: '600',
-  },
-  testApproveBtn: {
-    alignSelf: 'stretch',
-    backgroundColor: '#0284c7',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  testApproveBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
   },
 });

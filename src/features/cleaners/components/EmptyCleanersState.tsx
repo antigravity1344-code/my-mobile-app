@@ -12,9 +12,13 @@ export const EmptyCleanersState: React.FC<EmptyCleanersStateProps> = ({
 }) => (
   <View style={styles.container}>
     <Text style={styles.title}>
-      {isSearching ? 'نظافتچی‌ای با این جستجو پیدا نشد' : 'نظافتچی فعالی در این سطح نیست'}
+      {isSearching ? 'نظافتچی‌ای با این جستجو پیدا نشد' : 'بازارگاه متخصصین به سرور وصل نیست'}
     </Text>
-    <Text style={styles.subtitle}>فیلتر یا عبارت جستجو را تغییر دهید و دوباره تلاش کنید.</Text>
+    <Text style={styles.subtitle}>
+      {isSearching
+        ? 'فیلتر یا عبارت جستجو را تغییر دهید و دوباره تلاش کنید.'
+        : 'فهرست نمایشی حذف شده است. سفارش‌ها از مسیر پذیرش متخصص واقعی انجام می‌شود.'}
+    </Text>
     <Pressable onPress={onResetFilters} style={styles.button}>
       <Text style={styles.buttonText}>بازنشانی فیلترها</Text>
     </Pressable>

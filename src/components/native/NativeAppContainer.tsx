@@ -8,11 +8,15 @@ import {
   StatusBar,
 } from 'react-native';
 import { User, Briefcase, LogOut, ArrowRightLeft } from 'lucide-react-native';
-import { NativeAuthScreen, UserRole } from './NativeAuthScreen';
+import { NativeAuthScreen, UserRole, NativeAuthUser } from './NativeAuthScreen';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { useProfile } from '../../features/profile';
 import { appStorage } from '../../utils/storage';
+import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import { clearCustomerSession, CUSTOMER_TOKEN_KEY, saveCustomerSession } from './customerLoginStorage';
+import { clearWorkerSession, saveWorkerSession, WORKER_TOKEN_KEY } from './workerLoginStorage';
 
 const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
 const STORAGE_LOGGED_IN_KEY = 'PAKSHO_IS_LOGGED_IN';
@@ -22,10 +26,11 @@ export interface NativeAppContainerProps {
 }
 
 export const NativeAppContainer: React.FC<NativeAppContainerProps> = ({ initialFlavor }) => {
-  const { login, logout: profileLogout } = useProfile();
+  const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [currentRole, setCurrentRole] = useState<UserRole>(initialFlavor || 'CUSTOMER');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [sessionUser, setSessionUser] = useState<NativeAuthUser | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -50,24 +55,58 @@ export const NativeAppContainer: React.FC<NativeAppContainerProps> = ({ initialF
     };
   }, [initialFlavor]);
 
-  const handleLogin = (phoneNumber: string, role: UserRole) => {
-    login(phoneNumber);
+  const handleLogin = async (user: NativeAuthUser, token: string, role: UserRole) => {
+    login(user.phone);
+    syncAuthenticatedUser({
+      id: user.id,
+      name: user.name || '',
+      phone: user.phone,
+      avatar: user.avatar,
+    });
+    setSessionUser(user);
     setCurrentRole(role);
     setIsLoggedIn(true);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'true');
-    appStorage.setItem(STORAGE_ROLE_KEY, role);
+    await appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'true');
+    await appStorage.setItem(STORAGE_ROLE_KEY, role);
+    if (role === 'WORKER') {
+      await saveWorkerSession(appStorage, {
+        id: user.id,
+        phone: user.phone,
+        name: user.name || '',
+        avatar: user.avatar || '',
+        role: 'WORKER',
+        status: user.status || 'REGISTERED',
+      }, token);
+    } else {
+      await saveCustomerSession(appStorage, {
+        id: user.id,
+        phone: user.phone,
+        name: user.name || '',
+        avatar: user.avatar || '',
+        role: 'CUSTOMER',
+        isProfileComplete: user.isProfileComplete,
+      }, token);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (currentRole === 'WORKER') {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+      await apiFetch('/auth/logout', { method: 'POST' });
+      await clearWorkerSession(appStorage);
+    } else {
+      await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+      await apiFetch('/auth/logout', { method: 'POST' });
+      await clearCustomerSession(appStorage);
+    }
     profileLogout();
     setIsLoggedIn(false);
-    appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'false');
+    await appStorage.setItem(STORAGE_LOGGED_IN_KEY, 'false');
   };
 
-  const handleToggleRole = () => {
-    const nextRole: UserRole = currentRole === 'CUSTOMER' ? 'WORKER' : 'CUSTOMER';
-    setCurrentRole(nextRole);
-    appStorage.setItem(STORAGE_ROLE_KEY, nextRole);
+  const handleToggleRole = async () => {
+    // سوییچ نقش بدون ورود مجدد امن نیست؛ کاربر باید خارج شود و با نقش درست وارد شود.
+    await handleLogout();
   };
 
   if (isLoading) {
@@ -108,11 +147,9 @@ export const NativeAppContainer: React.FC<NativeAppContainerProps> = ({ initialF
         </View>
 
         <View style={styles.bannerActions}>
-          <Pressable onPress={handleToggleRole} style={styles.toggleRoleButton}>
+          <Pressable onPress={() => void handleToggleRole()} style={styles.toggleRoleButton}>
             <ArrowRightLeft size={13} color="#ffffff" />
-            <Text style={styles.toggleRoleText}>
-              {currentRole === 'WORKER' ? 'سوییچ به مشتری' : 'سوییچ به کارگر'}
-            </Text>
+            <Text style={styles.toggleRoleText}>خروج و ورود با نقش دیگر</Text>
           </Pressable>
 
           <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
@@ -125,12 +162,21 @@ export const NativeAppContainer: React.FC<NativeAppContainerProps> = ({ initialF
       <View style={styles.content}>
         {currentRole === 'CUSTOMER' ? (
           <NativeBookingWizard />
-        ) : (
+        ) : sessionUser ? (
           <NativeWorkerPortal
-            user={{ id: '1', phone: '', name: '', avatar: '', role: 'WORKER', status: 'APPROVED' }}
-            onSwitchToCustomer={() => setCurrentRole('CUSTOMER')}
-            onLogout={handleLogout}
+            user={{
+              id: sessionUser.id,
+              phone: sessionUser.phone,
+              name: sessionUser.name || '',
+              avatar: sessionUser.avatar || '',
+              role: 'WORKER',
+              status: sessionUser.status || 'REGISTERED',
+            }}
           />
+        ) : (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 24 }}>
+            برای پنل متخصص دوباره وارد شوید.
+          </Text>
         )}
       </View>
     </SafeAreaView>

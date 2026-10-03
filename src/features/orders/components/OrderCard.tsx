@@ -78,7 +78,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.specItem}>
           <Clock size={13} color="#64748b" />
           <Text style={styles.specText}>
-            {order.timeSlot.startTime} تا {order.timeSlot.endTime} ({order.durationHours} ساعت)
+            {order.timeSlot?.label ||
+              `${order.timeSlot?.startTime || ''} تا ${order.timeSlot?.endTime || ''}`}
+            {order.durationHours ? ` (${order.durationHours} ساعت)` : ''}
           </Text>
         </View>
 

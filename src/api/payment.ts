@@ -11,14 +11,12 @@ export interface PaymentResult {
   success: boolean;
   authority?: string;
   payUrl?: string;
-  isMock?: boolean;
   error?: string;
 }
 
 export const toPaymentAmountInRials = (amountInTomans: number): number => amountInTomans * 10;
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
-const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -35,16 +33,12 @@ const parsePaymentResult = (value: unknown): PaymentResult => {
   if (value.payUrl !== undefined && typeof value.payUrl !== 'string') {
     return { success: false, error: 'لینک پرداخت دریافتشده معتبر نیست.' };
   }
-  if (value.isMock !== undefined && typeof value.isMock !== 'boolean') {
-    return { success: false, error: 'نوع پاسخ پرداخت معتبر نیست.' };
-  }
   if (value.error !== undefined && typeof value.error !== 'string') {
     return { success: false, error: 'پیام خطای پرداخت معتبر نیست.' };
   }
 
   if (value.authority !== undefined) result.authority = value.authority;
   if (value.payUrl !== undefined) result.payUrl = value.payUrl;
-  if (value.isMock !== undefined) result.isMock = value.isMock;
   if (value.error !== undefined) result.error = value.error;
   return result;
 };
@@ -66,10 +60,13 @@ const parsePaymentVerification = (value: unknown): { success: boolean; refId?: s
   };
 };
 
+/** درخواست پرداخت فقط وقتی endpoint واقعی سرور موجود باشد. هیچ پرداخت ساختگی موفقی برنمی‌گردد. */
 export const requestPayment = async (payload: PaymentRequest): Promise<PaymentResult> => {
   if (!API_URL) {
-    await wait(700);
-    return { success: true, authority: `mock-${Date.now()}`, isMock: true };
+    return {
+      success: false,
+      error: 'درگاه پرداخت پیکربندی نشده است. سفارش بدون پیش‌پرداخت ثبت می‌شود.',
+    };
   }
 
   try {
@@ -78,6 +75,12 @@ export const requestPayment = async (payload: PaymentRequest): Promise<PaymentRe
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (response.status === 404) {
+      return {
+        success: false,
+        error: 'سرویس پرداخت روی سرور فعال نیست.',
+      };
+    }
     const result = parsePaymentResult(await response.json());
     return response.ok ? result : { success: false, error: result.error || 'درخواست پرداخت انجام نشد.' };
   } catch {
@@ -90,11 +93,7 @@ export const verifyPayment = async (
   amount: number,
 ): Promise<{ success: boolean; refId?: string; error?: string }> => {
   if (!API_URL) {
-    await wait(500);
-    if (!authority.startsWith('mock-')) {
-      return { success: false, error: 'پرداخت آزمایشی تایید نشد.' };
-    }
-    return { success: true, refId: `MOCK-${amount}-${Date.now()}` };
+    return { success: false, error: 'درگاه پرداخت پیکربندی نشده است.' };
   }
 
   try {
@@ -103,6 +102,9 @@ export const verifyPayment = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ authority, amount }),
     });
+    if (response.status === 404) {
+      return { success: false, error: 'سرویس تایید پرداخت روی سرور فعال نیست.' };
+    }
     const result = parsePaymentVerification(await response.json());
     return response.ok ? result : { success: false, error: result.error || 'پرداخت تایید نشد.' };
   } catch {

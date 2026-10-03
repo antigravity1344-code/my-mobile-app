@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { UserCheck, MapPin } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
+import type { ApiUser } from '../../api/types';
 
 interface CustomerOnboardingModalProps {
   visible: boolean;
   userId: string;
-  onComplete: (updatedUser: any) => void;
+  onComplete: (updatedUser: ApiUser) => void;
 }
 
 export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = ({
@@ -25,7 +26,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
 }) => {
   const [name, setName] = useState('');
   const [nationalId, setNationalId] = useState('');
-  const [birthDate, setBirthDate] = useState('۱۳۷۰/۰۱/۰۱');
+  const [birthDate, setBirthDate] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

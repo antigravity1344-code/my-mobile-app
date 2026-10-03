@@ -33,10 +33,11 @@ const STATUS_CONFIG: Record<
     Icon: Clock,
   },
   ACCEPTED: {
-    label: 'پذیرفته‌شده',
-    bgClass: 'bg-sky-100',
-    textClass: 'text-sky-700',
-    borderClass: 'border-sky-200',
+    label: 'در حال انجام',
+    bg: '#e0f2fe',
+    text: '#0369a1',
+    border: '#bae6fd',
+    Icon: CheckCircle2,
   },
   CONFIRMED: {
     label: 'تأیید شده',

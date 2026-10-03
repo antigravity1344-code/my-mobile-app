@@ -10,24 +10,38 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { apiFetch } from '../../api/apiClient';
+import type { ApiAdminStats, ApiAdminUser, ApiOrder } from '../../api/types';
 
 export const AdminPanelScreen: React.FC = () => {
   const [adminTab, setAdminTab] = useState<'orders' | 'cleaners' | 'stats'>('orders');
-  const [stats, setStats] = useState<any>(null);
-  const [workers, setWorkers] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [stats, setStats] = useState<ApiAdminStats | null>(null);
+  const [workers, setWorkers] = useState<ApiAdminUser[]>([]);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(false);
+  const [adminToken, setAdminToken] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const adminFetch = (endpoint: string, options: RequestInit = {}) =>
+    apiFetch(endpoint, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${adminToken}`,
+      },
+    });
 
   const loadData = async () => {
+    if (!adminToken) return;
     setLoading(true);
     try {
-      const statsRes = await apiFetch('/admin/stats');
+      const statsRes = await adminFetch('/admin/stats');
       if (statsRes.success) setStats(statsRes.stats);
 
-      const workersRes = await apiFetch('/admin/users?role=WORKER');
+      const workersRes = await adminFetch('/admin/users?role=WORKER');
       if (workersRes.success) setWorkers(workersRes.users);
 
-      const ordersRes = await apiFetch('/admin/orders');
+      const ordersRes = await adminFetch('/admin/orders');
       if (ordersRes.success) setOrders(ordersRes.orders);
     } catch (e) {
       console.error(e);
@@ -36,12 +50,36 @@ export const AdminPanelScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (adminToken) void loadData();
+  }, [adminToken]);
+
+  const handleAdminLogin = async () => {
+    setLoginError(null);
+    const res = await apiFetch('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+    if (res.success && res.token) {
+      setAdminToken(res.token);
+      setPassword('');
+    } else {
+      setLoginError(res.message || 'ورود مدیر ناموفق بود.');
+    }
+  };
+
+  const handleAdminLogout = async () => {
+    if (adminToken) {
+      await adminFetch('/admin/logout', { method: 'POST' });
+    }
+    setAdminToken('');
+    setStats(null);
+    setWorkers([]);
+    setOrders([]);
+  };
 
   const handleCompleteOrder = async (orderId: string) => {
     setLoading(true);
-    const res = await apiFetch('/admin/orders/' + orderId, {
+    const res = await adminFetch('/admin/orders/' + orderId, {
       method: 'PUT',
       body: JSON.stringify({ status: 'COMPLETED' }),
     });
@@ -51,7 +89,7 @@ export const AdminPanelScreen: React.FC = () => {
 
   const handleUpdateWorkerStatus = async (userId: string, status: string) => {
     setLoading(true);
-    const res = await apiFetch(`/admin/users/${userId}/status`, {
+    const res = await adminFetch(`/admin/users/${userId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status })
     });
@@ -60,6 +98,29 @@ export const AdminPanelScreen: React.FC = () => {
       loadData();
     }
   };
+
+  if (!adminToken) {
+    return (
+      <div className="mx-auto max-w-sm space-y-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-right text-white">
+        <h3 className="text-base font-bold">ورود مدیر</h3>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-sm"
+          placeholder="رمز مدیر"
+        />
+        {loginError ? <p className="text-xs text-rose-300">{loginError}</p> : null}
+        <button
+          type="button"
+          onClick={() => void handleAdminLogin()}
+          className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold"
+        >
+          ورود
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 text-right pb-6 font-sans">
@@ -70,14 +131,23 @@ export const AdminPanelScreen: React.FC = () => {
             <ShieldAlert className="w-5 h-5 text-sky-400" />
             <h3 className="text-base font-bold">داشبورد مدیریت پاکشو (Real Admin)</h3>
           </div>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="flex items-center gap-1 text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-1 rounded-full font-bold cursor-pointer hover:bg-sky-500/30"
-          >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-            بروزرسانی
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center gap-1 text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-1 rounded-full font-bold cursor-pointer hover:bg-sky-500/30"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              بروزرسانی
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleAdminLogout()}
+              className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-full font-bold cursor-pointer"
+            >
+              خروج
+            </button>
+          </div>
         </div>
         <p className="text-xs text-slate-300">مدیریت سفارش‌ها، تایید مدارک متخصصین و نظارت مالی واقعی</p>
       </div>
@@ -198,7 +268,7 @@ export const AdminPanelScreen: React.FC = () => {
                     <UserCheck className="w-4 h-4 text-sky-600" />
                     <div>
                       <span className="font-bold text-slate-800">{cleaner.name || 'متخصص جدید'}</span>
-                      <p className="text-[10px] text-slate-500">تلفن: {cleaner.phone} | کد ملی: {cleaner.nationalId || 'نامشخص'}</p>
+                      <p className="text-[10px] text-slate-500">تلفن: {cleaner.phone} | کد ملی: {cleaner.nationalIdMasked || 'نامشخص'}</p>
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${

@@ -1,21 +1,21 @@
-﻿import { Platform } from 'react-native';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class StorageService {
   private memoryFallback: Map<string, string> = new Map();
 
+  private async readRaw(key: string): Promise<string | null> {
+    const cached = this.memoryFallback.get(key);
+    if (cached !== undefined) return cached;
+
+    const stored = await AsyncStorage.getItem(key);
+    if (stored !== null) this.memoryFallback.set(key, stored);
+    return stored;
+  }
+
   async getItem<T>(key: string, defaultValue: T): Promise<T> {
     try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        const item = window.localStorage.getItem(key);
-        if (item !== null) {
-          return JSON.parse(item) as T;
-        }
-      } else {
-        const item = this.memoryFallback.get(key);
-        if (item !== undefined) {
-          return JSON.parse(item) as T;
-        }
-      }
+      const item = await this.readRaw(key);
+      if (item !== null) return JSON.parse(item) as T;
     } catch {
       // در صورت بروز هرگونه خطای پارس، مقدار پیش‌فرض بازگردانده می‌شود
     }
@@ -25,11 +25,8 @@ class StorageService {
   async setItem<T>(key: string, value: T): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, serialized);
-      } else {
-        this.memoryFallback.set(key, serialized);
-      }
+      this.memoryFallback.set(key, serialized);
+      await AsyncStorage.setItem(key, serialized);
     } catch {
       // چشم‌پوشی از خطاهای احتمالی ذخیره‌سازی
     }
@@ -37,11 +34,8 @@ class StorageService {
 
   async removeItem(key: string): Promise<void> {
     try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      } else {
-        this.memoryFallback.delete(key);
-      }
+      this.memoryFallback.delete(key);
+      await AsyncStorage.removeItem(key);
     } catch {
       // خطا نادیده گرفته می‌شود
     }

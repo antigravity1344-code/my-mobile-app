@@ -22,15 +22,16 @@ interface UserData {
 }
 
 interface CustomerAuthScreenProps {
-  onLogin: (user: UserData) => void;
+  onLogin: (user: UserData, token: string) => void;
 }
 
 export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin }) => {
-  const [phoneNumber, setPhoneNumber] = useState('09121111111');
-  const [otpCode, setOtpCode] = useState('1234');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const handleNext = async () => {
     if (!phoneNumber || phoneNumber.trim().length < 10) {
@@ -50,6 +51,8 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
 
     if (res.success) {
       setStep(2);
+      setInfoMessage(res.message || 'کد تایید صادر شد.');
+      setOtpCode('');
     } else {
       setErrorMessage(res.message || 'خطا در ارسال کد تایید');
     }
@@ -75,8 +78,8 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
 
     setLoading(false);
 
-    if (res.success && res.user) {
-      onLogin(res.user);
+    if (res.success && res.user && typeof res.token === 'string') {
+      onLogin(res.user, res.token);
     } else {
       setErrorMessage(res.message || 'کد تایید اشتباه است.');
     }
@@ -118,6 +121,11 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
               <Text style={styles.errorText}>{errorMessage}</Text>
             </View>
           )}
+          {infoMessage && !errorMessage ? (
+            <View style={styles.hintBox}>
+              <Text style={styles.hintText}>{infoMessage}</Text>
+            </View>
+          ) : null}
 
           {step === 1 ? (
             <>
@@ -152,13 +160,9 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
                 onChangeText={setOtpCode}
                 keyboardType="numeric"
                 maxLength={4}
-                placeholder="۱۲۳۴"
+                placeholder="کد ۴ رقمی"
                 placeholderTextColor="#94a3b8"
               />
-
-              <View style={styles.hintBox}>
-                <Text style={styles.hintText}>کد تستی سرور: ۱۲۳۴</Text>
-              </View>
 
               <Pressable onPress={handleVerify} disabled={loading} style={styles.submitButton}>
                 {loading ? (

@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { UserProfile, SavedAddress, WalletTransaction } from '../types/profile';
 import { appStorage } from '../../../utils/storage';
+import { apiFetch } from '../../../api/apiClient';
+import { attachStoredAuthToken } from '../../../api/authToken';
+import { CUSTOMER_TOKEN_KEY } from '../../../components/native/customerLoginStorage';
 
 const EMPTY_LOYALTY = {
   tier: 'NEW' as const,
@@ -20,13 +23,13 @@ const EMPTY_PROFILE: UserProfile = {
   savedAddresses: [],
 };
 
+/**
+ * پروفایل نمایشی قدیمی که نسخه‌های قبلی به‌صورت ثابت در حافظهٔ محلی می‌نوشتند.
+ * فقط شناسهٔ قدیمی `usr_101` بررسی می‌شود؛ شناسه‌ها/شماره‌های سرور (مثل USER-101) کاربر واقعی هستند.
+ */
 const isDemoProfile = (profile: UserProfile | null | undefined): boolean => {
   if (!profile) return false;
-  return (
-    profile.id === 'usr_101' ||
-    profile.id === 'USER-101' ||
-    profile.phoneNumber === '09123456789'
-  );
+  return profile.id === 'usr_101';
 };
 
 interface AuthUserSync {
@@ -55,6 +58,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const addressSyncUser = useRef('');
 
   useEffect(() => {
     void (async () => {
@@ -100,6 +104,42 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!hydrated) return;
     void appStorage.setItem('paksho_wallet_txs', transactions);
   }, [transactions, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || !profile.isLoggedIn || !profile.id) {
+      addressSyncUser.current = '';
+      return;
+    }
+    let cancelled = false;
+    const userId = profile.id;
+    void (async () => {
+      await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+      const res = await apiFetch('/users/addresses');
+      if (cancelled || !res.success || !Array.isArray(res.addresses)) return;
+      if (res.addresses.length > 0) {
+        setProfile((prev) => (prev.id === userId ? { ...prev, savedAddresses: res.addresses } : prev));
+      }
+      addressSyncUser.current = userId;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile.id, profile.isLoggedIn]);
+
+  useEffect(() => {
+    if (!hydrated || !profile.id || addressSyncUser.current !== profile.id) return;
+    const addresses = profile.savedAddresses;
+    const timer = setTimeout(() => {
+      void (async () => {
+        await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+        await apiFetch('/users/addresses', {
+          method: 'PUT',
+          body: JSON.stringify({ addresses }),
+        });
+      })();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [hydrated, profile.id, profile.savedAddresses]);
 
   const addSavedAddress = (newAddr: Omit<SavedAddress, 'id'>) => {
     const createdAddress: SavedAddress = {

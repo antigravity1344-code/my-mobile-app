@@ -225,8 +225,8 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
 
   const addressErrors = getAddressValidationErrors(booking.addressDetails);
   const getInputStyle = (field: keyof typeof booking.addressDetails) => {
-    const hasError = !!(addressErrors as any)[field];
-    const value = (booking.addressDetails as any)[field];
+    const hasError = !!(addressErrors as Partial<Record<keyof typeof booking.addressDetails, unknown>>)[field];
+    const value = booking.addressDetails[field];
     if (!value) return styles.inputError;
     if (hasError) return styles.inputError;
     return styles.inputSuccess;

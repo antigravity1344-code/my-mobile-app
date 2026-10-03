@@ -308,7 +308,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               <div className="flex justify-between items-center pt-2">
                 <span className="text-sm font-extrabold text-slate-900">مبلغ برآوردی:</span>
                 <span className="text-base sm:text-lg font-black text-emerald-600">
-                  {formattedTotalPrice} تومان
+                  {totalPrice.toLocaleString('fa-IR')} تومان
                 </span>
               </div>
               {pricing && pricing.discountAmount > 0 && (
@@ -407,7 +407,6 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   )}
                 </button>
               )}
-            </div>
             </div>
           </div>
         )}

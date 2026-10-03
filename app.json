@@ -12,13 +12,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.paksho.cleaningmobile"
+      "bundleIdentifier": "com.paksho.customer"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0f172a"
       },
-      "package": "com.paksho.cleaningmobile",
+      "package": "com.paksho.customer",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
