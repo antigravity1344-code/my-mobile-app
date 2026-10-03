@@ -1,5 +1,6 @@
 import React from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { Ban, Phone, ShieldCheck, Wallet, X } from 'lucide-react-native';
 import type { CleanerProfile } from '../types/cleaner';
 import { CLEANER_TIER_LABELS } from '../types/cleaner';
@@ -24,9 +25,10 @@ export const CleanerDetailModal: React.FC<CleanerDetailModalProps> = ({
   const cleanerCanCancel = isCleanerCancellationAllowed();
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
+      {(bottomInset) => (
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: 20 + bottomInset }]}>
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <X size={18} color="#334155" />
@@ -95,7 +97,8 @@ export const CleanerDetailModal: React.FC<CleanerDetailModalProps> = ({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 };
 

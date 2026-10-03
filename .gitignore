@@ -11,6 +11,9 @@ android/.kotlin
 
 # داده و لاگ‌های محلی سرور توسعه
 server/db.json
+server/data/
+server/uploads/
+server/uploads/
 server/server.stdout.log
 server/server.stderr.log
 

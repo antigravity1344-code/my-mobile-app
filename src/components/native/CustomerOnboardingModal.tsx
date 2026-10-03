@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,14 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Keyboard,
+  Platform,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { UserCheck, MapPin } from 'lucide-react-native';
+import { BottomSheetModal } from './BottomSheetModal';
 import { apiFetch } from '../../api/apiClient';
 import type { ApiUser } from '../../api/types';
 
@@ -18,6 +22,8 @@ interface CustomerOnboardingModalProps {
   userId: string;
   onComplete: (updatedUser: ApiUser) => void;
 }
+
+type FieldKey = 'name' | 'nationalId' | 'birthDate' | 'address';
 
 export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = ({
   visible,
@@ -30,6 +36,66 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldOffsets = useRef<Partial<Record<FieldKey, number>>>({});
+  const focusedFieldRef = useRef<FieldKey | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardInset(0);
+      focusedFieldRef.current = null;
+      return;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardInset(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
+  const scrollFieldIntoView = (key: FieldKey) => {
+    const delay = Platform.OS === 'android' ? 120 : 60;
+    setTimeout(() => {
+      if (key === 'birthDate' || key === 'address') {
+        scrollRef.current?.scrollToEnd({ animated: true });
+        return;
+      }
+      const y = fieldOffsets.current[key];
+      if (y == null) return;
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, y - 24),
+        animated: true,
+      });
+    }, delay);
+  };
+
+  useEffect(() => {
+    if (keyboardInset > 0 && focusedFieldRef.current) {
+      scrollFieldIntoView(focusedFieldRef.current);
+    }
+  }, [keyboardInset]);
+
+  const registerField = (key: FieldKey) => (event: LayoutChangeEvent) => {
+    fieldOffsets.current[key] = event.nativeEvent.layout.y;
+  };
+
+  const handleFieldFocus = (key: FieldKey) => {
+    focusedFieldRef.current = key;
+    scrollFieldIntoView(key);
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -64,92 +130,150 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
     }
   };
 
+  const androidKeyboardOpen = Platform.OS === 'android' && keyboardInset > 0;
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <ScrollView contentContainerStyle={styles.scroll}>
-            <View style={styles.header}>
-              <UserCheck size={28} color="#0284c7" />
-              <Text style={styles.title}>تکمیل اطلاعات هویتی مشتری</Text>
-            </View>
-
-            <Text style={styles.subtitle}>
-              جهت امنیت سفارش‌ها و ارائه خدمات بهتر، لطفاً اطلاعات اولیه خود را وارد کنید.
-            </Text>
-
-            {errorMsg && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{errorMsg}</Text>
+    <BottomSheetModal visible={visible} onRequestClose={() => {}}>
+      {(bottomInset) => (
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingBottom: Math.max(20, bottomInset) },
+            androidKeyboardOpen && {
+              justifyContent: 'flex-end',
+              paddingBottom: Math.max(bottomInset, keyboardInset),
+            },
+          ]}
+        >
+          <View
+            style={[styles.viewport, androidKeyboardOpen && styles.viewportKeyboard]}
+            onLayout={(event) => {
+              const nextHeight = event.nativeEvent.layout.height;
+              setViewportHeight((current) => (current === nextHeight ? current : nextHeight));
+            }}
+          >
+          <View style={[styles.modalContent, androidKeyboardOpen && styles.modalContentKeyboard, viewportHeight > 0 && { maxHeight: viewportHeight }]}>
+            <ScrollView
+              ref={scrollRef}
+              style={viewportHeight > 0 ? { maxHeight: viewportHeight } : undefined}
+              contentContainerStyle={styles.scroll}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              showsVerticalScrollIndicator
+            >
+              <View style={styles.header}>
+                <UserCheck size={28} color="#0284c7" />
+                <Text style={styles.title}>تکمیل اطلاعات هویتی مشتری</Text>
               </View>
-            )}
 
-            {/* نام و نام خانوادگی */}
-            <Text style={styles.label}>نام و نام خانوادگی:</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="مثال: علی رضایی"
-              placeholderTextColor="#94a3b8"
-            />
+              <Text style={styles.subtitle}>
+                جهت امنیت سفارش‌ها و ارائه خدمات بهتر، لطفاً اطلاعات اولیه خود را وارد کنید.
+              </Text>
 
-            {/* کد ملی */}
-            <Text style={styles.label}>کد ملی ۱۰ رقمی:</Text>
-            <TextInput
-              style={styles.input}
-              value={nationalId}
-              onChangeText={setNationalId}
-              keyboardType="numeric"
-              maxLength={10}
-              placeholder="۰۰۱۲۳۴۵۶۷۸"
-              placeholderTextColor="#94a3b8"
-            />
-
-            {/* تاریخ تولد */}
-            <Text style={styles.label}>تاریخ تولد:</Text>
-            <TextInput
-              style={styles.input}
-              value={birthDate}
-              onChangeText={setBirthDate}
-              placeholder="۱۳۷۰/۰۱/۰۱"
-              placeholderTextColor="#94a3b8"
-            />
-
-            {/* آدرس اصلی */}
-            <Text style={styles.label}>آدرس ثبت‌شده برای خدمات:</Text>
-            <View style={styles.inputWrapper}>
-              <MapPin size={18} color="#64748b" />
-              <TextInput
-                style={styles.inputInner}
-                value={address}
-                onChangeText={setAddress}
-                placeholder="مثال: تهران، خیابان آزادی، پلاک ۱۲"
-                placeholderTextColor="#94a3b8"
-              />
-            </View>
-
-            <Pressable onPress={handleSubmit} disabled={loading} style={styles.submitBtn}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitBtnText}>ثبت و تایید اطلاعات</Text>
+              {errorMsg && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{errorMsg}</Text>
+                </View>
               )}
-            </Pressable>
-          </ScrollView>
+
+              <View onLayout={registerField('name')}>
+                <Text style={styles.label}>نام و نام خانوادگی:</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  onFocus={() => handleFieldFocus('name')}
+                  placeholder="مثال: علی رضایی"
+                  placeholderTextColor="#94a3b8"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View onLayout={registerField('nationalId')}>
+                <Text style={styles.label}>کد ملی ۱۰ رقمی:</Text>
+                <TextInput
+                  style={styles.input}
+                  value={nationalId}
+                  onChangeText={setNationalId}
+                  onFocus={() => handleFieldFocus('nationalId')}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  placeholder="۰۰۱۲۳۴۵۶۷۸"
+                  placeholderTextColor="#94a3b8"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View onLayout={registerField('birthDate')}>
+                <Text style={styles.label}>تاریخ تولد:</Text>
+                <TextInput
+                  style={styles.input}
+                  value={birthDate}
+                  onChangeText={setBirthDate}
+                  onFocus={() => handleFieldFocus('birthDate')}
+                  placeholder="۱۳۷۰/۰۱/۰۱"
+                  placeholderTextColor="#94a3b8"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View onLayout={registerField('address')}>
+                <Text style={styles.label}>آدرس ثبت‌شده برای خدمات:</Text>
+                <View style={styles.inputWrapper}>
+                  <MapPin size={18} color="#64748b" />
+                  <TextInput
+                    style={styles.inputInner}
+                    value={address}
+                    onChangeText={setAddress}
+                    onFocus={() => handleFieldFocus('address')}
+                    placeholder="مثال: تهران، خیابان آزادی، پلاک ۱۲"
+                    placeholderTextColor="#94a3b8"
+                    returnKeyType="done"
+                  />
+                </View>
+              </View>
+
+              <Pressable onPress={handleSubmit} disabled={loading} style={styles.submitBtn}>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>ثبت و تایید اطلاعات</Text>
+                )}
+              </Pressable>
+            </ScrollView>
+          </View>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </KeyboardAvoidingView>
+      )}
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  viewport: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 440,
+    justifyContent: 'center',
+  },
+  viewportKeyboard: {
+    justifyContent: 'flex-end',
   },
   modalContent: {
     width: '100%',
@@ -157,11 +281,15 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
     backgroundColor: '#ffffff',
     borderRadius: 24,
-    padding: 20,
+    overflow: 'hidden',
     elevation: 10,
   },
+  modalContentKeyboard: {
+    maxHeight: '100%',
+  },
   scroll: {
-    paddingBottom: 10,
+    padding: 20,
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row-reverse',

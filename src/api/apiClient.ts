@@ -14,7 +14,7 @@ function resolveApiBaseUrl(): string {
     return `http://${host}:3000/api`;
   }
 
-  return 'http://127.0.0.1:3000/api';
+  return 'http://192.168.1.2:3000/api';
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();

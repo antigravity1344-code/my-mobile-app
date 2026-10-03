@@ -50,10 +50,8 @@ function roleForService(serviceId: string): SpecialistRole {
 
 /** سفارش سرور به‌علاوهٔ چند فیلد اختیاری که ممکن است در آینده از سرور بیایند. */
 type ServerOrderLike = ApiOrder & {
-  serviceId?: string;
   pricingType?: string;
   badge?: string;
-  serviceOptions?: Record<string, unknown>;
 };
 
 function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder {
@@ -69,13 +67,16 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder {
   else status = 'OPEN';
 
   const details: Record<string, string | number | boolean> = {};
+  if (typeof order.durationHours === 'number' && order.durationHours > 0) {
+    details['مدت'] = `${order.durationHours} ساعت`;
+  }
   if (order.serviceOptions && typeof order.serviceOptions === 'object') {
     for (const [k, v] of Object.entries(order.serviceOptions)) {
       if (v !== undefined && v !== null) details[k] = v as string | number | boolean;
     }
-  } else if (order.notes) {
-    details['توضیحات'] = String(order.notes);
   }
+  if (order.notes) details['یادداشت سفارش'] = String(order.notes);
+  if (order.addressNotes) details['یادداشت آدرس'] = String(order.addressNotes);
 
   return {
     id: order.id,
@@ -438,16 +439,18 @@ export const SpecialistPortalScreen: React.FC = () => {
                   <div className="flex items-center gap-1.5 text-slate-700">
                     <User className="w-3.5 h-3.5 text-slate-400" />
                     <span><strong className="text-slate-900">مشتری:</strong> {order.customerName}</span>
-                    <span className="text-slate-400 font-mono text-[11px] mr-auto flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      {order.phone}
-                    </span>
+                    {order.phone && order.phone !== '—' ? (
+                      <span className="text-slate-400 font-mono text-[11px] mr-auto flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        {order.phone}
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="flex items-start gap-1.5 text-slate-700">
                     <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0 mt-0.5" />
                     <span>
-                      <strong className="text-slate-900">محل انجام کار:</strong> {order.district}، {order.address}
+                      <strong className="text-slate-900">محل انجام کار:</strong> {order.address}
                     </span>
                   </div>
 

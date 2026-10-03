@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type {
   OrderItem,
   OrderFilterTab,
@@ -6,6 +6,8 @@ import type {
   OrderStats,
 } from '../types/order';
 import { orderService } from '../services/orderService';
+import { createLatestRequestGuard } from '../services/orderStatusWatch';
+import { selectCustomerOrders } from '../services/orderPayload';
 import { appStorage } from '../../../utils/storage';
 
 const CUSTOMER_USER_STORAGE_KEY = 'PAKSHO_USER_CUSTOMER';
@@ -40,7 +42,7 @@ interface OrdersContextValue {
   setFilterTab: (tab: OrderFilterTab) => void;
   setSearchQuery: (query: string) => void;
   setSortOption: (sort: OrderSortOption) => void;
-  refreshOrders: () => Promise<void>;
+  refreshOrders: (options?: { silent?: boolean }) => Promise<void>;
   selectOrder: (orderId: string | null) => void;
   openRatingModal: (orderId: string) => void;
   closeRatingModal: () => void;
@@ -68,19 +70,27 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [ratingModalOrderId, setRatingModalOrderId] = useState<string | null>(null);
 
-  const fetchOrders = useCallback(async () => {
+  const requestGuard = useRef(createLatestRequestGuard());
+
+  const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
+    const isCurrent = requestGuard.current();
     try {
       const userId = await resolveCustomerUserId();
-      const [filtered, full] = await Promise.all([
-        orderService.getOrders(filterTab, searchQuery, sortOption, userId),
-        orderService.getOrders('ALL', '', 'NEWEST', userId),
-      ]);
-      setOrders(filtered);
-      setAllOrders(full);
-      setLoadError(orderService.getLastOrdersLoadError());
+      const loaded = await orderService.getOrders('ALL', '', 'NEWEST', userId);
+      if (!isCurrent()) return;
+      const error = orderService.getLastOrdersLoadError();
+      if (error) {
+        if (!options?.silent) setLoadError(error);
+        return;
+      }
+      setLoadError(null);
+      setAllOrders(loaded);
+      setOrders(selectCustomerOrders(loaded, filterTab, searchQuery, sortOption));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [filterTab, searchQuery, sortOption]);
 
@@ -88,9 +98,9 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     void fetchOrders();
   }, [fetchOrders]);
 
-  const refreshOrders = useCallback(async () => {
-    setRefreshing(true);
-    await fetchOrders();
+  const refreshOrders = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
+    await fetchOrders(options);
   }, [fetchOrders]);
 
   const stats = useMemo(() => orderService.calculateStats(allOrders), [allOrders]);

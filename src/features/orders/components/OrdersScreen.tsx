@@ -23,6 +23,8 @@ import type { OrderItem, OrderSortOption } from '../types/order';
 import { OrderFilterTabs } from './OrderFilterTabs';
 import { OrderCard } from './OrderCard';
 import { EmptyOrdersState } from './EmptyOrdersState';
+import { formatOrderAmount } from '../services/orderService';
+import { startOrderStatusWatch } from '../services/orderStatusWatch';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderRatingModal } from './OrderRatingModal';
 
@@ -65,11 +67,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   useEffect(() => {
-    void refreshOrders();
     if (initialOrderId) {
       selectOrder(initialOrderId);
     }
-  }, [initialOrderId]);
+  }, [initialOrderId, selectOrder]);
+
+  useEffect(() => {
+    void refreshOrders({ silent: true });
+    return startOrderStatusWatch({
+      refresh: () => refreshOrders({ silent: true }),
+    });
+  }, [refreshOrders]);
 
   const activeRatingOrder = ratingModalOrderId
     ? allOrders.find((item) => item.id === ratingModalOrderId)
@@ -123,7 +131,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
             <View style={styles.statIconWrap}>
               <PackageCheck size={16} color="#0284c7" />
             </View>
-            <Text style={styles.statNumber}>{stats.totalCount.toLocaleString('fa-IR')}</Text>
+            <Text style={styles.statNumber}>{formatOrderAmount(stats.totalCount)}</Text>
             <Text style={styles.statTitle}>کل سفارش‌ها</Text>
           </View>
 
@@ -132,7 +140,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
               <Clock size={16} color="#d97706" />
             </View>
             <Text style={[styles.statNumber, { color: '#b45309' }]}>
-              {stats.activeCount.toLocaleString('fa-IR')}
+              {formatOrderAmount(stats.activeCount)}
             </Text>
             <Text style={styles.statTitle}>جاری و فعال</Text>
           </View>
@@ -142,7 +150,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
               <CheckCircle size={16} color="#059669" />
             </View>
             <Text style={[styles.statNumber, { color: '#047857' }]}>
-              {stats.completedCount.toLocaleString('fa-IR')}
+              {formatOrderAmount(stats.completedCount)}
             </Text>
             <Text style={styles.statTitle}>تکمیل‌شده</Text>
           </View>
@@ -152,7 +160,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
               <Wallet size={16} color="#64748b" />
             </View>
             <Text style={[styles.statNumber, { fontSize: 13, color: '#334155' }]}>
-              {(stats.totalSpent / 1000).toLocaleString('fa-IR')} هـ.ت
+              {formatOrderAmount((stats.totalSpent || 0) / 1000)} هـ.ت
             </Text>
             <Text style={styles.statTitle}>مجموع خرید</Text>
           </View>
@@ -272,6 +280,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
         onClose={closeRatingModal}
         onSubmit={async (rating, comment, tags) => {
           if (!activeRatingOrder) return { success: false, error: 'سفارش انتخاب نشده' };
+          if (activeRatingOrder.ratings?.customerRating) {
+            return { success: false, error: 'برای این سفارش قبلاً امتیاز ثبت شده است.' };
+          }
           return await rateOrder(activeRatingOrder.id, rating, comment, tags);
         }}
       />

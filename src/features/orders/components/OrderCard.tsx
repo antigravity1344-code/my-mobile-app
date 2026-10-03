@@ -10,7 +10,7 @@ import {
   Repeat,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { isOrderCancellable } from '../services/orderService';
+import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 
 interface OrderCardProps {
@@ -71,7 +71,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.specItem}>
           <Calendar size={13} color="#64748b" />
           <Text style={styles.specText}>
-            {order.date.dayOfWeek} {order.date.dayOfMonth} {order.date.monthName?.split(' ')[0] || ''}
+            {[
+              order.date?.dayOfWeek,
+              order.date?.dayOfMonth,
+              order.date?.monthName?.split(' ')[0] || '',
+            ]
+              .filter((part) => part !== undefined && part !== null && part !== 0 && String(part).trim() !== '' && String(part).trim() !== '—')
+              .join(' ') || '—'}
           </Text>
         </View>
 
@@ -79,7 +85,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
           <Clock size={13} color="#64748b" />
           <Text style={styles.specText}>
             {order.timeSlot?.label ||
-              `${order.timeSlot?.startTime || ''} تا ${order.timeSlot?.endTime || ''}`}
+              [order.timeSlot?.startTime, order.timeSlot?.endTime].filter(Boolean).join(' تا ') ||
+              '—'}
             {order.durationHours ? ` (${order.durationHours} ساعت)` : ''}
           </Text>
         </View>
@@ -87,7 +94,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.specItem}>
           <MapPin size={13} color="#64748b" />
           <Text style={styles.specText} numberOfLines={1}>
-            {order.address.district}
+            {order.address?.district || order.address?.fullAddress || '—'}
           </Text>
         </View>
       </View>
@@ -99,11 +106,17 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <View style={styles.cleanerAvatar}>
               <User size={13} color="#0284c7" />
             </View>
-            <Text style={styles.cleanerName}>{order.cleaner?.name}</Text>
-            <View style={styles.ratingBadge}>
-              <Star size={11} color="#f59e0b" fill="#f59e0b" />
-              <Text style={styles.ratingText}>{order.cleaner?.rating}</Text>
-            </View>
+            <Text style={styles.cleanerName}>
+              {order.cleaner?.name || order.cleaner?.phone || 'اطلاعات متخصص ثبت نشده'}
+            </Text>
+            {typeof order.cleaner?.rating === 'number' ? (
+              <View style={styles.ratingBadge}>
+                <Star size={11} color="#f59e0b" fill="#f59e0b" />
+                <Text style={styles.ratingText}>
+                  {order.cleaner.rating.toLocaleString('fa-IR')}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Text style={styles.cleanerRole}>متخصص اعزامی</Text>
         </View>
@@ -114,15 +127,17 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.priceWrap}>
           <Text style={styles.priceLabel}>مبلغ نهایی</Text>
           <Text style={styles.priceValue}>
-            {order.pricing.total.toLocaleString('fa-IR')} تومان
+            {formatOrderAmount(order.pricing?.total)} تومان
           </Text>
         </View>
 
         <View style={styles.actionsWrap}>
           {isCompleted && (
             <Pressable
+              disabled={hasRated}
               onPress={(e) => {
                 e.stopPropagation();
+                if (hasRated) return;
                 onPressRate?.(order);
               }}
               style={[styles.actionBtn, styles.rateBtn]}

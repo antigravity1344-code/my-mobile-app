@@ -3,6 +3,14 @@ const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const {
+  createWorkerDocumentStorage,
+  rememberDocument,
+  assignDocument,
+} = require('./workerDocumentStorage');
+const { createDataStore } = require('./dataStore');
+const kavenegarSms = require('./kavenegarSms');
+const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -26,6 +34,7 @@ function loadEnvFile(filePath) {
 
 loadEnvFile(path.join(__dirname, '.env'));
 loadEnvFile(path.join(__dirname, '..', '.env'));
+assertKeyConfigured();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -44,101 +53,32 @@ const ADMIN_USER_STATUSES = ['REGISTERED', 'PENDING_VERIFICATION', 'APPROVED', '
 const MIN_ORDER_PRICE = 50000;
 const MAX_ORDER_PRICE = 20000000;
 const MAX_DOC_CHARS = 400000;
+const MAX_ID_DOC_BYTES = 600 * 1024;
+const workerDocuments = createWorkerDocumentStorage(
+  process.env.PAKSHO_WORKER_DOC_DIR
+    ? path.resolve(process.env.PAKSHO_WORKER_DOC_DIR)
+    : path.join(__dirname, 'uploads', 'worker-docs')
+);
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+app.use('/uploads', (req, res) => {
+  res.status(404).json({ success: false, message: 'یافت نشد.' });
+});
+app.use('/data', (req, res) => {
+  res.status(404).json({ success: false, message: 'یافت نشد.' });
+});
 
-const DB_FILE = path.join(__dirname, 'db.json');
+const store = createDataStore(
+  process.env.PAKSHO_SQLITE_PATH
+    ? path.resolve(process.env.PAKSHO_SQLITE_PATH)
+    : path.join(__dirname, 'data', 'paksho.sqlite')
+);
 const otpSendWindow = new Map();
 const adminLoginAttempts = new Map();
 
-let db = {
-  users: [
-    {
-      id: 'USER-101',
-      phone: '09121111111',
-      role: 'CUSTOMER',
-      status: 'ACTIVE',
-      isProfileComplete: true,
-      name: 'علی رضایی',
-      nationalId: '0012345678',
-      birthDate: '1370/01/01',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      address: 'تهران، خیابان آزادی، پلاک ۱۲',
-      city: 'تهران',
-      addresses: ['تهران، خیابان آزادی، پلاک ۱۲'],
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'USER-102',
-      phone: '09122222222',
-      role: 'WORKER',
-      status: 'PENDING_VERIFICATION',
-      isProfileComplete: true,
-      name: 'رضا محمدی',
-      nationalId: '0087654321',
-      birthDate: '1368/05/12',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-      idDoc: 'کارت ملی و شناسنامه ثبت شده',
-      address: 'تهران، خیابان شریعتی، خیابان ملک',
-      city: 'تهران',
-      skills: ['نظافت منزل', 'نظافت راه پله'],
-      bankSheba: 'IR120000000000000000000000',
-      createdAt: new Date().toISOString()
-    }
-  ],
-  orders: [
-    {
-      id: 'ORD-101',
-      customerId: 'USER-101',
-      customerName: 'علی رضایی',
-      customerPhone: '09121111111',
-      customerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      serviceTitle: 'نظافت عادی منزل',
-      address: 'تهران، خیابان آزادی، پلاک ۱۲',
-      date: '۱۴۰۳/۰۷/۰۱',
-      time: '۱۰:۰۰',
-      price: 350000,
-      status: 'PENDING', // PENDING, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED
-      cleanerId: null,
-      cleanerName: null,
-      cleanerAvatar: null,
-      createdAt: new Date().toISOString()
-    }
-  ],
-  otpStore: {}
-};
-
-if (fs.existsSync(DB_FILE)) {
-  try {
-    const data = fs.readFileSync(DB_FILE, 'utf-8');
-    db = JSON.parse(data);
-    if (!db.otpStore) db.otpStore = {};
-    if (!db.sessions || typeof db.sessions !== 'object') db.sessions = {};
-  } catch (e) {
-    console.error('Error reading db.json', e);
-  }
-}
-
-function saveDb() {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-  } catch (e) {
-    console.error('Error saving db.json', e);
-  }
-}
-
 function pruneExpiredSessions() {
-  if (!db.sessions || typeof db.sessions !== 'object') return;
-  const now = Date.now();
-  let changed = false;
-  for (const [token, session] of Object.entries(db.sessions)) {
-    if (!session || session.expires < now) {
-      delete db.sessions[token];
-      changed = true;
-    }
-  }
-  if (changed) saveDb();
+  store.pruneSessions(Date.now());
 }
 
 function bearerToken(req) {
@@ -152,36 +92,32 @@ function clientKey(req) {
 
 function issueUserSession(user) {
   pruneExpiredSessions();
-  if (!db.sessions || typeof db.sessions !== 'object') db.sessions = {};
   const token = crypto.randomBytes(24).toString('hex');
-  db.sessions[token] = {
+  store.createSession(token, {
     userId: user.id,
     role: user.role,
     expires: Date.now() + USER_SESSION_MS
-  };
-  saveDb();
+  });
   return token;
 }
 
 function revokeUserSession(token) {
-  if (!token || !db.sessions) return false;
-  if (!db.sessions[token]) return false;
-  delete db.sessions[token];
-  saveDb();
-  return true;
+  if (!token) return false;
+  return store.deleteSession(token);
 }
 
 function authUserFromRequest(req) {
   const token = bearerToken(req);
-  if (!token || !db.sessions) return null;
-  const session = db.sessions[token];
+  if (!token) return null;
+  const session = store.getSession(token);
   if (!session) return null;
   if (session.expires < Date.now()) {
-    delete db.sessions[token];
-    saveDb();
+    store.deleteSession(token);
     return null;
   }
-  return db.users.find(u => u.id === session.userId && u.role === session.role) || null;
+  const user = store.getUser(session.userId);
+  if (!user || user.role !== session.role) return null;
+  return user;
 }
 
 function requireUser(req, res) {
@@ -195,6 +131,57 @@ function requireUser(req, res) {
     return null;
   }
   return user;
+}
+
+function detectImageKind(buffer) {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpeg';
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'png';
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'webp';
+  }
+  return null;
+}
+
+function parseIdDocFile(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: 'مدرک هویتی الزامی است.' };
+  }
+  const mime = typeof payload.mimeType === 'string' ? payload.mimeType.trim().toLowerCase() : '';
+  const allowed = { 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' };
+  if (!allowed[mime]) {
+    return { error: 'فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.' };
+  }
+  const raw = typeof payload.data === 'string' ? payload.data.trim() : '';
+  if (!raw) return { error: 'مدرک هویتی الزامی است.' };
+  const cleaned = raw.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
+  if (!cleaned || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned) || cleaned.length % 4 !== 0) {
+    return { error: 'فایل مدرک معتبر نیست.' };
+  }
+  const buffer = Buffer.from(cleaned, 'base64');
+  if (!buffer.length || buffer.length > MAX_ID_DOC_BYTES) {
+    return { error: 'حجم مدرک باید حداکثر ۶۰۰ کیلوبایت باشد.' };
+  }
+  const kind = detectImageKind(buffer);
+  if (!kind || kind !== allowed[mime]) {
+    return { error: 'محتوای فایل با نوع تصویر اعلام‌شده یکی نیست.' };
+  }
+  return { buffer, ext: kind === 'jpeg' ? 'jpg' : kind };
 }
 
 function publicUser(user) {
@@ -238,8 +225,49 @@ function createOrderId() {
   let id = '';
   do {
     id = 'ORD-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(4).toString('hex');
-  } while (db.orders.some(o => o.id === id));
+  } while (store.getOrder(id));
   return id;
+}
+
+function sanitizePricing(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const numericKeys = [
+    'subtotal',
+    'earlyBirdDiscountRate',
+    'earlyBirdDiscountAmount',
+    'tierDiscountRate',
+    'tierDiscountAmount',
+    'recurringDiscountRate',
+    'recurringDiscountAmount',
+    'discountRate',
+    'discountAmount',
+    'total',
+  ];
+  const pricing = {};
+  for (const key of numericKeys) {
+    if (typeof value[key] === 'number' && Number.isFinite(value[key])) pricing[key] = value[key];
+  }
+  if (typeof value.recurringDiscountDeferred === 'boolean') {
+    pricing.recurringDiscountDeferred = value.recurringDiscountDeferred;
+  }
+  return typeof pricing.total === 'number' ? pricing : null;
+}
+
+function sanitizeServiceOptions(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const options = {};
+  for (const [key, raw] of Object.entries(value).slice(0, 20)) {
+    if (!/^[A-Za-z0-9_]{1,40}$/.test(key)) continue;
+    if (typeof raw === 'string') {
+      const text = raw.trim().slice(0, 80);
+      if (text) options[key] = text;
+    } else if (typeof raw === 'number' && Number.isFinite(raw)) {
+      options[key] = raw;
+    } else if (typeof raw === 'boolean') {
+      options[key] = raw;
+    }
+  }
+  return Object.keys(options).length ? options : null;
 }
 
 function parseOrderPrice(raw) {
@@ -282,10 +310,10 @@ if (!ADMIN_PASSWORD) {
 // ------------------- API عمومی و احراز هویت -------------------
 
 // 1. ارسال OTP
-app.post('/api/auth/send-otp', (req, res) => {
-  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
-  if (!phone || phone.length < 10 || phone.length > 15) {
-    return res.status(400).json({ success: false, message: 'شماره همراه معتبر وارد کنید.' });
+app.post('/api/auth/send-otp', async (req, res) => {
+  const phone = kavenegarSms.normalizeIranMobile(req.body?.phone);
+  if (!phone) {
+    return res.status(400).json({ success: false, message: 'شماره همراه باید با ۰۹ و ۱۱ رقم باشد.' });
   }
 
   const now = Date.now();
@@ -302,7 +330,7 @@ app.post('/api/auth/send-otp', (req, res) => {
     });
   }
 
-  const existingOtp = db.otpStore[phone];
+  const existingOtp = store.getOtp(phone);
   if (existingOtp && now - existingOtp.lastSent < OTP_RESEND_MS) {
     const waitSec = Math.ceil((OTP_RESEND_MS - (now - existingOtp.lastSent)) / 1000);
     return res.status(429).json({
@@ -312,31 +340,37 @@ app.post('/api/auth/send-otp', (req, res) => {
   }
 
   const code = generateOtpCode();
-  db.otpStore[phone] = {
+  let delivery;
+  if (kavenegarSms.useFakeSms()) {
+    delivery = { ok: true };
+  } else {
+    delivery = await kavenegarSms.sendOtp(phone, code);
+  }
+  if (!delivery.ok) {
+    const message = delivery.status === 424
+      ? 'قالب پیامک تایید آماده نیست. کد تایید صادر نشد.'
+      : 'ارسال پیامک انجام نشد. کد تایید صادر نشد.';
+    return res.status(503).json({ success: false, message });
+  }
+
+  store.saveOtp(phone, {
     code,
     attempts: 0,
     lastSent: now,
     expires: now + OTP_TTL_MS
-  };
+  });
   window.count += 1;
   otpSendWindow.set(windowKey, window);
-  saveDb();
-
-  if (!IS_PRODUCTION) {
-    console.log(`[Paksho DEV OTP] phone=${phone} code=${code} (SMS واقعی وصل نیست)`);
-  }
 
   res.json({
     success: true,
-    message: IS_PRODUCTION
-      ? 'اگر پیامک واقعی پیکربندی شده باشد، کد ارسال می‌شود.'
-      : 'پیامک واقعی وصل نیست. کد تایید فقط در کنسول سرور توسعه چاپ شده است.'
+    message: 'کد تایید پیامک شد.'
   });
 });
 
 // 2. بررسی OTP
 app.post('/api/auth/verify-otp', (req, res) => {
-  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  const phone = kavenegarSms.normalizeIranMobile(req.body?.phone);
   const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
   const role = req.body?.role;
 
@@ -344,14 +378,13 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(400).json({ success: false, message: 'شماره تلفن و کد تایید الزامی است.' });
   }
 
-  const otpData = db.otpStore[phone];
+  const otpData = store.getOtp(phone);
   if (!otpData) {
     return res.status(400).json({ success: false, message: 'درخواستی برای این شماره یافت نشد.' });
   }
 
   if (otpData.expires && Date.now() > otpData.expires) {
-    delete db.otpStore[phone];
-    saveDb();
+    store.deleteOtp(phone);
     return res.status(400).json({ success: false, message: 'کد تایید منقضی شده است. دوباره درخواست دهید.' });
   }
 
@@ -359,41 +392,38 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(429).json({ success: false, message: 'تعداد تلاش‌های ناموفق بیش از حد مجاز است.' });
   }
 
-  if (code !== otpData.code) {
-    otpData.attempts += 1;
-    saveDb();
+  if (!secretsMatch(code, otpData.code)) {
+    store.saveOtp(phone, { ...otpData, attempts: otpData.attempts + 1 });
     return res.status(400).json({ success: false, message: 'کد تایید اشتباه است.' });
   }
 
-  delete db.otpStore[phone];
-
   const requestedRole = role === 'WORKER' ? 'WORKER' : 'CUSTOMER';
-  let user = db.users.find(u => u.phone === phone && u.role === requestedRole);
-
-  if (!user) {
-    user = {
-      id: 'USER-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
-      phone,
-      role: requestedRole,
-      status: requestedRole === 'WORKER' ? 'REGISTERED' : 'ACTIVE',
-      isProfileComplete: false,
-      name: '',
-      nationalId: '',
-      birthDate: '',
-      avatar: '',
-      idDoc: '',
-      address: '',
-      city: 'تهران',
-      skills: [],
-      bankSheba: '',
-      addresses: [],
-      savedAddresses: [],
-      createdAt: new Date().toISOString()
-    };
-    db.users.push(user);
-  }
-
-  saveDb();
+  let user = store.transaction(() => {
+    store.deleteOtp(phone);
+    let nextUser = store.getUserByPhone(phone, requestedRole);
+    if (!nextUser) {
+      nextUser = store.createUser({
+        id: 'USER-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
+        phone,
+        role: requestedRole,
+        status: requestedRole === 'WORKER' ? 'REGISTERED' : 'ACTIVE',
+        isProfileComplete: false,
+        name: '',
+        nationalId: '',
+        birthDate: '',
+        avatar: '',
+        idDoc: '',
+        address: '',
+        city: 'تهران',
+        skills: [],
+        bankSheba: '',
+        addresses: [],
+        savedAddresses: [],
+        createdAt: new Date().toISOString()
+      });
+    }
+    return nextUser;
+  });
 
   res.json({
     success: true,
@@ -425,29 +455,28 @@ app.put('/api/users/customer-profile', (req, res) => {
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'تغییر پروفایل کاربر دیگر مجاز نیست.' });
   }
-  const user = authUser;
-
   const nextName = typeof name === 'string' ? name.trim().slice(0, 80) : '';
   const nextNationalId = typeof nationalId === 'string' ? nationalId.trim() : '';
   const nextBirthDate = typeof birthDate === 'string' ? birthDate.trim().slice(0, 20) : '';
   const nextAddress = typeof address === 'string' ? address.trim().slice(0, 300) : '';
 
-  if (nextName) user.name = nextName;
-  if (nextNationalId) {
-    if (!/^\d{10}$/.test(nextNationalId)) {
-      return res.status(400).json({ success: false, message: 'کد ملی باید ۱۰ رقم باشد.' });
-    }
-    user.nationalId = nextNationalId;
-  }
-  if (nextBirthDate) user.birthDate = nextBirthDate;
-  if (nextAddress) {
-    user.address = nextAddress;
-    if (!user.addresses) user.addresses = [];
-    if (!user.addresses.includes(nextAddress)) user.addresses.push(nextAddress);
+  if (nextNationalId && !/^\d{10}$/.test(nextNationalId)) {
+    return res.status(400).json({ success: false, message: 'کد ملی باید ۱۰ رقم باشد.' });
   }
 
-  user.isProfileComplete = !!(user.name && user.nationalId);
-  saveDb();
+  const user = store.transaction(() => {
+    const current = store.getUser(authUser.id);
+    if (nextName) current.name = nextName;
+    if (nextNationalId) current.nationalId = nextNationalId;
+    if (nextBirthDate) current.birthDate = nextBirthDate;
+    if (nextAddress) {
+      current.address = nextAddress;
+      if (!current.addresses) current.addresses = [];
+      if (!current.addresses.includes(nextAddress)) current.addresses.push(nextAddress);
+    }
+    current.isProfileComplete = !!(current.name && current.nationalId);
+    return store.updateUser(current);
+  });
 
   res.json({ success: true, user: publicUser(user) });
 });
@@ -478,7 +507,7 @@ app.get('/api/users/addresses', (req, res) => {
   if (authUser.role !== 'CUSTOMER') {
     return res.status(403).json({ success: false, message: 'فقط مشتری به آدرس‌های خودش دسترسی دارد.' });
   }
-  res.json({ success: true, addresses: Array.isArray(authUser.savedAddresses) ? authUser.savedAddresses : [] });
+  res.json({ success: true, addresses: store.getAddresses(authUser.id) });
 });
 
 app.put('/api/users/addresses', (req, res) => {
@@ -500,11 +529,8 @@ app.put('/api/users/addresses', (req, res) => {
     }
     address.isDefault = false;
   });
-  authUser.savedAddresses = addresses;
-  const defaultAddress = addresses.find(address => address.isDefault) || addresses[0];
-  if (defaultAddress) authUser.address = defaultAddress.fullAddress;
-  saveDb();
-  res.json({ success: true, addresses });
+  const savedAddresses = store.updateAddresses(authUser.id, addresses);
+  res.json({ success: true, addresses: savedAddresses });
 });
 
 app.put('/api/users/worker-onboarding', (req, res) => {
@@ -513,7 +539,7 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   if (authUser.role !== 'WORKER') {
     return res.status(403).json({ success: false, message: 'فقط متخصص می‌تواند مدارک خودش را ثبت کند.' });
   }
-  const { userId, name, nationalId, birthDate, avatar, idDoc, address, city, skills, bankSheba } = req.body || {};
+  const { userId, name, nationalId, birthDate, avatar, idDocFile, address, city, skills, bankSheba } = req.body || {};
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'تغییر مدارک متخصص دیگر مجاز نیست.' });
   }
@@ -522,7 +548,7 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   const nextNationalId = typeof nationalId === 'string' ? nationalId.trim() : '';
   const nextBankSheba = typeof bankSheba === 'string' ? bankSheba.trim().toUpperCase() : '';
   const nextAvatar = typeof avatar === 'string' ? avatar.trim() : '';
-  const nextIdDoc = typeof idDoc === 'string' ? idDoc.trim() : '';
+  const uploadedIdDoc = parseIdDocFile(idDocFile);
 
   if (!nextName) {
     return res.status(400).json({ success: false, message: 'نام متخصص الزامی است.' });
@@ -536,31 +562,67 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   if (nextAvatar && nextAvatar.length > MAX_DOC_CHARS) {
     return res.status(400).json({ success: false, message: 'حجم تصویر پروفایل بیش از حد مجاز است.' });
   }
-  if (nextIdDoc && nextIdDoc.length > MAX_DOC_CHARS) {
-    return res.status(400).json({ success: false, message: 'حجم مدرک بیش از حد مجاز است.' });
+  if (uploadedIdDoc.error) {
+    return res.status(400).json({ success: false, message: uploadedIdDoc.error });
   }
   if (nextAvatar && nextAvatar.startsWith('data:') && !/^data:image\/(png|jpeg|jpg|webp);/i.test(nextAvatar)) {
     return res.status(400).json({ success: false, message: 'فرمت تصویر پروفایل مجاز نیست.' });
   }
 
-  user.name = nextName;
-  user.nationalId = nextNationalId;
-  user.birthDate = typeof birthDate === 'string' ? birthDate.trim().slice(0, 20) : user.birthDate;
-  if (nextAvatar) user.avatar = nextAvatar;
-  if (nextIdDoc) user.idDoc = nextIdDoc;
-  user.address = typeof address === 'string' ? address.trim().slice(0, 300) : user.address;
-  user.city = typeof city === 'string' ? city.trim().slice(0, 80) : user.city;
-  user.skills = Array.isArray(skills) ? skills.slice(0, 20).map(s => String(s).slice(0, 40)) : user.skills;
-  user.bankSheba = nextBankSheba;
+  const previousDocument = rememberDocument(user);
+  let storedDocument;
+  try {
+    storedDocument = workerDocuments.uploadWorkerDocument({
+      buffer: uploadedIdDoc.buffer,
+      ext: uploadedIdDoc.ext,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'ذخیره مدرک هویتی ممکن نشد.' });
+  }
 
-  user.status = 'PENDING_VERIFICATION';
-  user.isProfileComplete = true;
-
-  saveDb();
+  let savedUser;
+  try {
+    savedUser = store.transaction(() => {
+      const current = store.getUser(user.id);
+      current.name = nextName;
+      current.nationalId = nextNationalId;
+      current.birthDate = typeof birthDate === 'string' ? birthDate.trim().slice(0, 20) : current.birthDate;
+      if (nextAvatar) current.avatar = nextAvatar;
+      assignDocument(current, storedDocument.documentId);
+      current.address = typeof address === 'string' ? address.trim().slice(0, 300) : current.address;
+      current.city = typeof city === 'string' ? city.trim().slice(0, 80) : current.city;
+      current.skills = Array.isArray(skills) ? skills.slice(0, 20).map(s => String(s).slice(0, 40)) : current.skills;
+      current.bankSheba = nextBankSheba;
+      current.status = 'PENDING_VERIFICATION';
+      current.isProfileComplete = true;
+      return store.updateUser(current);
+    });
+  } catch (error) {
+    try {
+      workerDocuments.deleteWorkerDocument(storedDocument.documentId);
+    } catch (cleanupError) {
+      // فایل جدید بدون رکورد معتبر باقی نمی‌ماند.
+    }
+    return res.status(500).json({ success: false, message: 'ذخیره مدرک هویتی ممکن نشد.' });
+  }
+  if (previousDocument.idDoc && previousDocument.idDoc !== storedDocument.documentId) {
+    try {
+      workerDocuments.deleteWorkerDocument(previousDocument.idDoc);
+    } catch (error) {
+      // شناسه جدید ذخیره شده است و مدرک قبلی دیگر مرجع نیست.
+    }
+  }
+  if (previousDocument.hadPath) {
+    try {
+      workerDocuments.discardLegacyPath(previousDocument.idDocPath);
+    } catch (error) {
+      // مسیر قدیمی دیگر در رکورد کارگر نیست.
+    }
+  }
 
   res.json({
     success: true,
-    user: publicUser(user),
+    user: publicUser(savedUser),
     message: 'مدارک شما ثبت شد و در انتظار بررسی مدیریت قرار گرفت.'
   });
 });
@@ -572,12 +634,30 @@ app.post('/api/orders', (req, res) => {
   if (authUser.role !== 'CUSTOMER') {
     return res.status(403).json({ success: false, message: 'فقط مشتری می‌تواند سفارش ثبت کند.' });
   }
-  const { userId, serviceTitle, address, date, time, price, notes } = req.body || {};
+  const {
+    userId,
+    serviceTitle,
+    serviceId,
+    address,
+    date,
+    time,
+    price,
+    notes,
+    customerName,
+    customerPhone,
+    durationHours,
+    genderPreference,
+    serviceOptions,
+    addressNotes,
+    recurringFrequency,
+    customerTier,
+    pricing,
+  } = req.body || {};
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'ثبت سفارش برای کاربر دیگر مجاز نیست.' });
   }
   const user = authUser;
-  const orderAddress = typeof address === 'string' ? address.trim().slice(0, 400) : '';
+  const orderAddress = typeof address === 'string' ? address.trim().slice(0, 500) : '';
   if (!orderAddress) {
     return res.status(400).json({ success: false, message: 'آدرس سفارش الزامی است.' });
   }
@@ -592,14 +672,38 @@ app.post('/api/orders', (req, res) => {
     typeof serviceTitle === 'string' && serviceTitle.trim()
       ? serviceTitle.trim().slice(0, 120)
       : 'نظافت عادی منزل';
+  const storedServiceId = typeof serviceId === 'string' ? serviceId.trim().slice(0, 80) : '';
+  const requestedName = typeof customerName === 'string' ? customerName.trim().slice(0, 80) : '';
+  const requestedPhone = kavenegarSms.normalizeIranMobile(customerPhone);
+  const allowedGenders = ['FEMALE', 'MALE', 'NO_PREFERENCE'];
+  const storedGender = allowedGenders.includes(genderPreference) ? genderPreference : null;
+  const parsedDuration = typeof durationHours === 'number' ? durationHours : Number.NaN;
+  const storedDuration = Number.isInteger(parsedDuration) && parsedDuration >= 1 && parsedDuration <= 24
+    ? parsedDuration
+    : null;
+  const storedOptions = sanitizeServiceOptions(serviceOptions);
+  const storedAddressNotes = typeof addressNotes === 'string' ? addressNotes.trim().slice(0, 300) : '';
+  const frequencies = ['ONE_TIME', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'];
+  const tiers = ['NEW', 'SILVER', 'GOLD', 'VIP'];
+  const storedFrequency = frequencies.includes(recurringFrequency) ? recurringFrequency : null;
+  const storedTier = tiers.includes(customerTier) ? customerTier : null;
+  const storedPricing = sanitizePricing(pricing);
 
   const newOrder = {
     id: createOrderId(),
     customerId: user.id,
-    customerName: user.name || 'کاربر مشتری',
-    customerPhone: user.phone,
+    customerName: requestedName || user.name || 'کاربر مشتری',
+    customerPhone: requestedPhone || user.phone,
     customerAvatar: user.avatar || '',
     serviceTitle: title,
+    serviceId: storedServiceId || null,
+    durationHours: storedDuration,
+    genderPreference: storedGender,
+    serviceOptions: storedOptions,
+    addressNotes: storedAddressNotes || null,
+    recurringFrequency: storedFrequency,
+    customerTier: storedTier,
+    pricing: storedPricing,
     address: orderAddress,
     date: typeof date === 'string' ? date.trim().slice(0, 40) : 'امروز',
     time: typeof time === 'string' ? time.trim().slice(0, 40) : '14:00',
@@ -615,10 +719,19 @@ app.post('/api/orders', (req, res) => {
     createdAt: new Date().toISOString()
   };
 
-  db.orders.unshift(newOrder);
-  saveDb();
+  const savedOrder = store.transaction(() => {
+    const order = store.createOrder(newOrder);
+    store.addNotification(
+      user.id,
+      order.id,
+      'ORDER_CREATED',
+      'سفارش ثبت شد',
+      'سفارش ' + order.id + ' ثبت شد و در انتظار متخصص است.'
+    );
+    return order;
+  });
 
-  res.json({ success: true, order: newOrder });
+  res.json({ success: true, order: savedOrder });
 });
 
 // 6. سفارش‌های آماده (متخصصین تایید شده)
@@ -626,10 +739,10 @@ app.get('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   if (authUser.role === 'CUSTOMER') {
-    return res.json({ success: true, orders: db.orders.filter(o => o.customerId === authUser.id) });
+    return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }) });
   }
   if (authUser.role === 'WORKER') {
-    return res.json({ success: true, orders: db.orders.filter(o => o.cleanerId === authUser.id) });
+    return res.json({ success: true, orders: store.getOrders({ cleanerId: authUser.id }) });
   }
   return res.status(403).json({ success: false, message: 'دسترسی مجاز نیست.', orders: [] });
 });
@@ -643,7 +756,10 @@ app.get('/api/orders/available', (req, res) => {
   if (authUser.status !== 'APPROVED' && authUser.status !== 'ACTIVE') {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
-  const availableOrders = db.orders.filter(o => o.status === 'PENDING');
+  const availableOrders = store.getOrders({ status: 'PENDING' }).map((order) => ({
+    ...order,
+    customerPhone: '',
+  }));
   res.json({ success: true, orders: availableOrders });
 });
 
@@ -660,26 +776,18 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
     return res.status(403).json({ success: false, message: 'فقط متخصص می‌تواند سفارش را بپذیرد.' });
   }
 
-  const order = db.orders.find(o => o.id === orderId);
   const cleaner = authUser;
-
-  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
 
   if (!cleaner || (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE')) {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
   }
 
-  if (order.status !== 'PENDING') {
+  const accepted = store.tryAcceptOrder(orderId, cleaner);
+  if (accepted.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
+  if (accepted.code === 'conflict') {
     return res.status(400).json({ success: false, message: 'این سفارش قبلاً پذیرفته شده است.' });
   }
-
-  order.status = 'ACCEPTED';
-  order.cleanerId = cleaner.id;
-  order.cleanerName = cleaner.name;
-  order.cleanerAvatar = cleaner.avatar;
-  order.cleanerPhone = cleaner.phone || '';
-  saveDb();
-  res.json({ success: true, order });
+  res.json({ success: true, order: accepted.order });
 });
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -696,22 +804,16 @@ app.put('/api/orders/:orderId/cancel', (req, res) => {
     return res.status(403).json({ success: false, message: 'لغو سفارش کاربر دیگر مجاز نیست.' });
   }
   const trimmedUserId = authUser.id;
-  const order = db.orders.find(o => o.id === orderId);
-
-  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
-  if (!trimmedUserId || order.customerId !== trimmedUserId) {
+  const cancelReason = typeof reason === 'string' && reason.trim() ? reason.trim() : 'لغو توسط کاربر';
+  const cancelled = store.tryCancelOrder(orderId, trimmedUserId, CUSTOMER_CANCELLABLE_STATUSES, cancelReason);
+  if (cancelled.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  if (cancelled.code === 'forbidden') {
     return res.status(403).json({ success: false, message: 'فقط صاحب سفارش می‌تواند آن را لغو کند.' });
   }
-  if (!CUSTOMER_CANCELLABLE_STATUSES.includes(order.status)) {
+  if (cancelled.code === 'bad-status') {
     return res.status(400).json({ success: false, message: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' });
   }
-
-  order.status = 'CANCELLED';
-  order.cancelledAt = new Date().toISOString();
-  order.cancelledBy = trimmedUserId;
-  order.cancelReason = typeof reason === 'string' && reason.trim() ? reason.trim() : 'لغو توسط کاربر';
-  saveDb();
-  res.json({ success: true, order });
+  res.json({ success: true, order: cancelled.order });
 });
 
 // تکمیل سفارش توسط متخصص پذیرنده (ACCEPTED → COMPLETED)
@@ -727,31 +829,20 @@ app.put('/api/orders/:orderId/complete', (req, res) => {
     return res.status(403).json({ success: false, message: 'تکمیل سفارش با شناسه متخصص دیگر مجاز نیست.' });
   }
 
-  const order = db.orders.find(o => o.id === orderId);
-  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
-
-  if (order.status !== 'ACCEPTED') {
-    return res.status(400).json({ success: false, message: 'فقط سفارش‌های پذیرفته‌شده قابل تکمیل هستند.' });
-  }
-
-  if (order.cleanerId !== authUser.id) {
-    return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
-  }
-
   const cleaner = authUser;
   if (!cleaner || (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE')) {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
   }
 
-  order.status = 'COMPLETED';
-  order.completedAt = new Date().toISOString();
-  order.cleanerId = cleaner.id;
-  order.cleanerName = cleaner.name;
-  order.cleanerAvatar = cleaner.avatar;
-  order.cleanerPhone = cleaner.phone || '';
-
-  saveDb();
-  res.json({ success: true, order });
+  const completed = store.tryCompleteOrder(orderId, cleaner);
+  if (completed.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
+  if (completed.code === 'bad-status') {
+    return res.status(400).json({ success: false, message: 'فقط سفارش‌های پذیرفته‌شده قابل تکمیل هستند.' });
+  }
+  if (completed.code === 'forbidden') {
+    return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
+  }
+  res.json({ success: true, order: completed.order });
 });
 
 app.put('/api/orders/:orderId/rate', (req, res) => {
@@ -759,17 +850,6 @@ app.put('/api/orders/:orderId/rate', (req, res) => {
   if (!authUser) return;
   if (authUser.role !== 'CUSTOMER') {
     return res.status(403).json({ success: false, message: 'فقط مشتری صاحب سفارش می‌تواند امتیاز بدهد.' });
-  }
-  const order = db.orders.find(o => o.id === req.params.orderId);
-  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
-  if (order.customerId !== authUser.id) {
-    return res.status(403).json({ success: false, message: 'امتیازدهی به سفارش دیگران مجاز نیست.' });
-  }
-  if (order.status !== 'COMPLETED') {
-    return res.status(400).json({ success: false, message: 'فقط سفارش تکمیل‌شده قابل امتیازدهی است.' });
-  }
-  if (order.ratings && order.ratings.customerRating) {
-    return res.status(400).json({ success: false, message: 'برای این سفارش قبلاً امتیاز ثبت شده است.' });
   }
   const rating = Number(req.body && req.body.rating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
@@ -779,14 +859,28 @@ app.put('/api/orders/:orderId/rate', (req, res) => {
   const tags = Array.isArray(req.body?.tags)
     ? req.body.tags.slice(0, 8).map(t => String(t).slice(0, 40))
     : [];
-  order.ratings = {
+  const existing = store.getOrder(req.params.orderId);
+  const rated = store.createRating(req.params.orderId, authUser.id, {
     customerRating: rating,
     customerComment: comment,
     customerTags: tags,
+    cleanerId: existing && existing.cleanerId,
     ratedAt: new Date().toISOString()
-  };
-  saveDb();
-  res.json({ success: true, order });
+  });
+  if (rated.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  if (rated.code === 'forbidden') {
+    return res.status(403).json({ success: false, message: 'امتیازدهی به سفارش دیگران مجاز نیست.' });
+  }
+  if (rated.code === 'bad-status') {
+    return res.status(400).json({ success: false, message: 'فقط سفارش تکمیل‌شده قابل امتیازدهی است.' });
+  }
+  if (rated.code === 'no-cleaner') {
+    return res.status(400).json({ success: false, message: 'برای این سفارش متخصص ثبت نشده است.' });
+  }
+  if (rated.code === 'duplicate') {
+    return res.status(400).json({ success: false, message: 'برای این سفارش قبلاً امتیاز ثبت شده است.' });
+  }
+  res.json({ success: true, order: rated.order });
 });
 
 // ------------------- API اختصاصی پنل مدیریت (ADMIN API) -------------------
@@ -834,13 +928,91 @@ app.post('/api/admin/logout', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/api/support/messages', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  res.json({ success: true, messages: store.listSupportMessages(authUser.id) });
+});
+
+app.post('/api/support/messages', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim().slice(0, 120) : '';
+  const body = typeof req.body?.body === 'string' ? req.body.body.trim().slice(0, 2000) : '';
+  if (!subject || !body) {
+    return res.status(400).json({ success: false, message: 'موضوع و متن پیام الزامی است.' });
+  }
+  const message = store.addSupportMessage(authUser.id, authUser.role, subject, body);
+  res.status(201).json({ success: true, message });
+});
+
+app.get('/api/notifications', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  const notifications = store.listNotifications(authUser.id);
+  res.json({
+    success: true,
+    notifications,
+    unreadCount: notifications.filter((item) => !item.readAt).length,
+  });
+});
+
+app.post('/api/notifications/:id/read', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (!store.markNotificationRead(req.params.id, authUser.id)) {
+    return res.status(404).json({ success: false, message: 'اعلان یافت نشد.' });
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/wallet', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'CUSTOMER') {
+    return res.status(403).json({ success: false, message: 'کیف پول فقط برای مشتری است.' });
+  }
+  const wallet = store.walletFor(authUser.id);
+  res.json({
+    success: true,
+    balance: wallet.balance,
+    transactions: wallet.transactions,
+    topUpAvailable: false,
+    message: 'شارژ کیف پول به درگاه پرداخت وصل نیست.',
+  });
+});
+
+app.post('/api/wallet/topup', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  res.status(501).json({
+    success: false,
+    message: 'درگاه پرداخت وصل نیست. موجودی کیف پول تغییر نکرد.',
+  });
+});
+
+app.get('/api/loyalty', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'CUSTOMER') {
+    return res.status(403).json({ success: false, message: 'باشگاه مشتریان فقط برای مشتری است.' });
+  }
+  res.json({ success: true, loyalty: store.loyaltyFor(authUser.id) });
+});
+
 app.use('/api/admin', requireAdmin);
 
+app.get('/api/admin/support/messages', (req, res) => {
+  res.json({ success: true, messages: store.listAllSupportMessages() });
+});
+
 app.get('/api/admin/stats', (req, res) => {
-  const customers = db.users.filter(u => u.role === 'CUSTOMER');
-  const workers = db.users.filter(u => u.role === 'WORKER');
-  const pendingWorkers = db.users.filter(u => u.role === 'WORKER' && u.status === 'PENDING_VERIFICATION');
-  const completedOrders = db.orders.filter(o => o.status === 'COMPLETED');
+  const users = store.listUsers();
+  const orders = store.listOrders();
+  const customers = users.filter(u => u.role === 'CUSTOMER');
+  const workers = users.filter(u => u.role === 'WORKER');
+  const pendingWorkers = workers.filter(u => u.status === 'PENDING_VERIFICATION');
+  const completedOrders = orders.filter(o => o.status === 'COMPLETED');
   const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.price || 0), 0);
 
   res.json({
@@ -849,9 +1021,9 @@ app.get('/api/admin/stats', (req, res) => {
       totalCustomers: customers.length,
       totalWorkers: workers.length,
       pendingWorkersCount: pendingWorkers.length,
-      totalOrders: db.orders.length,
-      pendingOrdersCount: db.orders.filter(o => o.status === 'PENDING').length,
-      acceptedOrdersCount: db.orders.filter(o => o.status === 'ACCEPTED').length,
+      totalOrders: orders.length,
+      pendingOrdersCount: orders.filter(o => o.status === 'PENDING').length,
+      acceptedOrdersCount: orders.filter(o => o.status === 'ACCEPTED').length,
       completedOrdersCount: completedOrders.length,
       totalRevenue
     }
@@ -860,10 +1032,7 @@ app.get('/api/admin/stats', (req, res) => {
 
 app.get('/api/admin/users', (req, res) => {
   const { role } = req.query;
-  let result = db.users;
-  if (role) {
-    result = result.filter(u => u.role === role);
-  }
+  const result = store.listUsers(typeof role === 'string' && role ? role : undefined);
   res.json({ success: true, users: result.map(adminUserView) });
 });
 
@@ -878,81 +1047,155 @@ app.put('/api/admin/users/:userId/status', (req, res) => {
     });
   }
 
-  const user = db.users.find(u => u.id === userId);
-  if (!user) return res.status(404).json({ success: false, message: 'کاربر یافت نشد.' });
-
-  user.status = status;
-  saveDb();
+  const existing = store.getUser(userId);
+  if (!existing) return res.status(404).json({ success: false, message: 'کاربر یافت نشد.' });
+  existing.status = status;
+  const user = store.updateUser(existing);
 
   res.json({ success: true, user: adminUserView(user), message: `وضعیت کاربر به ${status} تغییر یافت.` });
 });
 
+app.get('/api/admin/workers/:userId/document', (req, res) => {
+  const user = store.getUser(req.params.userId);
+  if (!user || user.role !== 'WORKER') {
+    return res.status(404).json({ success: false, message: 'متخصص یافت نشد.' });
+  }
+  const document = workerDocuments.getWorkerDocument(user.idDoc);
+  if (!document) {
+    return res.status(404).json({ success: false, message: 'مدرک هویتی یافت نشد.' });
+  }
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.type(document.mimeType);
+  res.send(document.data);
+});
+
+app.delete('/api/admin/workers/:userId/document', (req, res) => {
+  const user = store.getUser(req.params.userId);
+  if (!user || user.role !== 'WORKER') {
+    return res.status(404).json({ success: false, message: 'متخصص یافت نشد.' });
+  }
+  const previous = rememberDocument(user);
+  if (!previous.idDoc) {
+    return res.status(404).json({ success: false, message: 'مدرک هویتی برای این متخصص ثبت نشده است.' });
+  }
+  const existing = workerDocuments.getWorkerDocument(previous.idDoc);
+  try {
+    store.transaction(() => {
+      const current = store.getUser(user.id);
+      current.idDoc = '';
+      return store.updateUser(current);
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'حذف مدرک هویتی ممکن نشد.' });
+  }
+  if (!existing) {
+    return res.status(404).json({ success: false, message: 'مدرک هویتی یافت نشد.' });
+  }
+  try {
+    workerDocuments.deleteWorkerDocument(previous.idDoc);
+  } catch (error) {
+    try {
+      store.transaction(() => {
+        const current = store.getUser(user.id);
+        current.idDoc = previous.idDoc;
+        store.updateUser(current);
+      });
+    } catch (restoreError) {
+      // شناسه مدرک اگر برنگردد، فایل خصوصی همچنان بدون URL عمومی است.
+    }
+    return res.status(500).json({ success: false, message: 'حذف مدرک هویتی ممکن نشد.' });
+  }
+  res.json({ success: true, message: 'مدرک هویتی حذف شد.' });
+});
+
 app.put('/api/admin/approve-worker/:userId', (req, res) => {
   const { userId } = req.params;
-  const user = db.users.find(u => u.id === userId);
-  if (!user) return res.status(404).json({ success: false, message: 'کاربر یافت نشد.' });
-  if (user.role !== 'WORKER') {
+  const existing = store.getUser(userId);
+  if (!existing) return res.status(404).json({ success: false, message: 'کاربر یافت نشد.' });
+  if (existing.role !== 'WORKER') {
     return res.status(400).json({ success: false, message: 'این کاربر متخصص نیست.' });
   }
 
-  user.status = 'APPROVED';
-  saveDb();
+  existing.status = 'APPROVED';
+  const user = store.updateUser(existing);
 
   res.json({ success: true, user: adminUserView(user), message: 'متخصص با موفقیت تایید شد.' });
 });
 
 app.get('/api/admin/orders', (req, res) => {
-  res.json({ success: true, orders: db.orders });
+  res.json({ success: true, orders: store.listOrders() });
 });
 
 app.put('/api/admin/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
   const { status, cleanerId } = req.body || {};
 
-  const order = db.orders.find(o => o.id === orderId);
-  if (!order) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  const updated = store.transaction(() => {
+    const order = store.getOrder(orderId);
+    if (!order) return { code: 'missing' };
+    const previousStatus = order.status;
+    if (cleanerId) {
+      const cleaner = store.getUser(cleanerId);
+      if (!cleaner || cleaner.role !== 'WORKER') return { code: 'bad-cleaner' };
+      if (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE') return { code: 'unapproved' };
+      order.cleanerId = cleanerId;
+      order.cleanerName = cleaner.name;
+      order.cleanerAvatar = cleaner.avatar;
+      order.cleanerPhone = cleaner.phone || '';
+      if (!status || status === 'ACCEPTED') order.status = 'ACCEPTED';
+    }
+    if (status) {
+      if (!ADMIN_ORDER_STATUSES.includes(status)) return { code: 'bad-status' };
+      order.status = status;
+      if (status === 'COMPLETED' && !order.completedAt) {
+        order.completedAt = new Date().toISOString();
+      }
+    }
+    const saved = store.updateOrder(order);
+    if (saved.status !== previousStatus) {
+      store.addNotification(
+        saved.customerId,
+        saved.id,
+        'ORDER_STATUS',
+        'وضعیت سفارش تغییر کرد',
+        'وضعیت سفارش ' + saved.id + ' به ' + saved.status + ' تغییر کرد.'
+      );
+      if (saved.cleanerId) {
+        store.addNotification(
+          saved.cleanerId,
+          saved.id,
+          'ORDER_STATUS',
+          'وضعیت سفارش تغییر کرد',
+          'وضعیت سفارش ' + saved.id + ' به ' + saved.status + ' تغییر کرد.'
+        );
+      }
+    }
+    return { code: 'ok', order: saved };
+  });
 
-  if (cleanerId) {
-    const cleaner = db.users.find(u => u.id === cleanerId && u.role === 'WORKER');
-    if (!cleaner) {
-      return res.status(400).json({ success: false, message: 'متخصص معتبر یافت نشد.' });
-    }
-    if (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE') {
-      return res.status(400).json({ success: false, message: 'متخصص هنوز تایید نشده است.' });
-    }
-    order.cleanerId = cleanerId;
-    order.cleanerName = cleaner.name;
-    order.cleanerAvatar = cleaner.avatar;
-    order.cleanerPhone = cleaner.phone || '';
-    if (!status || status === 'ACCEPTED') {
-      order.status = 'ACCEPTED';
-    }
+  if (updated.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  if (updated.code === 'bad-cleaner') {
+    return res.status(400).json({ success: false, message: 'متخصص معتبر یافت نشد.' });
   }
-  if (status) {
-    if (!ADMIN_ORDER_STATUSES.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'وضعیت سفارش معتبر نیست.',
-        allowed: ADMIN_ORDER_STATUSES
-      });
-    }
-    order.status = status;
-    if (status === 'COMPLETED' && !order.completedAt) {
-      order.completedAt = new Date().toISOString();
-    }
+  if (updated.code === 'unapproved') {
+    return res.status(400).json({ success: false, message: 'متخصص هنوز تایید نشده است.' });
   }
-
-  saveDb();
-  res.json({ success: true, order });
+  if (updated.code === 'bad-status') {
+    return res.status(400).json({
+      success: false,
+      message: 'وضعیت سفارش معتبر نیست.',
+      allowed: ADMIN_ORDER_STATUSES
+    });
+  }
+  res.json({ success: true, order: updated.order });
 });
 
 app.delete('/api/admin/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
-  const index = db.orders.findIndex(o => o.id === orderId);
-  if (index === -1) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
-
-  db.orders.splice(index, 1);
-  saveDb();
+  if (!store.deleteOrder(orderId)) {
+    return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  }
   res.json({ success: true, message: 'سفارش با موفقیت حذف شد.' });
 });
 
@@ -1218,6 +1461,10 @@ app.get('/admin', (req, res) => {
   `);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Paksho Secure Backend & Admin Dashboard running on http://0.0.0.0:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Paksho Secure Backend & Admin Dashboard running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = { app, store };

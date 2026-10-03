@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { Check, X } from 'lucide-react-native';
 import { CANCELLATION_RULES } from '../types/cleaner';
 import { useCleaners } from '../hooks/useCleaners';
@@ -17,9 +18,10 @@ export const CleanerSignupModal: React.FC = () => {
   } = useCleaners();
 
   return (
-    <Modal visible={signupVisible} animationType="slide" transparent onRequestClose={closeSignup}>
+    <BottomSheetModal visible={signupVisible} onRequestClose={closeSignup}>
+      {(bottomInset) => (
       <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: 20 + bottomInset }]}>
           <View style={styles.header}>
             <Pressable onPress={closeSignup} style={styles.closeBtn}>
               <X size={18} color="#334155" />
@@ -89,7 +91,8 @@ export const CleanerSignupModal: React.FC = () => {
           </ScrollView>
         </View>
       </View>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 };
 

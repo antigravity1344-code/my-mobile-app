@@ -29,6 +29,7 @@ export interface ApiOrderRatings {
   customerRating?: number;
   customerComment?: string;
   customerTags?: string[];
+  cleanerId?: string;
   ratedAt?: string;
 }
 
@@ -40,6 +41,26 @@ export interface ApiOrder {
   customerPhone: string;
   customerAvatar: string;
   serviceTitle: string;
+  serviceId?: string | null;
+  durationHours?: number | null;
+  genderPreference?: 'FEMALE' | 'MALE' | 'NO_PREFERENCE' | string | null;
+  serviceOptions?: Record<string, string | number | boolean> | null;
+  addressNotes?: string | null;
+  recurringFrequency?: 'ONE_TIME' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | string | null;
+  customerTier?: 'NEW' | 'SILVER' | 'GOLD' | 'VIP' | string | null;
+  pricing?: {
+    subtotal?: number;
+    earlyBirdDiscountRate?: number;
+    earlyBirdDiscountAmount?: number;
+    tierDiscountRate?: number;
+    tierDiscountAmount?: number;
+    recurringDiscountRate?: number;
+    recurringDiscountAmount?: number;
+    discountRate?: number;
+    discountAmount?: number;
+    recurringDiscountDeferred?: boolean;
+    total?: number;
+  } | null;
   address: string;
   date: string;
   time: string;

@@ -159,7 +159,10 @@ export function MainDashboard() {
                 <AdminPanelScreen />
               </div>
             ) : (
-              <BookingWizardContainer onNavigateHome={() => setActiveTab('Home')} />
+              <BookingWizardContainer
+                onNavigateHome={() => setActiveTab('Home')}
+                onViewOrders={() => setActiveTab('Orders')}
+              />
             )}
           </div>
         )}
@@ -269,7 +272,12 @@ export function MainDashboard() {
 
                 <div className="flex-1 overflow-y-auto p-3">
                   {activeTab === 'Home' && <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />}
-                  {activeTab === 'Wizard' && <BookingWizardContainer onNavigateHome={() => setActiveTab('Home')} />}
+                  {activeTab === 'Wizard' && (
+                    <BookingWizardContainer
+                      onNavigateHome={() => setActiveTab('Home')}
+                      onViewOrders={() => setActiveTab('Orders')}
+                    />
+                  )}
                   {activeTab === 'Orders' && <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />}
                   {activeTab === 'Specialist' && <SpecialistPortalScreen />}
                   {activeTab === 'Profile' && <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />}

@@ -4,12 +4,61 @@ import type {
   OrderSortOption,
   OrderStats,
   OrderStatus,
+  OrderTimelineEvent,
 } from '../types/order';
+import type { FinalPrice } from '../../../utils/pricing';
 import { appStorage } from '../../../utils/storage';
 import { apiFetch } from '../../../api/apiClient';
 import { attachStoredAuthToken } from '../../../api/authToken';
 import type { ApiOrder } from '../../../api/types';
 import { CUSTOMER_TOKEN_KEY } from '../../../components/native/customerLoginStorage';
+import {
+  formatSubmittedAddress,
+  selectCustomerOrders,
+  submittedDurationHours,
+  submittedOrderPrice,
+} from './orderPayload';
+
+const ORDER_STATUSES: OrderStatus[] = [
+  'PENDING',
+  'ACCEPTED',
+  'CONFIRMED',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+];
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** مبلغ امن برای نمایش در UI (جلوگیری از crash روی undefined) */
+export function formatOrderAmount(value: unknown): string {
+  return toFiniteNumber(value, 0).toLocaleString('fa-IR');
+}
+
+function buildPricingFromApiPrice(price: unknown): FinalPrice {
+  const total = toFiniteNumber(price, 0);
+  return {
+    subtotal: total,
+    earlyBirdDiscountRate: 0,
+    earlyBirdDiscountAmount: 0,
+    tierDiscountRate: 0,
+    tierDiscountAmount: 0,
+    recurringDiscountRate: 0,
+    recurringDiscountAmount: 0,
+    discountRate: 0,
+    discountAmount: 0,
+    recurringDiscountDeferred: false,
+    total,
+  };
+}
+
+function normalizeOrderStatus(status: unknown): OrderStatus {
+  return ORDER_STATUSES.includes(status as OrderStatus) ? (status as OrderStatus) : 'PENDING';
+}
 
 // Memory store for runtime mutations — start empty (no demo seed on boot).
 let ordersMemoryStore: OrderItem[] = [];
@@ -51,33 +100,143 @@ export const CANCELLABLE_ORDER_STATUSES: OrderStatus[] = [
   'IN_PROGRESS',
 ];
 
-/** نگاشت سفارش سرور به شکل نمایش مشتری. بعضی فیلدهای OrderItem (تاریخ/بازه) از سرور نمی‌آیند و خالی می‌مانند. */
+/** نگاشت سفارش سرور به شکل نمایش مشتری. فیلدهایی که سرور ندارد با مقدار امن پر می‌شوند. */
 export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
+  const createdAt = o.createdAt || new Date().toISOString();
+  const rawDate = typeof o.date === 'string' ? o.date.trim() : '';
+  const dateParts = rawDate.split(/\s+/).filter(Boolean);
+  const monthName = dateParts.length > 1 ? dateParts[0] : rawDate;
+  const dayRaw = dateParts.length > 1 ? dateParts[dateParts.length - 1] : '';
+  const parsedDay = toFiniteNumber(dayRaw, 0);
+  const dayOfMonth = parsedDay > 0 ? parsedDay : 0;
+  const timeLabel = typeof o.time === 'string' && o.time.trim() ? o.time.trim() : '—';
+  const fullAddress = typeof o.address === 'string' ? o.address.trim() : '';
+  const storedGender = o.genderPreference;
+  const genderPreference =
+    storedGender === 'FEMALE' || storedGender === 'MALE' || storedGender === 'NO_PREFERENCE'
+      ? storedGender
+      : 'NO_PREFERENCE';
+  const frequencies = ['ONE_TIME', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'] as const;
+  const tiers = ['NEW', 'SILVER', 'GOLD', 'VIP'] as const;
+  const recurringFrequency = frequencies.includes(o.recurringFrequency as (typeof frequencies)[number])
+    ? (o.recurringFrequency as (typeof frequencies)[number])
+    : 'ONE_TIME';
+  const customerTier = tiers.includes(o.customerTier as (typeof tiers)[number])
+    ? (o.customerTier as (typeof tiers)[number])
+    : 'NEW';
+  const storedPricing = o.pricing && typeof o.pricing === 'object' ? o.pricing : null;
+
   return {
     id: o.id,
     orderNumber: o.id,
-    serviceTitle: o.serviceTitle,
-    status: o.status,
-    paymentStatus: o.paymentStatus || 'PENDING',
-    paymentMethod: o.paymentMethod || 'CASH',
-    date: { dayOfWeek: 'روز', dayOfMonth: o.date ? o.date.split(' ')[1] : '1', monthName: o.date ? o.date.split(' ')[0] : 'ماه' },
-    timeSlot: { label: o.time, startTime: o.time || '', endTime: '' },
-    address: { district: o.address ? o.address.split(' ')[0] : 'نامشخص', fullAddress: o.address || '' },
-    pricing: { total: o.price || 0 },
-    createdAt: o.createdAt || new Date().toISOString(),
+    serviceId: typeof o.serviceId === 'string' ? o.serviceId : '',
+    serviceTitle: o.serviceTitle || 'سرویس نظافت',
+    pricingType: 'hourly',
+    status: normalizeOrderStatus(o.status),
+    paymentStatus: o.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
+    paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
+    date: {
+      dateString: o.date || '',
+      dayOfWeek: '',
+      dayOfMonth,
+      monthName,
+    },
+    timeSlot: {
+      id: `api-time-${o.id}`,
+      label: timeLabel,
+      startTime: timeLabel,
+      endTime: '',
+      period: 'MORNING',
+      isAvailable: true,
+    },
+    durationHours: typeof o.durationHours === 'number' && o.durationHours > 0 ? o.durationHours : 0,
+    genderPreference,
+    serviceOptions: o.serviceOptions && typeof o.serviceOptions === 'object' ? o.serviceOptions : {},
+    recurringFrequency,
+    customerTier,
+    address: {
+      district: '',
+      fullAddress: fullAddress || '—',
+      plaque: '',
+      unit: '',
+      hasElevator: false,
+      addressNotes: typeof o.addressNotes === 'string' ? o.addressNotes : undefined,
+      contactPhone: o.customerPhone || '',
+      recipientName: o.customerName || '—',
+      coordinates: { latitude: 0, longitude: 0 },
+    },
+    pricing: storedPricing && typeof storedPricing.total === 'number'
+      ? { ...buildPricingFromApiPrice(o.price), ...storedPricing, total: storedPricing.total }
+      : buildPricingFromApiPrice(o.price),
+    createdAt,
+    updatedAt: o.completedAt || o.cancelledAt || createdAt,
     cleaner: o.cleanerId
       ? {
           id: o.cleanerId,
-          name: o.cleanerName || 'متخصص',
+          name: typeof o.cleanerName === 'string' ? o.cleanerName.trim() : '',
           avatar: o.cleanerAvatar || undefined,
-          phone: o.cleanerPhone || '',
-          rating: o.ratings?.customerRating || 0,
-          completedJobsCount: 0,
+          phone: typeof o.cleanerPhone === 'string' ? o.cleanerPhone.trim() : '',
         }
       : undefined,
-    ratings: o.ratings || undefined,
-    timeline: [],
-  } as unknown as OrderItem;
+    ratings: o.ratings
+      ? {
+          customerRating: o.ratings.customerRating ?? null,
+          customerComment: o.ratings.customerComment,
+          customerTags: o.ratings.customerTags,
+          cleanerId: typeof o.ratings.cleanerId === 'string' ? o.ratings.cleanerId : o.cleanerId || undefined,
+          cleanerRating: null,
+          ratedAt: o.ratings.ratedAt,
+        }
+      : undefined,
+    notes: o.notes,
+    timeline: buildTimelineFromApiOrder(o, normalizeOrderStatus(o.status)),
+  };
+}
+
+function buildTimelineFromApiOrder(o: ApiOrder, status: OrderStatus): OrderTimelineEvent[] {
+  const submitted: OrderTimelineEvent = {
+    step: 'SUBMITTED',
+    title: 'سفارش ثبت شد',
+    timestamp: o.createdAt || '',
+    isCompleted: true,
+    isCurrent: status === 'PENDING',
+  };
+  if (status === 'CANCELLED') {
+    return [
+      { ...submitted, isCurrent: false },
+      {
+        step: 'CANCELLED',
+        title: 'سفارش لغو شد',
+        timestamp: o.cancelledAt || '',
+        isCompleted: true,
+        isCurrent: true,
+      },
+    ];
+  }
+  if (status === 'PENDING') return [submitted];
+
+  const cleanerName = typeof o.cleanerName === 'string' ? o.cleanerName.trim() : '';
+  const assigned: OrderTimelineEvent = {
+    step: 'ASSIGNED',
+    title: cleanerName ? `متخصص پذیرفت: ${cleanerName}` : 'متخصص سفارش را پذیرفت',
+    timestamp: '',
+    isCompleted: true,
+    isCurrent: status !== 'COMPLETED',
+  };
+  if (status !== 'COMPLETED') {
+    return [{ ...submitted, isCurrent: false }, assigned];
+  }
+  return [
+    { ...submitted, isCurrent: false },
+    { ...assigned, isCurrent: false },
+    {
+      step: 'FINISHED',
+      title: 'خدمت تکمیل شد',
+      timestamp: o.completedAt || '',
+      isCompleted: true,
+      isCurrent: true,
+    },
+  ];
 }
 
 export const isOrderCancellable = (status: OrderStatus): boolean =>
@@ -111,35 +270,7 @@ export const orderService = {
         result = mapped;
       }
 
-      if (filterTab === 'ACTIVE') {
-        const activeStatuses: OrderStatus[] = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
-        result = result.filter((item) => activeStatuses.includes(item.status));
-      } else if (filterTab === 'COMPLETED') {
-        result = result.filter((item) => item.status === 'COMPLETED');
-      } else if (filterTab === 'CANCELLED') {
-        result = result.filter((item) => item.status === 'CANCELLED');
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        result = result.filter(
-          (item) =>
-            item.orderNumber.toLowerCase().includes(q) ||
-            item.serviceTitle.toLowerCase().includes(q) ||
-            item.address.district.toLowerCase().includes(q) ||
-            item.address.fullAddress.toLowerCase().includes(q)
-        );
-      }
-
-      result.sort((a, b) => {
-        if (sortOption === 'NEWEST') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (sortOption === 'OLDEST') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        if (sortOption === 'PRICE_HIGH') return b.pricing.total - a.pricing.total;
-        if (sortOption === 'PRICE_LOW') return a.pricing.total - b.pricing.total;
-        return 0;
-      });
-
-      return result;
+      return selectCustomerOrders(result, filterTab, searchQuery, sortOption);
     } catch {
       lastOrdersLoadError = 'اتصال به سرور سفارش‌ها برقرار نشد.';
       return [];
@@ -227,7 +358,7 @@ export const orderService = {
         activeCount++;
       } else if (order.status === 'COMPLETED') {
         completedCount++;
-        totalSpent += order.pricing.total;
+        totalSpent += toFiniteNumber(order.pricing?.total, 0);
       } else if (order.status === 'CANCELLED') {
         cancelledCount++;
       }
@@ -252,16 +383,33 @@ export const orderService = {
         };
       }
 
+      const price = submittedOrderPrice(newOrder.pricing?.total);
+      if (price == null) {
+        return { success: false, error: 'مبلغ سفارش معتبر نیست.' };
+      }
+      const address = formatSubmittedAddress(newOrder.address);
+      if (!address) {
+        return { success: false, error: 'آدرس سفارش الزامی است.' };
+      }
+
       const payload = {
         userId: trimmedUserId,
         customerName: newOrder.address?.recipientName || 'کاربر مشتری',
         customerPhone: newOrder.address?.contactPhone || '',
+        serviceId: typeof newOrder.serviceId === 'string' ? newOrder.serviceId : '',
         serviceTitle: newOrder.serviceTitle,
-        address: newOrder.address?.fullAddress || `${newOrder.address?.district || ''} پلاک ${newOrder.address?.plaque || ''}`,
+        durationHours: submittedDurationHours(newOrder),
+        genderPreference: newOrder.genderPreference,
+        serviceOptions: newOrder.serviceOptions || {},
+        addressNotes: typeof newOrder.address?.addressNotes === 'string' ? newOrder.address.addressNotes : '',
+        recurringFrequency: newOrder.recurringFrequency,
+        customerTier: newOrder.customerTier,
+        pricing: newOrder.pricing,
+        address,
         date: `${newOrder.date?.monthName || ''} ${newOrder.date?.dayOfMonth || ''}`,
         time: newOrder.timeSlot?.label || `${newOrder.timeSlot?.startTime || ''} - ${newOrder.timeSlot?.endTime || ''}`,
-        price: newOrder.pricing?.total || 350000,
-        notes: newOrder.address?.addressNotes || '',
+        price,
+        notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
       };
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);

@@ -18,8 +18,8 @@ export interface CleanerInfo {
   name: string;
   avatar?: string;
   phone: string;
-  rating: number;
-  completedJobsCount: number;
+  rating?: number;
+  completedJobsCount?: number;
 }
 
 export type TimelineStepType =
@@ -43,6 +43,7 @@ export interface OrderRatingData {
   customerRating: number | null;
   customerComment?: string;
   customerTags?: string[];
+  cleanerId?: string;
   cleanerRating: number | null;
   cleanerNotes?: string;
   ratedAt?: string;

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -9,8 +8,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { X } from 'lucide-react-native';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { useProfile } from '../context/ProfileContext';
 
 interface Props {
@@ -60,19 +61,25 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose })
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={resetAndClose}>
+    <BottomSheetModal visible={visible} onRequestClose={resetAndClose}>
+      {(bottomInset) => (
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.card}>
+        <View style={[styles.card, { maxHeight: Math.round(Dimensions.get('window').height * 0.88) }]}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>افزودن آدرس جدید</Text>
             <Pressable onPress={resetAndClose} style={styles.closeBtn}>
               <X size={20} color="#64748b" />
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={{ maxHeight: Math.round(Dimensions.get('window').height * 0.88) - 64 }}
+            contentContainerStyle={[styles.body, { paddingBottom: 16 + bottomInset }]}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
             <View style={styles.field}>
               <Text style={styles.label}>عنوان آدرس</Text>
               <TextInput value={title} onChangeText={setTitle} placeholder="خانه" placeholderTextColor="#94a3b8" style={styles.input} />
@@ -108,7 +115,8 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose })
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 };
 
@@ -118,7 +126,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerTitle: { color: '#0f172a', fontWeight: '800', fontSize: 16 },
   closeBtn: { padding: 6 },
-  body: { padding: 16, gap: 12, paddingBottom: 40 },
+  body: { padding: 16, gap: 12 },
   field: { gap: 6 },
   label: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right' },

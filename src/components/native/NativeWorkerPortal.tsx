@@ -22,13 +22,14 @@ import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import type { ApiOrder } from '../../api/types';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
+import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
 interface NativeOrder {
   id: string;
   serviceTitle: string;
-  category: SpecialistCategory;
+  category: WorkerServiceCategory | null;
   badge: string;
   customerName: string;
   phone: string;
@@ -60,22 +61,25 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   const [loading, setLoading] = useState(false);
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
 
-  const mapBackendOrder = (o: ApiOrder): NativeOrder => ({
-    id: o.id,
-    serviceTitle: o.serviceTitle || 'نظافت منزل',
-    category: 'cleaner',
-    badge: 'ساعتی',
-    customerName: o.customerName || 'مشتری',
-    phone: o.customerPhone || '',
-    district: o.address ? o.address.split(' ')[0] : 'تهران',
-    address: o.address || 'بدون آدرس',
-    date: o.date || 'امروز',
-    timeSlot: o.time || 'نامشخص',
-    wageTotal: o.price ? Math.round(o.price * 0.8) : 0,
-    paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
-    detailsNote: o.notes || '',
-    status: o.status === 'PENDING' ? 'OPEN' : (o.status === 'ACCEPTED' || o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS') ? 'IN_PROGRESS' : o.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
-  });
+  const mapBackendOrder = (o: ApiOrder): NativeOrder => {
+    const classified = classifyWorkerOrder(o);
+    return {
+      id: o.id,
+      serviceTitle: o.serviceTitle || 'نظافت منزل',
+      category: classified.category,
+      badge: classified.badge,
+      customerName: o.customerName || 'مشتری',
+      phone: o.customerPhone || '',
+      district: o.address ? o.address.split(' ')[0] : 'تهران',
+      address: o.address || 'بدون آدرس',
+      date: o.date || 'امروز',
+      timeSlot: o.time || 'نامشخص',
+      wageTotal: o.price ? Math.round(o.price * 0.8) : 0,
+      paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
+      detailsNote: describeWorkerServiceFacts(o),
+      status: o.status === 'PENDING' ? 'OPEN' : (o.status === 'ACCEPTED' || o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS') ? 'IN_PROGRESS' : o.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
+    };
+  };
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -253,15 +257,17 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           filteredOrders.length === 0 ? (
             <View style={styles.emptyBox}>
               <CheckCircle size={40} color="#94a3b8" />
-              <Text style={styles.emptyTitle}>سفارش بازی موجود نیست</Text>
+              <Text style={styles.emptyTitle}>سفارشی برای پذیرش موجود نیست</Text>
             </View>
           ) : (
             filteredOrders.map(order => (
               <View key={order.id} style={styles.orderCard}>
                 <View style={styles.cardTop}>
-                  <View style={styles.badgeBox}>
-                    <Text style={styles.badgeText}>{order.badge}</Text>
-                  </View>
+                  {order.badge ? (
+                    <View style={styles.badgeBox}>
+                      <Text style={styles.badgeText}>{order.badge}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.titleArea}>
                     <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
                     <Text style={styles.orderId}>کد سفارش: {order.id}</Text>
@@ -295,7 +301,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
                     <Text style={styles.wageLabel}>دستمزد کارگر:</Text>
-                    <Text style={styles.wageValue}>{order.wageTotal.toLocaleString('fa-IR')} تومان</Text>
+                    <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
                   </View>
 
                   <Pressable
@@ -356,7 +362,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
                     <Text style={styles.wageLabel}>مبلغ تسویه:</Text>
-                    <Text style={styles.wageValue}>{order.wageTotal.toLocaleString('fa-IR')} تومان</Text>
+                    <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
                   </View>
                   {order.status === 'COMPLETED' ? (
                     <View style={styles.acceptedTag}>

@@ -351,6 +351,15 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
               فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
             </Text>
           )}
+          <Text style={styles.label}>یادداشت سفارش (اختیاری)</Text>
+          <TextInput
+            multiline
+            value={booking.notes}
+            onChangeText={booking.setNotes}
+            placeholder="مثال: لطفاً قبل از ورود تماس بگیرید"
+            placeholderTextColor="#94a3b8"
+            style={[styles.input, styles.textArea]}
+          />
           {booking.selectedService?.configuration.inputs?.map((input) => (
             <View key={input.id} style={styles.optionBlock}>
               <Text style={styles.label}>{input.label}{input.price ? ` (+${input.price.toLocaleString('fa-IR')} تومان)` : ''}</Text>
@@ -400,8 +409,8 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
           <TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} placeholder="مثال: ۴" placeholderTextColor="#94a3b8" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} placeholder="مثال: ۴" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
           </View>
           <Text style={styles.label}>نام و نام خانوادگی</Text>
           <TextInput
@@ -434,6 +443,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {booking.selectedDate?.dayOfMonth} {booking.selectedTimeSlot?.label}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
+            {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
             <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
             {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({Math.round(pricing.earlyBirdDiscountRate * 100)}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Star, X, Check, Award, User } from 'lucide-react-native';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import type { OrderItem } from '../types/order';
 
 interface OrderRatingModalProps {
@@ -47,6 +47,8 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
 
   if (!order) return null;
 
+  const alreadyRated = Boolean(order.ratings?.customerRating);
+
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
@@ -54,6 +56,10 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
   };
 
   const handleSubmit = async () => {
+    if (order.ratings?.customerRating) {
+      setErrorMessage('برای این سفارش قبلاً امتیاز ثبت شده است.');
+      return;
+    }
     if (selectedRating < 1) {
       setErrorMessage('لطفاً امتیاز خود را از ۱ تا ۵ ستاره مشخص کنید.');
       return;
@@ -73,8 +79,9 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+    <BottomSheetModal visible={visible} animationType="fade" onRequestClose={onClose}>
+      {(bottomInset) => (
+      <View style={[styles.overlay, { paddingBottom: Math.max(20, bottomInset) }]}>
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.header}>
@@ -191,18 +198,19 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
           {/* Footer Actions */}
           <View style={styles.footer}>
             <Pressable
-              disabled={submitting}
+              disabled={submitting || alreadyRated}
               onPress={handleSubmit}
-              style={[styles.submitBtn, submitting && styles.btnDisabled]}
+              style={[styles.submitBtn, (submitting || alreadyRated) && styles.btnDisabled]}
             >
               <Text style={styles.submitBtnText}>
-                {submitting ? 'در حال ثبت...' : 'ثبت امتیاز و نظر'}
+                {alreadyRated ? 'امتیاز قبلاً ثبت شده' : submitting ? 'در حال ثبت...' : 'ثبت امتیاز و نظر'}
               </Text>
             </Pressable>
           </View>
         </View>
       </View>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 };
 

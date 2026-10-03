@@ -8,12 +8,12 @@ import {
   Linking,
   Alert,
   TextInput,
-  Modal,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { HelpCircle, Phone, MessageCircle, ChevronDown, ChevronUp, X, Send } from 'lucide-react-native';
-import { appStorage } from '../../../utils/storage';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
+import { apiFetch } from '../../../api/apiClient';
 import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE, SUPPORT_TEL_URL } from '../supportConfig';
 
 export interface SupportUser {
@@ -35,8 +35,6 @@ type SupportMessage = {
   status: 'OPEN';
 };
 
-const storageKeyFor = (userId: string) => `paksho_support_messages_${userId}`;
-
 export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   const [openFaqId, setOpenFaqId] = useState<string | null>(SUPPORT_FAQ[0]?.id ?? null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -44,33 +42,24 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
 
   React.useEffect(() => {
     let alive = true;
     void (async () => {
       if (!user?.id) {
         setMessages([]);
-        setHydrated(true);
         return;
       }
-      const saved = await appStorage.getItem<SupportMessage[]>(storageKeyFor(user.id), []);
+      const res = await apiFetch('/support/messages');
       if (!alive) return;
-      const scoped = Array.isArray(saved)
-        ? saved.filter((m) => m && m.userId === user.id)
-        : [];
-      setMessages(scoped);
-      setHydrated(true);
+      const saved = Array.isArray(res.messages) ? res.messages : [];
+      setMessages(saved.filter((m: SupportMessage) => m && m.userId === user.id));
+      if (!res.success) setError(res.message || 'خواندن پیام‌ها از سرور ممکن نشد.');
     })();
     return () => {
       alive = false;
     };
   }, [user?.id]);
-
-  React.useEffect(() => {
-    if (!hydrated || !user?.id) return;
-    void appStorage.setItem(storageKeyFor(user.id), messages);
-  }, [messages, hydrated, user?.id]);
 
   const displayName = useMemo(() => user.name || 'کاربر پاکشو', [user.name]);
 
@@ -89,19 +78,21 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
       setError('موضوع و متن پیام الزامی است.');
       return;
     }
-    const next: SupportMessage = {
-      id: `sup_${Date.now()}`,
-      userId: user.id,
-      subject: subject.trim(),
-      body: body.trim(),
-      createdAt: new Date().toLocaleString('fa-IR'),
-      status: 'OPEN',
-    };
-    setMessages((prev) => [next, ...prev]);
-    setSubject('');
-    setBody('');
-    setError(null);
-    setComposeOpen(false);
+    void (async () => {
+      const res = await apiFetch('/support/messages', {
+        method: 'POST',
+        body: JSON.stringify({ subject: subject.trim(), body: body.trim() }),
+      });
+      if (!res.success || !res.message) {
+        setError(res.message || 'ثبت پیام روی سرور ممکن نشد.');
+        return;
+      }
+      setMessages((prev) => [res.message as SupportMessage, ...prev]);
+      setSubject('');
+      setBody('');
+      setError(null);
+      setComposeOpen(false);
+    })();
   };
 
   return (
@@ -158,15 +149,16 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
                 <Text style={styles.msgStatus}>باز</Text>
               </View>
               <Text style={styles.msgBody}>{msg.body}</Text>
-              <Text style={styles.msgMeta}>{msg.createdAt}</Text>
+              <Text style={styles.msgMeta}>{new Date(msg.createdAt).toLocaleString('fa-IR')}</Text>
             </View>
           ))
         )}
       </ScrollView>
 
-      <Modal visible={composeOpen} transparent animationType="slide" onRequestClose={() => setComposeOpen(false)}>
+      <BottomSheetModal visible={composeOpen} onRequestClose={() => setComposeOpen(false)}>
+        {(bottomInset) => (
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: 16 + bottomInset }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>پیام به پشتیبانی</Text>
               <Pressable onPress={() => setComposeOpen(false)} style={styles.closeBtn}>
@@ -196,7 +188,8 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             </Pressable>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+        )}
+      </BottomSheetModal>
     </View>
   );
 };

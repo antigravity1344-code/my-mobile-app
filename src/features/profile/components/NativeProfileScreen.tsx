@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
 import { NativeAddressManagerModal } from './NativeAddressManagerModal';
@@ -14,6 +15,7 @@ interface Props {
 
 export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
   const { profile, removeSavedAddress, setDefaultAddress, syncAuthenticatedUser } = useProfile();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [editName, setEditName] = useState(profile.fullName || '');
   const [editBirthDate, setEditBirthDate] = useState('');
@@ -58,7 +60,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 16 + bottomInset }]}>
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{profile.fullName ? profile.fullName.charAt(0) : 'ک'}</Text>
@@ -109,8 +111,12 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             <Crown size={16} color="#0284c7" />
             <Text style={styles.sectionTitle}>باشگاه مشتریان</Text>
           </View>
+          <Text style={styles.loyaltyTitle}>{profile.loyalty.title}</Text>
           <Text style={styles.muted}>
-            باشگاه مشتریان فعلاً فقط روی همین دستگاه نگه‌داری می‌شود و به سرور وصل نیست.
+            {profile.loyalty.completedOrdersCount} سفارش تکمیل‌شده · تخفیف {profile.loyalty.discountPercentage}٪
+          </Text>
+          <Text style={styles.muted}>
+            سطح بعدی پس از {profile.loyalty.nextTierOrderTarget} سفارش تکمیل‌شده و امتیاز کافی محاسبه می‌شود.
           </Text>
         </View>
 
@@ -121,7 +127,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <Text style={styles.wallet}>{formatCurrency(profile.walletBalance || 0)}</Text>
           <Text style={styles.muted}>
-            موجودی کیف پول محلی است و پرداخت واقعی محسوب نمی‌شود.
+            موجودی از سرور خوانده می‌شود. شارژ کیف پول تا اتصال درگاه پرداخت انجام نمی‌شود.
           </Text>
         </View>
 
@@ -178,7 +184,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 16, gap: 14, paddingBottom: 40 },
+  content: { padding: 16, gap: 14 },
   profileCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 20 },
@@ -191,6 +197,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   sectionTitle: { color: '#0f172a', fontWeight: '800', fontSize: 14 },
   muted: { textAlign: 'right', color: '#64748b', fontSize: 12 },
+  loyaltyTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 },
   wallet: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 20 },
   input: {
     borderWidth: 1,

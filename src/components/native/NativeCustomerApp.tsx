@@ -8,13 +8,14 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, LogOut, ClipboardList, Settings, HelpCircle } from 'lucide-react-native';
+import { Bell, User, LogOut, ClipboardList, Settings, HelpCircle } from 'lucide-react-native';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { OrdersScreen } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { NativeSupportScreen } from '../../features/support';
+import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
@@ -34,7 +35,7 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile' | 'support'>('wizard');
+  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile' | 'support' | 'alerts'>('wizard');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export const NativeCustomerApp: React.FC = () => {
   }, []);
 
   const handleLogin = async (user: UserData, token: string) => {
+    await saveCustomerSession(appStorage, user, token);
     login(user.phone);
     syncAuthenticatedUser({
       id: user.id,
@@ -75,7 +77,6 @@ export const NativeCustomerApp: React.FC = () => {
     });
     setUserData(user);
     setIsLoggedIn(true);
-    await saveCustomerSession(appStorage, user, token);
 
     if (!user.name || !user.isProfileComplete) {
       setShowOnboarding(true);
@@ -101,6 +102,8 @@ export const NativeCustomerApp: React.FC = () => {
     setIsLoggedIn(false);
     setUserData(null);
     setShowOnboarding(false);
+    setMainView('wizard');
+    setFocusOrderId(null);
     await clearCustomerSession(appStorage);
   };
 
@@ -146,6 +149,12 @@ export const NativeCustomerApp: React.FC = () => {
 
         <View style={styles.bannerActions}>
           <Pressable
+            onPress={() => setMainView(mainView === 'alerts' ? 'wizard' : 'alerts')}
+            style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
+          >
+            <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
+          </Pressable>
+          <Pressable
             onPress={() => setMainView(mainView === 'support' ? 'wizard' : 'support')}
             style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
           >
@@ -180,6 +189,8 @@ export const NativeCustomerApp: React.FC = () => {
           />
         ) : mainView === 'profile' ? (
           <NativeProfileScreen onLogout={handleLogout} />
+        ) : mainView === 'alerts' ? (
+          <NativeNotificationsScreen />
         ) : mainView === 'support' ? (
           <NativeSupportScreen
             user={{

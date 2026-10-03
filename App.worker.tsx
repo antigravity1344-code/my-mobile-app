@@ -1,3 +1,4 @@
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { WorkerBookingProvider } from './src/context/WorkerBookingContext';
 import { OrdersProvider } from './src/features/orders';
 import { ProfileProvider } from './src/features/profile';
@@ -6,6 +7,7 @@ import { NativeWorkerApp } from './src/components/native/NativeWorkerApp';
 
 export default function App() {
   return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <WorkerBookingProvider>
       <OrdersProvider>
         <ProfileProvider>
@@ -15,5 +17,6 @@ export default function App() {
         </ProfileProvider>
       </OrdersProvider>
     </WorkerBookingProvider>
+    </SafeAreaProvider>
   );
 }

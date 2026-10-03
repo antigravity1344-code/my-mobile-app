@@ -15,5 +15,7 @@ export async function attachStoredAuthToken(
   const saved = await store.getItem<unknown>(storageKey, '');
   if (typeof saved === 'string' && saved.trim()) {
     currentToken = saved.trim();
+  } else {
+    currentToken = '';
   }
 }

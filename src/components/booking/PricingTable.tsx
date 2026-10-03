@@ -1,5 +1,6 @@
 import { X } from 'lucide-react-native';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BottomSheetModal } from '../native/BottomSheetModal';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { calculatePrice, type PricingOptions } from '../../utils/pricing';
 import type { CleaningService } from '../../types/service';
@@ -18,9 +19,10 @@ const SCENARIOS: Array<{ title: string; serviceId: string; options: PricingOptio
 ];
 
 export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+  <BottomSheetModal visible={visible} onRequestClose={onClose}>
+    {(bottomInset) => (
     <View style={styles.backdrop}>
-      <View style={styles.modal}>
+      <View style={[styles.modal, { paddingBottom: 20 + bottomInset }]}>
         <View style={styles.header}>
           <Text style={styles.heading}>جدول شفاف تعرفه‌ها</Text>
           <Pressable onPress={onClose} accessibilityLabel="بستن جدول تعرفه‌ها"><X size={20} color="#475569" /></Pressable>
@@ -40,12 +42,13 @@ export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) 
         })}
       </View>
     </View>
-  </Modal>
+    )}
+  </BottomSheetModal>
 );
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 12 },
+  modal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 20, gap: 12 },
   header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   heading: { color: '#0f172a', fontSize: 20, fontWeight: '800', textAlign: 'right' },
   subtitle: { color: '#64748b', fontSize: 12, textAlign: 'right', lineHeight: 19 },

@@ -15,6 +15,7 @@ interface DateTimeSelectorProps {
   onChangeNotes: (notes: string) => void;
   onNext: () => void;
   onPrev: () => void;
+  hourlyEstimate?: number | null;
 }
 
 const generateDateOptions = () => {
@@ -77,6 +78,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
   onChangeNotes,
   onNext,
   onPrev,
+  hourlyEstimate = null,
 }) => {
   const [viewMode, setViewMode] = useState<'dates' | 'times'>('dates');
   const dateOptions = useMemo(() => generateDateOptions(), []);
@@ -230,9 +232,11 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400">
-          {durationHours} ساعت = {(durationHours * 150000).toLocaleString('fa-IR')} تومان (برآورد)
-        </p>
+        {typeof hourlyEstimate === 'number' ? (
+          <p className="text-[11px] text-slate-400">
+            {durationHours} ساعت = {hourlyEstimate.toLocaleString('fa-IR')} تومان (برآورد)
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-3">

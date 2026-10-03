@@ -8,13 +8,28 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { ShieldCheck, Clock, CheckCircle2, FileText, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
   onUpdateUser: (updatedUser: UserData) => void;
+}
+
+const MAX_ID_DOC_BYTES = 600 * 1024;
+
+type SelectedIdDoc = {
+  mimeType: 'image/jpeg';
+  data: string;
+  label: string;
+};
+
+function base64Size(value: string) {
+  const cleaned = value.replace(/\s/g, '');
+  const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
+  return Math.floor((cleaned.length * 3) / 4) - padding;
 }
 
 export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
@@ -27,6 +42,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('تهران');
   const [bankSheba, setBankSheba] = useState('');
+  const [idDocFile, setIdDocFile] = useState<SelectedIdDoc | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -81,6 +97,10 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       setErrorMsg('شماره شبا جهت تسویه حساب الزامی است.');
       return;
     }
+    if (!idDocFile) {
+      setErrorMsg('تصویر مدرک هویتی الزامی است.');
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
@@ -94,8 +114,11 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
         birthDate,
         address,
         city,
-        skills: ['نظافت منزل', 'نظافت راه پله'],
-        bankSheba
+        bankSheba,
+        idDocFile: {
+          mimeType: idDocFile.mimeType,
+          data: idDocFile.data,
+        },
       })
     });
 
@@ -106,6 +129,37 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     } else {
       setErrorMsg(res.message || 'خطا در ثبت مدارک.');
     }
+  };
+
+  const handlePickIdDoc = async () => {
+    setErrorMsg(null);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    if (asset.mimeType && !asset.mimeType.toLowerCase().startsWith('image/')) {
+      setIdDocFile(null);
+      setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
+      return;
+    }
+    if (!asset.base64) {
+      setIdDocFile(null);
+      setErrorMsg('خواندن تصویر مدرک ممکن نشد.');
+      return;
+    }
+    if (base64Size(asset.base64) > MAX_ID_DOC_BYTES) {
+      setIdDocFile(null);
+      setErrorMsg('حجم تصویر باید حداکثر ۶۰۰ کیلوبایت باشد.');
+      return;
+    }
+    setIdDocFile({
+      mimeType: 'image/jpeg',
+      data: asset.base64,
+      label: asset.fileName || 'تصویر مدرک',
+    });
   };
 
   return (
@@ -158,12 +212,12 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           placeholderTextColor="#94a3b8"
         />
 
-        {/* تصویر کارت ملی/مدرک */}
-        <Text style={styles.label}>تصویر کارت ملی / مدرک هویتی:</Text>
-        <View style={styles.docUploadBox}>
-          <FileText size={24} color="#16a34a" />
-          <Text style={styles.docUploadText}>مدرک هویتی آپلود شد (تایید هویت)</Text>
-        </View>
+        <Text style={styles.label}>تصویر مدرک هویتی:</Text>
+        <Pressable onPress={handlePickIdDoc} style={styles.input}>
+          <Text style={idDocFile ? styles.docPickedText : styles.docPlaceholder}>
+            {idDocFile ? `انتخاب شد: ${idDocFile.label}` : 'انتخاب تصویر از گالری'}
+          </Text>
+        </Pressable>
 
         {/* شهر و محدوده فعالیت */}
         <Text style={styles.label}>شهر و محدوده فعالیت:</Text>
@@ -283,6 +337,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 13,
     marginBottom: 14,
+    justifyContent: 'center',
+  },
+  docPlaceholder: {
+    color: '#94a3b8',
+    fontSize: 13,
+    textAlign: 'right',
+  },
+  docPickedText: {
+    color: '#0f172a',
+    fontSize: 13,
+    textAlign: 'right',
   },
   inputWrapper: {
     flexDirection: 'row-reverse',
@@ -302,22 +367,6 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 13,
-  },
-  docUploadBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#86efac',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  docUploadText: {
-    color: '#166534',
-    fontSize: 12,
-    fontWeight: '700',
   },
   submitBtn: {
     backgroundColor: '#16a34a',

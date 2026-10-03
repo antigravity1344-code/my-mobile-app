@@ -8,10 +8,12 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { Briefcase, LogOut } from 'lucide-react-native';
+import { Bell, Briefcase, HelpCircle, LogOut } from 'lucide-react-native';
 import { WorkerAuthScreen } from './WorkerAuthScreen';
 import { WorkerOnboardingScreen } from './WorkerOnboardingScreen';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
+import { NativeSupportScreen } from '../../features/support';
+import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
@@ -29,6 +31,7 @@ export const NativeWorkerApp: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [mainView, setMainView] = useState<'work' | 'support' | 'alerts'>('work');
 
   const refreshWorkerFromServer = async (current: UserData) => {
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
@@ -83,9 +86,9 @@ export const NativeWorkerApp: React.FC = () => {
   }, [isLoggedIn, userData?.id, userData?.status]);
 
   const handleLogin = async (user: UserData, token: string) => {
+    await saveWorkerSession(appStorage, user, token);
     setUserData(user);
     setIsLoggedIn(true);
-    await saveWorkerSession(appStorage, user, token);
     await refreshWorkerFromServer(user);
   };
 
@@ -140,6 +143,18 @@ export const NativeWorkerApp: React.FC = () => {
         </View>
 
         <View style={styles.bannerActions}>
+          <Pressable
+            onPress={() => setMainView(mainView === 'alerts' ? 'work' : 'alerts')}
+            style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
+          >
+            <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
+          </Pressable>
+          <Pressable
+            onPress={() => setMainView(mainView === 'support' ? 'work' : 'support')}
+            style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
+          >
+            <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
+          </Pressable>
           <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
             <LogOut size={16} color="#94a3b8" />
           </Pressable>
@@ -149,7 +164,11 @@ export const NativeWorkerApp: React.FC = () => {
       {/* اگر هنوز تایید نشده: فرم دریافت مدارک یا وضعیت انتظار */}
       {/* اگر تایید شده: کارتابل سفارش‌ها */}
       <View style={styles.content}>
-        {isApproved ? (
+        {mainView === 'alerts' ? (
+          <NativeNotificationsScreen />
+        ) : mainView === 'support' ? (
+          <NativeSupportScreen user={{ id: userData.id, name: userData.name || '', phone: userData.phone }} />
+        ) : isApproved ? (
           <NativeWorkerPortal user={userData} />
         ) : (
           <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
@@ -224,6 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#0f172a',
   },
+  ordersActiveButton: { backgroundColor: '#0284c7' },
   content: {
     flex: 1,
   },

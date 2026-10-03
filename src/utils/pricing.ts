@@ -129,7 +129,11 @@ export const calculatePrice = (
   options: PricingOptions = {},
 ): number => {
   if (service.id === 'hourly_labor') {
-    const hours = Math.max(3, Number(options.hours) || service.estimatedDurationHours || 3);
+    const explicitHours = Number(options.hours);
+    const selectedHours = Number.isFinite(explicitHours) && explicitHours > 0
+      ? explicitHours
+      : Number(durationHours) || service.estimatedDurationHours || 3;
+    const hours = Math.max(3, selectedHours);
     const workerCount = options.workerCount === '۳ نفر' ? 3 : options.workerCount === '۲ نفر' ? 2 : 1;
     const toolsFee = options.tools ? 80000 : 0;
     return service.basePrice * hours * workerCount + toolsFee;

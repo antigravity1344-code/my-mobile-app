@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { SUPPORT_TEL_URL } from '../../support';
 import {
   X,
@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { isOrderCancellable } from '../services/orderService';
+import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 
@@ -45,6 +45,12 @@ const RECURRING_TITLES: Record<string, string> = {
   MONTHLY: 'ماهانه',
 };
 
+const GENDER_TITLES: Record<string, string> = {
+  FEMALE: 'خانم',
+  MALE: 'آقا',
+  NO_PREFERENCE: 'بدون ترجیح',
+};
+
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   order,
   visible,
@@ -60,6 +66,39 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const isCancellable = isOrderCancellable(order.status);
   const isCompleted = order.status === 'COMPLETED';
+  const pricing = order.pricing;
+  const subtotal = pricing?.subtotal ?? pricing?.total ?? 0;
+  const earlyBirdAmount = pricing?.earlyBirdDiscountAmount ?? 0;
+  const earlyBirdRate = pricing?.earlyBirdDiscountRate ?? 0;
+  const tierAmount = pricing?.tierDiscountAmount ?? 0;
+  const recurringAmount = pricing?.recurringDiscountAmount ?? 0;
+  const totalAmount = pricing?.total ?? subtotal;
+  const dateLabel = [
+    order.date?.dayOfWeek,
+    order.date?.dayOfMonth,
+    order.date?.monthName,
+  ]
+    .filter((part) => part !== undefined && part !== null && part !== 0 && String(part).trim() !== '' && String(part).trim() !== '—')
+    .join(' ') || '—';
+  const timeLabel =
+    order.timeSlot?.label ||
+    [order.timeSlot?.startTime, order.timeSlot?.endTime].filter(Boolean).join(' الی ') ||
+    '—';
+  const durationLabel = order.durationHours > 0 ? ` (${order.durationHours} ساعت)` : '';
+  const addressLine = [
+    order.address?.district,
+    order.address?.fullAddress,
+    order.address?.plaque ? `پلاک ${order.address.plaque}` : '',
+    order.address?.unit ? `واحد ${order.address.unit}` : '',
+  ]
+    .filter((part) => Boolean(part && String(part).trim()))
+    .join('، ') || '—';
+  const recipientLabel = [
+    order.address?.recipientName || '—',
+    order.address?.contactPhone ? `(${order.address.contactPhone})` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const handleCallCleaner = () => {
     if (order.cleaner?.phone) {
@@ -87,9 +126,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <BottomSheetModal visible={visible} onRequestClose={onClose}>
+      {(bottomInset) => (
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: bottomInset }]}>
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -133,14 +173,29 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     <User size={26} color="#0284c7" />
                   </View>
                   <View style={styles.cleanerInfo}>
-                    <Text style={styles.cleanerName}>{order.cleaner?.name}</Text>
-                    <View style={styles.cleanerRatingRow}>
-                      <Star size={13} color="#f59e0b" fill="#f59e0b" />
-                      <Text style={styles.cleanerRatingText}>{order.cleaner?.rating}</Text>
-                      <Text style={styles.cleanerJobsText}>
-                        ({order.cleaner?.completedJobsCount} سفارش موفق)
-                      </Text>
-                    </View>
+                    <Text style={styles.cleanerName}>
+                      {order.cleaner?.name || order.cleaner?.phone || 'اطلاعات متخصص روی سفارش ثبت نشده'}
+                    </Text>
+                    {order.cleaner?.name && order.cleaner.phone ? (
+                      <Text style={styles.cleanerJobsText}>{order.cleaner.phone}</Text>
+                    ) : null}
+                    {typeof order.cleaner?.rating === 'number' || typeof order.cleaner?.completedJobsCount === 'number' ? (
+                      <View style={styles.cleanerRatingRow}>
+                        {typeof order.cleaner?.rating === 'number' ? (
+                          <>
+                            <Star size={13} color="#f59e0b" fill="#f59e0b" />
+                            <Text style={styles.cleanerRatingText}>
+                              {order.cleaner.rating.toLocaleString('fa-IR')}
+                            </Text>
+                          </>
+                        ) : null}
+                        {typeof order.cleaner?.completedJobsCount === 'number' ? (
+                          <Text style={styles.cleanerJobsText}>
+                            ({order.cleaner.completedJobsCount.toLocaleString('fa-IR')} سفارش موفق)
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
                   <Pressable onPress={handleCallCleaner} style={styles.callCleanerBtn}>
                     <Phone size={16} color="#fff" />
@@ -156,17 +211,32 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.infoRow}>
                 <Calendar size={15} color="#0284c7" />
                 <Text style={styles.infoLabel}>تاریخ رزرو:</Text>
-                <Text style={styles.infoValue}>
-                  {order.date.dayOfWeek} {order.date.dayOfMonth} {order.date.monthName}
-                </Text>
+                <Text style={styles.infoValue}>{dateLabel}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Clock size={15} color="#0284c7" />
                 <Text style={styles.infoLabel}>ساعت و مدت:</Text>
                 <Text style={styles.infoValue}>
-                  {order.timeSlot.startTime} الی {order.timeSlot.endTime} ({order.durationHours} ساعت)
+                  {timeLabel}
+                  {durationLabel}
                 </Text>
               </View>
+              <View style={styles.infoRow}>
+                <User size={15} color="#0284c7" />
+                <Text style={styles.infoLabel}>جنسیت متخصص:</Text>
+                <Text style={styles.infoValue}>
+                  {GENDER_TITLES[order.genderPreference] || 'بدون ترجیح'}
+                </Text>
+              </View>
+              {Object.entries(order.serviceOptions || {})
+                .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+                .map(([key, value]) => (
+                  <View key={key} style={styles.infoRow}>
+                    <Sparkles size={15} color="#0284c7" />
+                    <Text style={styles.infoLabel}>{key}:</Text>
+                    <Text style={styles.infoValue}>{String(value)}</Text>
+                  </View>
+                ))}
               <View style={styles.infoRow}>
                 <Sparkles size={15} color="#0284c7" />
                 <Text style={styles.infoLabel}>تناوب سفارش:</Text>
@@ -177,19 +247,19 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.infoRow}>
                 <MapPin size={15} color="#0284c7" />
                 <Text style={styles.infoLabel}>محله و نشانی:</Text>
-                <Text style={styles.infoValue}>
-                  {order.address.district}، {order.address.fullAddress}
-                  {order.address.plaque ? `، پلاک ${order.address.plaque}` : ''}
-                  {order.address.unit ? `، واحد ${order.address.unit}` : ''}
-                </Text>
+                <Text style={styles.infoValue}>{addressLine}</Text>
               </View>
               <View style={styles.infoRow}>
                 <User size={15} color="#0284c7" />
                 <Text style={styles.infoLabel}>تحویل‌گیرنده:</Text>
-                <Text style={styles.infoValue}>
-                  {order.address.recipientName} ({order.address.contactPhone})
-                </Text>
+                <Text style={styles.infoValue}>{recipientLabel}</Text>
               </View>
+              {order.notes?.trim() ? (
+                <Text style={styles.infoValue}>یادداشت سفارش: {order.notes.trim()}</Text>
+              ) : null}
+              {order.address?.addressNotes?.trim() ? (
+                <Text style={styles.infoValue}>یادداشت آدرس: {order.address.addressNotes.trim()}</Text>
+              ) : null}
             </View>
 
             {/* Financial Invoice Breakdown */}
@@ -201,43 +271,43 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.invoiceLine}>
                 <Text style={styles.invoiceLabel}>مبلغ پایه سرویس</Text>
                 <Text style={styles.invoiceValue}>
-                  {order.pricing.subtotal.toLocaleString('fa-IR')} تومان
+                  {formatOrderAmount(subtotal)} تومان
                 </Text>
               </View>
 
-              {order.pricing.earlyBirdDiscountAmount > 0 && (
+              {earlyBirdAmount > 0 && (
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>
-                    تخفیف رزرو زودهنگام ({Math.round(order.pricing.earlyBirdDiscountRate * 100)}٪)
+                    تخفیف رزرو زودهنگام ({Math.round(earlyBirdRate * 100)}٪)
                   </Text>
                   <Text style={styles.discountValue}>
-                    -{order.pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان
+                    -{formatOrderAmount(earlyBirdAmount)} تومان
                   </Text>
                 </View>
               )}
 
-              {order.pricing.tierDiscountAmount > 0 && (
+              {tierAmount > 0 && (
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>
-                    تخفیف باشگاه مشتریان (سطح {order.customerTier})
+                    تخفیف باشگاه مشتریان (سطح {order.customerTier || '—'})
                   </Text>
                   <Text style={styles.discountValue}>
-                    -{order.pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان
+                    -{formatOrderAmount(tierAmount)} تومان
                   </Text>
                 </View>
               )}
 
-              {order.pricing.recurringDiscountDeferred && (
+              {Boolean(pricing?.recurringDiscountDeferred) && (
                 <Text style={styles.deferredHint}>
                   💡 تخفیف سفارش دوره‌ای طبق استاندارد از جلسه دوم لحاظ خواهد شد.
                 </Text>
               )}
 
-              {order.pricing.recurringDiscountAmount > 0 && (
+              {recurringAmount > 0 && (
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text>
                   <Text style={styles.discountValue}>
-                    -{order.pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان
+                    -{formatOrderAmount(recurringAmount)} تومان
                   </Text>
                 </View>
               )}
@@ -247,7 +317,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>مبلغ نهایی پرداخت‌شده</Text>
                 <Text style={styles.totalValue}>
-                  {order.pricing.total.toLocaleString('fa-IR')} تومان
+                  {formatOrderAmount(totalAmount)} تومان
                 </Text>
               </View>
 
@@ -335,12 +405,16 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           <View style={styles.footer}>
             {isCompleted && (
               <Pressable
-                onPress={() => onOpenRating(order.id)}
+                disabled={Boolean(order.ratings?.customerRating)}
+                onPress={() => {
+                  if (order.ratings?.customerRating) return;
+                  onOpenRating(order.id);
+                }}
                 style={styles.footerRatingBtn}
               >
                 <Star size={16} color="#fff" />
                 <Text style={styles.footerRatingText}>
-                  {order.ratings?.customerRating ? 'ویرایش امتیاز و نظر' : 'ثبت امتیاز برای متخصص'}
+                  {order.ratings?.customerRating ? 'امتیاز ثبت شده' : 'ثبت امتیاز برای متخصص'}
                 </Text>
               </Pressable>
             )}
@@ -361,7 +435,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           </View>
         </View>
       </View>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 };
 

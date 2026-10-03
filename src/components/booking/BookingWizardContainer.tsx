@@ -4,7 +4,7 @@ import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
-import { calculateFinalPrice, type RecurringFrequency } from '../../utils/pricing';
+import { calculateFinalPrice, calculatePrice, type RecurringFrequency } from '../../utils/pricing';
 import { useOrders, type OrderItem } from '../../features/orders';
 import { normalizePersianDigits } from '../../utils/bookingValidation';
 import { Sparkles, Calendar, MapPin, Check, Clock, ShieldCheck, Loader2, CheckCircle, AlertCircle, ClipboardList } from 'lucide-react';
@@ -18,9 +18,10 @@ const STEPS = [
 
 export interface BookingWizardContainerProps {
   onNavigateHome?: () => void;
+  onViewOrders?: () => void;
 }
 
-export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ onNavigateHome }) => {
+export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ onNavigateHome, onViewOrders }) => {
   const {
     step,
     setStep,
@@ -47,6 +48,9 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     prevStep,
   } = useBooking();
 
+  const hourlyEstimate = selectedService?.pricingType === 'hourly'
+    ? calculatePrice(selectedService, durationHours, serviceOptions)
+    : null;
   const pricing = selectedService && selectedDate
     ? calculateFinalPrice(
       selectedService,
@@ -206,6 +210,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               onChangeNotes={setNotes}
               onNext={nextStep}
               onPrev={prevStep}
+              hourlyEstimate={hourlyEstimate}
             />
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
               <div className="mb-3 text-sm font-bold text-slate-700">تکرار سفارش</div>
@@ -299,9 +304,16 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                 <div className="text-left text-xs font-medium text-slate-800 max-w-xs leading-relaxed">
                   {addressDetails.district}، {addressDetails.fullAddress}، پلاک {addressDetails.plaque}
                   {addressDetails.unit ? `، واحد ${addressDetails.unit}` : ''}
+                  {addressDetails.floor ? `، طبقه ${addressDetails.floor}` : ''}
                   <div className="text-[11px] text-slate-500 mt-0.5">
                     تحویل‌گیرنده: {addressDetails.recipientName} ({addressDetails.contactPhone})
                   </div>
+                  {addressDetails.addressNotes ? (
+                    <div className="text-[11px] text-slate-500 mt-0.5">یادداشت آدرس: {addressDetails.addressNotes}</div>
+                  ) : null}
+                  {notes ? (
+                    <div className="text-[11px] text-slate-500 mt-0.5">یادداشت سفارش: {notes}</div>
+                  ) : null}
                 </div>
               </div>
 
@@ -380,7 +392,8 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                     setSubmissionState('idle');
                     setSubmissionMessage(null);
                     setCreatedOrderId(null);
-                    onNavigateHome?.();
+                    if (onViewOrders) onViewOrders();
+                    else onNavigateHome?.();
                   }}
                   className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-700 cursor-pointer"
                 >

@@ -63,32 +63,27 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     void (async () => {
       const savedProfile = await appStorage.getItem<UserProfile>('paksho_user_profile', EMPTY_PROFILE);
-      const savedTxs = await appStorage.getItem<WalletTransaction[]>('paksho_wallet_txs', []);
 
       setProfile((prev) => {
         // Prefer an already-synced authenticated user from NativeCustomerApp restore/login.
         if (prev.id && !isDemoProfile(prev)) {
-          return prev;
+          return { ...prev, walletBalance: 0, loyalty: EMPTY_LOYALTY };
         }
         if (savedProfile && !isDemoProfile(savedProfile)) {
           return {
             ...EMPTY_PROFILE,
             ...savedProfile,
+            walletBalance: 0,
+            loyalty: EMPTY_LOYALTY,
             isLoggedIn: Boolean(savedProfile.isLoggedIn && savedProfile.id),
           };
         }
         return EMPTY_PROFILE;
       });
+      setTransactions([]);
 
       if (!(savedProfile && !isDemoProfile(savedProfile))) {
         await appStorage.setItem('paksho_user_profile', EMPTY_PROFILE);
-      }
-
-      if (Array.isArray(savedTxs) && savedProfile && !isDemoProfile(savedProfile)) {
-        setTransactions(savedTxs);
-      } else {
-        setTransactions([]);
-        await appStorage.setItem('paksho_wallet_txs', []);
       }
 
       setHydrated(true);
@@ -101,9 +96,29 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [profile, hydrated]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    void appStorage.setItem('paksho_wallet_txs', transactions);
-  }, [transactions, hydrated]);
+    if (!hydrated || !profile.isLoggedIn || !profile.id) return;
+    let cancelled = false;
+    const userId = profile.id;
+    void (async () => {
+      await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+      const [wallet, loyalty] = await Promise.all([apiFetch('/wallet'), apiFetch('/loyalty')]);
+      if (cancelled) return;
+      setProfile((prev) => {
+        if (prev.id !== userId) return prev;
+        return {
+          ...prev,
+          walletBalance: wallet.success && typeof wallet.balance === 'number' ? wallet.balance : prev.walletBalance,
+          loyalty: loyalty.success && loyalty.loyalty ? loyalty.loyalty : prev.loyalty,
+        };
+      });
+      if (wallet.success && Array.isArray(wallet.transactions)) {
+        setTransactions(wallet.transactions);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile.id, profile.isLoggedIn]);
 
   useEffect(() => {
     if (!hydrated || !profile.isLoggedIn || !profile.id) {
@@ -170,38 +185,13 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const chargeWallet = (amount: number) => {
-    if (amount <= 0) return;
-    const newTx: WalletTransaction = {
-      id: `tx_${Date.now()}`,
-      amount,
-      type: 'DEPOSIT',
-      description: 'شارژ کیف پول',
-      date: new Date().toLocaleDateString('fa-IR'),
-      status: 'SUCCESS',
-    };
-    setTransactions((prev) => [newTx, ...prev]);
-    setProfile((prev) => ({
-      ...prev,
-      walletBalance: prev.walletBalance + amount,
-    }));
+    void amount;
   };
 
   const deductWallet = (amount: number, description: string): boolean => {
-    if (amount <= 0 || profile.walletBalance < amount) return false;
-    const newTx: WalletTransaction = {
-      id: `tx_${Date.now()}`,
-      amount,
-      type: 'WITHDRAW',
-      description: description || 'برداشت از کیف پول',
-      date: new Date().toLocaleDateString('fa-IR'),
-      status: 'SUCCESS',
-    };
-    setTransactions((prev) => [newTx, ...prev]);
-    setProfile((prev) => ({
-      ...prev,
-      walletBalance: prev.walletBalance - amount,
-    }));
-    return true;
+    void amount;
+    void description;
+    return false;
   };
 
   const logout = () => {
