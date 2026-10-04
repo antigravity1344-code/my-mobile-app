@@ -1,5 +1,8 @@
 import { registerRootComponent } from 'expo';
 import { Platform } from 'react-native';
+import App from './App';
+import CustomerApp from './App.customer';
+import WorkerApp from './App.worker';
 
 if (Platform.OS === 'web') {
   // تزریق استایل‌های Tailwind جهت نمایش کامل استایل‌ها در مرورگر وب
@@ -13,12 +16,11 @@ if (Platform.OS === 'web') {
     }
   }
   // داشبورد وب
-  registerRootComponent(require('./App').default);
+  registerRootComponent(App);
+} else if (process.env.EXPO_PUBLIC_APP_FLAVOR === 'worker') {
+  // روی گوشی: اپ متخصص
+  registerRootComponent(WorkerApp);
 } else {
-  // روی گوشی (اکسپو گو): نسخهٔ جدید اپ مشتری، یا متخصص با EXPO_PUBLIC_APP_FLAVOR=worker
-  if (process.env.EXPO_PUBLIC_APP_FLAVOR === 'worker') {
-    registerRootComponent(require('./App.worker').default);
-  } else {
-    registerRootComponent(require('./App.customer').default);
-  }
+  // روی گوشی: اپ مشتری (پیش‌فرض)
+  registerRootComponent(CustomerApp);
 }

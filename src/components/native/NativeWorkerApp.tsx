@@ -50,6 +50,13 @@ export const NativeWorkerApp: React.FC = () => {
       await saveWorkerSession(appStorage, next);
       return next;
     }
+    // نشست منقضی/نامعتبر: فرم آنبوردینگ را با session مرده نگه ندار
+    if (res && res.success === false && typeof res.message === 'string' && res.message.includes('ورود لازم')) {
+      setIsLoggedIn(false);
+      setUserData(null);
+      await clearWorkerSession(appStorage);
+      return current;
+    }
     return current;
   };
 
@@ -136,7 +143,11 @@ export const NativeWorkerApp: React.FC = () => {
             <View style={styles.roleBadgeWorker}>
               <Briefcase size={10} color="#fff" />
               <Text style={styles.roleBadgeText}>
-                {isApproved ? 'پنل کارتابل متخصصین' : 'در انتظار تایید مدارک'}
+                {isApproved
+                  ? 'پنل کارتابل متخصصین'
+                  : userData.status === 'PENDING_VERIFICATION'
+                    ? 'در انتظار تایید مدارک'
+                    : 'تکمیل مدارک هویتی'}
               </Text>
             </View>
           </View>

@@ -370,20 +370,22 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                       <Text style={[styles.acceptedTagText, { color: '#0284c7' }]}>تکمیل شده</Text>
                     </View>
                   ) : (
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                      <View style={styles.acceptedTag}>
-                        <CheckCircle size={14} color="#059669" />
-                        <Text style={styles.acceptedTagText}>پذیرفته شده</Text>
-                      </View>
-                      <Pressable
-                        onPress={() => handleCompleteOrder(order)}
-                        style={styles.completeButton}
-                      >
-                        <Text style={styles.completeButtonText}>اتمام کار</Text>
-                      </Pressable>
+                    <View style={styles.acceptedTag}>
+                      <CheckCircle size={14} color="#059669" />
+                      <Text style={styles.acceptedTagText}>پذیرفته شده</Text>
                     </View>
                   )}
                 </View>
+                {order.status !== 'COMPLETED' ? (
+                  <Pressable
+                    onPress={() => handleCompleteOrder(order)}
+                    style={styles.completeButtonFull}
+                    accessibilityRole="button"
+                    accessibilityLabel="اتمام کار"
+                  >
+                    <Text style={styles.completeButtonText}>اتمام کار</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ))
           )
@@ -452,5 +454,13 @@ const styles = StyleSheet.create({
   acceptedTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
   acceptedTagText: { color: '#059669', fontSize: 11, fontWeight: '700' },
   completeButton: { backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  completeButtonFull: {
+    marginTop: 10,
+    backgroundColor: '#0284c7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   completeButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
 });

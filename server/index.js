@@ -1116,6 +1116,13 @@ app.put('/api/admin/approve-worker/:userId', (req, res) => {
   if (existing.role !== 'WORKER') {
     return res.status(400).json({ success: false, message: 'این کاربر متخصص نیست.' });
   }
+  if (existing.status !== 'PENDING_VERIFICATION') {
+    return res.status(400).json({
+      success: false,
+      message: 'فقط متخصص با وضعیت «در انتظار بررسی مدارک» قابل تایید است.',
+      status: existing.status
+    });
+  }
 
   existing.status = 'APPROVED';
   const user = store.updateUser(existing);

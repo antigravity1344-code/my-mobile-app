@@ -21,9 +21,21 @@
       "package": "com.paksho.worker",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "CAMERA"
       ]
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "پاکشو برای ارسال مدرک هویتی متخصص به دسترسی گالری نیاز دارد.",
+          "cameraPermission": "پاکشو برای تهیه تصویر مدرک هویتی به دوربین نیاز دارد."
+        }
+      ]
+    ],
     "web": {
       "bundler": "metro"
     }
