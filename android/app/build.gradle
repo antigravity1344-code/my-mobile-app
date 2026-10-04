@@ -8,17 +8,11 @@ apply plugin: "com.facebook.react"
  */
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
-def getAppEntryFile() {
-    def projRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-    def tasks = gradle.startParameter.taskRequests*.args.flatten()
-    if (tasks.any { it.toLowerCase().contains("worker") }) {
-        return file("${projRoot}/index.worker.ts")
-    }
-    return file("${projRoot}/index.customer.ts")
-}
-
+// پیش‌فرض امن: مشتری. Entry واقعی هر variant پایین‌تر، بعد از ساخته‌شدن taskها ست می‌شود.
+// انتخاب سراسری بر اساس نام taskها اشتباه است؛ اگر Worker و Customer با هم build شوند
+// هر دو bundle از index.worker.ts ساخته می‌شدند.
 react {
-    entryFile = getAppEntryFile()
+    entryFile = file("${projectRoot}/index.customer.ts")
     reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
     hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
@@ -203,5 +197,14 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+gradle.projectsEvaluated {
+    tasks.matching { it.name ==~ /createBundle.+JsAndAssets/ }.configureEach { task ->
+        def entryName = task.name.toLowerCase().contains("worker") ? "index.worker.ts" : "index.customer.ts"
+        def entry = new File(projectRoot, entryName)
+        logger.lifecycle("Paksho bundle entry: ${task.name} -> ${entryName}")
+        task.entryFile.set(entry)
     }
 }

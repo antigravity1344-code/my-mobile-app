@@ -6,4 +6,7 @@ export interface UserData {
   role: string;
   status: string; // REGISTERED, PENDING_VERIFICATION, APPROVED, ACTIVE
   isProfileComplete?: boolean;
+  birthDate?: string;
+  address?: string;
+  city?: string;
 }
