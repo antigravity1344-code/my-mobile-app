@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Image,
-} from 'react-native';
-import { Bell, User, LogOut, ClipboardList, Settings, HelpCircle } from 'lucide-react-native';
+import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
@@ -19,6 +11,11 @@ import { NativeNotificationsScreen } from '../../features/notifications/NativeNo
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
+import { SERVICES_CATALOG } from '../../config/servicesData';
+import { useBooking } from '../../context/BookingContext';
+import { colors, useCustomerFonts } from '../../theme/customerHome';
+import { CustomerHomeScreen } from './CustomerHomeScreen';
+import { CustomerTabBar, type CustomerTab } from './CustomerTabBar';
 import {
   clearCustomerSession,
   CUSTOMER_TOKEN_KEY,
@@ -31,11 +28,13 @@ type UserData = CustomerSessionUser;
 
 export const NativeCustomerApp: React.FC = () => {
   const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
+  const booking = useBooking();
+  const [fontsLoaded, fontError] = useCustomerFonts();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile' | 'support' | 'alerts'>('wizard');
+  const [mainView, setMainView] = useState<CustomerTab | 'alerts'>('home');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,7 +101,7 @@ export const NativeCustomerApp: React.FC = () => {
     setIsLoggedIn(false);
     setUserData(null);
     setShowOnboarding(false);
-    setMainView('wizard');
+    setMainView('home');
     setFocusOrderId(null);
     await clearCustomerSession(appStorage);
   };
@@ -120,66 +119,48 @@ export const NativeCustomerApp: React.FC = () => {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+  if (!fontsLoaded && !fontError) {
+    return <View style={styles.homeLoading} />;
+  }
 
-      {/* مودال تکمیل پروفایل مشتری */}
+  const openBooking = (serviceId?: string) => {
+    booking.resetBooking();
+    if (serviceId) {
+      const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible);
+      if (service) {
+        booking.setSelectedService(service);
+        booking.setStep(2);
+      }
+    }
+    setFocusOrderId(null);
+    setMainView('wizard');
+  };
+
+  const activeTab: CustomerTab = mainView === 'alerts' ? 'home' : mainView;
+
+  return (
+    <EdgeSafeAreaView style={styles.homeShell} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+
       <CustomerOnboardingModal
         visible={showOnboarding}
         userId={userData.id}
         onComplete={handleOnboardingComplete}
       />
 
-      {/* نوار بالای اپ مشتری */}
-      <View style={styles.roleBanner}>
-        <View style={styles.userInfoRow}>
-          <Image
-            source={{ uri: userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
-            style={styles.avatarImage}
-          />
-          <View style={styles.userDetails}>
-            <Text style={styles.userNameText}>{userData.name || 'کاربر مشتری'}</Text>
-            <View style={styles.roleBadgeCustomer}>
-              <User size={10} color="#fff" />
-              <Text style={styles.roleBadgeText}>پنل مشتریان پاکشو</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.bannerActions}>
-          <Pressable
-            onPress={() => setMainView(mainView === 'alerts' ? 'wizard' : 'alerts')}
-            style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
-          >
-            <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'support' ? 'wizard' : 'support')}
-            style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
-          >
-            <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'profile' ? 'wizard' : 'profile')}
-            style={[styles.logoutIconButton, mainView === 'profile' && styles.ordersActiveButton]}
-          >
-            <Settings size={16} color={mainView === 'profile' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'orders' ? 'wizard' : 'orders')}
-            style={[styles.logoutIconButton, mainView === 'orders' && styles.ordersActiveButton]}
-          >
-            <ClipboardList size={16} color={mainView === 'orders' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
-            <LogOut size={16} color="#94a3b8" />
-          </Pressable>
-        </View>
-      </View>
-
       <View style={styles.content}>
-        {mainView === 'orders' ? (
+        {mainView === 'home' ? (
+          <CustomerHomeScreen
+            userName={userData.name}
+            onStartBooking={openBooking}
+            onOpenOrders={(orderId) => {
+              setFocusOrderId(orderId ?? null);
+              setMainView('orders');
+            }}
+            onOpenNotifications={() => setMainView('alerts')}
+            onOpenSupport={() => setMainView('support')}
+          />
+        ) : mainView === 'orders' ? (
           <OrdersScreen
             initialOrderId={focusOrderId}
             onNavigateToBooking={() => {
@@ -208,7 +189,15 @@ export const NativeCustomerApp: React.FC = () => {
           />
         )}
       </View>
-    </SafeAreaView>
+
+      <CustomerTabBar
+        active={activeTab}
+        onChange={(tab) => {
+          if (tab !== 'orders') setFocusOrderId(null);
+          setMainView(tab);
+        }}
+      />
+    </EdgeSafeAreaView>
   );
 };
 
@@ -221,64 +210,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
-  roleBanner: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+  homeLoading: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
-  userInfoRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 2,
-    borderColor: '#0284c7',
-  },
-  userDetails: {
-    alignItems: 'flex-start',
-  },
-  userNameText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  roleBadgeCustomer: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 2,
-  },
-  roleBadgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  bannerActions: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoutIconButton: {
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: '#0f172a',
-  },
-  ordersActiveButton: {
-    backgroundColor: '#0284c7',
+  homeShell: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
   content: {
     flex: 1,
