@@ -173,10 +173,7 @@ export function CustomerHomeScreen({
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>خدمات پاکشو</Text>
-          <Pressable accessibilityRole="button" onPress={() => onStartBooking()} hitSlop={8}>
-            <Text style={styles.sectionLink}>همه خدمات</Text>
-          </Pressable>
+          <Text style={[styles.sectionTitle, styles.servicesTitle]}>خدمات پاکشو</Text>
         </View>
         <View style={styles.serviceGrid}>
           {[SERVICE_SHORTCUTS.slice(0, 3), SERVICE_SHORTCUTS.slice(3)].map((row) => (
@@ -312,8 +309,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingTop: 14,
-    paddingBottom: 22,
+    paddingTop: 10,
+    paddingBottom: 14,
     gap: 12,
   },
   greeting: {
@@ -447,6 +444,10 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.text,
     textAlign: 'right',
+  },
+  servicesTitle: {
+    width: '100%',
+    textAlign: 'center',
   },
   sectionLink: {
     ...type.medium,
