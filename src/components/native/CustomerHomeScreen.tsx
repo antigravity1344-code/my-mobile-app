@@ -199,10 +199,10 @@ export function CustomerHomeScreen({
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>سفارش جاری</Text>
+        <View style={styles.orderHead}>
+          <Text style={[styles.sectionTitle, styles.orderTitle]}>سفارش جاری</Text>
           <Pressable accessibilityRole="button" onPress={() => onOpenOrders()} hitSlop={8}>
-            <Text style={styles.sectionLink}>مشاهده همه</Text>
+            <Text style={styles.orderLink}>مشاهده همه</Text>
           </Pressable>
         </View>
         {currentOrder ? (
@@ -439,6 +439,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  orderHead: {
+    width: '100%',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  orderTitle: {
+    flexShrink: 1,
+    textAlign: 'right',
+    paddingRight: 0,
+    marginRight: 0,
+  },
+  orderLink: {
+    ...type.bold,
+    ...fa,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.teal,
+    textAlign: 'right',
+  },
   sectionTitle: {
     ...type.bold,
     ...fa,
@@ -451,18 +472,11 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
   },
-  sectionLink: {
-    ...type.medium,
-    ...fa,
-    fontSize: 12.5,
-    lineHeight: 16,
-    color: colors.teal,
-    textAlign: 'right',
-  },
   serviceGrid: {
     gap: 8,
   },
   serviceRow: {
+    width: '100%',
     flexDirection: 'row-reverse',
     alignItems: 'stretch',
     gap: 8,
@@ -503,6 +517,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   orderCard: {
+    width: '100%',
+    alignSelf: 'stretch',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: colors.white,
