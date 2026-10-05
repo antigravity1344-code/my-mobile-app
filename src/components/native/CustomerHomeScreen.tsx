@@ -454,10 +454,12 @@ const styles = StyleSheet.create({
   orderLink: {
     ...type.bold,
     ...fa,
+    fontWeight: '400',
     fontSize: 16,
     lineHeight: 21,
     color: colors.teal,
-    textAlign: 'right',
+    textAlign: 'left',
+    paddingLeft: 8,
   },
   sectionTitle: {
     ...type.bold,
