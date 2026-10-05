@@ -1,6 +1,9 @@
-import { useState, useMemo } from 'react';
-import { Calendar, Clock, FileText } from 'lucide-react';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
+import { toPersianDigits } from '../../design-system/format';
+
+import { useState, useMemo } from 'react';
+
+import { Calendar, Clock, FileText } from 'lucide-react';
 
 interface DateTimeSelectorProps {
   selectedDate: JalaliDateOption | null;
@@ -41,7 +44,8 @@ const generateDateOptions = () => {
     const dateParts = persianDateFormatter.formatToParts(date);
     const dateKeyParts = persianDateKeyFormatter.formatToParts(date);
     const getPart = (type: string) => dateParts.find((part) => part.type === type)?.value ?? '';
-    const getKeyPart = (type: string) => dateKeyParts.find((part) => part.type === type)?.value ?? '';
+    const getKeyPart = (type: string) =>
+      dateKeyParts.find((part) => part.type === type)?.value ?? '';
 
     options.push({
       dateString: `${normalizeDigits(getKeyPart('year'))}-${normalizeDigits(getKeyPart('month')).padStart(2, '0')}-${normalizeDigits(getKeyPart('day')).padStart(2, '0')}`,
@@ -57,12 +61,55 @@ const generateDateOptions = () => {
 };
 
 const TIME_SLOTS = [
-  { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود (۸:۰۰ - ۱۰:۰۰)', period: 'MORNING' as const, isAvailable: true },
-  { id: 'morning-2', startTime: '10:00', endTime: '12:00', label: 'صبح (۱۰:۰۰ - ۱۲:۰۰)', period: 'MORNING' as const, isAvailable: true },
-  { id: 'afternoon-1', startTime: '14:00', endTime: '16:00', label: 'ظهر (۱۴:۰۰ - ۱۶:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
-  { id: 'afternoon-2', startTime: '16:00', endTime: '18:00', label: 'عصر (۱۶:۰۰ - ۱۸:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
-  { id: 'evening-1', startTime: '18:00', endTime: '20:00', label: 'شب (۱۸:۰۰ - ۲۰:۰۰)', period: 'EVENING' as const, isAvailable: false },
-  { id: 'evening-2', startTime: '20:00', endTime: '22:00', label: 'شب دیر (۲۰:۰۰ - ۲۲:۰۰)', period: 'EVENING' as const, isAvailable: false, extraFee: 20000 },
+  {
+    id: 'morning-1',
+    startTime: '08:00',
+    endTime: '10:00',
+    label: 'صبح زود (۸:۰۰ - ۱۰:۰۰)',
+    period: 'MORNING' as const,
+    isAvailable: true,
+  },
+  {
+    id: 'morning-2',
+    startTime: '10:00',
+    endTime: '12:00',
+    label: 'صبح (۱۰:۰۰ - ۱۲:۰۰)',
+    period: 'MORNING' as const,
+    isAvailable: true,
+  },
+  {
+    id: 'afternoon-1',
+    startTime: '14:00',
+    endTime: '16:00',
+    label: 'ظهر (۱۴:۰۰ - ۱۶:۰۰)',
+    period: 'AFTERNOON' as const,
+    isAvailable: true,
+  },
+  {
+    id: 'afternoon-2',
+    startTime: '16:00',
+    endTime: '18:00',
+    label: 'عصر (۱۶:۰۰ - ۱۸:۰۰)',
+    period: 'AFTERNOON' as const,
+    isAvailable: true,
+  },
+  {
+    id: 'evening-1',
+    startTime: '18:00',
+    endTime: '20:00',
+    label: 'شب (۱۸:۰۰ - ۲۰:۰۰)',
+    period: 'EVENING' as const,
+    isAvailable: false,
+  },
+  {
+    id: 'evening-2',
+    startTime: '20:00',
+    endTime: '22:00',
+    label: 'شب دیر (۲۰:۰۰ - ۲۲:۰۰)',
+    period: 'EVENING' as const,
+    isAvailable: false,
+    extraFee: 20000,
+  },
 ];
 
 export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
@@ -87,7 +134,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
     <div className="space-y-5 text-right" dir="rtl">
       <div>
         <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-sky-600" />
+          <Calendar className="w-5 h-5 text-[#0C786E]" />
           <span>۲. تاریخ و زمان اعزام متخصص</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
@@ -99,14 +146,14 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
         <button
           type="button"
           onClick={() => setViewMode('dates')}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${viewMode === 'dates' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${viewMode === 'dates' ? 'bg-white text-[#084842] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
           تاریخ
         </button>
         <button
           type="button"
           onClick={() => setViewMode('times')}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${viewMode === 'times' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${viewMode === 'times' ? 'bg-white text-[#084842] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           disabled={!selectedDate}
         >
           ساعت
@@ -122,16 +169,20 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                 key={date.dateString}
                 type="button"
                 onClick={() => onSelectDate(date)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer text-left ${isSelected ? 'bg-sky-50 border-sky-300 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer text-left ${isSelected ? 'bg-[#F2FBFA] border-[#6DCEC2] shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}
               >
-                <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                <div
+                  className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${isSelected ? 'bg-[#0A5E56] text-white' : 'bg-slate-100 text-slate-600'}`}
+                >
                   <span className="text-[10px] font-medium">{date.dayOfWeek}</span>
                   <span className="text-lg font-black leading-tight">{date.dayOfMonth}</span>
                   <span className="text-[10px] text-slate-500">{date.monthName}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${isSelected ? 'text-sky-700' : 'text-slate-800'}`}>
+                    <span
+                      className={`text-sm font-bold ${isSelected ? 'text-[#084842]' : 'text-slate-800'}`}
+                    >
                       {date.dayOfWeek} {date.dayOfMonth} {date.monthName}
                     </span>
                     {date.isToday && (
@@ -140,16 +191,20 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                       </span>
                     )}
                     {date.isTomorrow && !date.isToday && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#D7F3EF] text-[#084842] font-semibold">
                         فردا
                       </span>
                     )}
                   </div>
                 </div>
                 {isSelected && (
-                  <div className="w-5 h-5 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-[#0A5E56] flex items-center justify-center shrink-0">
                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   </div>
                 )}
@@ -168,9 +223,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 block">
-              ساعت اعزام متخصص
-            </label>
+            <label className="text-xs font-bold text-slate-700 block">ساعت اعزام متخصص</label>
             <div className="space-y-2">
               {TIME_SLOTS.map((slot) => {
                 const isSelected = selectedTimeSlot?.id === slot.id;
@@ -182,13 +235,17 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                     type="button"
                     disabled={!isAvailable}
                     onClick={() => isAvailable && onSelectTimeSlot(slot)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer text-left ${isSelected && isAvailable ? 'bg-sky-50 border-sky-300 shadow-sm' : isAvailable ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer text-left ${isSelected && isAvailable ? 'bg-[#F2FBFA] border-[#6DCEC2] shadow-sm' : isAvailable ? 'bg-white border-slate-200 hover:border-slate-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
                   >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? 'bg-sky-600 text-white' : isAvailable ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-300'}`}>
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#0A5E56] text-white' : isAvailable ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-300'}`}
+                    >
                       <Clock className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className={`text-sm font-bold ${isAvailable ? 'text-slate-800' : 'text-slate-400'}`}>
+                      <span
+                        className={`text-sm font-bold ${isAvailable ? 'text-slate-800' : 'text-slate-400'}`}
+                      >
                         {slot.label}
                       </span>
                       <div className="text-xs text-slate-500 mt-0.5">
@@ -201,9 +258,13 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                       </span>
                     )}
                     {isSelected && (
-                      <div className="w-5 h-5 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-[#0A5E56] flex items-center justify-center shrink-0">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       </div>
                     )}
@@ -226,23 +287,21 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
               key={hours}
               type="button"
               onClick={() => onChangeDuration(hours)}
-              className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition cursor-pointer ${durationHours === hours ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition cursor-pointer ${durationHours === hours ? 'bg-[#0A5E56] text-white border-[#0A5E56] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
             >
-              {hours} ساعت
+              {toPersianDigits(hours)} ساعت
             </button>
           ))}
         </div>
         {typeof hourlyEstimate === 'number' ? (
           <p className="text-[11px] text-slate-400">
-            {durationHours} ساعت = {hourlyEstimate.toLocaleString('fa-IR')} تومان (برآورد)
+            {toPersianDigits(durationHours)} ساعت = {hourlyEstimate.toLocaleString('fa-IR')} تومان (برآورد)
           </p>
         ) : null}
       </div>
 
       <div className="space-y-3">
-        <label className="text-xs font-bold text-slate-700 block">
-          ترجیح جنسیتی متخصص:
-        </label>
+        <label className="text-xs font-bold text-slate-700 block">ترجیح جنسیتی متخصص:</label>
         <div className="grid grid-cols-3 gap-2">
           {[
             { value: 'FEMALE' as const, label: 'خانم', icon: '♀' },
@@ -253,7 +312,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
               key={option.value}
               type="button"
               onClick={() => onChangeGender(option.value)}
-              className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-bold transition cursor-pointer ${genderPreference === option.value ? 'bg-sky-50 border-sky-300 text-sky-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+              className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-bold transition cursor-pointer ${genderPreference === option.value ? 'bg-[#F2FBFA] border-[#6DCEC2] text-[#084842]' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
             >
               <span className="text-lg">{option.icon}</span>
               <span>{option.label}</span>
@@ -272,11 +331,11 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
           value={notes}
           onChange={(e) => onChangeNotes(e.target.value)}
           placeholder="مثال: لطفاً دسترسی خاصی دارید؟ یادداشت خود را اینجا بنویسید..."
-          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 resize-none"
+          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 placeholder-slate-400 focus:border-[#0A5E56] focus:outline-none focus:ring-2 focus:ring-[#0A5E56]/20 resize-none"
         />
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+      <div className="sticky bottom-0 z-20 flex items-center justify-between border-t border-[#E8DCCE] bg-[#FFFBF6]/95 pt-4 backdrop-blur">
         <button
           type="button"
           onClick={onPrev}
@@ -289,9 +348,11 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
           type="button"
           onClick={onNext}
           disabled={!selectedDate || !selectedTimeSlot}
-          className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm cursor-pointer"
+          className="flex items-center gap-1.5 rounded-xl bg-[#0A5E56] px-6 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-[#084842] disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm cursor-pointer"
         >
-          تایید و حرکت به مرحله بعد ↑
+          {selectedDate && selectedTimeSlot
+            ? 'تایید و حرکت به مرحله بعد ↑'
+            : 'تاریخ و ساعت را انتخاب کنید'}
         </button>
       </div>
     </div>
