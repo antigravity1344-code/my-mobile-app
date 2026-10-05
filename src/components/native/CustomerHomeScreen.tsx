@@ -171,7 +171,7 @@ export function CustomerHomeScreen({
         </Pressable>
       </View>
 
-      <View style={styles.section}>
+      <View style={[styles.section, styles.servicesSection]}>
         <View style={styles.sectionHead}>
           <Text style={[styles.sectionTitle, styles.servicesTitle]}>خدمات پاکشو</Text>
         </View>
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    marginBottom: space.lg,
+    marginBottom: 20,
     ...shadowMd,
   },
   fill: {
@@ -430,6 +430,9 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: space.lg,
+  },
+  servicesSection: {
+    marginBottom: 20,
   },
   sectionHead: {
     flexDirection: 'row-reverse',
