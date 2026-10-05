@@ -6,7 +6,7 @@ import vazirmatnRegular from '../../assets/fonts/Vazirmatn-UI-FD-Regular.ttf';
 import vazirmatnSemiBold from '../../assets/fonts/Vazirmatn-UI-FD-SemiBold.ttf';
 
 export const colors = {
-  bg: '#F4F1EA',
+  bg: '#F6F2E6',
   teal: '#11766F',
   tealDark: '#0E635D',
   tealSoft: '#E6F3F2',
