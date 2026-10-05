@@ -179,21 +179,25 @@ export function CustomerHomeScreen({
           </Pressable>
         </View>
         <View style={styles.serviceGrid}>
-          {SERVICE_SHORTCUTS.map((item) => (
-            <Pressable
-              key={item.label}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              onPress={() => openService(item.serviceId)}
-              style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}
-            >
-              <View style={styles.serviceIcon}>
-                <item.Icon size={18} />
-              </View>
-              <Text style={styles.serviceName} numberOfLines={2}>
-                {item.label}
-              </Text>
-            </Pressable>
+          {[SERVICE_SHORTCUTS.slice(0, 3), SERVICE_SHORTCUTS.slice(3)].map((row) => (
+            <View key={row[0].serviceId} style={styles.serviceRow}>
+              {row.map((item) => (
+                <Pressable
+                  key={item.serviceId}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  onPress={() => openService(item.serviceId)}
+                  style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}
+                >
+                  <View style={styles.serviceIcon}>
+                    <item.Icon size={18} />
+                  </View>
+                  <Text style={styles.serviceName} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           ))}
         </View>
       </View>
@@ -453,12 +457,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   serviceGrid: {
+    gap: 8,
+  },
+  serviceRow: {
     flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
+    alignItems: 'stretch',
     gap: 8,
   },
   serviceCard: {
-    width: '31.5%',
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
     backgroundColor: colors.white,
     borderRadius: 14,
     borderWidth: 1,
