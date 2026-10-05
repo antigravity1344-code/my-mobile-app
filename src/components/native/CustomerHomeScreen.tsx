@@ -203,7 +203,7 @@ export function CustomerHomeScreen({
       {hero.kind === 'error' ? (
         <View style={styles.heroError}>
           <Text style={styles.heroErrorTitle}>خواندن سفارش‌ها انجام نشد</Text>
-          <Text style={styles.heroErrorText}>{hero.message}</Text>
+          <Text style={styles.heroErrorText}>لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => void refreshOrders()}
