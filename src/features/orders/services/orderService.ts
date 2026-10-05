@@ -250,30 +250,35 @@ export const orderService = {
     searchQuery: string = '',
     sortOption: OrderSortOption = 'NEWEST',
     userId: string,
-  ): Promise<OrderItem[]> {
+  ): Promise<{ orders: OrderItem[]; error: string | null }> {
     try {
       const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
       if (!trimmedUserId) {
         lastOrdersLoadError = null;
-        return [];
+        return { orders: [], error: null };
       }
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
       const res = await apiFetch('/orders');
       const resolved = resolveCustomerOrdersResponse(res);
-      lastOrdersLoadError = resolved.error;
+      const error = resolved.error;
+      lastOrdersLoadError = error;
       let result: OrderItem[] = [];
-      if (!resolved.error) {
+      if (!error) {
         const mapped: OrderItem[] = resolved.orders.map((o) => mapApiOrderForCustomer(o));
         ordersMemoryStore = mapped;
         persistOrders();
         result = mapped;
       }
 
-      return selectCustomerOrders(result, filterTab, searchQuery, sortOption);
+      return {
+        orders: selectCustomerOrders(result, filterTab, searchQuery, sortOption),
+        error,
+      };
     } catch {
-      lastOrdersLoadError = 'اتصال به سرور سفارش‌ها برقرار نشد.';
-      return [];
+      const error = 'اتصال به سرور سفارش‌ها برقرار نشد.';
+      lastOrdersLoadError = error;
+      return { orders: [], error };
     }
   },
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
@@ -127,11 +127,9 @@ export function CustomerHomeScreen({
   const avatarUri = (userAvatar || '').trim();
   const initial = profileInitial(userName);
   const { allOrders, loading, loadError, refreshing, refreshOrders } = useOrders();
-  const hasOrders = useRef(false);
-  hasOrders.current = allOrders.length > 0;
 
   useEffect(() => {
-    void refreshOrders({ silent: hasOrders.current });
+    void refreshOrders({ silent: true });
   }, [refreshOrders]);
 
   useEffect(() => {

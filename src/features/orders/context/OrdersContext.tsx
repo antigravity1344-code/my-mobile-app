@@ -6,6 +6,7 @@ import type {
   OrderStats,
 } from '../types/order';
 import { orderService } from '../services/orderService';
+import { applyOrdersFetch, shouldStartOrdersRefresh } from '../services/ordersFetch';
 import { createLatestRequestGuard } from '../services/orderStatusWatch';
 import { selectCustomerOrders } from '../services/orderPayload';
 import { appStorage } from '../../../utils/storage';
@@ -71,22 +72,37 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [ratingModalOrderId, setRatingModalOrderId] = useState<string | null>(null);
 
   const requestGuard = useRef(createLatestRequestGuard());
+  const inFlightCount = useRef(0);
+  const loadErrorRef = useRef<string | null>(null);
+  const allOrdersRef = useRef<OrderItem[]>([]);
 
   const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
     const isCurrent = requestGuard.current();
+    inFlightCount.current += 1;
     try {
       const userId = await resolveCustomerUserId();
       const loaded = await orderService.getOrders('ALL', '', 'NEWEST', userId);
+      const next = applyOrdersFetch(
+        { loadError: loadErrorRef.current, orders: allOrdersRef.current },
+        {
+          isCurrent: isCurrent(),
+          silent: Boolean(options?.silent),
+          error: loaded.error,
+          orders: loaded.orders,
+        },
+      );
       if (!isCurrent()) return;
-      const error = orderService.getLastOrdersLoadError();
-      if (error) {
-        if (!options?.silent) setLoadError(error);
-        return;
+      const ordersChanged = next.orders !== allOrdersRef.current;
+      const errorChanged = next.loadError !== loadErrorRef.current;
+      loadErrorRef.current = next.loadError;
+      allOrdersRef.current = next.orders;
+      if (errorChanged) setLoadError(next.loadError);
+      if (ordersChanged) {
+        setAllOrders(next.orders);
+        setOrders(selectCustomerOrders(next.orders, filterTab, searchQuery, sortOption));
       }
-      setLoadError(null);
-      setAllOrders(loaded);
-      setOrders(selectCustomerOrders(loaded, filterTab, searchQuery, sortOption));
     } finally {
+      inFlightCount.current = Math.max(0, inFlightCount.current - 1);
       if (isCurrent()) {
         setLoading(false);
         setRefreshing(false);
@@ -99,6 +115,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [fetchOrders]);
 
   const refreshOrders = useCallback(async (options?: { silent?: boolean }) => {
+    if (!shouldStartOrdersRefresh(Boolean(options?.silent), inFlightCount.current > 0)) return;
     if (!options?.silent) setRefreshing(true);
     await fetchOrders(options);
   }, [fetchOrders]);
