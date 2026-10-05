@@ -1,19 +1,23 @@
-import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
+import { NativeCustomerApp } from './src/components/native/NativeCustomerApp';
 import { BookingProvider } from './src/context/BookingContext';
+import { PakshoThemeProvider } from './src/design-system';
 import { OrdersProvider } from './src/features/orders';
 import { ProfileProvider } from './src/features/profile';
-import { NativeCustomerApp } from './src/components/native/NativeCustomerApp';
+
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function App() {
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-    <BookingProvider>
-      <OrdersProvider>
-        <ProfileProvider>
-          <NativeCustomerApp />
-        </ProfileProvider>
-      </OrdersProvider>
-    </BookingProvider>
-    </SafeAreaProvider>
+    <PakshoThemeProvider>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <BookingProvider>
+          <OrdersProvider>
+            <ProfileProvider>
+              <NativeCustomerApp />
+            </ProfileProvider>
+          </OrdersProvider>
+        </BookingProvider>
+      </SafeAreaProvider>
+    </PakshoThemeProvider>
   );
 }

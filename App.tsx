@@ -1,5 +1,18 @@
+import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
+import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
+import { CustomerHomeFrame, HomeScreen } from './src/components/dashboard/HomeScreen';
+import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPortalScreen';
+import { NativeAppContainer } from './src/components/native/NativeAppContainer';
+import { BookingProvider, useBooking } from './src/context/BookingContext';
+import { DesignSystemSample, PakshoThemeProvider } from './src/design-system';
+import { MobileAuthModal } from './src/features/auth';
+import { CleanersProvider } from './src/features/cleaners';
+import { OrdersProvider, OrdersScreen } from './src/features/orders';
+import { ProfileProvider, ProfileScreen } from './src/features/profile';
+
 import { useState } from 'react';
 import { Platform } from 'react-native';
+
 import {
   Sparkles,
   Home,
@@ -11,25 +24,24 @@ import {
   ShieldCheck,
   Briefcase,
 } from 'lucide-react';
-import { BookingProvider, useBooking } from './src/context/BookingContext';
-import { BookingWizardContainer } from './src/components/booking/BookingWizardContainer';
-import { HomeScreen } from './src/components/dashboard/HomeScreen';
-import { AdminPanelScreen } from './src/components/dashboard/AdminPanelScreen';
-import { SpecialistPortalScreen } from './src/components/dashboard/SpecialistPortalScreen';
-import { NativeAppContainer } from './src/components/native/NativeAppContainer';
-import { OrdersProvider, OrdersScreen } from './src/features/orders';
-import { ProfileProvider, ProfileScreen } from './src/features/profile';
-import { CleanersProvider } from './src/features/cleaners';
-import { MobileAuthModal } from './src/features/auth';
-
 
 // داشبورد اصلی وب با قابلیت سوئیچ بین حالت ویزارد و شبیه‌ساز موبایل
 export function MainDashboard() {
-  const [activeTab, setActiveTab] = useState<'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin' | 'Specialist'>('Wizard');
+  const [activeTab, setActiveTab] = useState<
+    'Home' | 'Orders' | 'Profile' | 'Wizard' | 'Admin' | 'Specialist'
+  >('Wizard');
   const [viewMode, setViewMode] = useState<'wizard' | 'simulator'>('wizard');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const { addressDetails, step } = useBooking();
+  const showComponents =
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    window.location.hash === '#components';
+
+  if (showComponents) {
+    return <DesignSystemSample />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100 font-sans" dir="rtl">
@@ -46,7 +58,9 @@ export function MainDashboard() {
                 اسپرینت ۵: ماژول پروفایل و احراز هویت
               </span>
             </div>
-            <p className="text-xs text-slate-400">سیستم رزرو آنلاین به همراه مدیریت سفارش‌ها و پروفایل کاربر</p>
+            <p className="text-xs text-slate-400">
+              سیستم رزرو آنلاین به همراه مدیریت سفارش‌ها و پروفایل کاربر
+            </p>
           </div>
         </div>
 
@@ -56,7 +70,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Home')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Home' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Home'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Home className="w-3.5 h-3.5" />
@@ -65,7 +81,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Wizard')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Wizard' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Wizard'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <CalendarCheck className="w-3.5 h-3.5" />
@@ -74,7 +92,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Orders')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Orders' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Orders'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Receipt className="w-3.5 h-3.5" />
@@ -83,7 +103,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Specialist')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Specialist' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Specialist'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Briefcase className="w-3.5 h-3.5" />
@@ -92,7 +114,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Profile')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Profile' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Profile'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <User className="w-3.5 h-3.5" />
@@ -101,7 +125,9 @@ export function MainDashboard() {
             <button
               onClick={() => setActiveTab('Admin')}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'Admin' ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                activeTab === 'Admin'
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -115,7 +141,9 @@ export function MainDashboard() {
           <button
             onClick={() => setViewMode('wizard')}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-              viewMode === 'wizard' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              viewMode === 'wizard'
+                ? 'bg-sky-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -124,7 +152,9 @@ export function MainDashboard() {
           <button
             onClick={() => setViewMode('simulator')}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-              viewMode === 'simulator' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+              viewMode === 'simulator'
+                ? 'bg-sky-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Smartphone className="w-3.5 h-3.5" />
@@ -139,8 +169,15 @@ export function MainDashboard() {
         {viewMode === 'wizard' && (
           <div className="w-full max-w-4xl">
             {activeTab === 'Home' ? (
-              <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
-                <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />
+              <div
+                dir="ltr"
+                className="flex h-[760px] max-h-[calc(100vh-8rem)] w-full max-w-[400px] flex-col overflow-hidden rounded-[32px] shadow-2xl ring-1 ring-black/10"
+              >
+                <CustomerHomeFrame
+                  onOpenOrders={() => setActiveTab('Orders')}
+                  onOpenProfile={() => setActiveTab('Profile')}
+                  onStartBooking={() => setActiveTab('Wizard')}
+                />
               </div>
             ) : activeTab === 'Orders' ? (
               <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-xl text-slate-900">
@@ -188,11 +225,15 @@ export function MainDashboard() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">گیرنده:</span>
-                    <span className="text-slate-200 font-medium">{addressDetails.recipientName || 'وارد نشده'}</span>
+                    <span className="text-slate-200 font-medium">
+                      {addressDetails.recipientName || 'وارد نشده'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">موبایل:</span>
-                    <span className="text-emerald-400 font-mono font-bold">{addressDetails.contactPhone || 'وارد نشده'}</span>
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {addressDetails.contactPhone || 'وارد نشده'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -203,7 +244,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Home')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Home' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Home'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     خانه
@@ -211,7 +254,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Wizard')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Wizard' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Wizard'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     رزرو
@@ -219,7 +264,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Orders')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Orders' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Orders'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     سفارش‌ها
@@ -227,7 +274,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Specialist')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Specialist' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Specialist'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     متخصصین
@@ -235,7 +284,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Profile')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Profile' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Profile'
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     پروفایل
@@ -243,7 +294,9 @@ export function MainDashboard() {
                   <button
                     onClick={() => setActiveTab('Admin')}
                     className={`py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                      activeTab === 'Admin' ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      activeTab === 'Admin'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
                     مدیریت
@@ -271,16 +324,24 @@ export function MainDashboard() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3">
-                  {activeTab === 'Home' && <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />}
+                  {activeTab === 'Home' && (
+                    <div dir="ltr">
+                      <HomeScreen onStartBooking={() => setActiveTab('Wizard')} />
+                    </div>
+                  )}
                   {activeTab === 'Wizard' && (
                     <BookingWizardContainer
                       onNavigateHome={() => setActiveTab('Home')}
                       onViewOrders={() => setActiveTab('Orders')}
                     />
                   )}
-                  {activeTab === 'Orders' && <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />}
+                  {activeTab === 'Orders' && (
+                    <OrdersScreen onNavigateToBooking={() => setActiveTab('Wizard')} />
+                  )}
                   {activeTab === 'Specialist' && <SpecialistPortalScreen />}
-                  {activeTab === 'Profile' && <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />}
+                  {activeTab === 'Profile' && (
+                    <ProfileScreen onOpenLoginModal={() => setIsAuthModalOpen(true)} />
+                  )}
                   {activeTab === 'Admin' && <AdminPanelScreen />}
                 </div>
 
@@ -349,10 +410,7 @@ export function MainDashboard() {
       </main>
 
       {/* مدال ورود پیامکی */}
-      <MobileAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
+      <MobileAuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 }
@@ -362,18 +420,20 @@ export default function App(props?: Record<string, unknown>) {
   const rawFlavor = (props?.appFlavor || expObj?.initialProps?.appFlavor) as string | undefined;
   const flavor = rawFlavor?.toLowerCase() === 'worker' ? 'WORKER' : 'CUSTOMER';
   return (
-    <BookingProvider>
-      <OrdersProvider>
-        <ProfileProvider>
-          <CleanersProvider>
-            {Platform.OS === 'web' ? (
-              <MainDashboard />
-            ) : (
-              <NativeAppContainer initialFlavor={flavor} />
-            )}
-          </CleanersProvider>
-        </ProfileProvider>
-      </OrdersProvider>
-    </BookingProvider>
+    <PakshoThemeProvider>
+      <BookingProvider>
+        <OrdersProvider>
+          <ProfileProvider>
+            <CleanersProvider>
+              {Platform.OS === 'web' ? (
+                <MainDashboard />
+              ) : (
+                <NativeAppContainer initialFlavor={flavor} />
+              )}
+            </CleanersProvider>
+          </ProfileProvider>
+        </OrdersProvider>
+      </BookingProvider>
+    </PakshoThemeProvider>
   );
 }

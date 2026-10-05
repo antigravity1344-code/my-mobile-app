@@ -1,24 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  Image,
-} from 'react-native';
-import { Bell, User, LogOut, ClipboardList, Settings, HelpCircle } from 'lucide-react-native';
-import { CustomerAuthScreen } from './CustomerAuthScreen';
-import { CustomerOnboardingModal } from './CustomerOnboardingModal';
-import { NativeBookingWizard } from '../booking/NativeBookingWizard';
+import { apiFetch } from '../../api/apiClient';
+import { attachStoredAuthToken } from '../../api/authToken';
+import { BottomTabBar, CUSTOMER_TAB_ITEMS, LoadingState, colors } from '../../design-system';
+import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { OrdersScreen } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { NativeSupportScreen } from '../../features/support';
-import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { appStorage } from '../../utils/storage';
-import { apiFetch } from '../../api/apiClient';
-import { attachStoredAuthToken } from '../../api/authToken';
+import { NativeBookingWizard } from '../booking/NativeBookingWizard';
+import { HomeScreen } from '../dashboard/HomeScreen';
+import { CustomerAuthScreen } from './CustomerAuthScreen';
+import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import {
   clearCustomerSession,
   CUSTOMER_TOKEN_KEY,
@@ -26,6 +17,11 @@ import {
   saveCustomerSession,
   type CustomerSessionUser,
 } from './customerLoginStorage';
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet, SafeAreaView, StatusBar, Image } from 'react-native';
+
+import { Bell, User, LogOut } from 'lucide-react-native';
 
 type UserData = CustomerSessionUser;
 
@@ -35,7 +31,9 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<'wizard' | 'orders' | 'profile' | 'support' | 'alerts'>('wizard');
+  const [mainView, setMainView] = useState<
+    'home' | 'wizard' | 'orders' | 'profile' | 'support' | 'alerts'
+  >('home');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,13 +100,13 @@ export const NativeCustomerApp: React.FC = () => {
     setIsLoggedIn(false);
     setUserData(null);
     setShowOnboarding(false);
-    setMainView('wizard');
+    setMainView('home');
     setFocusOrderId(null);
     await clearCustomerSession(appStorage);
   };
 
   if (isLoading) {
-    return <View style={styles.loadingContainer} />;
+    return <LoadingState fill label="در حال آماده‌سازی پاکشو" />;
   }
 
   if (!isLoggedIn || !userData) {
@@ -121,8 +119,11 @@ export const NativeCustomerApp: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+    <SafeAreaView style={[styles.safeArea, mainView === 'home' && styles.homeSafeArea]}>
+      <StatusBar
+        barStyle={mainView === 'home' ? 'dark-content' : 'light-content'}
+        backgroundColor={mainView === 'home' ? colors.cream[50] : colors.legacy.slate950}
+      />
 
       {/* مودال تکمیل پروفایل مشتری */}
       <CustomerOnboardingModal
@@ -131,52 +132,40 @@ export const NativeCustomerApp: React.FC = () => {
         onComplete={handleOnboardingComplete}
       />
 
-      {/* نوار بالای اپ مشتری */}
-      <View style={styles.roleBanner}>
-        <View style={styles.userInfoRow}>
-          <Image
-            source={{ uri: userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
-            style={styles.avatarImage}
-          />
-          <View style={styles.userDetails}>
-            <Text style={styles.userNameText}>{userData.name || 'کاربر مشتری'}</Text>
-            <View style={styles.roleBadgeCustomer}>
-              <User size={10} color="#fff" />
-              <Text style={styles.roleBadgeText}>پنل مشتریان پاکشو</Text>
+      {/* نوار بالای اپ مشتری؛ خانه هدر خودش را دارد */}
+      {mainView !== 'home' ? (
+        <View style={styles.roleBanner}>
+          <View style={styles.userInfoRow}>
+            <Image
+              source={{
+                uri:
+                  userData.avatar ||
+                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+              }}
+              style={styles.avatarImage}
+            />
+            <View style={styles.userDetails}>
+              <Text style={styles.userNameText}>{userData.name || 'کاربر مشتری'}</Text>
+              <View style={styles.roleBadgeCustomer}>
+                <User size={10} color="#fff" />
+                <Text style={styles.roleBadgeText}>پنل مشتریان پاکشو</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.bannerActions}>
-          <Pressable
-            onPress={() => setMainView(mainView === 'alerts' ? 'wizard' : 'alerts')}
-            style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
-          >
-            <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'support' ? 'wizard' : 'support')}
-            style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
-          >
-            <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'profile' ? 'wizard' : 'profile')}
-            style={[styles.logoutIconButton, mainView === 'profile' && styles.ordersActiveButton]}
-          >
-            <Settings size={16} color={mainView === 'profile' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'orders' ? 'wizard' : 'orders')}
-            style={[styles.logoutIconButton, mainView === 'orders' && styles.ordersActiveButton]}
-          >
-            <ClipboardList size={16} color={mainView === 'orders' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
-            <LogOut size={16} color="#94a3b8" />
-          </Pressable>
+          <View style={styles.bannerActions}>
+            <Pressable
+              onPress={() => setMainView(mainView === 'alerts' ? 'home' : 'alerts')}
+              style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
+            >
+              <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
+            </Pressable>
+            <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
+              <LogOut size={16} color="#94a3b8" />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={styles.content}>
         {mainView === 'orders' ? (
@@ -199,6 +188,12 @@ export const NativeCustomerApp: React.FC = () => {
               phone: userData.phone,
             }}
           />
+        ) : mainView === 'home' ? (
+          <HomeScreen
+            displayName={userData.name || undefined}
+            onOpenNotifications={() => setMainView('alerts')}
+            onStartBooking={() => setMainView('wizard')}
+          />
         ) : (
           <NativeBookingWizard
             onOrderCreated={(orderId) => {
@@ -208,6 +203,16 @@ export const NativeCustomerApp: React.FC = () => {
           />
         )}
       </View>
+      <BottomTabBar
+        activeId={mainView === 'wizard' ? 'book' : mainView === 'alerts' ? undefined : mainView}
+        items={CUSTOMER_TAB_ITEMS}
+        onChange={(id) => {
+          if (id === 'book') setMainView('wizard');
+          else if (id === 'home' || id === 'orders' || id === 'profile' || id === 'support') {
+            setMainView(id);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -217,9 +222,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#0f172a',
+  homeSafeArea: {
+    backgroundColor: colors.cream[50],
   },
   roleBanner: {
     flexDirection: 'row-reverse',
