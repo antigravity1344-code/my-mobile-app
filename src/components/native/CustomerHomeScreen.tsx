@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
@@ -222,6 +222,7 @@ export function CustomerHomeScreen({
       {hero.kind === 'reorder' ? (
         <ReorderHero order={hero.order} onReorder={() => onStartBooking(hero.preselectServiceId)} />
       ) : null}
+      {hero.kind === 'none' ? <WelcomeHero /> : null}
 
       <View style={[styles.section, styles.servicesSection]}>
         <View style={styles.sectionHead}>
@@ -388,6 +389,30 @@ function ReorderHero({ order, onReorder }: { order: OrderItem; onReorder: () => 
       >
         <Text style={styles.reorderBtnText}>سفارش مجدد</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function WelcomeHero() {
+  return (
+    <View style={styles.cta}>
+      <View style={styles.ctaTone}>
+        <Svg width="100%" height="100%" style={styles.fill}>
+          <Defs>
+            <LinearGradient id="customerHomeWelcome" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.06} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0.04} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#customerHomeWelcome)" />
+          <Circle cx="8%" cy="12%" r="56" fill="#FFFFFF" fillOpacity={0.06} />
+          <Circle cx="20%" cy="100%" r="40" fill="#FFFFFF" fillOpacity={0.04} />
+        </Svg>
+      </View>
+      <Text style={styles.welcomeTitle}>به پاکشو خوش آمدید!</Text>
+      <Text style={styles.welcomeDesc}>متخصصین متعهد برای نظافت و خدمات منزل شما.</Text>
+      <View style={styles.welcomeDivider} />
+      <Text style={styles.welcomeHint}>خدمت مورد نظرتان را از لیست زیر انتخاب کنید ↓</Text>
     </View>
   );
 }
@@ -989,6 +1014,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: colors.white,
+  },
+  welcomeTitle: {
+    ...type.bold,
+    ...fa,
+    fontSize: 18,
+    lineHeight: 26,
+    color: colors.white,
+    textAlign: 'right',
+    marginBottom: 8,
+  },
+  welcomeDesc: {
+    ...type.regular,
+    ...fa,
+    fontSize: 13.5,
+    lineHeight: 22,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'right',
+  },
+  welcomeDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  welcomeHint: {
+    ...type.medium,
+    ...fa,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'right',
   },
   pressed: {
     opacity: 0.86,
