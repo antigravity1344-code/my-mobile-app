@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
@@ -20,6 +20,7 @@ import {
   IconServiceWorker,
   IconShield,
   IconStatusClock,
+  IconTabUser,
 } from './icons/CustomerIcons';
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -61,16 +62,18 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
 
 type Props = {
   userName?: string;
+  userAvatar?: string;
+  onOpenProfile?: () => void;
   onStartBooking: (serviceId?: string) => void;
   onOpenOrders: (orderId?: string) => void;
   onOpenNotifications: () => void;
   onOpenSupport: () => void;
 };
 
-function greetingTitle(name?: string): string {
+function profileInitial(name?: string): string {
   const trimmed = (name || '').trim();
-  if (!trimmed) return 'سلام';
-  return `سلام، ${trimmed}`;
+  if (!trimmed) return '';
+  return trimmed.charAt(0);
 }
 
 function orderTime(order: OrderItem): string {
@@ -97,11 +100,15 @@ function visibleServiceId(serviceId: string): string | undefined {
 
 export function CustomerHomeScreen({
   userName,
+  userAvatar,
+  onOpenProfile,
   onStartBooking,
   onOpenOrders,
   onOpenNotifications,
   onOpenSupport,
 }: Props) {
+  const avatarUri = (userAvatar || '').trim();
+  const initial = profileInitial(userName);
   const { allOrders } = useOrders();
 
   const currentOrder = useMemo(() => {
@@ -121,10 +128,22 @@ export function CustomerHomeScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <View style={styles.greeting}>
-          <Text style={styles.greetingTitle}>{greetingTitle(userName)}</Text>
-          <Text style={styles.greetingSub}>امروز چه خدمتی نیاز داری؟</Text>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="پروفایل"
+          onPress={onOpenProfile}
+          style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
+        >
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : initial ? (
+            <Text style={styles.avatarLetter}>{initial}</Text>
+          ) : (
+            <IconTabUser size={20} color={colors.teal} strokeWidth={1.7} />
+          )}
+        </Pressable>
+        <Text style={styles.wordmark}>پاکشو</Text>
+        <View style={styles.headerSpacer} />
         <View style={styles.headerActions}>
           <Pressable
             accessibilityRole="button"
@@ -307,38 +326,47 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-    paddingBottom: 14,
-    gap: 12,
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 8,
   },
-  greeting: {
-    flex: 1,
-    minWidth: 0,
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.tealSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  greetingTitle: {
+  avatarImage: {
+    width: 40,
+    height: 40,
+  },
+  avatarLetter: {
+    ...type.bold,
+    ...fa,
+    fontSize: 16,
+    lineHeight: 20,
+    color: colors.teal,
+    textAlign: 'center',
+  },
+  wordmark: {
     ...type.bold,
     ...fa,
     fontSize: 18,
     lineHeight: 24,
-    color: colors.text,
+    color: colors.teal,
     textAlign: 'right',
-    marginBottom: 5,
   },
-  greetingSub: {
-    ...type.regular,
-    ...fa,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.muted,
-    textAlign: 'right',
+  headerSpacer: {
+    flex: 1,
   },
   headerActions: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: space.xs,
-    paddingTop: 2,
   },
   iconBtn: {
     width: 40,

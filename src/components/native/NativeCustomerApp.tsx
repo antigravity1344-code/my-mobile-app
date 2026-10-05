@@ -152,6 +152,8 @@ export const NativeCustomerApp: React.FC = () => {
         {mainView === 'home' ? (
           <CustomerHomeScreen
             userName={userData.name}
+            userAvatar={userData.avatar}
+            onOpenProfile={() => setMainView('profile')}
             onStartBooking={openBooking}
             onOpenOrders={(orderId) => {
               setFocusOrderId(orderId ?? null);
