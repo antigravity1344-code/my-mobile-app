@@ -106,3 +106,9 @@ Do not change location or submit logic when that screen is restyled. Show a clea
 - New components set `direction: 'rtl'` on themselves and use normal `row`, so the first child sits on the right. Old screens keep `row-reverse` until they migrate.
 - Customer native landing is Home. رزرو opens the existing wizard. Order creation still jumps to سفارش‌ها. Logout still calls the same API.
 - The old home’s unverified gift badge and 4.8 score are not carried over. Quick-select still does `setSelectedService` and then opens booking, as before.
+
+## Phase 2 (booking wizard)
+
+Customer Home was left as Phase 1 built it.
+
+The web wizard (`BookingWizardContainer` and its step components) and the native wizard (`NativeBookingWizard`, pricing sheet) now use the cream/teal scale. Continue stays disabled until the step is valid, and the label says what is missing. Address validation messages are unchanged. GPS is a status panel: loading, 12 second timeout, permission denied, empty fix, and success. The address fields stay on the page so the order can still be typed. `location.ts`, pricing, and `addNewOrder` are untouched. `resolveGpsFix` only sequences the existing permission and position helpers and stops the spinner if they hang. A fix that arrives after the timeout is still written with the same address-field update. Submit without a logged-in customer still fails with the existing auth error.
