@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
+import { selectSmartHero } from './selectSmartHero';
 import {
   IconBell,
-  IconChevronBack,
   IconClock,
   IconHeadset,
   IconHeadsetCompact,
@@ -22,8 +22,6 @@ import {
   IconStatusClock,
   IconTabUser,
 } from './icons/CustomerIcons';
-
-const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: 'در انتظار تأیید',
@@ -98,6 +96,25 @@ function visibleServiceId(serviceId: string): string | undefined {
   return service?.id;
 }
 
+function statusLine(status: OrderStatus): string {
+  if (status === 'PENDING') return 'سفارش ثبت شده و در انتظار تأیید است.';
+  if (status === 'ACCEPTED') return 'سفارش شما در حال پیگیری است.';
+  if (status === 'CONFIRMED') return 'سفارش تأیید شده است.';
+  if (status === 'ASSIGNED') return 'متخصص برای این سفارش مشخص شده است.';
+  if (status === 'IN_PROGRESS') return 'انجام خدمت آغاز شده است.';
+  return '';
+}
+
+function formatHistoryDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('fa-IR');
+}
+
+function iconForService(serviceId: string): typeof IconServiceHome {
+  return SERVICE_SHORTCUTS.find((item) => item.serviceId === serviceId)?.Icon ?? IconServiceHome;
+}
+
 export function CustomerHomeScreen({
   userName,
   userAvatar,
@@ -109,13 +126,30 @@ export function CustomerHomeScreen({
 }: Props) {
   const avatarUri = (userAvatar || '').trim();
   const initial = profileInitial(userName);
-  const { allOrders } = useOrders();
+  const { allOrders, loading, loadError, refreshing, refreshOrders } = useOrders();
+  const hasOrders = useRef(false);
+  hasOrders.current = allOrders.length > 0;
 
-  const currentOrder = useMemo(() => {
-    const active = allOrders.filter((order) => ACTIVE_STATUSES.includes(order.status));
-    active.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    return active[0];
-  }, [allOrders]);
+  useEffect(() => {
+    void refreshOrders({ silent: hasOrders.current });
+  }, [refreshOrders]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void refreshOrders({ silent: true });
+    });
+    return () => subscription.remove();
+  }, [refreshOrders]);
+
+  const hero = useMemo(
+    () =>
+      selectSmartHero(
+        allOrders,
+        { loading: loading || refreshing, error: loadError },
+        (serviceId) => Boolean(visibleServiceId(serviceId)),
+      ),
+    [allOrders, loading, refreshing, loadError],
+  );
 
   const openService = (serviceId: string) => {
     onStartBooking(visibleServiceId(serviceId));
@@ -165,30 +199,31 @@ export function CustomerHomeScreen({
         </View>
       </View>
 
-      <View style={styles.cta}>
-        <View style={styles.ctaTone}>
-          <Svg width="100%" height="100%" style={styles.fill}>
-            <Defs>
-              <LinearGradient id="customerHomeCta" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.06} />
-                <Stop offset="1" stopColor="#000000" stopOpacity={0.04} />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#customerHomeCta)" />
-          </Svg>
+      {hero.kind === 'loading' ? <HeroSkeleton /> : null}
+      {hero.kind === 'error' ? (
+        <View style={styles.heroError}>
+          <Text style={styles.heroErrorTitle}>خواندن سفارش‌ها انجام نشد</Text>
+          <Text style={styles.heroErrorText}>{hero.message}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void refreshOrders()}
+            style={({ pressed }) => [styles.heroRetry, pressed && styles.pressed]}
+          >
+            <Text style={styles.heroRetryText}>تلاش دوباره</Text>
+          </Pressable>
         </View>
-        <Text style={styles.ctaTitle}>ثبت سفارش جدید</Text>
-        <Text style={styles.ctaDesc}>در چند قدم ساده رزرو کن</Text>
-        <Text style={[styles.ctaDesc, styles.ctaDescSecond]}>پرداخت بعد از انجام کار</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="شروع"
-          onPress={() => onStartBooking()}
-          style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
-        >
-          <Text style={styles.ctaBtnText}>شروع</Text>
-        </Pressable>
-      </View>
+      ) : null}
+      {hero.kind === 'active' ? (
+        <ActiveOrderHero
+          order={hero.order}
+          otherActiveCount={hero.otherActiveCount}
+          onOpen={() => onOpenOrders(hero.order.id)}
+          onOpenAll={() => onOpenOrders()}
+        />
+      ) : null}
+      {hero.kind === 'reorder' ? (
+        <ReorderHero order={hero.order} onReorder={() => onStartBooking(visibleServiceId(hero.order.serviceId))} />
+      ) : null}
 
       <View style={[styles.section, styles.servicesSection]}>
         <View style={styles.sectionHead}>
@@ -222,22 +257,6 @@ export function CustomerHomeScreen({
         </View>
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.orderHead}>
-          <Text style={[styles.sectionTitle, styles.orderTitle]}>سفارش جاری</Text>
-          <Pressable accessibilityRole="button" onPress={() => onOpenOrders()} hitSlop={8}>
-            <Text style={styles.orderLink}>مشاهده همه</Text>
-          </Pressable>
-        </View>
-        {currentOrder ? (
-          <OrderSummary order={currentOrder} onPress={() => onOpenOrders(currentOrder.id)} />
-        ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>سفارش جاری ندارید</Text>
-          </View>
-        )}
-      </View>
-
       <View style={styles.trustRow}>
         <View style={styles.trustItem}>
           <IconShield />
@@ -264,53 +283,120 @@ export function CustomerHomeScreen({
   );
 }
 
-function OrderSummary({ order, onPress }: { order: OrderItem; onPress: () => void }) {
+function HeroSkeleton() {
+  return (
+    <View style={styles.heroSkeleton}>
+      <View style={styles.skelLine} />
+      <View style={[styles.skelLine, styles.skelLineShort]} />
+      <View style={styles.skelButton} />
+    </View>
+  );
+}
+
+function ActiveOrderHero({
+  order,
+  otherActiveCount,
+  onOpen,
+  onOpenAll,
+}: {
+  order: OrderItem;
+  otherActiveCount: number;
+  onOpen: () => void;
+  onOpenAll: () => void;
+}) {
   const tone = STATUS_TONE[order.status] ?? STATUS_TONE.PENDING;
   const time = orderTime(order);
   const place = orderPlace(order);
   const amount = `${formatOrderAmount(order.pricing?.total)} تومان`;
+  const others = otherActiveCount.toLocaleString('fa-IR');
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.orderCard, pressed && styles.pressed]}
-    >
-      <View style={styles.orderBody}>
-        <View style={styles.orderTop}>
-          <Text style={styles.orderName} numberOfLines={2}>
+    <View style={styles.cta}>
+      <View style={styles.ctaTone}>
+        <Svg width="100%" height="100%" style={styles.fill}>
+          <Defs>
+            <LinearGradient id="customerHomeCta" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.06} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0.04} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#customerHomeCta)" />
+        </Svg>
+      </View>
+      <View style={styles.heroTop}>
+        <Text style={styles.heroTitle} numberOfLines={2}>
+          {order.serviceTitle}
+        </Text>
+        <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+          <IconStatusClock color={tone.icon} />
+          <Text style={[styles.statusText, { color: tone.text }]}>{STATUS_LABEL[order.status]}</Text>
+        </View>
+      </View>
+      <Text style={styles.heroLine}>{statusLine(order.status)}</Text>
+      {time || place ? (
+        <View style={styles.orderMeta}>
+          {time ? (
+            <>
+              <IconClock color="rgba(255,255,255,0.8)" />
+              <Text style={styles.heroMeta}>{time}</Text>
+            </>
+          ) : null}
+          {time && place ? <View style={styles.heroDot} /> : null}
+          {place ? (
+            <>
+              <IconPin color="rgba(255,255,255,0.8)" />
+              <Text style={styles.heroMeta} numberOfLines={1}>
+                {place}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+      <Text style={styles.heroAmount}>{amount}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="پیگیری سفارش"
+        onPress={onOpen}
+        style={({ pressed }) => [styles.ctaBtn, styles.heroCtaBtn, pressed && styles.pressed]}
+      >
+        <Text style={styles.ctaBtnText}>پیگیری سفارش</Text>
+      </Pressable>
+      {otherActiveCount > 0 ? (
+        <Pressable accessibilityRole="button" onPress={onOpenAll} hitSlop={8} style={styles.heroMore}>
+          <Text style={styles.heroMoreText}>{`+${others} سفارش فعال دیگر · مشاهده همه`}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function ReorderHero({ order, onReorder }: { order: OrderItem; onReorder: () => void }) {
+  const ServiceIcon = iconForService(order.serviceId);
+  const when = formatHistoryDate(order.createdAt);
+
+  return (
+    <View style={styles.reorderCard}>
+      <View style={styles.reorderRow}>
+        <View style={styles.reorderIcon}>
+          <ServiceIcon size={22} />
+        </View>
+        <View style={styles.reorderCopy}>
+          <Text style={styles.reorderLabel}>آخرین خدمت</Text>
+          <Text style={styles.reorderTitle} numberOfLines={2}>
             {order.serviceTitle}
           </Text>
-          <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-            <IconStatusClock color={tone.icon} />
-            <Text style={[styles.statusText, { color: tone.text }]}>{STATUS_LABEL[order.status]}</Text>
-          </View>
+          {when ? <Text style={styles.reorderDate}>{`آخرین سفارش: ${when}`}</Text> : null}
         </View>
-        {time || place ? (
-          <View style={styles.orderMeta}>
-            {time ? (
-              <>
-                <IconClock />
-                <Text style={styles.metaText}>{time}</Text>
-              </>
-            ) : null}
-            {time && place ? <View style={styles.metaDot} /> : null}
-            {place ? (
-              <>
-                <IconPin />
-                <Text style={styles.metaText} numberOfLines={1}>
-                  {place}
-                </Text>
-              </>
-            ) : null}
-          </View>
-        ) : null}
-        <Text style={styles.orderPrice}>{amount}</Text>
       </View>
-      <View style={styles.chevron}>
-        <IconChevronBack />
-      </View>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="سفارش مجدد"
+        onPress={onReorder}
+        style={({ pressed }) => [styles.reorderBtn, pressed && styles.pressed]}
+      >
+        <Text style={styles.reorderBtnText}>سفارش مجدد</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -402,7 +488,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     marginBottom: 20,
-    alignItems: 'center',
     ...shadowMd,
   },
   fill: {
@@ -455,6 +540,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadowCtaBtn,
+  },
+  heroCtaBtn: {
+    alignSelf: 'flex-end',
   },
   ctaBtnText: {
     ...type.bold,
@@ -697,6 +785,204 @@ const styles = StyleSheet.create({
     width: 1,
     height: 16,
     backgroundColor: colors.border,
+  },
+  heroTop: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  heroTitle: {
+    ...type.bold,
+    ...fa,
+    flex: 1,
+    fontSize: 17,
+    lineHeight: 24,
+    color: colors.white,
+    textAlign: 'right',
+  },
+  heroLine: {
+    ...type.regular,
+    ...fa,
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'right',
+    marginBottom: 8,
+  },
+  heroMeta: {
+    ...type.regular,
+    ...fa,
+    fontSize: 12.5,
+    lineHeight: 16,
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  heroDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  heroAmount: {
+    ...type.bold,
+    ...fa,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.white,
+    textAlign: 'right',
+    marginBottom: 16,
+  },
+  heroMore: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  heroMoreText: {
+    ...type.medium,
+    ...fa,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.white,
+    textAlign: 'right',
+  },
+  heroSkeleton: {
+    minHeight: 152,
+    borderRadius: radius.card,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  skelLine: {
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.tealSoft,
+    width: '70%',
+    alignSelf: 'flex-end',
+  },
+  skelLineShort: {
+    width: '42%',
+  },
+  skelButton: {
+    height: 44,
+    width: 140,
+    borderRadius: radius.button,
+    backgroundColor: colors.tealSoft,
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  heroError: {
+    backgroundColor: colors.white,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: '#F3D4BE',
+    padding: 16,
+    marginBottom: 20,
+    gap: 8,
+  },
+  heroErrorTitle: {
+    ...type.bold,
+    ...fa,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text,
+    textAlign: 'right',
+  },
+  heroErrorText: {
+    ...type.regular,
+    ...fa,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.muted,
+    textAlign: 'right',
+  },
+  heroRetry: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.teal,
+    borderRadius: radius.button,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroRetryText: {
+    ...type.bold,
+    ...fa,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.white,
+  },
+  reorderCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 20,
+    gap: 16,
+    ...shadowMd,
+  },
+  reorderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reorderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.tealSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  reorderLabel: {
+    ...type.medium,
+    ...fa,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.muted,
+    textAlign: 'right',
+  },
+  reorderTitle: {
+    ...type.bold,
+    ...fa,
+    fontSize: 16,
+    lineHeight: 22,
+    color: colors.text,
+    textAlign: 'right',
+  },
+  reorderDate: {
+    ...type.regular,
+    ...fa,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.muted,
+    textAlign: 'right',
+  },
+  reorderBtn: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.teal,
+    borderRadius: radius.button,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderBtnText: {
+    ...type.bold,
+    ...fa,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.white,
   },
   pressed: {
     opacity: 0.86,
