@@ -4,7 +4,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
-import { selectSmartHero } from './selectSmartHero';
+import { completedRecencyIso, selectSmartHero } from './selectSmartHero';
 import {
   IconBell,
   IconClock,
@@ -220,7 +220,7 @@ export function CustomerHomeScreen({
         />
       ) : null}
       {hero.kind === 'reorder' ? (
-        <ReorderHero order={hero.order} onReorder={() => onStartBooking(visibleServiceId(hero.order.serviceId))} />
+        <ReorderHero order={hero.order} onReorder={() => onStartBooking(hero.preselectServiceId)} />
       ) : null}
 
       <View style={[styles.section, styles.servicesSection]}>
@@ -258,23 +258,17 @@ export function CustomerHomeScreen({
       <View style={styles.trustRow}>
         <View style={styles.trustItem}>
           <IconShield />
-          <Text style={styles.trustText} numberOfLines={1}>
-            متخصص تأییدشده
-          </Text>
+          <Text style={styles.trustText}>متخصص تأییدشده</Text>
         </View>
         <View style={styles.trustDivider} />
         <View style={styles.trustItem}>
           <IconPriceTag />
-          <Text style={styles.trustText} numberOfLines={1}>
-            قیمت شفاف
-          </Text>
+          <Text style={styles.trustText}>قیمت شفاف</Text>
         </View>
         <View style={styles.trustDivider} />
         <View style={styles.trustItem}>
           <IconHeadsetCompact />
-          <Text style={styles.trustText} numberOfLines={1}>
-            پشتیبانی سریع
-          </Text>
+          <Text style={styles.trustText}>پشتیبانی سریع</Text>
         </View>
       </View>
     </ScrollView>
@@ -370,7 +364,7 @@ function ActiveOrderHero({
 
 function ReorderHero({ order, onReorder }: { order: OrderItem; onReorder: () => void }) {
   const ServiceIcon = iconForService(order.serviceId);
-  const when = formatHistoryDate(order.createdAt);
+  const when = formatHistoryDate(completedRecencyIso(order));
 
   return (
     <View style={styles.reorderCard}>
@@ -683,18 +677,25 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
+    height: 24,
+    marginTop: 0,
+    marginBottom: 0,
     borderRadius: radius.pill,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 0,
     flexShrink: 0,
   },
   statusText: {
     ...type.semibold,
     ...fa,
+    marginTop: 0,
+    marginBottom: 0,
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 16,
     textAlign: 'right',
+    textAlignVertical: 'center',
   },
   orderMeta: {
     flexDirection: 'row-reverse',
@@ -757,36 +758,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.trust,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     marginBottom: 12,
-    gap: 2,
+    gap: 6,
   },
   trustItem: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     minWidth: 0,
   },
   trustText: {
     ...type.medium,
     ...fa,
-    fontSize: 10.5,
-    lineHeight: 13,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 16,
     color: colors.muted,
     textAlign: 'right',
-    flexShrink: 1,
+    textAlignVertical: 'center',
   },
   trustDivider: {
     width: 1,
-    height: 16,
+    alignSelf: 'stretch',
+    marginVertical: 2,
     backgroundColor: colors.border,
   },
   heroTop: {
     flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
     marginBottom: 8,
@@ -795,10 +799,13 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     flex: 1,
+    marginTop: 0,
+    marginBottom: 0,
     fontSize: 17,
     lineHeight: 24,
     color: colors.white,
     textAlign: 'right',
+    textAlignVertical: 'center',
   },
   heroLine: {
     ...type.regular,
@@ -846,7 +853,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   heroSkeleton: {
-    minHeight: 152,
+    minHeight: 168,
     borderRadius: radius.card,
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -919,6 +926,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: 168,
     padding: 16,
     marginBottom: 20,
     gap: 16,

@@ -12,6 +12,8 @@ export type SmartHeroOrder = {
   id: string;
   status: OrderStatus;
   createdAt: string;
+  /** Completion time when the server sent one; otherwise the last update. */
+  updatedAt?: string;
   serviceId: string;
   serviceTitle: string;
 };
@@ -20,7 +22,7 @@ export type SmartHeroSelection<T extends SmartHeroOrder = SmartHeroOrder> =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'active'; order: T; otherActiveCount: number }
-  | { kind: 'reorder'; order: T }
+  | { kind: 'reorder'; order: T; preselectServiceId: string | undefined }
   | { kind: 'none' };
 
 function timestamp(value: string): number {
@@ -30,6 +32,17 @@ function timestamp(value: string): number {
 
 function newestFirst<T extends SmartHeroOrder>(left: T, right: T): number {
   return timestamp(right.createdAt) - timestamp(left.createdAt);
+}
+
+/** Completion/update time when it parses, otherwise the created time. */
+export function completedRecencyIso(order: { updatedAt?: string; createdAt: string }): string {
+  const updated = typeof order.updatedAt === 'string' ? order.updatedAt.trim() : '';
+  if (updated && timestamp(updated) > 0) return updated;
+  return order.createdAt;
+}
+
+function completedNewestFirst<T extends SmartHeroOrder>(left: T, right: T): number {
+  return timestamp(completedRecencyIso(right)) - timestamp(completedRecencyIso(left));
 }
 
 export function selectSmartHero<T extends SmartHeroOrder>(
@@ -60,9 +73,14 @@ export function selectSmartHero<T extends SmartHeroOrder>(
   const latestCompleted = orders
     .filter((order) => order.status === 'COMPLETED')
     .slice()
-    .sort(newestFirst)[0];
-  if (latestCompleted && isReorderableService(latestCompleted.serviceId)) {
-    return { kind: 'reorder', order: latestCompleted };
+    .sort(completedNewestFirst)[0];
+  if (latestCompleted) {
+    const serviceId = latestCompleted.serviceId;
+    return {
+      kind: 'reorder',
+      order: latestCompleted,
+      preselectServiceId: isReorderableService(serviceId) ? serviceId : undefined,
+    };
   }
 
   return { kind: 'none' };
