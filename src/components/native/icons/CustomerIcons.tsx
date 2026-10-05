@@ -103,22 +103,32 @@ export function IconServiceHome({ size = 22, color = '#11766F', strokeWidth = 1.
   );
 }
 
-export function IconServiceWindow({ size = 22, color = '#11766F', strokeWidth = 1.6 }: IconProps) {
+export function IconServiceStairs({ size = 18, color = '#11766F', strokeWidth = 1.6 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x={4}
-        y={4}
-        width={16}
-        height={16}
-        rx={2}
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap={cap}
-        strokeLinejoin={join}
-      />
-      <Path d="M4 12h16M12 4v16" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
-      <Path d="M7.5 7.5l2 2" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+      <Path d="M4 20h16" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+      <Path d="M4 20V15h4v-4h4V7h4V4" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+    </Svg>
+  );
+}
+
+export function IconServiceWorker({ size = 18, color = '#11766F', strokeWidth = 1.6 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={9} cy={7} r={2.4} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M4.8 19.5v-1.8a4.2 4.2 0 0 1 8.4 0v1.8" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+      <Path d="M14.5 8.5h4.2l.6 2.2H16" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+      <Path d="M16.2 10.7V16" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} />
+    </Svg>
+  );
+}
+
+export function IconServicePaint({ size = 18, color = '#11766F', strokeWidth = 1.6 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x={3.5} y={4} width={13} height={5.5} rx={1.6} stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M14 9.5v2.2a2 2 0 0 1-2 2H10" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} strokeLinejoin={join} />
+      <Path d="M10 13.7V20" stroke={color} strokeWidth={strokeWidth} strokeLinecap={cap} />
     </Svg>
   );
 }

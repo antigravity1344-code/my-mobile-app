@@ -14,8 +14,10 @@ import {
   IconPriceTag,
   IconServiceHome,
   IconServiceOffice,
+  IconServicePaint,
   IconServiceSofa,
-  IconServiceWindow,
+  IconServiceStairs,
+  IconServiceWorker,
   IconShield,
   IconStatusClock,
 } from './icons/CustomerIcons';
@@ -44,15 +46,17 @@ const STATUS_TONE: Record<OrderStatus, { bg: string; text: string; icon: string 
 
 type Shortcut = {
   label: string;
-  serviceId: string | null;
+  serviceId: string;
   Icon: typeof IconServiceHome;
 };
 
 const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'نظافت منزل', serviceId: 'home_unit_cleaning', Icon: IconServiceHome },
-  { label: 'شیشه‌پاک‌کنی', serviceId: null, Icon: IconServiceWindow },
-  { label: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', Icon: IconServiceSofa },
+  { label: 'راه‌پله و مشاعات', serviceId: 'staircase_common_areas', Icon: IconServiceStairs },
   { label: 'نظافت محل کار', serviceId: 'office_company_cleaning', Icon: IconServiceOffice },
+  { label: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', Icon: IconServiceSofa },
+  { label: 'کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
+  { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
 ];
 
 type Props = {
@@ -87,8 +91,7 @@ function orderPlace(order: OrderItem): string {
   return first;
 }
 
-function visibleServiceId(serviceId: string | null): string | undefined {
-  if (!serviceId) return undefined;
+function visibleServiceId(serviceId: string): string | undefined {
   const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible);
   return service?.id;
 }
@@ -108,7 +111,7 @@ export function CustomerHomeScreen({
     return active[0];
   }, [allOrders]);
 
-  const openService = (serviceId: string | null) => {
+  const openService = (serviceId: string) => {
     onStartBooking(visibleServiceId(serviceId));
   };
 
@@ -185,7 +188,7 @@ export function CustomerHomeScreen({
               style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}
             >
               <View style={styles.serviceIcon}>
-                <item.Icon />
+                <item.Icon size={18} />
               </View>
               <Text style={styles.serviceName} numberOfLines={2}>
                 {item.label}
@@ -451,26 +454,26 @@ const styles = StyleSheet.create({
   },
   serviceGrid: {
     flexDirection: 'row-reverse',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   serviceCard: {
-    flex: 1,
-    minHeight: 108,
+    width: '31.5%',
     backgroundColor: colors.white,
-    borderRadius: radius.card,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingTop: 14,
-    paddingBottom: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
     paddingHorizontal: 4,
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
     ...shadowMd,
   },
   serviceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.iconTile,
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     backgroundColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -478,8 +481,8 @@ const styles = StyleSheet.create({
   serviceName: {
     ...type.medium,
     ...fa,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 13,
     color: colors.text,
     textAlign: 'center',
   },
