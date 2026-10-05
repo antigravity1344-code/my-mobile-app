@@ -139,7 +139,7 @@ export const NativeWorkerApp: React.FC = () => {
             style={styles.avatarImage}
           />
           <View style={styles.userDetails}>
-            <Text style={styles.userNameText}>{userData.name || 'متخصص پاکشو'}</Text>
+            <Text style={styles.userNameText}>{userData.name || ''}</Text>
             <View style={styles.roleBadgeWorker}>
               <Briefcase size={10} color="#fff" />
               <Text style={styles.roleBadgeText}>

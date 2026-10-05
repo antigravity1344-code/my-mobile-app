@@ -167,7 +167,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           </View>
           <View>
             <View style={styles.nameRow}>
-              <Text style={styles.workerName}>{user?.name || 'پنل کارگر'}</Text>
+              <Text style={styles.workerName}>{user?.name || ''}</Text>
               <View style={styles.onlineBadge}>
                 <View style={styles.onlineDot} />
                 <Text style={styles.onlineText}>آماده کار</Text>

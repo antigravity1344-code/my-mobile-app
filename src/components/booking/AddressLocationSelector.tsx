@@ -283,7 +283,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
             type="text"
             value={addressDetails.recipientName}
             onChange={(e) => onUpdateField('recipientName', e.target.value)}
-            placeholder="مثال: علی رضایی"
+            placeholder="نام و نام خانوادگی"
             className={`w-full rounded-xl border bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${validationErrors.recipientName ? 'border-red-300' : 'border-slate-200'}`}
           />
           {validationErrors.recipientName && (

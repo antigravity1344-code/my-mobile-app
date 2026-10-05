@@ -61,7 +61,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
     };
   }, [user?.id]);
 
-  const displayName = useMemo(() => user.name || 'کاربر پاکشو', [user.name]);
+  const displayName = useMemo(() => (user.name || '').trim(), [user.name]);
 
   const callSupport = () => {
     void Linking.openURL(SUPPORT_TEL_URL).catch(() => {

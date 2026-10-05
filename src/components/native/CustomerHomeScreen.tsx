@@ -159,7 +159,8 @@ export function CustomerHomeScreen({
           </Svg>
         </View>
         <Text style={styles.ctaTitle}>ثبت سفارش جدید</Text>
-        <Text style={styles.ctaDesc}>در چند قدم ساده رزرو کن؛ پرداخت بعد از انجام کار.</Text>
+        <Text style={styles.ctaDesc}>در چند قدم ساده رزرو کن</Text>
+        <Text style={[styles.ctaDesc, styles.ctaDescSecond]}>پرداخت بعد از انجام کار</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="شروع"
@@ -369,6 +370,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     marginBottom: 20,
+    alignItems: 'center',
     ...shadowMd,
   },
   fill: {
@@ -394,7 +396,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 24,
     color: colors.white,
-    textAlign: 'right',
+    textAlign: 'center',
+    alignSelf: 'stretch',
     marginBottom: 8,
   },
   ctaDesc: {
@@ -403,13 +406,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: 'rgba(255,255,255,0.88)',
-    textAlign: 'right',
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+  ctaDescSecond: {
+    marginTop: 4,
     marginBottom: 16,
-    maxWidth: 300,
-    alignSelf: 'flex-end',
   },
   ctaBtn: {
-    alignSelf: 'flex-end',
+    alignSelf: 'center',
     backgroundColor: colors.white,
     borderRadius: radius.button,
     minHeight: 44,

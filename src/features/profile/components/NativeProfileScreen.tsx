@@ -66,7 +66,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             <Text style={styles.avatarText}>{profile.fullName ? profile.fullName.charAt(0) : 'ک'}</Text>
           </View>
           <View style={styles.userMeta}>
-            <Text style={styles.name}>{profile.fullName || 'کاربر پاکشو'}</Text>
+            <Text style={styles.name}>{profile.fullName || ''}</Text>
             <Text style={styles.phone}>{profile.phoneNumber}</Text>
             <Text style={styles.userId}>شناسه: {profile.id || '—'}</Text>
           </View>

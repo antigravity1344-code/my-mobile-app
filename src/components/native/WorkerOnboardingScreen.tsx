@@ -263,7 +263,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
               value={name}
               onChangeText={setName}
               onFocus={() => scrollFieldIntoView('name')}
-              placeholder="مثال: رضا محمدی"
+              placeholder="نام و نام خانوادگی"
               placeholderTextColor="#94a3b8"
               returnKeyType="next"
             />

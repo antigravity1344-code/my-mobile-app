@@ -27,7 +27,7 @@ export const ProfileScreen: React.FC = () => {
           <User className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-sm font-bold text-slate-900">{addressDetails.recipientName || 'کاربر پاکشو'}</h3>
+          <h3 className="text-sm font-bold text-slate-900">{addressDetails.recipientName || ''}</h3>
           <p className="text-xs text-slate-500">{addressDetails.contactPhone || 'شماره تماس ثبت نشده'}</p>
           <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${tierInfo.color}`}>
             {tierInfo.label}
@@ -49,7 +49,7 @@ export const ProfileScreen: React.FC = () => {
               type="text"
               value={addressDetails.recipientName}
               onChange={(e) => updateAddressField('recipientName', e.target.value)}
-              placeholder="مثال: محمد احمدی"
+              placeholder="نام و نام خانوادگی"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:outline-none focus:border-sky-500 text-xs"
             />
           </div>

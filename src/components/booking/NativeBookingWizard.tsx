@@ -417,7 +417,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             value={booking.addressDetails.recipientName}
             onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('recipientName', value); }}
             onFocus={scrollFocusedFieldIntoView}
-            placeholder="مثال: علی احمدی"
+            placeholder="نام و نام خانوادگی"
             placeholderTextColor="#94a3b8"
             style={[styles.input, getInputStyle('recipientName')]}
           />

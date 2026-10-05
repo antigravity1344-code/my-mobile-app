@@ -119,7 +119,7 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 className={styles.input}
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="محمد محمدی"
+                placeholder="نام و نام خانوادگی"
               />
             </div>
 

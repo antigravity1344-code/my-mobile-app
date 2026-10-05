@@ -267,7 +267,7 @@ export const AdminPanelScreen: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-sky-600" />
                     <div>
-                      <span className="font-bold text-slate-800">{cleaner.name || 'متخصص جدید'}</span>
+                      <span className="font-bold text-slate-800">{cleaner.name || ''}</span>
                       <p className="text-[10px] text-slate-500">تلفن: {cleaner.phone} | کد ملی: {cleaner.nationalIdMasked || 'نامشخص'}</p>
                     </div>
                   </div>
