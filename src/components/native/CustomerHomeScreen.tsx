@@ -70,8 +70,7 @@ type Props = {
 function greetingTitle(name?: string): string {
   const trimmed = (name || '').trim();
   if (!trimmed) return 'سلام';
-  const given = trimmed.split(/\s+/)[0];
-  return `سلام، ${given}`;
+  return `سلام، ${trimmed}`;
 }
 
 function orderTime(order: OrderItem): string {
@@ -481,6 +480,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: 'center',
     gap: 6,
+    minHeight: 80,
     ...shadowMd,
   },
   serviceIcon: {
@@ -494,6 +494,9 @@ const styles = StyleSheet.create({
   serviceName: {
     ...type.medium,
     ...fa,
+    width: '100%',
+    alignSelf: 'stretch',
+    minHeight: 26,
     fontSize: 10,
     lineHeight: 13,
     color: colors.text,
