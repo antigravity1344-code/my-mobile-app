@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
-import { colors, radius, shadowBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
+import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
 import {
   IconBell,
   IconChevronBack,
@@ -202,8 +202,12 @@ export function CustomerHomeScreen({
                   key={item.serviceId}
                   accessibilityRole="button"
                   accessibilityLabel={item.label}
+                  android_ripple={{ color: colors.servicePress, foreground: true }}
                   onPress={() => openService(item.serviceId)}
-                  style={({ pressed }) => [styles.serviceCard, pressed && styles.pressed]}
+                  style={(state) => {
+                    const hovered = 'hovered' in state && Boolean((state as { hovered?: boolean }).hovered);
+                    return [styles.serviceCard, (state.pressed || hovered) && styles.serviceCardPressed];
+                  }}
                 >
                   <View style={styles.serviceIcon}>
                     <item.Icon size={18} />
@@ -450,7 +454,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadowBtn,
+    ...shadowCtaBtn,
   },
   ctaBtnText: {
     ...type.bold,
@@ -530,6 +534,10 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 80,
     ...shadowMd,
+  },
+  serviceCardPressed: {
+    backgroundColor: colors.servicePress,
+    borderColor: colors.servicePressBorder,
   },
   serviceIcon: {
     width: 32,

@@ -20,6 +20,8 @@ export const colors = {
   border: 'rgba(31, 42, 40, 0.06)',
   navBorder: 'rgba(31, 42, 40, 0.08)',
   dot: '#D92D4A',
+  servicePress: '#FBE6D4',
+  servicePressBorder: '#F3D4BE',
 } as const;
 
 export const space = {
@@ -90,6 +92,18 @@ export const shadowMd: ViewStyle =
 
 export const shadowSm: ViewStyle =
   Platform.OS === 'web' ? { boxShadow: '0 1px 2px rgba(0,0,0,0.04)' } : shadowSmNative;
+
+export const shadowCtaBtn: ViewStyle =
+  Platform.OS === 'web'
+    ? { boxShadow: '0 4px 10px rgba(14, 99, 93, 0.22)' }
+    : {
+        shadowColor: '#0E635D',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
+        shadowRadius: 10,
+        elevation: 4,
+        boxShadow: '0px 4px 10px rgba(14, 99, 93, 0.22)',
+      };
 
 export const shadowBtn: ViewStyle =
   Platform.OS === 'web'
