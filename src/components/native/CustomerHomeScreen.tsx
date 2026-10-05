@@ -102,7 +102,7 @@ export function CustomerHomeScreen({
   onOpenNotifications,
   onOpenSupport,
 }: Props) {
-  const { allOrders, loading } = useOrders();
+  const { allOrders } = useOrders();
 
   const currentOrder = useMemo(() => {
     const active = allOrders.filter((order) => ACTIVE_STATUSES.includes(order.status));
@@ -207,7 +207,7 @@ export function CustomerHomeScreen({
         </View>
         {currentOrder ? (
           <OrderSummary order={currentOrder} onPress={() => onOpenOrders(currentOrder.id)} />
-        ) : loading ? null : (
+        ) : (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>سفارش جاری ندارید</Text>
           </View>
@@ -449,8 +449,7 @@ const styles = StyleSheet.create({
   orderTitle: {
     flexShrink: 1,
     textAlign: 'right',
-    paddingRight: 0,
-    marginRight: 0,
+    paddingRight: 8,
   },
   orderLink: {
     ...type.bold,
@@ -603,6 +602,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyCard: {
+    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: colors.white,
     borderRadius: radius.card,
     borderWidth: 1,
