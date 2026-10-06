@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  type FocusEvent,
 } from 'react-native';
 import { Check, Clock, MapPin, Sparkles } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
@@ -82,8 +83,33 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [districtSearch, setDistrictSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  const scrollFocusedFieldIntoView = () => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+  const scrollFocusedFieldIntoView = (
+    event?: FocusEvent,
+  ) => {
+    const delay = Platform.OS === 'android' ? 250 : 120;
+    setTimeout(() => {
+      const scroll = scrollRef.current as
+        | (ScrollView & {
+            getScrollResponder?: () => {
+              scrollResponderScrollNativeHandleToKeyboard?: (
+                nodeHandle: number,
+                additionalOffset: number,
+                preventNegativeScrollOffset?: boolean,
+              ) => void;
+            };
+          })
+        | null;
+      const target = event?.nativeEvent?.target;
+      const responder = scroll?.getScrollResponder?.();
+      if (
+        typeof target === 'number' &&
+        responder?.scrollResponderScrollNativeHandleToKeyboard
+      ) {
+        responder.scrollResponderScrollNativeHandleToKeyboard(target, 96, true);
+        return;
+      }
+      scroll?.scrollToEnd({ animated: true });
+    }, delay);
   };
   const [pricingVisible, setPricingVisible] = useState(false);
   const { profile, addSavedAddress } = useProfile();
@@ -293,7 +319,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
   const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
@@ -406,11 +432,11 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             </Text>
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color="#0284c7" /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color="#0284c7" />}</Pressable>
-          <TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
-          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
+          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
+          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} placeholder="مثال: ۴" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۴" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
           </View>
           <Text style={styles.label}>نام و نام خانوادگی</Text>
           <TextInput

@@ -143,7 +143,21 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     async (orderId: string, reason?: string) => {
       const userId = await resolveCustomerUserId();
       const result = await orderService.cancelOrder(orderId, reason, userId);
-      if (result.success) {
+      if (result.success && result.order) {
+        // Patch local state immediately so UI shows CANCELLED even if refetch fails/stale-guards.
+        setAllOrders((prev) => {
+          const next = prev.map((item) =>
+            item.id === orderId ? { ...item, ...result.order!, status: 'CANCELLED' as const } : item,
+          );
+          allOrdersRef.current = next;
+          return next;
+        });
+        setOrders((prev) =>
+          prev.map((item) =>
+            item.id === orderId ? { ...item, ...result.order!, status: 'CANCELLED' as const } : item,
+          ),
+        );
+        // Sync remaining list from server (optional; local CANCELLED already applied).
         await fetchOrders();
       }
       return result;

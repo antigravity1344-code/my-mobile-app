@@ -192,13 +192,15 @@ export const NativeCustomerApp: React.FC = () => {
         )}
       </View>
 
-      <CustomerTabBar
-        active={activeTab}
-        onChange={(tab) => {
-          if (tab !== 'orders') setFocusOrderId(null);
-          setMainView(tab);
-        }}
-      />
+      {mainView !== 'wizard' ? (
+        <CustomerTabBar
+          active={activeTab}
+          onChange={(tab) => {
+            if (tab !== 'orders') setFocusOrderId(null);
+            setMainView(tab);
+          }}
+        />
+      ) : null}
     </EdgeSafeAreaView>
   );
 };
