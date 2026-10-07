@@ -4,6 +4,19 @@ export type PricingOptions = Record<string, string | number | boolean>;
 export type RecurringFrequency = 'ONE_TIME' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
 export type CustomerTier = 'NEW' | 'SILVER' | 'GOLD' | 'VIP';
 
+/** نام فارسی سطح باشگاه مشتریان؛ فقط برای نمایش. */
+export const CUSTOMER_TIER_LABELS: Record<CustomerTier, string> = {
+  NEW: 'جدید',
+  SILVER: 'نقره‌ای',
+  GOLD: 'طلایی',
+  VIP: 'ویژه',
+};
+
+export const customerTierLabel = (tier: unknown): string =>
+  typeof tier === 'string' && Object.prototype.hasOwnProperty.call(CUSTOMER_TIER_LABELS, tier)
+    ? CUSTOMER_TIER_LABELS[tier as CustomerTier]
+    : '';
+
 export interface LoyaltyPricingOptions {
   recurringFrequency?: RecurringFrequency;
   isFirstRecurringInvoice?: boolean;

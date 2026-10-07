@@ -188,6 +188,7 @@ export const NativeCustomerApp: React.FC = () => {
               setFocusOrderId(orderId);
               setMainView('orders');
             }}
+            onExit={() => setMainView('home')}
           />
         )}
       </View>

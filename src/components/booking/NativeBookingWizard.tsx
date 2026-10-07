@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -11,17 +13,18 @@ import {
   View,
   type FocusEvent,
 } from 'react-native';
-import { Check, Clock, MapPin, Sparkles } from 'lucide-react-native';
+import { Check, Clock, MapPin, Sparkles, X } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { calculateFinalPrice, type FinalPrice } from '../../utils/pricing';
+import { calculateFinalPrice, customerTierLabel, type FinalPrice } from '../../utils/pricing';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
 import { isValidAddress, normalizePersianDigits, getAddressValidationErrors } from '../../utils/bookingValidation';
 import { useOrders, type OrderItem } from '../../features/orders';
 import { useProfile, type SavedAddress } from '../../features/profile';
+import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from './wizardBackNavigation';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -71,9 +74,11 @@ const StepHeader = ({ step }: { step: number }) => (
 
 interface NativeBookingWizardProps {
   onOrderCreated?: (orderId: string) => void;
+  /** Leave the wizard (e.g. back to the home tab). The booking draft is reset before this is called. */
+  onExit?: () => void;
 }
 
-export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps) => {
+export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWizardProps) => {
   const booking = useBooking();
   const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
@@ -309,12 +314,49 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');
-      setSubmissionMessage(`درخواست شما ثبت شد. شماره سفارش: ${orderId}`);
+      setSubmissionMessage(`درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار تأیید است.`);
     } else {
       setSubmissionState('error');
       setSubmissionMessage(result.error || 'ثبت سفارش انجام نشد.');
     }
   };
+
+  const isSubmitting = submissionState === 'submitting';
+  const isSubmitted = submissionState === 'success';
+  const exitWizard = () => {
+    // Nothing is sent to the server here; just drop the half-filled draft and leave.
+    booking.resetBooking();
+    onExit?.();
+  };
+  const runWizardNavigation = (action: WizardBackAction) => {
+    if (action === 'previous') {
+      booking.prevStep();
+    } else if (action === 'exitToHome') {
+      exitWizard();
+    } else if (action === 'confirmExit') {
+      Alert.alert(
+        'از ثبت سفارش خارج شوید؟',
+        'اطلاعاتی که وارد کرده‌اید پاک می‌شود.',
+        [
+          { text: 'ادامه ثبت سفارش', style: 'cancel' },
+          { text: 'خروج', style: 'destructive', onPress: exitWizard },
+        ],
+        { cancelable: true },
+      );
+    }
+  };
+  const navigationState = { step: booking.step, submitting: isSubmitting, submitted: isSubmitted };
+  const handleClosePress = () => runWizardNavigation(getWizardCloseAction(navigationState));
+  const hardwareBackRef = useRef<() => void>(() => {});
+  hardwareBackRef.current = () => runWizardNavigation(getWizardBackAction(navigationState));
+  useEffect(() => {
+    // Registered only while the wizard is mounted, so Android back never closes the app from here.
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      hardwareBackRef.current();
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
 
@@ -329,6 +371,18 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}><Sparkles size={22} color="#fff" /></View>
           <View><Text style={styles.title}>پاکشو</Text><Text style={styles.subtitle}>رزرو سرویس نظافت</Text></View>
+          <View style={styles.flex} />
+          <Pressable
+            onPress={handleClosePress}
+            disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel="بستن ثبت سفارش"
+            accessibilityState={{ disabled: isSubmitting }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed, isSubmitting && styles.disabled]}
+          >
+            <X size={20} color="#475569" />
+          </Pressable>
         </View>
         <StepHeader step={booking.step} />
 
@@ -432,7 +486,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             </Text>
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color="#0284c7" /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color="#0284c7" />}</Pressable>
-          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={styles.chipText}>{district}</Text></Pressable>)}</ScrollView>
+          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
             <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
@@ -473,7 +527,7 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
             <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
             {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({Math.round(pricing.earlyBirdDiscountRate * 100)}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
-            {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان ({booking.customerTier})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
+            {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان (سطح {customerTierLabel(booking.customerTier) || '—'})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.recurringDiscountDeferred && <Text style={styles.recurringHint}>فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.</Text>}
             {pricing.recurringDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text><Text style={styles.discountAmount}>-{pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ برآوردی</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
@@ -482,9 +536,6 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
           {submissionState === 'success' ? (
             <View style={styles.successCard}>
               <Text style={styles.successTitle}>سفارش ثبت شد</Text>
-              {createdOrderId ? (
-                <Text style={styles.successOrderId}>شماره سفارش: {createdOrderId}</Text>
-              ) : null}
               {submissionMessage ? <Text style={styles.successMessage}>{submissionMessage}</Text> : null}
               <Text style={styles.successHint}>پرداخت بعد از انجام کار است. جزئیات را در فهرست سفارش‌ها ببینید.</Text>
               <Pressable
@@ -516,13 +567,17 @@ export const NativeBookingWizard = ({ onOrderCreated }: NativeBookingWizardProps
           )}
         </View>}
 
-        {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} style={styles.back}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
+        {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} accessibilityRole="button" accessibilityState={{ disabled: booking.step === 1 }} style={[styles.back, booking.step === 1 && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
+        {booking.step === 4 && !isSubmitted && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={isSubmitting} accessibilityRole="button" accessibilityState={{ disabled: isSubmitting }} style={[styles.back, isSubmitting && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable></View>}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  closeButtonPressed: { backgroundColor: '#e2e8f0' },
+  backDisabled: { opacity: 0.35 },
   successMessage: { color: '#166534', backgroundColor: '#dcfce7', padding: 12, borderRadius: 12, textAlign: 'right' },
   successCard: { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#86efac', borderRadius: 16, padding: 16, gap: 10 },
   successTitle: { textAlign: 'right', color: '#166534', fontWeight: '900', fontSize: 18 },
