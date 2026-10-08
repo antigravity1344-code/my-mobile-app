@@ -29,6 +29,8 @@ import type { OrderItem } from '../types/order';
 import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
+import { customerTierLabel } from '../../../utils/pricing';
+import { describeServiceOptions } from '../../../components/native/workerServiceCategory';
 
 interface OrderDetailModalProps {
   order: OrderItem | undefined;
@@ -140,7 +142,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <Text style={styles.headerTitle}>جزئیات سفارش</Text>
                 <OrderStatusBadge status={order.status} size="sm" />
               </View>
-              <Text style={styles.headerSubtitle}>{order.orderNumber}</Text>
+              {dateLabel !== '—' ? <Text style={styles.headerSubtitle}>{dateLabel}</Text> : null}
             </View>
           </View>
 
@@ -228,13 +230,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   {GENDER_TITLES[order.genderPreference] || 'بدون ترجیح'}
                 </Text>
               </View>
-              {Object.entries(order.serviceOptions || {})
-                .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
-                .map(([key, value]) => (
-                  <View key={key} style={styles.infoRow}>
+              {describeServiceOptions(order.serviceId, order.serviceOptions).map((option) => (
+                  <View key={option.key} style={styles.infoRow}>
                     <Sparkles size={15} color="#0284c7" />
-                    <Text style={styles.infoLabel}>{key}:</Text>
-                    <Text style={styles.infoValue}>{String(value)}</Text>
+                    <Text style={styles.infoLabel}>{option.label}:</Text>
+                    <Text style={styles.infoValue}>{option.value}</Text>
                   </View>
                 ))}
               <View style={styles.infoRow}>
@@ -289,7 +289,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               {tierAmount > 0 && (
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>
-                    تخفیف باشگاه مشتریان (سطح {order.customerTier || '—'})
+                    تخفیف باشگاه مشتریان (سطح {customerTierLabel(order.customerTier) || '—'})
                   </Text>
                   <Text style={styles.discountValue}>
                     -{formatOrderAmount(tierAmount)} تومان

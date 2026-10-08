@@ -173,7 +173,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="جستجوی کد سفارش، خدمت، محله یا متخصص..."
+              placeholder="جستجوی خدمت، محله یا متخصص..."
               placeholderTextColor="#94a3b8"
               style={styles.searchInput}
             />

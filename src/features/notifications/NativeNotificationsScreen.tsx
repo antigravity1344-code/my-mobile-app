@@ -11,6 +11,30 @@ type AppNotification = {
   readAt: string | null;
 };
 
+const STATUS_TEXT: Record<string, string> = {
+  PENDING: 'در انتظار تأیید',
+  ACCEPTED: 'در حال انجام',
+  CONFIRMED: 'تأیید شده',
+  ASSIGNED: 'تخصیص متخصص',
+  IN_PROGRESS: 'در حال انجام',
+  COMPLETED: 'انجام شده',
+  CANCELLED: 'لغو شده',
+};
+
+/**
+ * فقط برای نمایش: کد فنی سفارش (ORD-…) را حذف و وضعیت انگلیسی را به فارسی تبدیل می‌کند.
+ * داده، API و ذخیره‌سازی تغییری نمی‌کنند.
+ */
+function formatNotificationText(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/\bORD-[A-Za-z0-9-]+/g, '')
+    .replace(/\b(IN_PROGRESS|PENDING|ACCEPTED|CONFIRMED|ASSIGNED|COMPLETED|CANCELLED)\b/g, (status) => `«${STATUS_TEXT[status]}»`)
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+([.،,!؟])/g, '$1')
+    .trim();
+}
+
 export const NativeNotificationsScreen: React.FC = () => {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +63,13 @@ export const NativeNotificationsScreen: React.FC = () => {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>اعلان‌های سفارش</Text>
-      <Text style={styles.hint}>این فهرست داخل اپ است و پیامک یا اعلان سیستمی نیست.</Text>
+      <Text style={styles.hint}>اعلان‌های مربوط به سفارش‌های شما اینجا نمایش داده می‌شود.</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {items.length === 0 ? <Text style={styles.empty}>اعلانی ثبت نشده است.</Text> : null}
       {items.map((item) => (
         <Pressable key={item.id} onPress={() => void markRead(item)} style={[styles.card, !item.readAt && styles.unread]}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <Text style={styles.body}>{item.body}</Text>
+          <Text style={styles.cardTitle}>{formatNotificationText(item.title)}</Text>
+          <Text style={styles.body}>{formatNotificationText(item.body)}</Text>
           <Text style={styles.meta}>{new Date(item.createdAt).toLocaleString('fa-IR')}</Text>
         </Pressable>
       ))}

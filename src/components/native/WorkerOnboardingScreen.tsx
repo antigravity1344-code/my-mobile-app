@@ -378,7 +378,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitBtnText}>ارسال مدارک برای بررسی و تایید ادمین ←</Text>
+              <Text style={styles.submitBtnText}>ارسال مدارک برای بررسی و تایید مدیریت ←</Text>
             )}
           </Pressable>
         </View>

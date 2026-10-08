@@ -55,7 +55,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
     });
     await saveCustomerSession(appStorage, res.user);
     setEditName(res.user.name || '');
-    setProfileMessage('اطلاعات هویتی روی سرور ذخیره شد.');
+    setProfileMessage('اطلاعات شما ذخیره شد.');
   };
 
   return (
@@ -68,7 +68,6 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           <View style={styles.userMeta}>
             <Text style={styles.name}>{profile.fullName || ''}</Text>
             <Text style={styles.phone}>{profile.phoneNumber}</Text>
-            <Text style={styles.userId}>شناسه: {profile.id || '—'}</Text>
           </View>
         </View>
 
@@ -102,7 +101,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           />
           {profileMessage ? <Text style={styles.muted}>{profileMessage}</Text> : null}
           <Pressable onPress={() => void saveIdentity()} disabled={savingProfile} style={styles.saveBtn}>
-            {savingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>ذخیره روی سرور</Text>}
+            {savingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>ذخیره اطلاعات</Text>}
           </Pressable>
         </View>
 
@@ -127,7 +126,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <Text style={styles.wallet}>{formatCurrency(profile.walletBalance || 0)}</Text>
           <Text style={styles.muted}>
-            موجودی از سرور خوانده می‌شود. شارژ کیف پول تا اتصال درگاه پرداخت انجام نمی‌شود.
+            امکان شارژ کیف پول به‌زودی فعال می‌شود.
           </Text>
         </View>
 
@@ -191,7 +190,6 @@ const styles = StyleSheet.create({
   userMeta: { flex: 1, alignItems: 'flex-end', gap: 2 },
   name: { color: '#0f172a', fontWeight: '800', fontSize: 16 },
   phone: { color: '#475569', fontSize: 13 },
-  userId: { color: '#94a3b8', fontSize: 11 },
   section: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', gap: 8 },
   sectionHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },

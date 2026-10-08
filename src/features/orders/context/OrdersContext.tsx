@@ -183,7 +183,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!userId) {
         return {
           success: false,
-          error: 'شناسه کاربر احراز هویت‌شده برای ثبت سفارش موجود نیست.',
+          error: 'برای ثبت سفارش، لطفاً دوباره وارد حساب خود شوید.',
         };
       }
 

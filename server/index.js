@@ -734,6 +734,75 @@ app.post('/api/orders', (req, res) => {
   res.json({ success: true, order: savedOrder });
 });
 
+// ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
+// تلفن و آدرس دقیق مشتری فقط بعد از پذیرش موفق و فقط برای کار فعالِ همان متخصص فرستاده می‌شود.
+const WORKER_ACTIVE_ORDER_STATUSES = ['ACCEPTED', 'IN_PROGRESS', 'CONFIRMED', 'ASSIGNED'];
+
+/** محدوده/محله: اولین بخش آدرس (قبل از «،»). بخشی که عدد دارد یا بلند است (احتمالاً نشانی دقیق) فرستاده نمی‌شود. */
+function orderAreaFromAddress(address) {
+  const first = String(address || '').split(/[،,]/)[0].trim();
+  if (!first || first.length > 40 || /[0-9۰-۹٠-٩]/.test(first)) return '';
+  return first;
+}
+
+/** سفارش باز برای فهرست «سفارش‌های جدید»: فقط اطلاعات لازم برای تصمیم پذیرش. */
+function workerAvailableOrderView(order) {
+  const area = orderAreaFromAddress(order.address);
+  return {
+    id: order.id,
+    status: order.status,
+    serviceId: order.serviceId ?? null,
+    serviceTitle: order.serviceTitle,
+    durationHours: order.durationHours ?? null,
+    genderPreference: order.genderPreference ?? null,
+    serviceOptions: order.serviceOptions ?? null,
+    recurringFrequency: order.recurringFrequency ?? null,
+    date: order.date,
+    time: order.time,
+    price: order.price,
+    paymentMethod: order.paymentMethod,
+    // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
+    createdAt: order.createdAt,
+    area,
+    address: area,
+    addressNotes: null,
+    customerName: '',
+    customerPhone: '',
+    customerAvatar: '',
+    cleanerId: null,
+    cleanerName: null,
+    cleanerAvatar: null,
+  };
+}
+
+/** سفارش‌های خود متخصص: برای کار لغوشده/تمام‌شده تلفن و آدرس دقیق حذف می‌شود. */
+function workerAssignedOrderView(order) {
+  const area = orderAreaFromAddress(order.address);
+  if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
+    return { ...order, area };
+  }
+  return {
+    ...order,
+    area,
+    address: area,
+    addressNotes: null,
+    customerPhone: '',
+    customerAvatar: '',
+  };
+}
+
+function acceptConflictMessage(order, cleanerId) {
+  const status = order && order.status;
+  if (status === 'CANCELLED') return 'این سفارش توسط مشتری لغو شده است.';
+  if (WORKER_ACTIVE_ORDER_STATUSES.includes(status)) {
+    return order.cleanerId && order.cleanerId === cleanerId
+      ? 'این سفارش قبلاً توسط شما پذیرفته شده است.'
+      : 'این سفارش قبلاً توسط متخصص دیگری پذیرفته شده است.';
+  }
+  if (status === 'COMPLETED') return 'این سفارش انجام شده است و دیگر قابل پذیرش نیست.';
+  return 'این سفارش در حال حاضر قابل پذیرش نیست.';
+}
+
 // 6. سفارش‌های آماده (متخصصین تایید شده)
 app.get('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
@@ -742,7 +811,7 @@ app.get('/api/orders', (req, res) => {
     return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }) });
   }
   if (authUser.role === 'WORKER') {
-    return res.json({ success: true, orders: store.getOrders({ cleanerId: authUser.id }) });
+    return res.json({ success: true, orders: store.getOrders({ cleanerId: authUser.id }).map(workerAssignedOrderView) });
   }
   return res.status(403).json({ success: false, message: 'دسترسی مجاز نیست.', orders: [] });
 });
@@ -756,10 +825,7 @@ app.get('/api/orders/available', (req, res) => {
   if (authUser.status !== 'APPROVED' && authUser.status !== 'ACTIVE') {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
-  const availableOrders = store.getOrders({ status: 'PENDING' }).map((order) => ({
-    ...order,
-    customerPhone: '',
-  }));
+  const availableOrders = store.getOrders({ status: 'PENDING' }).map(workerAvailableOrderView);
   res.json({ success: true, orders: availableOrders });
 });
 
@@ -785,7 +851,7 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   const accepted = store.tryAcceptOrder(orderId, cleaner);
   if (accepted.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
   if (accepted.code === 'conflict') {
-    return res.status(400).json({ success: false, message: 'این سفارش قبلاً پذیرفته شده است.' });
+    return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
   }
   res.json({ success: true, order: accepted.order });
 });
@@ -842,7 +908,8 @@ app.put('/api/orders/:orderId/complete', (req, res) => {
   if (completed.code === 'forbidden') {
     return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
   }
-  res.json({ success: true, order: completed.order });
+  // سفارش تمام‌شده: همان نمای GET /orders (بدون تلفن و آدرس دقیق مشتری).
+  res.json({ success: true, order: workerAssignedOrderView(completed.order) });
 });
 
 app.put('/api/orders/:orderId/rate', (req, res) => {
@@ -1466,6 +1533,21 @@ app.get('/admin', (req, res) => {
 </body>
 </html>
   `);
+});
+
+// ------------------- خطای پیش‌بینی‌نشده -------------------
+// بدون این بخش، Express در حالت development متن خطا و مسیر فایل‌های سرور را برای کاربر می‌فرستد.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = Number(err && (err.status || err.statusCode));
+  if (status === 413) {
+    return res.status(413).json({ success: false, message: 'حجم اطلاعات ارسالی بیش از حد مجاز است.' });
+  }
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ success: false, message: 'درخواست نامعتبر است. لطفاً دوباره تلاش کنید.' });
+  }
+  console.error('[Paksho] خطای پیش‌بینی‌نشده:', err);
+  return res.status(500).json({ success: false, message: 'مشکلی پیش آمد. لطفاً دوباره تلاش کنید.' });
 });
 
 if (require.main === module) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,20 @@ import { attachStoredAuthToken } from '../../api/authToken';
 import type { ApiOrder } from '../../api/types';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
 import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
+import {
+  canAcceptWorkerOrder,
+  canCallWorkerCustomer,
+  canCompleteWorkerOrder,
+  isActiveWorkerJob,
+  normalizeWorkerOrderStatus,
+  partitionWorkerJobs,
+  preAcceptOrderView,
+  workerOrderArea,
+  workerStatusLabel,
+  workerStatusTone,
+  type WorkerOrderStatus,
+  type WorkerStatusTone,
+} from './workerOrderStatus';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -40,7 +54,9 @@ interface NativeOrder {
   wageTotal: number;
   paymentMethod: 'ONLINE' | 'CASH';
   detailsNote: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED';
+  /** وضعیت خام سرور (CANCELLED/CONFIRMED دیگر به OPEN تبدیل نمی‌شوند). */
+  status: WorkerOrderStatus;
+  createdAt: string;
 }
 
 interface NativeWorkerPortalProps {
@@ -60,6 +76,21 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   const [myAcceptedOrders, setMyAcceptedOrders] = useState<NativeOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
+  // جلوگیری از ارسال دوباره پذیرش/تکمیل برای همان سفارش تا پاسخ قبلی برسد
+  const actionsInFlight = useRef<Set<string>>(new Set());
+  const [busyOrderIds, setBusyOrderIds] = useState<string[]>([]);
+
+  const beginOrderAction = (orderId: string): boolean => {
+    if (actionsInFlight.current.has(orderId)) return false;
+    actionsInFlight.current.add(orderId);
+    setBusyOrderIds(Array.from(actionsInFlight.current));
+    return true;
+  };
+
+  const endOrderAction = (orderId: string) => {
+    actionsInFlight.current.delete(orderId);
+    setBusyOrderIds(Array.from(actionsInFlight.current));
+  };
 
   const mapBackendOrder = (o: ApiOrder): NativeOrder => {
     const classified = classifyWorkerOrder(o);
@@ -70,14 +101,15 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       badge: classified.badge,
       customerName: o.customerName || 'مشتری',
       phone: o.customerPhone || '',
-      district: o.address ? o.address.split(' ')[0] : 'تهران',
-      address: o.address || 'بدون آدرس',
+      district: workerOrderArea(o),
+      address: o.address || '',
       date: o.date || 'امروز',
       timeSlot: o.time || 'نامشخص',
       wageTotal: o.price ? Math.round(o.price * 0.8) : 0,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
-      status: o.status === 'PENDING' ? 'OPEN' : (o.status === 'ACCEPTED' || o.status === 'ASSIGNED' || o.status === 'IN_PROGRESS') ? 'IN_PROGRESS' : o.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
+      status: normalizeWorkerOrderStatus(o.status),
+      createdAt: o.createdAt || '',
     };
   };
 
@@ -87,7 +119,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
       const availRes = await apiFetch('/orders/available');
       if (availRes.success && Array.isArray(availRes.orders)) {
-        setAvailableOrders((availRes.orders as ApiOrder[]).map(mapBackendOrder));
+        // سفارش باز: فقط محدوده؛ تلفن، نام، یادداشت و نشانی دقیق قبل از پذیرش نگه داشته نمی‌شود.
+        setAvailableOrders((availRes.orders as ApiOrder[]).map((o) => mapBackendOrder(preAcceptOrderView(o))));
       } else {
         setAvailableOrders([]);
       }
@@ -112,45 +145,126 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   }, [fetchOrders]);
 
   const handleAcceptOrder = async (order: NativeOrder) => {
-    if (!user?.id) return;
+    if (!user?.id || !canAcceptWorkerOrder(order.status)) return;
+    if (!beginOrderAction(order.id)) return;
     try {
       const res = await apiFetch('/orders/' + order.id + '/accept', {
         method: 'PUT',
         body: JSON.stringify({ cleanerId: user.id }),
       });
       if (res.success) {
-        setSuccessAlert('سفارش شماره ' + order.id + ' با موفقیت پذیرفته شد.');
+        setSuccessAlert('سفارش «' + order.serviceTitle + '» با موفقیت پذیرفته شد.');
         setTimeout(() => setSuccessAlert(null), 5000);
-        fetchOrders();
       } else {
         alert(res.message || 'خطا در پذیرش سفارش');
       }
     } catch {
-      alert('خطا در ارتباط با سرور');
+      alert('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+    } finally {
+      endOrderAction(order.id);
+      // بعد از موفقیت یا خطا (مثلاً سفارشی که مشتری لغو کرده) فهرست‌ها تازه می‌شوند تا کارت کهنه نماند.
+      void fetchOrders();
     }
   };
 
   const handleCompleteOrder = async (order: NativeOrder) => {
-    if (!user?.id) return;
+    if (!user?.id || !canCompleteWorkerOrder(order.status)) return;
+    if (!beginOrderAction(order.id)) return;
     try {
       const res = await apiFetch('/orders/' + order.id + '/complete', {
         method: 'PUT',
         body: JSON.stringify({ cleanerId: user.id }),
       });
       if (res.success) {
-        setSuccessAlert('سفارش شماره ' + order.id + ' تکمیل شد.');
+        setSuccessAlert('سفارش «' + order.serviceTitle + '» تکمیل شد.');
         setTimeout(() => setSuccessAlert(null), 5000);
-        fetchOrders();
       } else {
         alert(res.message || 'خطا در تکمیل سفارش');
       }
     } catch {
-      alert('خطا در ارتباط با سرور');
+      alert('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+    } finally {
+      endOrderAction(order.id);
+      void fetchOrders();
     }
   };
 
-  const handleCallCustomer = (phone: string) => {
-    Linking.openURL('tel:' + phone);
+  const handleCallCustomer = (order: NativeOrder) => {
+    if (!canCallWorkerCustomer(order.status, order.phone)) return;
+    Linking.openURL('tel:' + order.phone);
+  };
+
+  const { active: activeJobs, history: jobHistory } = partitionWorkerJobs(myAcceptedOrders);
+
+  const badgeStyleFor = (tone: WorkerStatusTone) =>
+    tone === 'cancelled' ? styles.cancelledBadge : tone === 'completed' ? styles.completedBadge : tone === 'active' ? styles.inProgressBadge : styles.neutralBadge;
+  const badgeTextStyleFor = (tone: WorkerStatusTone) =>
+    tone === 'cancelled' ? styles.cancelledBadgeText : tone === 'completed' ? styles.completedBadgeText : tone === 'active' ? styles.inProgressBadgeText : styles.neutralBadgeText;
+
+  const renderJobCard = (order: NativeOrder) => {
+    const active = isActiveWorkerJob(order.status);
+    const tone = workerStatusTone(order.status);
+    const busy = busyOrderIds.includes(order.id);
+    return (
+      <View key={order.id} style={[styles.orderCard, active ? styles.myJobCard : styles.historyCard]}>
+        <View style={styles.cardTop}>
+          <View style={badgeStyleFor(tone)}>
+            <Text style={badgeTextStyleFor(tone)}>{workerStatusLabel(order.status)}</Text>
+          </View>
+          <View style={styles.titleArea}>
+            <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoRow}>
+          <MapPin size={16} color={active ? '#059669' : '#94a3b8'} />
+          {active ? (
+            <Text style={styles.infoText}>
+              {order.district ? <Text style={styles.boldText}>{order.district}: </Text> : null}
+              {order.address || 'بدون آدرس'}
+            </Text>
+          ) : (
+            <Text style={styles.infoText}>{order.district || 'محدوده نامشخص'}</Text>
+          )}
+        </View>
+
+        <View style={styles.infoRow}>
+          <Clock size={16} color={active ? '#059669' : '#94a3b8'} />
+          <Text style={styles.infoText}>{order.date} | {order.timeSlot}</Text>
+        </View>
+
+        {canCallWorkerCustomer(order.status, order.phone) ? (
+          <View style={styles.actionButtonsRow}>
+            <Pressable
+              onPress={() => handleCallCustomer(order)}
+              style={styles.callButton}
+            >
+              <Phone size={16} color="#fff" />
+              <Text style={styles.callButtonText}>تماس با مشتری ({order.phone})</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.cardFooter}>
+          <View style={styles.wageBox}>
+            <Text style={styles.wageLabel}>مبلغ تسویه:</Text>
+            <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
+          </View>
+        </View>
+        {canCompleteWorkerOrder(order.status) ? (
+          <Pressable
+            onPress={() => handleCompleteOrder(order)}
+            disabled={busy}
+            style={[styles.completeButtonFull, busy && styles.buttonDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel="اتمام کار"
+            accessibilityState={{ disabled: busy }}
+          >
+            <Text style={styles.completeButtonText}>{busy ? 'در حال ثبت...' : 'اتمام کار'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
   };
 
   const filteredOrders = availableOrders.filter(order => {
@@ -213,7 +327,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           style={[styles.tabItem, activeTab === 'my_jobs' && styles.tabItemActive]}
         >
           <Text style={[styles.tabText, activeTab === 'my_jobs' && styles.tabTextActive]}>
-            کارهای من ({myAcceptedOrders.length})
+            کارهای من ({activeJobs.length})
           </Text>
         </Pressable>
       </View>
@@ -270,26 +384,20 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                   ) : null}
                   <View style={styles.titleArea}>
                     <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
-                    <Text style={styles.orderId}>کد سفارش: {order.id}</Text>
                   </View>
                 </View>
 
                 <View style={styles.infoRow}>
                   <MapPin size={16} color="#0284c7" />
                   <Text style={styles.infoText}>
-                    <Text style={styles.boldText}>{order.district}: </Text>
-                    {order.address}
+                    <Text style={styles.boldText}>{order.district || 'محدوده نامشخص'}</Text>
+                    {' — آدرس دقیق و تماس پس از پذیرش نمایش داده می‌شود'}
                   </Text>
                 </View>
 
                 <View style={styles.infoRow}>
                   <Clock size={16} color="#0284c7" />
                   <Text style={styles.infoText}>{order.date} | {order.timeSlot}</Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <User size={16} color="#0284c7" />
-                  <Text style={styles.infoText}>مشتری: {order.customerName}</Text>
                 </View>
 
                 {order.detailsNote ? (
@@ -304,13 +412,21 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                     <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
                   </View>
 
-                  <Pressable
-                    onPress={() => handleAcceptOrder(order)}
-                    style={styles.acceptButton}
-                  >
-                    <CheckCircle size={16} color="#fff" />
-                    <Text style={styles.acceptButtonText}>پذیرش سفارش</Text>
-                  </Pressable>
+                  {canAcceptWorkerOrder(order.status) ? (
+                    <Pressable
+                      onPress={() => handleAcceptOrder(order)}
+                      disabled={busyOrderIds.includes(order.id)}
+                      style={[styles.acceptButton, busyOrderIds.includes(order.id) && styles.buttonDisabled]}
+                      accessibilityState={{ disabled: busyOrderIds.includes(order.id) }}
+                    >
+                      <CheckCircle size={16} color="#fff" />
+                      <Text style={styles.acceptButtonText}>
+                        {busyOrderIds.includes(order.id) ? 'در حال پذیرش...' : 'پذیرش سفارش'}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.wageLabel}>{workerStatusLabel(order.status)}</Text>
+                  )}
                 </View>
               </View>
             ))
@@ -322,72 +438,22 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               <Text style={styles.emptyTitle}>هنوز سفارشی نپذیرفته‌اید</Text>
             </View>
           ) : (
-            myAcceptedOrders.map(order => (
-              <View key={order.id} style={[styles.orderCard, styles.myJobCard]}>
-                <View style={styles.cardTop}>
-                  <View style={styles.inProgressBadge}>
-                    <Text style={styles.inProgressBadgeText}>
-                      {order.status === 'COMPLETED' ? 'انجام شده' : 'در حال انجام'}
-                    </Text>
-                  </View>
-                  <View style={styles.titleArea}>
-                    <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
-                    <Text style={styles.orderId}>کد سفارش: {order.id}</Text>
-                  </View>
+            <>
+              {activeJobs.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Briefcase size={40} color="#94a3b8" />
+                  <Text style={styles.emptyTitle}>کار فعالی ندارید</Text>
                 </View>
-
-                <View style={styles.infoRow}>
-                  <MapPin size={16} color="#059669" />
-                  <Text style={styles.infoText}>
-                    <Text style={styles.boldText}>{order.district}: </Text>
-                    {order.address}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Clock size={16} color="#059669" />
-                  <Text style={styles.infoText}>{order.date} | {order.timeSlot}</Text>
-                </View>
-
-                <View style={styles.actionButtonsRow}>
-                  <Pressable
-                    onPress={() => handleCallCustomer(order.phone)}
-                    style={styles.callButton}
-                  >
-                    <Phone size={16} color="#fff" />
-                    <Text style={styles.callButtonText}>تماس با مشتری ({order.phone})</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <View style={styles.wageBox}>
-                    <Text style={styles.wageLabel}>مبلغ تسویه:</Text>
-                    <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
-                  </View>
-                  {order.status === 'COMPLETED' ? (
-                    <View style={styles.acceptedTag}>
-                      <CheckCircle size={14} color="#0284c7" />
-                      <Text style={[styles.acceptedTagText, { color: '#0284c7' }]}>تکمیل شده</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.acceptedTag}>
-                      <CheckCircle size={14} color="#059669" />
-                      <Text style={styles.acceptedTagText}>پذیرفته شده</Text>
-                    </View>
-                  )}
-                </View>
-                {order.status !== 'COMPLETED' ? (
-                  <Pressable
-                    onPress={() => handleCompleteOrder(order)}
-                    style={styles.completeButtonFull}
-                    accessibilityRole="button"
-                    accessibilityLabel="اتمام کار"
-                  >
-                    <Text style={styles.completeButtonText}>اتمام کار</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ))
+              ) : (
+                activeJobs.map(renderJobCard)
+              )}
+              {jobHistory.length > 0 ? (
+                <>
+                  <Text style={styles.historyTitle}>سوابق (انجام‌شده و لغوشده)</Text>
+                  {jobHistory.map(renderJobCard)}
+                </>
+              ) : null}
+            </>
           )
         ) : null}
       </ScrollView>
@@ -432,11 +498,19 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10 },
   titleArea: { flex: 1, alignItems: 'flex-end' },
   serviceTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
-  orderId: { fontSize: 10, color: '#94a3b8', marginTop: 2 },
   badgeBox: { backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { color: '#0369a1', fontSize: 10, fontWeight: '700' },
   inProgressBadge: { backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   inProgressBadgeText: { color: '#047857', fontSize: 10, fontWeight: '700' },
+  completedBadge: { backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  completedBadgeText: { color: '#0369a1', fontSize: 10, fontWeight: '700' },
+  cancelledBadge: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  cancelledBadgeText: { color: '#b91c1c', fontSize: 10, fontWeight: '700' },
+  neutralBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  neutralBadgeText: { color: '#475569', fontSize: 10, fontWeight: '700' },
+  historyCard: { opacity: 0.85 },
+  historyTitle: { color: '#94a3b8', fontSize: 12, fontWeight: '800', textAlign: 'right', marginTop: 8 },
+  buttonDisabled: { opacity: 0.6 },
   infoRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
   infoText: { fontSize: 12, color: '#475569', textAlign: 'right', flex: 1 },
   boldText: { fontWeight: '700', color: '#0f172a' },
@@ -451,8 +525,6 @@ const styles = StyleSheet.create({
   wageValue: { fontSize: 14, fontWeight: '900', color: '#059669' },
   acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
   acceptButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  acceptedTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  acceptedTagText: { color: '#059669', fontSize: 11, fontWeight: '700' },
   completeButton: { backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
   completeButtonFull: {
     marginTop: 10,

@@ -19,6 +19,10 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+/** پیام‌های عمومی و غیرفنی برای نمایش به کاربر. */
+export const CONNECTION_ERROR_MESSAGE = 'ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
+export const GENERIC_ERROR_MESSAGE = 'مشکلی پیش آمد. لطفاً دوباره تلاش کنید.';
+
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   try {
     const token = getApiAuthToken();
@@ -49,7 +53,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     if (!text) {
       return {
         success: false,
-        message: response.ok ? 'پاسخ خالی از سرور' : `خطای سرور (${response.status})`,
+        message: GENERIC_ERROR_MESSAGE,
       };
     }
 
@@ -58,12 +62,12 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     } catch {
       return {
         success: false,
-        message: `پاسخ نامعتبر از سرور (${response.status})`,
+        message: GENERIC_ERROR_MESSAGE,
       };
     }
   } catch (error) {
     // console.error باعث RedBox/LogBox مزاحم روی گوشی می‌شود؛ warn کافی است.
     console.warn(`API Error on ${endpoint}:`, error);
-    return { success: false, message: 'خطا در ارتباط با سرور محلی' };
+    return { success: false, message: CONNECTION_ERROR_MESSAGE };
   }
 }

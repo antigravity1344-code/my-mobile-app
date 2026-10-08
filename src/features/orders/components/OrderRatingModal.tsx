@@ -10,6 +10,7 @@ import {
 import { Star, X, Check, Award, User } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import type { OrderItem } from '../types/order';
+import { customerTierLabel } from '../../../utils/pricing';
 
 interface OrderRatingModalProps {
   order: OrderItem | undefined;
@@ -90,7 +91,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
             </Pressable>
             <View style={styles.headerTitleWrap}>
               <Text style={styles.headerTitle}>ثبت نظر و امتیاز</Text>
-              <Text style={styles.headerSubtitle}>{order.orderNumber}</Text>
+              <Text style={styles.headerSubtitle}>{order.serviceTitle}</Text>
             </View>
           </View>
 
@@ -119,7 +120,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
                 <View style={styles.reciprocalTextWrap}>
                   <Text style={styles.reciprocalTitle}>امتیاز متخصص به شما به عنوان مشتری:</Text>
                   <Text style={styles.reciprocalScore}>
-                    {order.ratings.cleanerRating} از ۵ ستاره • سطح مشتری: {order.customerTier}
+                    {order.ratings.cleanerRating} از ۵ ستاره • سطح مشتری: {customerTierLabel(order.customerTier) || '—'}
                   </Text>
                 </View>
               </View>

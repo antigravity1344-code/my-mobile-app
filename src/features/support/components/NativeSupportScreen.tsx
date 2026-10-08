@@ -54,7 +54,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
       if (!alive) return;
       const saved = Array.isArray(res.messages) ? res.messages : [];
       setMessages(saved.filter((m: SupportMessage) => m && m.userId === user.id));
-      if (!res.success) setError(res.message || 'خواندن پیام‌ها از سرور ممکن نشد.');
+      if (!res.success) setError(res.message || 'دریافت پیام‌ها انجام نشد. لطفاً دوباره تلاش کنید.');
     })();
     return () => {
       alive = false;
@@ -84,7 +84,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
         body: JSON.stringify({ subject: subject.trim(), body: body.trim() }),
       });
       if (!res.success || !res.message) {
-        setError(res.message || 'ثبت پیام روی سرور ممکن نشد.');
+        setError(res.message || 'ارسال پیام انجام نشد. لطفاً دوباره تلاش کنید.');
         return;
       }
       setMessages((prev) => [res.message as SupportMessage, ...prev]);
@@ -105,7 +105,6 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             {displayName} عزیز، سوال‌های متداول را ببینید یا با پشتیبانی تماس بگیرید.
           </Text>
           <Text style={styles.meta}>ساعات پاسخگویی: {SUPPORT_HOURS}</Text>
-          <Text style={styles.meta}>شناسه شما: {user.id}</Text>
         </View>
 
         <View style={styles.actions}>

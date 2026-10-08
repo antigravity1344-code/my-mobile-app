@@ -39,10 +39,13 @@ export function classifyWorkerOrder(order: {
   };
 }
 
-function optionLabel(serviceId: string, key: string): string {
+/** برچسب فارسی گزینه سرویس؛ برای کلید ناشناخته null (کلید انگلیسی نمایش داده نمی‌شود). */
+function optionLabel(serviceId: string, key: string): string | null {
   const service = SERVICES_CATALOG.find((item) => item.id === serviceId);
-  const input = service?.configuration.inputs?.find((item) => item.id === key);
-  return input?.label || key;
+  const input = service
+    ? service.configuration.inputs?.find((item) => item.id === key)
+    : SERVICES_CATALOG.flatMap((item) => item.configuration.inputs ?? []).find((item) => item.id === key);
+  return input?.label || null;
 }
 
 function optionValue(value: unknown): string {
@@ -50,6 +53,24 @@ function optionValue(value: unknown): string {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'string') return value.trim();
   return '';
+}
+
+export type ServiceOptionRow = { key: string; label: string; value: string };
+
+/** گزینه‌های ذخیره‌شده سفارش به‌صورت برچسب و مقدار فارسی؛ کلیدهای ناشناخته و مقادیر خالی حذف می‌شوند. */
+export function describeServiceOptions(
+  serviceId: string | null | undefined,
+  options: Record<string, unknown> | null | undefined,
+): ServiceOptionRow[] {
+  if (!options || typeof options !== 'object') return [];
+  const id = typeof serviceId === 'string' ? serviceId : '';
+  const rows: ServiceOptionRow[] = [];
+  for (const [key, raw] of Object.entries(options)) {
+    const label = optionLabel(id, key);
+    const value = optionValue(raw);
+    if (label && value) rows.push({ key, label, value });
+  }
+  return rows;
 }
 
 export function describeWorkerServiceFacts(order: {
@@ -65,11 +86,8 @@ export function describeWorkerServiceFacts(order: {
     lines.push(`مدت: ${order.durationHours} ساعت`);
   }
   const serviceId = typeof order.serviceId === 'string' ? order.serviceId : '';
-  if (order.serviceOptions && typeof order.serviceOptions === 'object') {
-    for (const [key, value] of Object.entries(order.serviceOptions)) {
-      const text = optionValue(value);
-      if (text) lines.push(`${optionLabel(serviceId, key)}: ${text}`);
-    }
+  for (const option of describeServiceOptions(serviceId, order.serviceOptions)) {
+    lines.push(`${option.label}: ${option.value}`);
   }
   const gender = typeof order.genderPreference === 'string' ? GENDER_LABELS[order.genderPreference] : '';
   const optionGender = optionValue(order.serviceOptions?.gender);

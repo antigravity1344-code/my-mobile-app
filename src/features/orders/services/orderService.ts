@@ -8,7 +8,7 @@ import type {
 } from '../types/order';
 import type { FinalPrice } from '../../../utils/pricing';
 import { appStorage } from '../../../utils/storage';
-import { apiFetch } from '../../../api/apiClient';
+import { apiFetch, CONNECTION_ERROR_MESSAGE } from '../../../api/apiClient';
 import { attachStoredAuthToken } from '../../../api/authToken';
 import type { ApiOrder } from '../../../api/types';
 import { CUSTOMER_TOKEN_KEY } from '../../../components/native/customerLoginStorage';
@@ -78,7 +78,7 @@ export function resolveCustomerOrdersResponse(apiResult: {
   }
   return {
     orders: [],
-    error: apiResult?.message || 'اتصال به سرور سفارش‌ها برقرار نشد.',
+    error: apiResult?.message || 'دریافت سفارش‌ها انجام نشد. لطفاً دوباره تلاش کنید.',
   };
 }
 
@@ -276,7 +276,7 @@ export const orderService = {
         error,
       };
     } catch {
-      const error = 'اتصال به سرور سفارش‌ها برقرار نشد.';
+      const error = CONNECTION_ERROR_MESSAGE;
       lastOrdersLoadError = error;
       return { orders: [], error };
     }
@@ -294,7 +294,7 @@ export const orderService = {
   ): Promise<{ success: boolean; error?: string; order?: OrderItem; refundAmount?: number }> {
     const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
     if (!trimmedUserId) {
-      return { success: false, error: 'شناسه مشتری برای لغو سفارش موجود نیست.' };
+      return { success: false, error: 'برای لغو سفارش، لطفاً دوباره وارد حساب خود شوید.' };
     }
 
     await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
@@ -304,7 +304,7 @@ export const orderService = {
     });
 
     if (!res.success || !res.order) {
-      return { success: false, error: res.message || 'لغو سفارش روی سرور انجام نشد.' };
+      return { success: false, error: res.message || 'لغو سفارش انجام نشد. لطفاً دوباره تلاش کنید.' };
     }
 
     const updatedOrder = mapApiOrderForCustomer(res.order) as OrderItem;
@@ -340,7 +340,7 @@ export const orderService = {
     });
 
     if (!res.success || !res.order) {
-      return { success: false, error: res.message || 'ثبت امتیاز روی سرور انجام نشد.' };
+      return { success: false, error: res.message || 'ثبت امتیاز انجام نشد. لطفاً دوباره تلاش کنید.' };
     }
 
     const updatedOrder = mapApiOrderForCustomer(res.order) as OrderItem;
@@ -384,7 +384,7 @@ export const orderService = {
       if (!trimmedUserId) {
         return {
           success: false,
-          error: 'شناسه کاربر احراز هویت‌شده برای ثبت سفارش موجود نیست.',
+          error: 'برای ثبت سفارش، لطفاً دوباره وارد حساب خود شوید.',
         };
       }
 
@@ -426,7 +426,7 @@ export const orderService = {
       if (!res.success) {
         return {
           success: false,
-          error: res.message || 'خطا در ثبت سفارش در سرور مرکزی. سفارش ثبت نشد.'
+          error: res.message || 'ثبت سفارش انجام نشد. لطفاً دوباره تلاش کنید.'
         };
       }
 
@@ -442,7 +442,7 @@ export const orderService = {
     } catch {
       return {
         success: false,
-        error: 'برقرار نشدن ارتباط با سرور. لطفاً اتصال شبکه را بررسی فرمایید.'
+        error: CONNECTION_ERROR_MESSAGE
       };
     }
   },

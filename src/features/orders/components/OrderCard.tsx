@@ -42,11 +42,10 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       onPress={() => onPressDetails(order)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
-      {/* Top Bar: Order Number + Status Badge */}
+      {/* Top Bar: Status Badge + Recurring Tag */}
       <View style={styles.headerRow}>
         <OrderStatusBadge status={order.status} size="sm" />
         <View style={styles.orderNumberWrap}>
-          <Text style={styles.orderNumber}>{order.orderNumber}</Text>
           {isRecurring && (
             <View style={styles.recurringTag}>
               <Repeat size={10} color="#0284c7" />
@@ -206,11 +205,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-  },
-  orderNumber: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
   },
   recurringTag: {
     flexDirection: 'row-reverse',
