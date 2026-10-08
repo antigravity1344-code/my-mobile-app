@@ -41,7 +41,7 @@ export interface FinalPrice {
 const normalizeDigits = (value: string) =>
   value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
 
-const jalaliToGregorian = (year: number, month: number, day: number): [number, number, number] => {
+export const jalaliToGregorian = (year: number, month: number, day: number): [number, number, number] => {
   let gregorianYear: number;
   let adjustedYear = year;
   if (adjustedYear > 979) {

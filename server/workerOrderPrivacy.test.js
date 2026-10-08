@@ -192,6 +192,8 @@ test('worker order views hide customer contact data until an active accept', asy
   assert.equal(accepted.json.order.status, 'ACCEPTED');
   assert.equal(accepted.json.order.customerPhone, CUSTOMER_PHONE);
   assert.equal(accepted.json.order.address, FULL_ADDRESS);
+  assert.equal(Object.hasOwn(accepted.json.order, 'notes'), false, 'customer free-text notes are not in the accept response');
+  assert.equal(accepted.text.includes('وسایل نظافت'), false, 'accept response: notes text');
 
   const takenByOther = await request(server, {
     method: 'PUT',
@@ -227,7 +229,8 @@ test('worker order views hide customer contact data until an active accept', asy
   assert.equal(job.customerPhone, CUSTOMER_PHONE);
   assert.equal(job.address, FULL_ADDRESS);
   assert.equal(job.addressNotes, ADDRESS_NOTE);
-  assert.equal(job.notes, ORDER_NOTE, 'active assigned job may keep notes');
+  assert.equal(Object.hasOwn(job, 'notes'), false, 'customer free-text notes are not in the worker work view');
+  assert.equal(mine.text.includes('وسایل نظافت'), false, 'worker list: notes text');
   assert.equal(job.area, 'سعادت‌آباد');
 
   // admin-set active statuses also keep contact data for the assigned worker
@@ -413,4 +416,73 @@ test('a malformed accept request gets a friendly JSON error without internal det
   assert.equal(body.message, 'درخواست نامعتبر است. لطفاً دوباره تلاش کنید.');
   assert.equal(/SyntaxError|node_modules|at \S+ \(|[A-Za-z]:\\|\/server\//.test(res.text), false, 'no stack or paths');
   assert.equal(store.getOrder(order.id).status, 'PENDING', 'a broken request changes nothing');
+});
+
+test('customer free-text notes never reach the worker but stay for the customer and admin', async (t) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const admin = await request(server, {
+    method: 'POST',
+    pathname: '/api/admin/login',
+    body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+  });
+  const adminToken = admin.json.token;
+  const customer = await login(server, '09130000101', 'CUSTOMER');
+  const worker = await approvedWorker(server, '09130000102', adminToken);
+  const NOTE_WORDS = 'وسایل نظافت';
+  function assertNoNotes(response, label) {
+    assert.equal(response.text.includes(NOTE_WORDS), false, label + ': notes text');
+    assert.equal(response.text.includes(NOTE_PHONE_ASCII), false, label + ': phone typed in notes (ascii)');
+    assert.equal(response.text.includes(NOTE_PHONE_FA), false, label + ': phone typed in notes (persian digits)');
+    const orders = response.json.orders || (response.json.order ? [response.json.order] : []);
+    for (const order of orders) assert.equal(Object.hasOwn(order, 'notes'), false, label + ': notes field');
+  }
+
+  const order = await createOrder(server, customer.token);
+  assertNoNotes(await request(server, { pathname: '/api/orders/available', token: worker.token }), 'available');
+  const accepted = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/accept', token: worker.token, body: {} });
+  assert.equal(accepted.status, 200);
+  assertNoNotes(accepted, 'accept response');
+  // اطلاعات لازم برای انجام کار بعد از پذیرش حذف نمی‌شود.
+  assert.equal(accepted.json.order.customerPhone, CUSTOMER_PHONE);
+  assert.equal(accepted.json.order.address, FULL_ADDRESS);
+  assert.equal(accepted.json.order.addressNotes, ADDRESS_NOTE);
+  assert.equal(accepted.json.order.date, 'مهر 20');
+  assert.equal(accepted.json.order.time, '10:00 - 14:00');
+  assert.deepEqual(accepted.json.order.serviceOptions, { rooms: 2 });
+  assert.ok(accepted.json.order.acceptedAt);
+
+  for (const status of ['ACCEPTED', 'IN_PROGRESS', 'CONFIRMED', 'ASSIGNED']) {
+    if (status !== 'ACCEPTED') {
+      const set = await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status } });
+      assert.equal(set.status, 200);
+    }
+    const mine = await request(server, { pathname: '/api/orders', token: worker.token });
+    const job = mine.json.orders.find((item) => item.id === order.id);
+    assert.equal(job.status, status);
+    assert.equal(job.customerPhone, CUSTOMER_PHONE, status + ' keeps phone');
+    assert.equal(job.addressNotes, ADDRESS_NOTE, status + ' keeps address note');
+    assertNoNotes(mine, 'worker list ' + status);
+  }
+  const backToAccepted = await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'ACCEPTED' } });
+  assert.equal(backToAccepted.status, 200);
+  const completed = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: {} });
+  assert.equal(completed.status, 200);
+  assertNoNotes(completed, 'complete response');
+  assertNoNotes(await request(server, { pathname: '/api/orders', token: worker.token }), 'worker list COMPLETED');
+
+  const cancelledOrder = await createOrder(server, customer.token);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledOrder.id + '/accept', token: worker.token, body: {} })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledOrder.id + '/cancel', token: customer.token, body: {} })).status, 200);
+  assertNoNotes(await request(server, { pathname: '/api/orders', token: worker.token }), 'worker list CANCELLED');
+  assertNoNotes(await request(server, { pathname: '/api/notifications', token: worker.token }), 'worker notifications');
+
+  // مشتری و مدیر همچنان یادداشت را می‌بینند.
+  const customerList = await request(server, { pathname: '/api/orders', token: customer.token });
+  assert.equal(customerList.json.orders.find((item) => item.id === order.id).notes, ORDER_NOTE);
+  const adminList = await request(server, { pathname: '/api/admin/orders', token: adminToken });
+  assert.equal(adminList.json.orders.find((item) => item.id === order.id).notes, ORDER_NOTE);
+  assert.equal(store.getOrder(order.id).notes, ORDER_NOTE, 'the note itself is kept');
 });

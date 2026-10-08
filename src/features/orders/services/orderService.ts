@@ -18,6 +18,7 @@ import {
   submittedDurationHours,
   submittedOrderPrice,
 } from './orderPayload';
+import { expectedStartAtFromSelection } from '../../../utils/expectedStartAt';
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING',
@@ -393,6 +394,7 @@ export const orderService = {
         return { success: false, error: 'مبلغ سفارش معتبر نیست.' };
       }
       const address = formatSubmittedAddress(newOrder.address);
+      const expectedStartAt = expectedStartAtFromSelection(newOrder.date?.dateString, newOrder.timeSlot?.startTime);
       if (!address) {
         return { success: false, error: 'آدرس سفارش الزامی است.' };
       }
@@ -415,6 +417,8 @@ export const orderService = {
         time: newOrder.timeSlot?.label || `${newOrder.timeSlot?.startTime || ''} - ${newOrder.timeSlot?.endTime || ''}`,
         price,
         notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
+        // شروع بازه انتخاب‌شده به وقت تهران، به‌صورت UTC؛ اگر قابل ساختن نباشد فرستاده نمی‌شود.
+        ...(expectedStartAt ? { expectedStartAt } : {}),
       };
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);

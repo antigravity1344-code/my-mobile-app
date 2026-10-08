@@ -427,16 +427,4 @@ if (!isMainThread) {
     assert.equal(migrated.getOrder('ORD-NEW').serviceId, 'hourly_labor');
     migrated.close();
   });
-
-  test('migrated sqlite matches db.json counts', { skip: !fs.existsSync(path.join(__dirname, 'db.json')) }, () => {
-    // Legacy JSON store was removed after sqlite migration; skip when fixture is absent.
-    const json = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-    const migrated = createDataStore(path.join(__dirname, 'data', 'paksho.sqlite'));
-    const actual = migrated.counts();
-    migrated.close();
-    assert.equal(actual.users, json.users.length);
-    assert.equal(actual.orders, json.orders.length);
-    assert.equal(actual.otps, Object.keys(json.otpStore || {}).length);
-    assert.equal(actual.sessions, Object.keys(json.sessions || {}).length);
-  });
 }

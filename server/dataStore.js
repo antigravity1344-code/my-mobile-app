@@ -59,6 +59,54 @@ const ORDER_FIELDS = new Set([
   'cancelReason',
 ]);
 
+// نوع‌های رویداد سفارش طبق D-52 سند ARCHITECTURE_DECISIONS.md. نوع جدید فقط با تصمیم ثبت‌شده در سند اضافه می‌شود.
+const ORDER_EVENT_KINDS = Object.freeze([
+  'START_REPORTED_BY_WORKER',
+  'START_CONFIRMED_BY_CUSTOMER',
+  'START_DENIED_BY_CUSTOMER',
+  'START_PROMPT_SENT',
+  'START_PROMPT_ANSWERED',
+  'END_REPORTED_BY_WORKER',
+  'END_CONFIRMED_BY_CUSTOMER',
+  'END_DENIED_BY_CUSTOMER',
+  'DISPUTE_OPENED',
+  'ADMIN_DECISION',
+  'WORKER_CANNOT_CONTINUE',
+  'EXPECTED_TIME_CHANGED',
+  // تاریخچه پذیرش‌ها (تصمیم صاحب محصول در مرحله ۱): هر پذیرش موفق یک رکورد؛ acceptedAt روی سفارش آخرین پذیرش است.
+  'ORDER_ACCEPTED',
+]);
+const ORDER_EVENT_ACTOR_ROLES = Object.freeze(['customer', 'worker', 'admin', 'system']);
+// مدیر فعلاً حساب کاربری و شناسه ندارد؛ برای مدیر و سیستم actorId می‌تواند خالی باشد.
+const ACTOR_ROLES_WITHOUT_ID = Object.freeze(['admin', 'system']);
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+const MAX_EVENT_NOTE_LENGTH = 500;
+const ISO_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+/** زمان ISO 8601 با منطقه زمانی صریح را به UTC ISO تبدیل می‌کند؛ مقدار نامعتبر null برمی‌گرداند. */
+function normalizeIsoTimestamp(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text || text.length > 40) return null;
+  const match = ISO_TIMESTAMP_PATTERN.exec(text);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = match[6] === undefined ? 0 : Number(match[6]);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return null;
+  const calendarDay = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDay.getUTCMonth() !== month - 1 || calendarDay.getUTCDate() !== day) return null;
+  const zone = match[7];
+  if (zone !== 'Z' && (Number(zone.slice(1, 3)) > 23 || Number(zone.slice(4, 6)) > 59)) return null;
+  const ms = Date.parse(text);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
 function createDataStore(filename) {
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   const database = new DatabaseSync(filename, { timeout: 5000 });
@@ -177,12 +225,49 @@ function createDataStore(filename) {
     ['recurringFrequency', 'recurringFrequency TEXT'],
     ['customerTier', 'customerTier TEXT'],
     ['pricingJson', 'pricingJson TEXT'],
+    // مرحله ۱ معماری (D-50): فقط با دستورهای اختصاصی نوشته می‌شوند، نه با insert/update عمومی سفارش.
+    ['acceptedAt', 'acceptedAt TEXT'],
+    ['expectedStartAt', 'expectedStartAt TEXT'],
+    ['agreedStartAt', 'agreedStartAt TEXT'],
+    ['startStatus', "startStatus TEXT NOT NULL DEFAULT 'not_recorded'"],
   ];
   for (const [name, definition] of addedOrderColumns) {
     if (!orderColumnNames.has(name)) {
       database.exec(`ALTER TABLE orders ADD COLUMN ${definition}`);
     }
   }
+
+  // رویدادهای سفارش (D-02، D-52): فقط درج. orderId عمداً کلید خارجی ندارد.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS order_events (
+      id TEXT PRIMARY KEY,
+      orderId TEXT NOT NULL,
+      actorId TEXT,
+      actorRole TEXT NOT NULL CHECK (actorRole IN ('customer', 'worker', 'admin', 'system')),
+      kind TEXT NOT NULL,
+      claimedAt TEXT,
+      recordedAt TEXT NOT NULL,
+      correctsEventId TEXT REFERENCES order_events(id),
+      note TEXT,
+      idempotencyKey TEXT NOT NULL UNIQUE
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(orderId, recordedAt);
+    CREATE TRIGGER IF NOT EXISTS order_events_no_update BEFORE UPDATE ON order_events
+    BEGIN
+      SELECT RAISE(ABORT, 'order_events is append-only');
+    END;
+    CREATE TRIGGER IF NOT EXISTS order_events_no_delete BEFORE DELETE ON order_events
+    BEGIN
+      SELECT RAISE(ABORT, 'order_events is append-only');
+    END;
+    -- جلوی بازنویسی با INSERT OR REPLACE / REPLACE INTO / UPSERT را هم می‌گیرد (حذف ضمنیِ REPLACE تریگر حذف را صدا نمی‌زند).
+    CREATE TRIGGER IF NOT EXISTS order_events_no_overwrite BEFORE INSERT ON order_events
+    WHEN EXISTS (SELECT 1 FROM order_events WHERE id = NEW.id)
+      OR EXISTS (SELECT 1 FROM order_events WHERE idempotencyKey = NEW.idempotencyKey)
+    BEGIN
+      SELECT RAISE(ABORT, 'order_events is append-only');
+    END;
+  `);
 
   let depth = 0;
 
@@ -256,6 +341,10 @@ function createDataStore(filename) {
       customerTier: row.customerTier == null ? null : row.customerTier,
       serviceOptions: parseJson(row.serviceOptionsJson, null),
       pricing: parseJson(row.pricingJson, null),
+      acceptedAt: row.acceptedAt == null ? null : row.acceptedAt,
+      expectedStartAt: row.expectedStartAt == null ? null : row.expectedStartAt,
+      agreedStartAt: row.agreedStartAt == null ? null : row.agreedStartAt,
+      startStatus: row.startStatus || 'not_recorded',
     };
     const optional = [
       'customerAvatar',
@@ -328,6 +417,26 @@ function createDataStore(filename) {
   const listOrdersStmt = database.prepare('SELECT * FROM orders ORDER BY seq ASC');
   const nextOrderSeq = database.prepare('SELECT COALESCE(MIN(seq), 0) - 1 AS seq FROM orders');
   const deleteOrderStmt = database.prepare('DELETE FROM orders WHERE id = ?');
+  const setExpectedStartAtStmt = database.prepare('UPDATE orders SET expectedStartAt = ? WHERE id = ?');
+  const recordAcceptanceStmt = database.prepare('UPDATE orders SET acceptedAt = ? WHERE id = ?');
+  const countAcceptanceEventsStmt = database.prepare(
+    "SELECT COUNT(*) AS n FROM order_events WHERE orderId = ? AND kind = 'ORDER_ACCEPTED'"
+  );
+  // تنها مسیر پاک کردن پذیرش: برگشت سفارش فعال به PENDING (پذیرش و متخصص اختصاص‌یافته با هم پاک می‌شوند).
+  const clearAcceptanceStmt = database.prepare(`
+    UPDATE orders SET acceptedAt = NULL, cleanerId = NULL, cleanerName = NULL, cleanerAvatar = NULL, cleanerPhone = NULL
+    WHERE id = ?
+  `);
+  const insertOrderEventStmt = database.prepare(`
+    INSERT INTO order_events (
+      id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const selectOrderEventStmt = database.prepare('SELECT * FROM order_events WHERE id = ?');
+  const selectOrderEventByKeyStmt = database.prepare('SELECT * FROM order_events WHERE idempotencyKey = ?');
+  const listOrderEventsStmt = database.prepare(
+    'SELECT * FROM order_events WHERE orderId = ? ORDER BY recordedAt ASC, rowid ASC'
+  );
 
   const upsertOtp = database.prepare(`
     INSERT INTO otp_store (phone, code, attempts, lastSent, expires)
@@ -479,9 +588,62 @@ function createDataStore(filename) {
   }
 
   function createOrder(order) {
-    const seq = nextOrderSeq.get().seq;
-    insertOrder.run(...orderParams(order, seq));
-    return getOrder(order.id);
+    return transaction(() => {
+      const seq = nextOrderSeq.get().seq;
+      insertOrder.run(...orderParams(order, seq));
+      if (order.expectedStartAt != null) {
+        const expectedStartAt = normalizeIsoTimestamp(order.expectedStartAt);
+        if (!expectedStartAt) throw new Error('INVALID_EXPECTED_START_AT');
+        setExpectedStartAtStmt.run(expectedStartAt, order.id);
+      }
+      return getOrder(order.id);
+    });
+  }
+
+  /**
+   * تنها محل ثبت پذیرش (D-50). acceptedAt سفارش زمان آخرین پذیرش معتبر می‌شود و هر پذیرش
+   * در همان تراکنش یک رویداد ORDER_ACCEPTED در order_events می‌گیرد تا زمان‌های قبلی از دست نروند.
+   * actor: { actorRole: 'worker' | 'admin', actorId, at? }. سفارش باید متخصص داشته باشد.
+   */
+  function recordAcceptance(orderId, actor) {
+    const info = actor && typeof actor === 'object' ? actor : {};
+    if (info.actorRole !== 'worker' && info.actorRole !== 'admin') throw new Error('INVALID_ACCEPTANCE_ACTOR');
+    const acceptedAt = info.at === undefined ? new Date().toISOString() : normalizeIsoTimestamp(info.at);
+    if (!acceptedAt) throw new Error('INVALID_ACCEPTED_AT');
+    return transaction(() => {
+      const row = selectOrder.get(orderId);
+      if (!row) throw new Error('ORDER_NOT_FOUND');
+      if (!row.cleanerId) throw new Error('ACCEPTANCE_WITHOUT_WORKER');
+      recordAcceptanceStmt.run(acceptedAt, orderId);
+      // کلید با شماره ترتیب پذیرش این سفارش ساخته می‌شود (داخل همان تراکنش BEGIN IMMEDIATE)،
+      // پس دو پذیرش در یک میلی‌ثانیه هم کلید یکسان نمی‌گیرند و رویدادهای قبلی دست نمی‌خورند.
+      const acceptanceNumber = countAcceptanceEventsStmt.get(orderId).n + 1;
+      const event = appendOrderEvent({
+        orderId,
+        actorId: typeof info.actorId === 'string' ? info.actorId : null,
+        actorRole: info.actorRole,
+        kind: 'ORDER_ACCEPTED',
+        claimedAt: acceptedAt,
+        idempotencyKey: 'accept:' + orderId + ':' + acceptanceNumber,
+      });
+      if (event.code !== 'ok') throw new Error('ACCEPTANCE_EVENT_NOT_RECORDED');
+      return acceptedAt;
+    });
+  }
+
+  /**
+   * برگشت سفارش فعال به PENDING (تصمیم صاحب محصول، D-50): acceptedAt و متخصص اختصاص‌یافته
+   * در یک دستور پاک می‌شوند. این تنها مسیر پاک کردن acceptedAt است و نوشتن آن فقط در recordAcceptance است.
+   * تاریخچه پذیرش‌ها در order_events می‌ماند و رویدادی اضافه نمی‌شود. سفارش باید از قبل PENDING باشد.
+   */
+  function clearAcceptanceForReturnToPending(orderId) {
+    return transaction(() => {
+      const row = selectOrder.get(orderId);
+      if (!row) throw new Error('ORDER_NOT_FOUND');
+      if (row.status !== 'PENDING') throw new Error('ORDER_NOT_PENDING');
+      clearAcceptanceStmt.run(orderId);
+      return getOrder(orderId);
+    });
   }
 
   function updateOrder(order) {
@@ -684,6 +846,7 @@ function createDataStore(filename) {
       order.cleanerAvatar = cleaner.avatar || '';
       order.cleanerPhone = cleaner.phone || '';
       updateOrder(order);
+      recordAcceptance(order.id, { actorRole: 'worker', actorId: cleaner.id });
       addNotification(order.customerId, order.id, 'ORDER_ACCEPTED', 'سفارش پذیرفته شد', 'سفارش ' + order.id + ' توسط متخصص پذیرفته شد.');
       addNotification(cleaner.id, order.id, 'ORDER_ACCEPTED', 'پذیرش سفارش', 'سفارش ' + order.id + ' را پذیرفتید.');
       return { code: 'ok', order: getOrder(orderId) };
@@ -739,6 +902,96 @@ function createDataStore(filename) {
       updateOrder(order);
       return { code: 'ok', order: getOrder(orderId) };
     });
+  }
+
+  function orderEventFromRow(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      orderId: row.orderId,
+      actorId: row.actorId == null ? null : row.actorId,
+      actorRole: row.actorRole,
+      kind: row.kind,
+      claimedAt: row.claimedAt == null ? null : row.claimedAt,
+      recordedAt: row.recordedAt,
+      correctsEventId: row.correctsEventId == null ? null : row.correctsEventId,
+      note: row.note == null ? null : row.note,
+      idempotencyKey: row.idempotencyKey,
+    };
+  }
+
+  /**
+   * ثبت یک رویداد سفارش (فقط درج). نتیجه:
+   * ok | duplicate (همان کلید با همان محتوا) | key-conflict (همان کلید با محتوای دیگر)
+   * | invalid (فیلد نامعتبر) | missing-order | missing-correction (رکورد اصلاح‌شده نیست یا مال سفارش دیگری است).
+   */
+  function appendOrderEvent(input) {
+    const data = input && typeof input === 'object' ? input : {};
+    const orderId = typeof data.orderId === 'string' ? data.orderId.trim() : '';
+    const actorRole = data.actorRole;
+    const actorId = typeof data.actorId === 'string' && data.actorId.trim() ? data.actorId.trim() : null;
+    const kind = data.kind;
+    const idempotencyKey = typeof data.idempotencyKey === 'string' ? data.idempotencyKey.trim() : '';
+    if (!orderId) return { code: 'invalid', field: 'orderId' };
+    if (!ORDER_EVENT_ACTOR_ROLES.includes(actorRole)) return { code: 'invalid', field: 'actorRole' };
+    if (!actorId && !ACTOR_ROLES_WITHOUT_ID.includes(actorRole)) return { code: 'invalid', field: 'actorId' };
+    if (data.actorId != null && typeof data.actorId !== 'string') return { code: 'invalid', field: 'actorId' };
+    if (!ORDER_EVENT_KINDS.includes(kind)) return { code: 'invalid', field: 'kind' };
+    if (!idempotencyKey || idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+      return { code: 'invalid', field: 'idempotencyKey' };
+    }
+    let claimedAt = null;
+    if (data.claimedAt != null) {
+      claimedAt = normalizeIsoTimestamp(data.claimedAt);
+      if (!claimedAt) return { code: 'invalid', field: 'claimedAt' };
+    }
+    let correctsEventId = null;
+    if (data.correctsEventId != null) {
+      if (typeof data.correctsEventId !== 'string' || !data.correctsEventId.trim()) {
+        return { code: 'invalid', field: 'correctsEventId' };
+      }
+      correctsEventId = data.correctsEventId.trim();
+    }
+    let note = null;
+    if (data.note != null) {
+      if (typeof data.note !== 'string' || data.note.length > MAX_EVENT_NOTE_LENGTH) {
+        return { code: 'invalid', field: 'note' };
+      }
+      note = data.note;
+    }
+
+    return transaction(() => {
+      const candidate = { orderId, actorId, actorRole, kind, claimedAt, correctsEventId, note, idempotencyKey };
+      const sameContent = (event) =>
+        event.orderId === candidate.orderId &&
+        event.actorId === candidate.actorId &&
+        event.actorRole === candidate.actorRole &&
+        event.kind === candidate.kind &&
+        event.claimedAt === candidate.claimedAt &&
+        event.correctsEventId === candidate.correctsEventId &&
+        event.note === candidate.note;
+
+      const existing = orderEventFromRow(selectOrderEventByKeyStmt.get(idempotencyKey));
+      if (existing) return { code: sameContent(existing) ? 'duplicate' : 'key-conflict', event: existing };
+      if (!selectOrder.get(orderId)) return { code: 'missing-order' };
+      if (correctsEventId) {
+        const corrected = selectOrderEventStmt.get(correctsEventId);
+        if (!corrected || corrected.orderId !== orderId) return { code: 'missing-correction' };
+      }
+
+      // کلید تکراری بالاتر در همین تراکنش BEGIN IMMEDIATE بررسی شده؛ تریگر جلوی هر بازنویسی را هم می‌گیرد.
+      const id = newRecordId('EVT-');
+      const recordedAt = new Date().toISOString();
+      insertOrderEventStmt.run(
+        id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey
+      );
+      return { code: 'ok', event: orderEventFromRow(selectOrderEventStmt.get(id)) };
+    });
+  }
+
+  function listOrderEvents(orderId) {
+    if (typeof orderId !== 'string' || !orderId) return [];
+    return listOrderEventsStmt.all(orderId).map(orderEventFromRow);
   }
 
   function newRecordId(prefix) {
@@ -946,6 +1199,10 @@ function createDataStore(filename) {
     importSnapshot,
     backupTo,
     migrateSensitiveFields,
+    recordAcceptance,
+    clearAcceptanceForReturnToPending,
+    appendOrderEvent,
+    listOrderEvents,
     tryAcceptOrder,
     tryCompleteOrder,
     tryCancelOrder,
@@ -962,4 +1219,4 @@ function createDataStore(filename) {
   };
 }
 
-module.exports = { createDataStore };
+module.exports = { createDataStore, ORDER_EVENT_KINDS, ORDER_EVENT_ACTOR_ROLES, normalizeIsoTimestamp };

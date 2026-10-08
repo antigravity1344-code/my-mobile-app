@@ -8,7 +8,7 @@ const {
   rememberDocument,
   assignDocument,
 } = require('./workerDocumentStorage');
-const { createDataStore } = require('./dataStore');
+const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 
@@ -652,6 +652,7 @@ app.post('/api/orders', (req, res) => {
     recurringFrequency,
     customerTier,
     pricing,
+    expectedStartAt,
   } = req.body || {};
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'ثبت سفارش برای کاربر دیگر مجاز نیست.' });
@@ -688,6 +689,17 @@ app.post('/api/orders', (req, res) => {
   const storedFrequency = frequencies.includes(recurringFrequency) ? recurringFrequency : null;
   const storedTier = tiers.includes(customerTier) ? customerTier : null;
   const storedPricing = sanitizePricing(pricing);
+  // زمان مورد انتظار ساختاریافته (D-50): اختیاری برای اپ‌های قدیمی؛ مقدار نامعتبر رد می‌شود. هیچ قانون زمانی اعمال نمی‌شود.
+  let storedExpectedStartAt = null;
+  if (expectedStartAt !== undefined && expectedStartAt !== null && expectedStartAt !== '') {
+    storedExpectedStartAt = normalizeIsoTimestamp(expectedStartAt);
+    if (!storedExpectedStartAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'زمان انتخاب‌شده برای شروع کار معتبر نیست. لطفاً تاریخ و ساعت را دوباره انتخاب کنید.'
+      });
+    }
+  }
 
   const newOrder = {
     id: createOrderId(),
@@ -716,6 +728,7 @@ app.post('/api/orders', (req, res) => {
     cleanerName: null,
     cleanerAvatar: null,
     cleanerPhone: null,
+    expectedStartAt: storedExpectedStartAt,
     createdAt: new Date().toISOString()
   };
 
@@ -778,17 +791,41 @@ function workerAvailableOrderView(order) {
 /** سفارش‌های خود متخصص: برای کار لغوشده/تمام‌شده تلفن و آدرس دقیق حذف می‌شود. */
 function workerAssignedOrderView(order) {
   const area = orderAreaFromAddress(order.address);
+  // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
+  const { notes, ...workerVisible } = order;
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
-    return { ...order, area };
+    return { ...workerVisible, area };
   }
   return {
-    ...order,
+    ...workerVisible,
     area,
     address: area,
     addressNotes: null,
     customerPhone: '',
     customerAvatar: '',
   };
+}
+
+// برچسب فارسی وضعیت برای متن اعلان تغییر وضعیت (D-06)؛ همان برچسب‌های صفحه اعلان‌های اپ.
+const ORDER_STATUS_LABELS = {
+  PENDING: 'در انتظار تأیید',
+  ACCEPTED: 'در حال انجام',
+  CONFIRMED: 'تأیید شده',
+  ASSIGNED: 'تخصیص متخصص',
+  IN_PROGRESS: 'در حال انجام',
+  COMPLETED: 'انجام شده',
+  CANCELLED: 'لغو شده',
+};
+
+function orderStatusLabel(status) {
+  return ORDER_STATUS_LABELS[status] || 'وضعیت جدید';
+}
+
+/** متخصص برای سپردن سفارش: باید وجود داشته باشد، متخصص باشد و تأییدشده و فعال باشد. */
+function adminWorkerProblem(worker) {
+  if (!worker || worker.role !== 'WORKER') return 'bad-cleaner';
+  if (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE') return 'unapproved';
+  return null;
 }
 
 function acceptConflictMessage(order, cleanerId) {
@@ -853,7 +890,7 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   if (accepted.code === 'conflict') {
     return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
   }
-  res.json({ success: true, order: accepted.order });
+  res.json({ success: true, order: workerAssignedOrderView(accepted.order) });
 });
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -1209,10 +1246,19 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     const order = store.getOrder(orderId);
     if (!order) return { code: 'missing' };
     const previousStatus = order.status;
+    // سفارش PENDING متخصص ندارد؛ اطلاعات متخصص باقی‌مانده روی یک ردیف PENDING قدیمی نادیده گرفته می‌شود
+    // تا هیچ تغییر وضعیتی سفارش را بی‌صدا با آن متخصص فعال یا بسته نکند.
+    if (previousStatus === 'PENDING') {
+      order.cleanerId = null;
+      order.cleanerName = null;
+      order.cleanerAvatar = null;
+      order.cleanerPhone = null;
+    }
+    const previousCleanerId = order.cleanerId;
     if (cleanerId) {
       const cleaner = store.getUser(cleanerId);
-      if (!cleaner || cleaner.role !== 'WORKER') return { code: 'bad-cleaner' };
-      if (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE') return { code: 'unapproved' };
+      const cleanerProblem = adminWorkerProblem(cleaner);
+      if (cleanerProblem) return { code: cleanerProblem };
       order.cleanerId = cleanerId;
       order.cleanerName = cleaner.name;
       order.cleanerAvatar = cleaner.avatar;
@@ -1226,22 +1272,56 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
         order.completedAt = new Date().toISOString();
       }
     }
-    const saved = store.updateOrder(order);
+    // سفارشی که هنوز پذیرفته نشده مستقیم تکمیل‌شده ثبت نمی‌شود (D-50).
+    if (previousStatus === 'PENDING' && order.status === 'COMPLETED') return { code: 'not-accepted' };
+    // ورود از وضعیت غیرفعال به وضعیت فعال، یا اختصاص متخصص دیگر به سفارش فعال، پذیرش است و
+    // فقط از تابع واحد recordAcceptance (D-50) می‌گذرد. پذیرش بدون متخصص مجاز نیست.
+    // جابه‌جایی بین وضعیت‌های فعال با همان متخصص پذیرش جدید نیست.
+    const wasActive = WORKER_ACTIVE_ORDER_STATUSES.includes(previousStatus);
+    const isActive = WORKER_ACTIVE_ORDER_STATUSES.includes(order.status);
+    const workerChanged = Boolean(cleanerId) && cleanerId !== previousCleanerId;
+    // تکمیل یا لغو پذیرش نیست؛ پس تعویض متخصص در همان درخواست مجاز نیست تا متخصصی بدون پذیرش ثبت نشود.
+    // مدیر اول متخصص جدید را با پذیرش معتبر اختصاص می‌دهد و بعد سفارش را تکمیل یا لغو می‌کند.
+    if (workerChanged && (order.status === 'COMPLETED' || order.status === 'CANCELLED')) {
+      return { code: 'worker-change-on-close' };
+    }
+    const isAcceptance = isActive && (!wasActive || workerChanged);
+    // سفارش PENDING متخصص ندارد: هر ذخیره در PENDING پذیرش و متخصص را در همین تراکنش پاک می‌کند
+    // (تاریخچه در order_events می‌ماند).
+    const savesAsPending = order.status === 'PENDING';
+    if (isAcceptance && !order.cleanerId) return { code: 'needs-worker' };
+    // متخصص فعلی سفارش، نه فقط متخصص فرستاده‌شده، داخل همین تراکنش دوباره بررسی می‌شود تا
+    // سفارش با متخصص حذف‌شده، تأییدنشده یا مسدود فعال نشود.
+    if (isAcceptance) {
+      const workerProblem = adminWorkerProblem(store.getUser(order.cleanerId));
+      if (workerProblem) return { code: workerProblem };
+    }
+    let saved = store.updateOrder(order);
+    if (isAcceptance) {
+      store.recordAcceptance(saved.id, { actorRole: 'admin', actorId: null });
+      saved = store.getOrder(saved.id);
+    }
+    if (savesAsPending) {
+      saved = store.clearAcceptanceForReturnToPending(saved.id);
+    }
+    // متخصصی که با برگشت به PENDING کنار گذاشته شده، مثل قبل اعلان تغییر وضعیت را می‌گیرد.
+    const notifiedWorkerId = saved.cleanerId || (savesAsPending ? previousCleanerId : null);
     if (saved.status !== previousStatus) {
+      const statusText = 'وضعیت سفارش ' + saved.id + ' به «' + orderStatusLabel(saved.status) + '» تغییر کرد.';
       store.addNotification(
         saved.customerId,
         saved.id,
         'ORDER_STATUS',
         'وضعیت سفارش تغییر کرد',
-        'وضعیت سفارش ' + saved.id + ' به ' + saved.status + ' تغییر کرد.'
+        statusText
       );
-      if (saved.cleanerId) {
+      if (notifiedWorkerId) {
         store.addNotification(
-          saved.cleanerId,
+          notifiedWorkerId,
           saved.id,
           'ORDER_STATUS',
           'وضعیت سفارش تغییر کرد',
-          'وضعیت سفارش ' + saved.id + ' به ' + saved.status + ' تغییر کرد.'
+          statusText
         );
       }
     }
@@ -1254,6 +1334,24 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
   }
   if (updated.code === 'unapproved') {
     return res.status(400).json({ success: false, message: 'متخصص هنوز تایید نشده است.' });
+  }
+  if (updated.code === 'not-accepted') {
+    return res.status(400).json({
+      success: false,
+      message: 'این سفارش هنوز توسط متخصصی پذیرفته نشده است و نمی‌توان آن را تکمیل‌شده ثبت کرد.'
+    });
+  }
+  if (updated.code === 'worker-change-on-close') {
+    return res.status(400).json({
+      success: false,
+      message: 'تغییر متخصص همراه با تکمیل یا لغو سفارش ممکن نیست. اول متخصص جدید را به سفارش اختصاص دهید، بعد وضعیت را تغییر دهید.'
+    });
+  }
+  if (updated.code === 'needs-worker') {
+    return res.status(400).json({
+      success: false,
+      message: 'برای فعال کردن این سفارش، اول یک متخصص تأییدشده به آن اختصاص دهید.'
+    });
   }
   if (updated.code === 'bad-status') {
     return res.status(400).json({
