@@ -1296,6 +1296,15 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       const workerProblem = adminWorkerProblem(store.getUser(order.cleanerId));
       if (workerProblem) return { code: workerProblem };
     }
+    if (savesAsPending) {
+      // سفارش PENDING متخصص ندارد: فیلدهای متخصص و acceptedAt از شیء حافظه هم پاک می‌شوند
+      // تا دیتابیس و حافظه همگام باشند و مقادیر cleanerId جدید ناخواسته ذخیره نشوند.
+      order.cleanerId = null;
+      order.cleanerName = null;
+      order.cleanerAvatar = null;
+      order.cleanerPhone = null;
+      order.acceptedAt = null;
+    }
     let saved = store.updateOrder(order);
     if (isAcceptance) {
       store.recordAcceptance(saved.id, { actorRole: 'admin', actorId: null });
@@ -1304,8 +1313,33 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     if (savesAsPending) {
       saved = store.clearAcceptanceForReturnToPending(saved.id);
     }
-    // متخصصی که با برگشت به PENDING کنار گذاشته شده، مثل قبل اعلان تغییر وضعیت را می‌گیرد.
-    const notifiedWorkerId = saved.cleanerId || (savesAsPending ? previousCleanerId : null);
+
+    const isWorkerReassigned =
+      Boolean(previousCleanerId) &&
+      Boolean(cleanerId) &&
+      cleanerId !== previousCleanerId &&
+      saved.cleanerId === cleanerId &&
+      WORKER_ACTIVE_ORDER_STATUSES.includes(saved.status);
+
+    if (isWorkerReassigned) {
+      store.addNotification(
+        previousCleanerId,
+        saved.id,
+        'ORDER_REASSIGNED',
+        'تغییر متخصص سفارش',
+        'سفارش ' + saved.id + ' توسط پشتیبانی به متخصص دیگری واگذار شد.'
+      );
+      store.addNotification(
+        saved.cleanerId,
+        saved.id,
+        'ORDER_ASSIGNED',
+        'واگذاری سفارش جدید',
+        'سفارش ' + saved.id + ' توسط پشتیبانی به شما واگذار شد.'
+      );
+    }
+
+    // متخصصی که با برگشت به PENDING کنار گذاشته شده، اعلان تغییر وضعیت را می‌گیرد (فقط اگر قبلاً متخصصی منتسب بوده باشد).
+    const notifiedWorkerId = savesAsPending ? previousCleanerId : saved.cleanerId;
     if (saved.status !== previousStatus) {
       const statusText = 'وضعیت سفارش ' + saved.id + ' به «' + orderStatusLabel(saved.status) + '» تغییر کرد.';
       store.addNotification(
@@ -1315,7 +1349,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
         'وضعیت سفارش تغییر کرد',
         statusText
       );
-      if (notifiedWorkerId) {
+      if (notifiedWorkerId && !isWorkerReassigned) {
         store.addNotification(
           notifiedWorkerId,
           saved.id,
