@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   BackHandler,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -11,7 +12,6 @@ import {
   Text,
   TextInput,
   View,
-  type FocusEvent,
 } from 'react-native';
 import { Check, Clock, MapPin, Sparkles, X } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
@@ -28,6 +28,7 @@ import { useProfile, type SavedAddress } from '../../features/profile';
 import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from './wizardBackNavigation';
 import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
 import { createSubmitGuard } from './submitGuard';
+import { computeRevealDelta } from './keyboardReveal';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -86,34 +87,61 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   useEffect(() => {
     districtStripScroll.reset();
   }, [districtSearch, districtStripScroll]);
-  const scrollFocusedFieldIntoView = (
-    event?: FocusEvent,
-  ) => {
-    const delay = Platform.OS === 'android' ? 250 : 120;
-    setTimeout(() => {
-      const scroll = scrollRef.current as
-        | (ScrollView & {
-            getScrollResponder?: () => {
-              scrollResponderScrollNativeHandleToKeyboard?: (
-                nodeHandle: number,
-                additionalOffset: number,
-                preventNegativeScrollOffset?: boolean,
-              ) => void;
-            };
-          })
-        | null;
-      const target = event?.nativeEvent?.target;
-      const responder = scroll?.getScrollResponder?.();
-      if (
-        typeof target === 'number' &&
-        responder?.scrollResponderScrollNativeHandleToKeyboard
-      ) {
-        responder.scrollResponderScrollNativeHandleToKeyboard(target, 96, true);
-        return;
-      }
-      scroll?.scrollToEnd({ animated: true });
-    }, delay);
+  // Keep the focused address field (plak/unit/name/phone…) above the Android keyboard.
+  // RN's built-in scroll-to-keyboard helper (ScrollView responder) assumes a full-screen ScrollView and, before
+  // keyboardDidShow arrives, uses the window height as keyboard top — so fields in the middle of the
+  // form (plak/unit) were scrolled to the top or left behind the keyboard. We measure in window
+  // coordinates instead and re-check once the keyboard is really shown (and the view has resized).
+  const scrollYRef = useRef(0);
+  const revealTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const revealFocusedField = () => {
+    const input = TextInput.State.currentlyFocusedInput?.() as unknown as
+      | { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void }
+      | null;
+    const scroll = scrollRef.current;
+    if (!input?.measureInWindow || !scroll) return;
+    const host = (scroll as unknown as { getNativeScrollRef?: () => unknown }).getNativeScrollRef?.() as
+      | { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void }
+      | null
+      | undefined;
+    if (!host?.measureInWindow) return;
+    host.measureInWindow((_sx, sy, _sw, sh) => {
+      input.measureInWindow?.((_ix, iy, _iw, ih) => {
+        const kb = Keyboard.metrics();
+        const delta = computeRevealDelta({
+          fieldTop: iy,
+          fieldBottom: iy + ih,
+          viewportTop: sy,
+          viewportBottom: sy + sh,
+          keyboardTop: kb && kb.height > 0 ? kb.screenY : undefined,
+        });
+        if (delta !== 0) {
+          scrollRef.current?.scrollTo({ y: Math.max(0, scrollYRef.current + delta), animated: true });
+        }
+      });
+    });
   };
+  const scheduleReveal = (delays: number[]) => {
+    revealTimersRef.current.forEach(clearTimeout);
+    revealTimersRef.current = delays.map((ms) => setTimeout(revealFocusedField, ms));
+  };
+  const scrollFocusedFieldIntoView = () => {
+    // Keyboard already open (moving between fields, e.g. پلاک → واحد): reveal now and once more after
+    // a possible keyboard type change (text ↔ number-pad). Otherwise keyboardDidShow triggers it;
+    // the late timer is only a fallback for devices that never send that event.
+    scheduleReveal(Keyboard.isVisible() ? [120, 400] : [700]);
+  };
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      if (TextInput.State.currentlyFocusedInput?.()) scheduleReveal([60, 350]);
+    });
+    return () => {
+      show.remove();
+      revealTimersRef.current.forEach(clearTimeout);
+      revealTimersRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [pricingVisible, setPricingVisible] = useState(false);
   const { profile, addSavedAddress } = useProfile();
   const savedAddresses = profile.savedAddresses ?? [];
@@ -373,6 +401,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        scrollEventThrottle={16}
+        onScroll={(e) => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
       >
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}><Sparkles size={22} color="#fff" /></View>
