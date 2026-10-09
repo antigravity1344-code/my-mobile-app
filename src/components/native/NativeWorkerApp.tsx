@@ -24,6 +24,7 @@ import {
   WORKER_TOKEN_KEY,
   type WorkerSessionUser,
 } from './workerLoginStorage';
+import { useAccountBlockedLogout } from './useAccountBlockedLogout';
 
 type UserData = WorkerSessionUser;
 
@@ -112,6 +113,9 @@ export const NativeWorkerApp: React.FC = () => {
     await clearWorkerSession(appStorage);
   };
 
+  // حساب مسدودشده توسط مدیر: پیام سرور، سپس خروج با همین handleLogout.
+  useAccountBlockedLogout(isLoggedIn, handleLogout);
+
   if (isLoading) {
     return <View style={styles.loadingContainer} />;
   }
@@ -180,7 +184,7 @@ export const NativeWorkerApp: React.FC = () => {
         ) : mainView === 'support' ? (
           <NativeSupportScreen user={{ id: userData.id, name: userData.name || '', phone: userData.phone }} />
         ) : isApproved ? (
-          <NativeWorkerPortal user={userData} />
+          <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
         ) : (
           <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
         )}

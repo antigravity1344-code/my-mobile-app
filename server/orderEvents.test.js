@@ -1003,7 +1003,7 @@ if (!isMainThread) {
       request(server, { method: 'PUT', pathname: '/api/admin/orders/' + orderId, token: adminToken, body });
     const id = (await postOrder(server, customer.token)).json.order.id;
     const steps = [
-      [{ cleanerId: worker.user.id }, 'در حال انجام'],
+      [{ cleanerId: worker.user.id }, 'پذیرفته‌شده'],
       [{ status: 'CONFIRMED' }, 'تأیید شده'],
       [{ status: 'ASSIGNED' }, 'تخصیص متخصص'],
       [{ status: 'IN_PROGRESS' }, 'در حال انجام'],

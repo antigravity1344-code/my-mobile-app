@@ -9,7 +9,9 @@ export type OrderStatus =
   | 'ASSIGNED'
   | 'IN_PROGRESS'
   | 'COMPLETED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  /** وضعیتی که اپ نمی‌شناسد (مثلاً وضعیت جدید سرور)؛ فقط نمایش، بدون هیچ اقدام. */
+  | 'UNKNOWN';
 
 export type OrderPaymentMethod = 'ONLINE' | 'CASH';
 

@@ -4,7 +4,7 @@ import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
-import { OrdersScreen } from '../../features/orders';
+import { OrdersScreen, useOrders } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
@@ -23,12 +23,14 @@ import {
   saveCustomerSession,
   type CustomerSessionUser,
 } from './customerLoginStorage';
+import { useAccountBlockedLogout } from './useAccountBlockedLogout';
 
 type UserData = CustomerSessionUser;
 
 export const NativeCustomerApp: React.FC = () => {
   const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
   const booking = useBooking();
+  const { resetOrders } = useOrders();
   const [fontsLoaded, fontError] = useCustomerFonts();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -98,6 +100,7 @@ export const NativeCustomerApp: React.FC = () => {
     await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
     await apiFetch('/auth/logout', { method: 'POST' });
     profileLogout();
+    await resetOrders();
     setIsLoggedIn(false);
     setUserData(null);
     setShowOnboarding(false);
@@ -105,6 +108,9 @@ export const NativeCustomerApp: React.FC = () => {
     setFocusOrderId(null);
     await clearCustomerSession(appStorage);
   };
+
+  // حساب مسدودشده توسط مدیر: پیام سرور، سپس خروج با همین handleLogout.
+  useAccountBlockedLogout(isLoggedIn, handleLogout);
 
   if (isLoading) {
     return <View style={styles.loadingContainer} />;
@@ -173,7 +179,12 @@ export const NativeCustomerApp: React.FC = () => {
         ) : mainView === 'profile' ? (
           <NativeProfileScreen onLogout={handleLogout} />
         ) : mainView === 'alerts' ? (
-          <NativeNotificationsScreen />
+          <NativeNotificationsScreen
+            onOpenOrder={(orderId) => {
+              setFocusOrderId(orderId);
+              setMainView('orders');
+            }}
+          />
         ) : mainView === 'support' ? (
           <NativeSupportScreen
             user={{

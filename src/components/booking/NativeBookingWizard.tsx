@@ -18,6 +18,7 @@ import { useBooking } from '../../context/BookingContext';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { calculateFinalPrice, customerTierLabel, type FinalPrice } from '../../utils/pricing';
+import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
@@ -25,6 +26,8 @@ import { isValidAddress, normalizePersianDigits, getAddressValidationErrors } fr
 import { useOrders, type OrderItem } from '../../features/orders';
 import { useProfile, type SavedAddress } from '../../features/profile';
 import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from './wizardBackNavigation';
+import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
+import { createSubmitGuard } from './submitGuard';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -33,28 +36,7 @@ const TIME_SLOTS: TimeSlot[] = [
   { id: 'afternoon-2', startTime: '16:00', endTime: '18:00', label: 'عصر', period: 'AFTERNOON', isAvailable: true },
 ];
 
-const makeDates = (): JalaliDateOption[] => {
-  const today = new Date();
-  const formatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: 'long', day: 'numeric' });
-  const keyFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-  return Array.from({ length: 35 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
-    const parts = formatter.formatToParts(date);
-    const keyParts = keyFormatter.formatToParts(date);
-    const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-    const keyValue = (type: string) => keyParts.find((part) => part.type === type)?.value ?? '';
-    return {
-      dateString: `${keyValue('year')}-${keyValue('month')}-${keyValue('day')}`.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))),
-      dayOfWeek: days[date.getDay()],
-      dayOfMonth: Number(value('day').replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))),
-      monthName: `${value('month')} ${value('year')}`,
-      isToday: index === 0,
-      isTomorrow: index === 1,
-    };
-  });
-};
+const makeDates = (): JalaliDateOption[] => buildJalaliDateOptions();
 
 const StepHeader = ({ step }: { step: number }) => (
   <View style={styles.stepRow}>
@@ -86,8 +68,24 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const submitGuard = useRef(createSubmitGuard());
   const [districtSearch, setDistrictSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const dateStripRef = useRef<ScrollView>(null);
+  const savedAddressStripRef = useRef<ScrollView>(null);
+  const districtStripRef = useRef<ScrollView>(null);
+  const [dateStripScroll] = useState(() => createScrollToEndOnce(() => dateStripRef.current));
+  const [savedAddressStripScroll] = useState(() => createScrollToEndOnce(() => savedAddressStripRef.current));
+  const [districtStripScroll] = useState(() => createScrollToEndOnce(() => districtStripRef.current));
+  // Strips remount when the step changes; let each open at its right edge (first item) again.
+  useEffect(() => {
+    dateStripScroll.reset();
+    savedAddressStripScroll.reset();
+    districtStripScroll.reset();
+  }, [booking.step, dateStripScroll, savedAddressStripScroll, districtStripScroll]);
+  useEffect(() => {
+    districtStripScroll.reset();
+  }, [districtSearch, districtStripScroll]);
   const scrollFocusedFieldIntoView = (
     event?: FocusEvent,
   ) => {
@@ -264,6 +262,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   };
   const submitCurrentBooking = async () => {
     if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot) return;
+    // دو لمس سریع قبل از رندر بعدی هر دو از disabled رد می‌شوند؛ این قفل همزمان فقط یکی را می‌فرستد.
+    if (!submitGuard.current.tryBegin()) return;
     setSubmissionState('submitting');
     setSubmissionMessage(null);
 
@@ -309,7 +309,13 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       updatedAt: now,
     };
 
-    const result = await addNewOrder(newOrder);
+    let result: { success: boolean; error?: string; order?: OrderItem };
+    try {
+      result = await addNewOrder(newOrder);
+    } catch {
+      result = { success: false };
+    }
+    submitGuard.current.finish(result.success);
     if (result.success) {
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
@@ -403,8 +409,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           <Text style={styles.heading}>تاریخ و ساعت</Text>
           <Text style={styles.earlyBirdHint}>با رزرو برای ۷ روز آینده یا بیشتر، تا ۱۰٪ تخفیف برنامه‌ریزی زودهنگام بگیرید.</Text>
           <Text style={styles.label}>تاریخ اعزام</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, { flexDirection: 'row-reverse' }]}>
-            {dates.map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{date.dayOfMonth}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
+          <ScrollView ref={dateStripRef} horizontal showsHorizontalScrollIndicator={false} onContentSizeChange={dateStripScroll.onContentSizeChange} contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}>
+            {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{date.dayOfMonth}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
           <Text style={styles.label}>بازه زمانی</Text>
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color="#0284c7" /><Text style={styles.flex}>{slot.label} ({slot.startTime} تا {slot.endTime})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color="#059669" />}</Pressable>)}
@@ -456,11 +462,13 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <View style={styles.savedAddressBlock}>
               <Text style={styles.label}>آدرس‌های ذخیره‌شده</Text>
               <ScrollView
+                ref={savedAddressStripRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.horizontalList, { flexDirection: 'row-reverse' }]}
+                onContentSizeChange={savedAddressStripScroll.onContentSizeChange}
+                contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}
               >
-                {savedAddresses.map((address) => {
+                {rtlOrder(savedAddresses).map((address) => {
                   const selected = selectedSavedAddressId === address.id;
                   return (
                     <Pressable
@@ -486,7 +494,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             </Text>
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color="#0284c7" /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color="#0284c7" />}</Pressable>
-          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, flexDirection: 'row-reverse' }}>{filteredDistricts.map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
+          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView ref={districtStripRef} horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} onContentSizeChange={districtStripScroll.onContentSizeChange} contentContainerStyle={[{ paddingHorizontal: 16 }, styles.rtlStrip]}>{rtlOrder(filteredDistricts).map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
             <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
@@ -542,6 +550,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
                 onPress={() => {
                   const orderId = createdOrderId;
                   booking.resetBooking();
+                  submitGuard.current = createSubmitGuard();
                   setSubmissionState('idle');
                   setSubmissionMessage(null);
                   setCreatedOrderId(null);
@@ -590,7 +599,7 @@ const styles = StyleSheet.create({
   discountLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ecfdf5', borderRadius: 10, padding: 10 },
   discountLabel: { color: '#047857', fontSize: 12, fontWeight: '700', textAlign: 'right' },
   discountAmount: { color: '#059669', fontSize: 13, fontWeight: '800' },
-  screen: { flex: 1, backgroundColor: '#f8fafc' }, content: { padding: 20, paddingTop: 56, paddingBottom: 160 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7' }, title: { textAlign: 'right', color: '#0f172a', fontSize: 22, fontWeight: '800' }, subtitle: { textAlign: 'right', color: '#64748b', fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: '#0284c7' }, stepNumber: { color: '#64748b', fontWeight: '700' }, stepNumberActive: { color: '#fff' }, stepLabel: { color: '#94a3b8', fontSize: 11 }, stepLabelActive: { color: '#0284c7', fontWeight: '700' }, section: { gap: 12 }, pricingButton: { alignItems: 'center', padding: 13, borderRadius: 13, backgroundColor: '#e0f2fe' }, pricingButtonText: { color: '#0369a1', fontWeight: '800' }, optionBlock: { gap: 8 }, toggle: { alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }, toggleSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, heading: { textAlign: 'right', color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 6 }, label: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 8 }, labeledInput: { flex: 1, gap: 6 }, inputLabel: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, padding: 15 }, cardSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 14 }, muted: { color: '#64748b', fontSize: 11, textAlign: 'right' }, configuration: { color: '#0369a1', fontSize: 10, textAlign: 'right', marginTop: 3 }, price: { color: '#059669', fontSize: 11, fontWeight: '700', textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' }, dateDay: { color: '#475569', fontSize: 11 }, dateNumber: { color: '#0f172a', fontWeight: '800' }, slot: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, choiceText: { color: '#475569', fontSize: 12 }, choiceTextSelected: { color: '#fff', fontWeight: '700', fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#e0f2fe' }, gpsText: { color: '#0369a1', fontWeight: '700' }, inputError: { borderColor: '#ef4444', borderWidth: 1 }, inputSuccess: { borderColor: '#10b981', borderWidth: 1 }, input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: '#0f172a', textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { flex: 1 }, chip: { paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' }, chipSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
+  screen: { flex: 1, backgroundColor: '#f8fafc' }, content: { padding: 20, paddingTop: 56, paddingBottom: 160 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0284c7' }, title: { textAlign: 'right', color: '#0f172a', fontSize: 22, fontWeight: '800' }, subtitle: { textAlign: 'right', color: '#64748b', fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: '#0284c7' }, stepNumber: { color: '#64748b', fontWeight: '700' }, stepNumberActive: { color: '#fff' }, stepLabel: { color: '#94a3b8', fontSize: 11 }, stepLabelActive: { color: '#0284c7', fontWeight: '700' }, section: { gap: 12 }, pricingButton: { alignItems: 'center', padding: 13, borderRadius: 13, backgroundColor: '#e0f2fe' }, pricingButtonText: { color: '#0369a1', fontWeight: '800' }, optionBlock: { gap: 8 }, toggle: { alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }, toggleSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, heading: { textAlign: 'right', color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 6 }, label: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 8 }, labeledInput: { flex: 1, gap: 6 }, inputLabel: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 16, padding: 15 }, cardSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#e0f2fe', alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 14 }, muted: { color: '#64748b', fontSize: 11, textAlign: 'right' }, configuration: { color: '#0369a1', fontSize: 10, textAlign: 'right', marginTop: 3 }, price: { color: '#059669', fontSize: 11, fontWeight: '700', textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, rtlStrip: { flexGrow: 1, flexDirection: 'row', justifyContent: 'flex-end' }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: '#0284c7', backgroundColor: '#e0f2fe' }, dateDay: { color: '#475569', fontSize: 11 }, dateNumber: { color: '#0f172a', fontWeight: '800' }, slot: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' }, choiceText: { color: '#475569', fontSize: 12 }, choiceTextSelected: { color: '#fff', fontWeight: '700', fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: '#e0f2fe' }, gpsText: { color: '#0369a1', fontWeight: '700' }, inputError: { borderColor: '#ef4444', borderWidth: 1 }, inputSuccess: { borderColor: '#10b981', borderWidth: 1 }, input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: '#0f172a', textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { flex: 1 }, chip: { paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' }, chipSelected: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
   savedAddressBlock: { gap: 8 },
   savedAddressEmpty: { textAlign: 'right', color: '#64748b', fontSize: 12, lineHeight: 19, backgroundColor: '#f1f5f9', padding: 12, borderRadius: 12 },
   savedAddressCard: { width: 200, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', gap: 4 },

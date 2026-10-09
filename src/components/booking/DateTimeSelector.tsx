@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Calendar, Clock, FileText } from 'lucide-react';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
+import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
 
 interface DateTimeSelectorProps {
   selectedDate: JalaliDateOption | null;
@@ -18,43 +19,8 @@ interface DateTimeSelectorProps {
   hourlyEstimate?: number | null;
 }
 
-const generateDateOptions = () => {
-  const today = new Date();
-  const options = [];
-  const dayNames = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-  const persianDateFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  const persianDateKeyFormatter = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const normalizeDigits = (value: string) =>
-    value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
-
-  for (let i = 0; i < 35; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const dateParts = persianDateFormatter.formatToParts(date);
-    const dateKeyParts = persianDateKeyFormatter.formatToParts(date);
-    const getPart = (type: string) => dateParts.find((part) => part.type === type)?.value ?? '';
-    const getKeyPart = (type: string) => dateKeyParts.find((part) => part.type === type)?.value ?? '';
-
-    options.push({
-      dateString: `${normalizeDigits(getKeyPart('year'))}-${normalizeDigits(getKeyPart('month')).padStart(2, '0')}-${normalizeDigits(getKeyPart('day')).padStart(2, '0')}`,
-      dayOfWeek: dayNames[date.getDay()],
-      dayOfMonth: Number(normalizeDigits(getPart('day'))),
-      monthName: `${getPart('month')} ${getPart('year')}`,
-      isToday: i === 0,
-      isTomorrow: i === 1,
-    });
-  }
-
-  return options;
-};
+// تبدیل خالص میلادی→شمسی (Intl تقویم پارسی روی برخی موتورها سال خالی برمی‌گرداند).
+const generateDateOptions = () => buildJalaliDateOptions();
 
 const TIME_SLOTS = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود (۸:۰۰ - ۱۰:۰۰)', period: 'MORNING' as const, isAvailable: true },

@@ -1,6 +1,9 @@
 /** Shared customer support contact + FAQ for Paksho. */
-export const SUPPORT_PHONE = '02191001234';
+/** شماره پشتیبانی با رقم لاتین برای لینک tel: */
+export const SUPPORT_PHONE = '09129289422';
 export const SUPPORT_TEL_URL = `tel:${SUPPORT_PHONE}`;
+/** همان شماره با رقم فارسی برای نمایش */
+export const SUPPORT_PHONE_DISPLAY = '۰۹۱۲۹۲۸۹۴۲۲';
 export const SUPPORT_HOURS = 'همه‌روزه ۹ تا ۲۱';
 
 export type FaqItem = { id: string; question: string; answer: string };

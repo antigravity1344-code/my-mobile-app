@@ -14,9 +14,12 @@ import type { ApiOrder } from '../../../api/types';
 import { CUSTOMER_TOKEN_KEY } from '../../../components/native/customerLoginStorage';
 import {
   formatSubmittedAddress,
+  parseSubmittedDate,
   selectCustomerOrders,
+  submittedDateText,
   submittedDurationHours,
   submittedOrderPrice,
+  submittedTimeText,
 } from './orderPayload';
 import { expectedStartAtFromSelection } from '../../../utils/expectedStartAt';
 
@@ -58,7 +61,9 @@ function buildPricingFromApiPrice(price: unknown): FinalPrice {
 }
 
 function normalizeOrderStatus(status: unknown): OrderStatus {
-  return ORDER_STATUSES.includes(status as OrderStatus) ? (status as OrderStatus) : 'PENDING';
+  const value = typeof status === 'string' ? status.trim().toUpperCase() : '';
+  // وضعیت ناشناخته دیگر «در انتظار» و قابل لغو نمایش داده نمی‌شود.
+  return ORDER_STATUSES.includes(value as OrderStatus) ? (value as OrderStatus) : 'UNKNOWN';
 }
 
 // Memory store for runtime mutations — start empty (no demo seed on boot).
@@ -83,9 +88,8 @@ export function resolveCustomerOrdersResponse(apiResult: {
   };
 }
 
-const persistOrders = () => {
-  void appStorage.setItem('paksho_orders_list', ordersMemoryStore);
-};
+/** کلیدی که نسخه‌های قبلی کل فهرست سفارش‌ها را در آن ذخیره می‌کردند و هرگز خوانده نمی‌شد؛ فقط برای پاک‌کردن. */
+const LEGACY_ORDERS_STORAGE_KEY = 'paksho_orders_list';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -105,11 +109,7 @@ export const CANCELLABLE_ORDER_STATUSES: OrderStatus[] = [
 export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
   const createdAt = o.createdAt || new Date().toISOString();
   const rawDate = typeof o.date === 'string' ? o.date.trim() : '';
-  const dateParts = rawDate.split(/\s+/).filter(Boolean);
-  const monthName = dateParts.length > 1 ? dateParts[0] : rawDate;
-  const dayRaw = dateParts.length > 1 ? dateParts[dateParts.length - 1] : '';
-  const parsedDay = toFiniteNumber(dayRaw, 0);
-  const dayOfMonth = parsedDay > 0 ? parsedDay : 0;
+  const { dayOfMonth, monthName } = parseSubmittedDate(rawDate);
   const timeLabel = typeof o.time === 'string' && o.time.trim() ? o.time.trim() : '—';
   const fullAddress = typeof o.address === 'string' ? o.address.trim() : '';
   const storedGender = o.genderPreference;
@@ -215,6 +215,8 @@ function buildTimelineFromApiOrder(o: ApiOrder, status: OrderStatus): OrderTimel
     ];
   }
   if (status === 'PENDING') return [submitted];
+  // وضعیت ناشناخته: مرحله‌ای که رخ نداده («متخصص پذیرفت») نشان داده نمی‌شود.
+  if (status === 'UNKNOWN') return [{ ...submitted, isCurrent: false }];
 
   const cleanerName = typeof o.cleanerName === 'string' ? o.cleanerName.trim() : '';
   const assigned: OrderTimelineEvent = {
@@ -246,6 +248,13 @@ export const isOrderCancellable = (status: OrderStatus): boolean =>
 export const orderService = {
   getLastOrdersLoadError,
 
+  /** هنگام خروج: سفارش‌های کاربر قبلی از حافظه و فهرست قدیمی ذخیره‌شده روی دستگاه پاک می‌شود. */
+  async clearOrdersCache(): Promise<void> {
+    ordersMemoryStore = [];
+    lastOrdersLoadError = null;
+    await appStorage.removeItem(LEGACY_ORDERS_STORAGE_KEY);
+  },
+
   async getOrders(
     filterTab: OrderFilterTab = 'ALL',
     searchQuery: string = '',
@@ -268,7 +277,6 @@ export const orderService = {
       if (!error) {
         const mapped: OrderItem[] = resolved.orders.map((o) => mapApiOrderForCustomer(o));
         ordersMemoryStore = mapped;
-        persistOrders();
         result = mapped;
       }
 
@@ -312,7 +320,6 @@ export const orderService = {
     const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
     if (index >= 0) {
       ordersMemoryStore[index] = { ...ordersMemoryStore[index], ...updatedOrder, status: 'CANCELLED' };
-      persistOrders();
     }
     return { success: true, order: updatedOrder, refundAmount: 0 };
   },
@@ -348,7 +355,6 @@ export const orderService = {
     const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
     if (index >= 0) {
       ordersMemoryStore[index] = updatedOrder;
-      persistOrders();
     }
     return { success: true, order: updatedOrder };
   },
@@ -413,8 +419,8 @@ export const orderService = {
         customerTier: newOrder.customerTier,
         pricing: newOrder.pricing,
         address,
-        date: `${newOrder.date?.monthName || ''} ${newOrder.date?.dayOfMonth || ''}`,
-        time: newOrder.timeSlot?.label || `${newOrder.timeSlot?.startTime || ''} - ${newOrder.timeSlot?.endTime || ''}`,
+        date: submittedDateText(newOrder.date),
+        time: submittedTimeText(newOrder.timeSlot),
         price,
         notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
         // شروع بازه انتخاب‌شده به وقت تهران، به‌صورت UTC؛ اگر قابل ساختن نباشد فرستاده نمی‌شود.
@@ -440,7 +446,6 @@ export const orderService = {
       }
 
       ordersMemoryStore = [newOrder, ...ordersMemoryStore];
-      persistOrders();
 
       return { success: true, order: newOrder };
     } catch {

@@ -12,6 +12,7 @@ import {
 import type { OrderItem } from '../types/order';
 import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
+import { orderAmountLabel } from '../orderStatusLabels';
 
 interface OrderCardProps {
   order: OrderItem;
@@ -124,7 +125,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       {/* Price & Actions Row */}
       <View style={styles.footerRow}>
         <View style={styles.priceWrap}>
-          <Text style={styles.priceLabel}>مبلغ نهایی</Text>
+          <Text style={styles.priceLabel}>{orderAmountLabel(order.status, order.paymentStatus)}</Text>
           <Text style={styles.priceValue}>
             {formatOrderAmount(order.pricing?.total)} تومان
           </Text>

@@ -1,3 +1,4 @@
+import { CUSTOMER_ORDER_STATUS_LABELS } from '../../features/orders/orderStatusLabels';
 import type { ApiOrder } from '../../api/types';
 
 /** وضعیت خام سفارش از سرور، همان‌طور که برای متخصص نگه داشته می‌شود؛ مقدار ناشناخته UNKNOWN است. */
@@ -33,7 +34,7 @@ export const WORKER_ACTIVE_STATUSES: readonly WorkerOrderStatus[] = [
 
 export const WORKER_STATUS_LABEL: Record<WorkerOrderStatus, string> = {
   PENDING: 'در انتظار پذیرش',
-  ACCEPTED: 'پذیرفته شده',
+  ACCEPTED: CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED,
   CONFIRMED: 'تأیید شده',
   ASSIGNED: 'تخصیص داده شده',
   IN_PROGRESS: 'در حال انجام',

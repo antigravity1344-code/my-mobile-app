@@ -50,6 +50,15 @@ const OTP_RESEND_MS = 30 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const ADMIN_ORDER_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const ADMIN_USER_STATUSES = ['REGISTERED', 'PENDING_VERIFICATION', 'APPROVED', 'ACTIVE', 'REJECTED', 'BLOCKED'];
+// برچسب فارسی وضعیت کاربر برای پیام‌ها؛ وضعیت خام انگلیسی به کاربر نشان داده نمی‌شود (D-06).
+const USER_STATUS_LABELS = {
+  REGISTERED: 'ثبت‌نام اولیه',
+  PENDING_VERIFICATION: 'در انتظار بررسی مدارک',
+  APPROVED: 'تأیید شده',
+  ACTIVE: 'فعال',
+  REJECTED: 'رد شده',
+  BLOCKED: 'مسدود شده',
+};
 const MIN_ORDER_PRICE = 50000;
 const MAX_ORDER_PRICE = 20000000;
 const MAX_DOC_CHARS = 400000;
@@ -127,7 +136,7 @@ function requireUser(req, res) {
     return null;
   }
   if (user.status === 'BLOCKED') {
-    res.status(403).json({ success: false, message: 'حساب شما مسدود شده است.' });
+    res.status(403).json({ success: false, code: 'ACCOUNT_BLOCKED', message: 'حساب شما مسدود شده است.' });
     return null;
   }
   return user;
@@ -789,10 +798,18 @@ function workerAvailableOrderView(order) {
 }
 
 /** سفارش‌های خود متخصص: برای کار لغوشده/تمام‌شده تلفن و آدرس دقیق حذف می‌شود. */
+/** نظر و برچسب‌های امتیاز مشتری برای متخصص فرستاده نمی‌شود (D-32)؛ فقط عدد امتیاز و زمان آن می‌ماند. */
+function workerVisibleRatings(ratings) {
+  if (!ratings || typeof ratings !== 'object') return ratings;
+  const { customerComment, customerTags, ...visible } = ratings;
+  return visible;
+}
+
 function workerAssignedOrderView(order) {
   const area = orderAreaFromAddress(order.address);
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
-  const { notes, ...workerVisible } = order;
+  const { notes, ratings, ...rest } = order;
+  const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area };
   }
@@ -809,7 +826,7 @@ function workerAssignedOrderView(order) {
 // برچسب فارسی وضعیت برای متن اعلان تغییر وضعیت (D-06)؛ همان برچسب‌های صفحه اعلان‌های اپ.
 const ORDER_STATUS_LABELS = {
   PENDING: 'در انتظار تأیید',
-  ACCEPTED: 'در حال انجام',
+  ACCEPTED: 'پذیرفته‌شده',
   CONFIRMED: 'تأیید شده',
   ASSIGNED: 'تخصیص متخصص',
   IN_PROGRESS: 'در حال انجام',
@@ -1156,7 +1173,7 @@ app.put('/api/admin/users/:userId/status', (req, res) => {
   existing.status = status;
   const user = store.updateUser(existing);
 
-  res.json({ success: true, user: adminUserView(user), message: `وضعیت کاربر به ${status} تغییر یافت.` });
+  res.json({ success: true, user: adminUserView(user), message: `وضعیت کاربر به «${USER_STATUS_LABELS[status] || 'جدید'}» تغییر یافت.` });
 });
 
 app.get('/api/admin/workers/:userId/document', (req, res) => {
@@ -1629,7 +1646,7 @@ app.get('/admin', (req, res) => {
     }
 
     function getOrderStatusTitle(status) {
-      if (status === 'ACCEPTED') return 'پذیرفته شده';
+      if (status === 'ACCEPTED') return 'پذیرفته‌شده';
       if (status === 'PENDING') return 'در انتظار متخصص';
       return status;
     }

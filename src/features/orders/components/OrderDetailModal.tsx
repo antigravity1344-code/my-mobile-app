@@ -29,6 +29,7 @@ import type { OrderItem } from '../types/order';
 import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
+import { orderAmountLabel, paymentStatusDisplay } from '../orderStatusLabels';
 import { customerTierLabel } from '../../../utils/pricing';
 import { describeServiceOptions } from '../../../components/native/workerServiceCategory';
 
@@ -68,6 +69,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const isCancellable = isOrderCancellable(order.status);
   const isCompleted = order.status === 'COMPLETED';
+  const paymentDisplay = paymentStatusDisplay(order.paymentStatus);
   const pricing = order.pricing;
   const subtotal = pricing?.subtotal ?? pricing?.total ?? 0;
   const earlyBirdAmount = pricing?.earlyBirdDiscountAmount ?? 0;
@@ -315,16 +317,22 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.totalDivider} />
 
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>مبلغ نهایی پرداخت‌شده</Text>
+                <Text style={styles.totalLabel}>{orderAmountLabel(order.status, order.paymentStatus)}</Text>
                 <Text style={styles.totalValue}>
                   {formatOrderAmount(totalAmount)} تومان
                 </Text>
               </View>
 
               <View style={styles.paymentStatusBadge}>
-                <CheckCircle2 size={13} color="#059669" />
+                {paymentDisplay.tone === 'paid' ? (
+                  <CheckCircle2 size={13} color="#059669" />
+                ) : paymentDisplay.tone === 'failed' ? (
+                  <AlertTriangle size={13} color="#dc2626" />
+                ) : (
+                  <Clock size={13} color="#d97706" />
+                )}
                 <Text style={styles.paymentStatusText}>
-                  وضعیت پرداخت: {order.paymentStatus === 'PAID' ? 'موفق و تایید شده' : 'در انتظار / ناموفق'} • روش: {order.paymentMethod === 'ONLINE' ? 'اینترنتی' : 'نقدی'}
+                  وضعیت پرداخت: {paymentDisplay.label} • روش: {order.paymentMethod === 'ONLINE' ? 'اینترنتی' : 'نقدی'}
                 </Text>
               </View>
             </View>

@@ -486,3 +486,147 @@ test('customer free-text notes never reach the worker but stay for the customer 
   assert.equal(adminList.json.orders.find((item) => item.id === order.id).notes, ORDER_NOTE);
   assert.equal(store.getOrder(order.id).notes, ORDER_NOTE, 'the note itself is kept');
 });
+
+test('the customer rating comment and tags never reach the worker (D-32) but stay for the customer and admin', async (t) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const admin = await request(server, {
+    method: 'POST',
+    pathname: '/api/admin/login',
+    body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+  });
+  const adminToken = admin.json.token;
+  const customer = await login(server, '09130000201', 'CUSTOMER');
+  const worker = await approvedWorker(server, '09130000202', adminToken);
+  const COMMENT = 'نظر خصوصی مشتری درباره رفتار متخصص';
+  const TAG = 'برچسب-خصوصی-مشتری';
+
+  const order = await createOrder(server, customer.token);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/accept', token: worker.token, body: {} })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: {} })).status, 200);
+  const rated = await request(server, {
+    method: 'PUT',
+    pathname: '/api/orders/' + order.id + '/rate',
+    token: customer.token,
+    body: { rating: 4, comment: COMMENT, tags: [TAG] },
+  });
+  assert.equal(rated.status, 200);
+
+  function assertNoCustomerFeedback(response, label) {
+    assert.equal(response.text.includes(COMMENT), false, label + ': comment text');
+    assert.equal(response.text.includes(TAG), false, label + ': tag text');
+    const orders = response.json.orders || (response.json.order ? [response.json.order] : []);
+    for (const item of orders) {
+      if (!item.ratings) continue;
+      assert.equal(Object.hasOwn(item.ratings, 'customerComment'), false, label + ': customerComment field');
+      assert.equal(Object.hasOwn(item.ratings, 'customerTags'), false, label + ': customerTags field');
+    }
+  }
+
+  const workerList = await request(server, { pathname: '/api/orders', token: worker.token });
+  assertNoCustomerFeedback(workerList, 'worker list COMPLETED');
+  assertNoCustomerFeedback(await request(server, { pathname: '/api/notifications', token: worker.token }), 'worker notifications');
+
+  // Admin moves the rated order back to an active status: the worker view must still hide the feedback.
+  const reactivated = await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'ACCEPTED' } });
+  if (reactivated.status === 200) {
+    assertNoCustomerFeedback(await request(server, { pathname: '/api/orders', token: worker.token }), 'worker list ACCEPTED after rating');
+  }
+
+  // Customer and admin still see the full rating.
+  const customerList = await request(server, { pathname: '/api/orders', token: customer.token });
+  const own = customerList.json.orders.find((item) => item.id === order.id);
+  assert.equal(own.ratings.customerComment, COMMENT);
+  assert.deepEqual(own.ratings.customerTags, [TAG]);
+  const adminList = await request(server, { pathname: '/api/admin/orders', token: adminToken });
+  assert.equal(adminList.json.orders.find((item) => item.id === order.id).ratings.customerComment, COMMENT);
+  assert.equal(store.getOrder(order.id).ratings.customerComment, COMMENT, 'the comment itself is kept');
+});
+
+test('status notifications call ACCEPTED «پذیرفته‌شده», not «در حال انجام» (E6)', async (t) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const admin = await request(server, {
+    method: 'POST',
+    pathname: '/api/admin/login',
+    body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+  });
+  const adminToken = admin.json.token;
+  const customer = await login(server, '09130000301', 'CUSTOMER');
+  const worker = await approvedWorker(server, '09130000302', adminToken);
+  const order = await createOrder(server, customer.token);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/accept', token: worker.token, body: {} })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'IN_PROGRESS' } })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'ACCEPTED' } })).status, 200);
+
+  const notes = await request(server, { pathname: '/api/notifications', token: customer.token });
+  const statusBodies = notes.json.notifications.filter((n) => n.orderId === order.id && n.kind === 'ORDER_STATUS').map((n) => n.body);
+  assert.ok(statusBodies.some((body) => body.includes('«در حال انجام»')), 'IN_PROGRESS keeps «در حال انجام»: ' + statusBodies.join(' | '));
+  assert.ok(statusBodies.some((body) => body.includes('«پذیرفته‌شده»')), 'ACCEPTED reads «پذیرفته‌شده»: ' + statusBodies.join(' | '));
+});
+
+test('admin user-status message names the status in Persian, never the raw enum (D-06)', async (t) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const admin = await request(server, {
+    method: 'POST',
+    pathname: '/api/admin/login',
+    body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+  });
+  const adminToken = admin.json.token;
+  const worker = await login(server, '09130000141', 'WORKER');
+
+  const expected = {
+    BLOCKED: 'مسدود شده',
+    ACTIVE: 'فعال',
+    REJECTED: 'رد شده',
+    APPROVED: 'تأیید شده',
+    PENDING_VERIFICATION: 'در انتظار بررسی مدارک',
+    REGISTERED: 'ثبت‌نام اولیه',
+  };
+  for (const [status, label] of Object.entries(expected)) {
+    const res = await request(server, {
+      method: 'PUT',
+      pathname: '/api/admin/users/' + worker.user.id + '/status',
+      token: adminToken,
+      body: { status },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.message, 'وضعیت کاربر به «' + label + '» تغییر یافت.');
+    assert.doesNotMatch(res.json.message, /[A-Z_]{4,}/);
+  }
+});
+
+test('a blocked user gets 403 with code ACCOUNT_BLOCKED and the unchanged Persian message on every request', async (t) => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+
+  const admin = await request(server, {
+    method: 'POST',
+    pathname: '/api/admin/login',
+    body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+  });
+  const adminToken = admin.json.token;
+  const worker = await login(server, '09130000151', 'WORKER');
+  const blocked = await request(server, {
+    method: 'PUT',
+    pathname: '/api/admin/users/' + worker.user.id + '/status',
+    token: adminToken,
+    body: { status: 'BLOCKED' },
+  });
+  assert.equal(blocked.status, 200);
+
+  for (const pathname of ['/api/orders', '/api/orders/available', '/api/notifications']) {
+    const res = await request(server, { pathname, token: worker.token });
+    assert.equal(res.status, 403, pathname);
+    assert.equal(res.json.code, 'ACCOUNT_BLOCKED', pathname);
+    assert.equal(res.json.message, 'حساب شما مسدود شده است.', pathname);
+  }
+});

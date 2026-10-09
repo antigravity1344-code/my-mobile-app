@@ -347,7 +347,7 @@ export const SpecialistPortalScreen: React.FC = () => {
             <div key={'mine-' + order.id} className="bg-white border border-emerald-200 rounded-xl p-3 space-y-2 text-right">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-mono font-bold text-slate-500">{order.id}</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">پذیرفته شده</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">پذیرفته‌شده</span>
               </div>
               <p className="text-xs text-slate-700">{order.serviceTitle}</p>
               <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>

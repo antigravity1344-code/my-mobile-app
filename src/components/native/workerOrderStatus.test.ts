@@ -1,3 +1,4 @@
+import { CUSTOMER_ORDER_STATUS_LABELS } from '../../features/orders/orderStatusLabels';
 import { describe, expect, it } from 'vitest';
 import type { ApiOrder } from '../../api/types';
 import {
@@ -39,7 +40,8 @@ describe('workerOrderStatus', () => {
     const labels = ALL.map(workerStatusLabel);
     expect(new Set(labels).size).toBe(ALL.length);
     expect(workerStatusLabel('CANCELLED')).toBe('لغو شده');
-    expect(workerStatusLabel('ACCEPTED')).toBe('پذیرفته شده');
+    expect(workerStatusLabel('ACCEPTED')).toBe('پذیرفته‌شده');
+    expect(workerStatusLabel('ACCEPTED')).toBe(CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED);
     expect(workerStatusLabel('COMPLETED')).toBe('انجام شده');
     expect(workerStatusTone('CANCELLED')).toBe('cancelled');
     expect(workerStatusTone('UNKNOWN')).toBe('neutral');

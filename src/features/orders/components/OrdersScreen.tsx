@@ -263,6 +263,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
 
       {/* Order Detail Modal */}
       <OrderDetailModal
+        key={selectedOrder?.id ?? 'no-order'}
         order={selectedOrder}
         visible={Boolean(selectedOrder)}
         onClose={handleCloseDetail}
@@ -275,6 +276,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
 
       {/* Order Rating Modal */}
       <OrderRatingModal
+        key={activeRatingOrder?.id ?? 'no-order'}
         order={activeRatingOrder}
         visible={Boolean(activeRatingOrder)}
         onClose={closeRatingModal}

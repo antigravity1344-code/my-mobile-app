@@ -9,6 +9,7 @@ import {
   User,
 } from 'lucide-react-native';
 import type { OrderStatus } from '../types/order';
+import { CUSTOMER_ORDER_STATUS_LABELS } from '../orderStatusLabels';
 
 interface OrderStatusBadgeProps {
   status: OrderStatus;
@@ -26,35 +27,35 @@ const STATUS_CONFIG: Record<
   }
 > = {
   PENDING: {
-    label: 'در انتظار تأیید',
+    label: CUSTOMER_ORDER_STATUS_LABELS.PENDING,
     bg: '#fef3c7',
     text: '#92400e',
     border: '#fde68a',
     Icon: Clock,
   },
   ACCEPTED: {
-    label: 'در حال انجام',
+    label: CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED,
     bg: '#e0f2fe',
     text: '#0369a1',
     border: '#bae6fd',
     Icon: CheckCircle2,
   },
   CONFIRMED: {
-    label: 'تأیید شده',
+    label: CUSTOMER_ORDER_STATUS_LABELS.CONFIRMED,
     bg: '#e0f2fe',
     text: '#0369a1',
     border: '#bae6fd',
     Icon: CheckCircle2,
   },
   ASSIGNED: {
-    label: 'تخصیص متخصص',
+    label: CUSTOMER_ORDER_STATUS_LABELS.ASSIGNED,
     bg: '#ede9fe',
     text: '#6d28d9',
     border: '#ddd6fe',
     Icon: User,
   },
   IN_PROGRESS: {
-    label: 'در حال انجام',
+    label: CUSTOMER_ORDER_STATUS_LABELS.IN_PROGRESS,
     bg: '#dcfce7',
     text: '#15803d',
     border: '#bbf7d0',
@@ -72,6 +73,13 @@ const STATUS_CONFIG: Record<
     bg: '#fee2e2',
     text: '#b91c1c',
     border: '#fecaca',
+    Icon: AlertTriangle,
+  },
+  UNKNOWN: {
+    label: CUSTOMER_ORDER_STATUS_LABELS.UNKNOWN,
+    bg: '#f1f5f9',
+    text: '#475569',
+    border: '#e2e8f0',
     Icon: AlertTriangle,
   },
 };

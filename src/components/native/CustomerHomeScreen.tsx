@@ -1,10 +1,14 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
 import { completedRecencyIso, selectSmartHero } from './selectSmartHero';
+import { formatJalaliDateTime } from '../../utils/jalaliDisplay';
+import { CUSTOMER_ORDER_STATUS_LABELS } from '../../features/orders/orderStatusLabels';
+import { apiFetch } from '../../api/apiClient';
+import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
 import {
   IconBell,
   IconClock,
@@ -23,15 +27,7 @@ import {
   IconTabUser,
 } from './icons/CustomerIcons';
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  PENDING: 'در انتظار تأیید',
-  ACCEPTED: 'در حال انجام',
-  CONFIRMED: 'تأیید شده',
-  ASSIGNED: 'تخصیص متخصص',
-  IN_PROGRESS: 'در حال انجام',
-  COMPLETED: 'انجام شده',
-  CANCELLED: 'لغو شده',
-};
+const STATUS_LABEL: Record<OrderStatus, string> = CUSTOMER_ORDER_STATUS_LABELS;
 
 const STATUS_TONE: Record<OrderStatus, { bg: string; text: string; icon: string }> = {
   PENDING: { bg: colors.amberBg, text: colors.amberText, icon: colors.amberIcon },
@@ -41,6 +37,7 @@ const STATUS_TONE: Record<OrderStatus, { bg: string; text: string; icon: string 
   IN_PROGRESS: { bg: '#DCFCE7', text: '#15803D', icon: '#15803D' },
   COMPLETED: { bg: '#CCFBF1', text: '#0F766E', icon: '#0F766E' },
   CANCELLED: { bg: '#FEE2E2', text: '#B91C1C', icon: '#B91C1C' },
+  UNKNOWN: { bg: '#F1F5F9', text: '#475569', icon: '#64748B' },
 };
 
 type Shortcut = {
@@ -106,9 +103,7 @@ function statusLine(status: OrderStatus): string {
 }
 
 function formatHistoryDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('fa-IR');
+  return formatJalaliDateTime(value);
 }
 
 function iconForService(serviceId: string): typeof IconServiceHome {
@@ -128,16 +123,27 @@ export function CustomerHomeScreen({
   const initial = profileInitial(userName);
   const { allOrders, loading, loadError, refreshing, refreshOrders } = useOrders();
 
+  // نقطه زنگ فقط وقتی اعلان خوانده‌نشده هست؛ خطا یا نامعلوم = بدون نقطه.
+  const [unreadCount, setUnreadCount] = useState(0);
+  const loadUnreadCount = useCallback(async () => {
+    const res = await apiFetch('/notifications');
+    setUnreadCount(unreadCountFromResponse(res));
+  }, []);
+
   useEffect(() => {
     void refreshOrders({ silent: true });
-  }, [refreshOrders]);
+    void loadUnreadCount();
+  }, [refreshOrders, loadUnreadCount]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void refreshOrders({ silent: true });
+      if (next === 'active') {
+        void refreshOrders({ silent: true });
+        void loadUnreadCount();
+      }
     });
     return () => subscription.remove();
-  }, [refreshOrders]);
+  }, [refreshOrders, loadUnreadCount]);
 
   const hero = useMemo(
     () =>
@@ -184,7 +190,7 @@ export function CustomerHomeScreen({
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
           >
             <IconBell />
-            <View style={styles.notifDot} />
+            {unreadCount > 0 ? <View style={styles.notifDot} /> : null}
           </Pressable>
           <Pressable
             accessibilityRole="button"

@@ -1,5 +1,6 @@
 ﻿import Constants from 'expo-constants';
 import { getApiAuthToken } from './authToken';
+import { accountBlockedMessage, emitAccountBlocked, isAccountBlockedResponse } from './accountBlocked';
 
 function resolveApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -58,7 +59,14 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     }
 
     try {
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      // کد وضعیت خطا (مثلاً ۴۰۱) را به پاسخ اضافه می‌کنیم تا صفحه‌ها بتوانند پایان نشست را تشخیص دهند.
+      if (!response.ok && parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !('httpStatus' in parsed)) {
+        parsed.httpStatus = response.status;
+      }
+      // حساب مسدود: اپ (مشتری/متخصص) پیام را نشان می‌دهد و کاربر را خارج می‌کند.
+      if (isAccountBlockedResponse(parsed)) emitAccountBlocked(accountBlockedMessage(parsed));
+      return parsed;
     } catch {
       return {
         success: false,

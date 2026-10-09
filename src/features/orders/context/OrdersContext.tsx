@@ -55,13 +55,14 @@ interface OrdersContextValue {
     tags?: string[],
   ) => Promise<{ success: boolean; error?: string }>;
   addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string; order?: OrderItem }>;
+  /** خروج یا تغییر کاربر: همه سفارش‌ها و انتخاب‌های کاربر قبلی پاک می‌شود. */
+  resetOrders: () => Promise<void>;
 }
 
 const OrdersContext = createContext<OrdersContextValue | undefined>(undefined);
 
 export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allOrders, setAllOrders] = useState<OrderItem[]>([]);
-  const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -97,10 +98,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       loadErrorRef.current = next.loadError;
       allOrdersRef.current = next.orders;
       if (errorChanged) setLoadError(next.loadError);
-      if (ordersChanged) {
-        setAllOrders(next.orders);
-        setOrders(selectCustomerOrders(next.orders, filterTab, searchQuery, sortOption));
-      }
+      if (ordersChanged) setAllOrders(next.orders);
     } finally {
       inFlightCount.current = Math.max(0, inFlightCount.current - 1);
       if (isCurrent()) {
@@ -108,11 +106,17 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setRefreshing(false);
       }
     }
-  }, [filterTab, searchQuery, sortOption]);
+  }, []);
 
   useEffect(() => {
     void fetchOrders();
   }, [fetchOrders]);
+
+  // جستجو، تب و مرتب‌سازی فقط روی فهرست بارگذاری‌شده اعمال می‌شود؛ با هر حرف تایپ‌شده درخواست سرور نمی‌رود.
+  const orders = useMemo(
+    () => selectCustomerOrders(allOrders, filterTab, searchQuery, sortOption),
+    [allOrders, filterTab, searchQuery, sortOption],
+  );
 
   const refreshOrders = useCallback(async (options?: { silent?: boolean }) => {
     if (!shouldStartOrdersRefresh(Boolean(options?.silent), inFlightCount.current > 0)) return;
@@ -152,11 +156,6 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           allOrdersRef.current = next;
           return next;
         });
-        setOrders((prev) =>
-          prev.map((item) =>
-            item.id === orderId ? { ...item, ...result.order!, status: 'CANCELLED' as const } : item,
-          ),
-        );
         // Sync remaining list from server (optional; local CANCELLED already applied).
         await fetchOrders();
       }
@@ -176,6 +175,25 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
     [fetchOrders, closeRatingModal],
   );
+
+  const resetOrders = useCallback(async () => {
+    // پاسخ درخواست‌های در جریانِ کاربر قبلی دیگر اعمال نمی‌شود.
+    requestGuard.current();
+    // درخواست کهنه دیگر loading را خاموش نمی‌کند؛ شمارنده صفر می‌شود تا رفرش بی‌صدای کاربر بعدی رد نشود.
+    inFlightCount.current = 0;
+    allOrdersRef.current = [];
+    loadErrorRef.current = null;
+    setAllOrders([]);
+    setLoadError(null);
+    setLoading(true);
+    setRefreshing(false);
+    setFilterTab('ALL');
+    setSearchQuery('');
+    setSortOption('NEWEST');
+    setSelectedOrderId(null);
+    setRatingModalOrderId(null);
+    await orderService.clearOrdersCache();
+  }, []);
 
   const addNewOrder = useCallback(
     async (order: OrderItem) => {
@@ -221,6 +239,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         cancelOrder,
         rateOrder,
         addNewOrder,
+        resetOrders,
       }}
     >
       {children}

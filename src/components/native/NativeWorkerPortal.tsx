@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Linking,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   Briefcase,
@@ -20,6 +21,7 @@ import { UserData } from '../../types/user';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
+import { isAccountBlockedResponse } from '../../api/accountBlocked';
 import type { ApiOrder } from '../../api/types';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
 import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
@@ -37,6 +39,15 @@ import {
   type WorkerOrderStatus,
   type WorkerStatusTone,
 } from './workerOrderStatus';
+import {
+  applyWorkerOrdersLoad,
+  classifyWorkerOrdersResponse,
+  shouldStartWorkerOrdersFetch,
+  showsWorkerOrdersSpinner,
+  type WorkerOrdersFetchMode,
+  type WorkerOrdersResponse,
+  type WorkerOrdersState,
+} from './workerOrdersFetch';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -63,19 +74,32 @@ interface NativeWorkerPortalProps {
   user: UserData;
   onSwitchToCustomer?: () => void;
   onLogout?: () => void;
+  /** وقتی سرور نشست را نامعتبر می‌داند (۴۰۱)، دکمه «ورود دوباره» این را صدا می‌زند. */
+  onSessionExpired?: () => void;
 }
 
 export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   user,
   onSwitchToCustomer,
   onLogout,
+  onSessionExpired,
 }) => {
   const [activeCategory, setActiveCategory] = useState<SpecialistCategory>('all');
   const [activeTab, setActiveTab] = useState<'available' | 'my_jobs'>('available');
-  const [availableOrders, setAvailableOrders] = useState<NativeOrder[]>([]);
-  const [myAcceptedOrders, setMyAcceptedOrders] = useState<NativeOrder[]>([]);
+  const [ordersState, setOrdersState] = useState<WorkerOrdersState<NativeOrder>>({
+    available: [],
+    mine: [],
+    error: null,
+    sessionExpired: false,
+  });
+  const availableOrders = ordersState.available;
+  const myAcceptedOrders = ordersState.mine;
   const [loading, setLoading] = useState(false);
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
+  // تعداد درخواست‌های در جریان و شماره آخرین درخواست؛ پاسخ کهنه‌تر از آخرین درخواست اعمال نمی‌شود.
+  const fetchesInFlight = useRef(0);
+  const latestFetchId = useRef(0);
+  const sessionExpiredRef = useRef(false);
   // جلوگیری از ارسال دوباره پذیرش/تکمیل برای همان سفارش تا پاسخ قبلی برسد
   const actionsInFlight = useRef<Set<string>>(new Set());
   const [busyOrderIds, setBusyOrderIds] = useState<string[]>([]);
@@ -113,36 +137,51 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     };
   };
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
+  const fetchOrders = useCallback(async (mode: WorkerOrdersFetchMode) => {
+    if (mode === 'poll' && sessionExpiredRef.current) return;
+    if (!shouldStartWorkerOrdersFetch(mode, fetchesInFlight.current > 0)) return;
+    const fetchId = ++latestFetchId.current;
+    fetchesInFlight.current += 1;
+    if (showsWorkerOrdersSpinner(mode)) setLoading(true);
     try {
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-      const availRes = await apiFetch('/orders/available');
-      if (availRes.success && Array.isArray(availRes.orders)) {
-        // سفارش باز: فقط محدوده؛ تلفن، نام، یادداشت و نشانی دقیق قبل از پذیرش نگه داشته نمی‌شود.
-        setAvailableOrders((availRes.orders as ApiOrder[]).map((o) => mapBackendOrder(preAcceptOrderView(o))));
-      } else {
-        setAvailableOrders([]);
+      const available = classifyWorkerOrdersResponse(await apiFetch('/orders/available'));
+      let mine: WorkerOrdersResponse | null = null;
+      if (user?.id && available.kind !== 'expired' && available.kind !== 'blocked') {
+        // توکن سراسری است؛ پیش از درخواست دوم دوباره توکن متخصص گذاشته می‌شود.
+        await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+        mine = classifyWorkerOrdersResponse(await apiFetch('/orders'));
       }
-
-      if (user?.id) {
-        const myRes = await apiFetch('/orders');
-        if (myRes.success && Array.isArray(myRes.orders)) {
-          setMyAcceptedOrders((myRes.orders as ApiOrder[]).map(mapBackendOrder));
-        }
-      }
+      if (fetchId !== latestFetchId.current) return;
+      // سفارش باز: فقط محدوده؛ تلفن، نام، یادداشت و نشانی دقیق قبل از پذیرش نگه داشته نمی‌شود.
+      const availableMapped: WorkerOrdersResponse =
+        available.kind === 'ok'
+          ? { kind: 'ok', orders: (available.orders as ApiOrder[]).map((o) => mapBackendOrder(preAcceptOrderView(o))) }
+          : available;
+      const mineMapped: WorkerOrdersResponse | null =
+        mine && mine.kind === 'ok' ? { kind: 'ok', orders: (mine.orders as ApiOrder[]).map(mapBackendOrder) } : mine;
+      setOrdersState((prev) => {
+        const next = applyWorkerOrdersLoad(prev, { available: availableMapped, mine: mineMapped }, mode);
+        sessionExpiredRef.current = next.sessionExpired;
+        return next;
+      });
     } catch (e) {
-      console.error('Error fetching orders', e);
+      console.warn('Error fetching worker orders', e);
     } finally {
-      setLoading(false);
+      fetchesInFlight.current -= 1;
+      if (fetchId === latestFetchId.current) setLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
-    void fetchOrders();
-    const interval = setInterval(() => void fetchOrders(), 10000);
+    void fetchOrders('initial');
+    const interval = setInterval(() => void fetchOrders('poll'), 10000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
+
+  const showActionError = (message: string) => {
+    Alert.alert('خطا', message, [{ text: 'باشه' }]);
+  };
 
   const handleAcceptOrder = async (order: NativeOrder) => {
     if (!user?.id || !canAcceptWorkerOrder(order.status)) return;
@@ -156,15 +195,30 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         setSuccessAlert('سفارش «' + order.serviceTitle + '» با موفقیت پذیرفته شد.');
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
-        alert(res.message || 'خطا در پذیرش سفارش');
+        // حساب مسدود: دیالوگ و خروج را useAccountBlockedLogout نشان می‌دهد؛ دیالوگ دوم لازم نیست.
+        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'خطا در پذیرش سفارش');
       }
     } catch {
-      alert('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
     } finally {
       endOrderAction(order.id);
       // بعد از موفقیت یا خطا (مثلاً سفارشی که مشتری لغو کرده) فهرست‌ها تازه می‌شوند تا کارت کهنه نماند.
-      void fetchOrders();
+      void fetchOrders('after-action');
     }
+  };
+
+  const confirmCompleteOrder = (order: NativeOrder) => {
+    if (!user?.id || !canCompleteWorkerOrder(order.status)) return;
+    if (busyOrderIds.includes(order.id)) return;
+    Alert.alert(
+      'اتمام کار',
+      'آیا کار «' + order.serviceTitle + '» واقعاً تمام شده است؟ پس از ثبت، سفارش به‌عنوان انجام‌شده برای مشتری نمایش داده می‌شود.',
+      [
+        { text: 'انصراف', style: 'cancel' },
+        { text: 'بله، تمام شد', onPress: () => void handleCompleteOrder(order) },
+      ],
+      { cancelable: true },
+    );
   };
 
   const handleCompleteOrder = async (order: NativeOrder) => {
@@ -179,13 +233,14 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         setSuccessAlert('سفارش «' + order.serviceTitle + '» تکمیل شد.');
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
-        alert(res.message || 'خطا در تکمیل سفارش');
+        // حساب مسدود: دیالوگ و خروج را useAccountBlockedLogout نشان می‌دهد؛ دیالوگ دوم لازم نیست.
+        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'خطا در تکمیل سفارش');
       }
     } catch {
-      alert('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
     } finally {
       endOrderAction(order.id);
-      void fetchOrders();
+      void fetchOrders('after-action');
     }
   };
 
@@ -253,7 +308,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         </View>
         {canCompleteWorkerOrder(order.status) ? (
           <Pressable
-            onPress={() => handleCompleteOrder(order)}
+            onPress={() => confirmCompleteOrder(order)}
             disabled={busy}
             style={[styles.completeButtonFull, busy && styles.buttonDisabled]}
             accessibilityRole="button"
@@ -364,12 +419,34 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         </ScrollView>
       )}
 
+      {ordersState.error ? (
+        <View style={styles.alertError}>
+          <Text style={styles.alertErrorText}>{ordersState.error}</Text>
+          {ordersState.sessionExpired ? (
+            onSessionExpired ? (
+              <Pressable onPress={onSessionExpired} style={styles.retryButton} accessibilityRole="button">
+                <Text style={styles.retryButtonText}>ورود دوباره</Text>
+              </Pressable>
+            ) : null
+          ) : (
+            <Pressable
+              onPress={() => void fetchOrders('manual')}
+              disabled={loading}
+              style={[styles.retryButton, loading && styles.buttonDisabled]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryButtonText}>تلاش دوباره</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
+
       {loading && <ActivityIndicator size="large" color="#059669" style={{marginTop: 20}} />}
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         {!loading && activeTab === 'available' ? (
           filteredOrders.length === 0 ? (
-            <View style={styles.emptyBox}>
+            ordersState.error ? null : <View style={styles.emptyBox}>
               <CheckCircle size={40} color="#94a3b8" />
               <Text style={styles.emptyTitle}>سفارشی برای پذیرش موجود نیست</Text>
             </View>
@@ -433,7 +510,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           )
         ) : !loading && activeTab === 'my_jobs' ? (
           myAcceptedOrders.length === 0 ? (
-            <View style={styles.emptyBox}>
+            ordersState.error ? null : <View style={styles.emptyBox}>
               <Briefcase size={40} color="#94a3b8" />
               <Text style={styles.emptyTitle}>هنوز سفارشی نپذیرفته‌اید</Text>
             </View>
@@ -463,6 +540,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
+  alertError: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: 'rgba(239, 68, 68, 0.12)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)' },
+  alertErrorText: { flex: 1, color: '#fecaca', fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  retryButton: { backgroundColor: '#ef4444', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  retryButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   headerBar: { backgroundColor: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#334155', paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16 },
   workerProfile: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 12 },
   avatarBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },

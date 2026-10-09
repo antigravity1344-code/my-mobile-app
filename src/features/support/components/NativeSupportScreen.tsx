@@ -14,7 +14,8 @@ import {
 import { HelpCircle, Phone, MessageCircle, ChevronDown, ChevronUp, X, Send } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { apiFetch } from '../../../api/apiClient';
-import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE, SUPPORT_TEL_URL } from '../supportConfig';
+import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
+import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE_DISPLAY, SUPPORT_TEL_URL } from '../supportConfig';
 
 export interface SupportUser {
   id: string;
@@ -117,7 +118,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             <Text style={styles.secondaryBtnText}>ارسال پیام</Text>
           </Pressable>
         </View>
-        <Text style={styles.phoneHint}>شماره: {SUPPORT_PHONE}</Text>
+        <Text style={styles.phoneHint}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
 
         <Text style={styles.sectionTitle}>سوالات متداول</Text>
         {SUPPORT_FAQ.map((item) => {
@@ -148,7 +149,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
                 <Text style={styles.msgStatus}>باز</Text>
               </View>
               <Text style={styles.msgBody}>{msg.body}</Text>
-              <Text style={styles.msgMeta}>{new Date(msg.createdAt).toLocaleString('fa-IR')}</Text>
+              <Text style={styles.msgMeta}>{formatJalaliDateTime(msg.createdAt, { withTime: true })}</Text>
             </View>
           ))
         )}

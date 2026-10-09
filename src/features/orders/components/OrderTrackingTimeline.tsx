@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Check, Clock, CircleDot, AlertCircle } from 'lucide-react-native';
 import type { OrderTimelineEvent } from '../types/order';
+import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
 
 interface OrderTrackingTimelineProps {
   events: OrderTimelineEvent[];
@@ -60,7 +61,7 @@ export const OrderTrackingTimeline: React.FC<OrderTrackingTimelineProps> = ({ ev
                 >
                   {event.title}
                 </Text>
-                <Text style={styles.timestamp}>{event.timestamp}</Text>
+                <Text style={styles.timestamp}>{formatJalaliDateTime(event.timestamp, { withTime: true }) || event.timestamp}</Text>
               </View>
               {Boolean(event.description) && (
                 <Text style={styles.description}>{event.description}</Text>

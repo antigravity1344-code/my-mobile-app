@@ -11,6 +11,7 @@ import { Star, X, Check, Award, User } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import type { OrderItem } from '../types/order';
 import { customerTierLabel } from '../../../utils/pricing';
+import { initialRatingDraft } from './ratingDraft';
 
 interface OrderRatingModalProps {
   order: OrderItem | undefined;
@@ -34,15 +35,11 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [selectedRating, setSelectedRating] = useState<number>(
-    order?.ratings?.customerRating || 5,
-  );
-  const [comment, setComment] = useState<string>(
-    order?.ratings?.customerComment || '',
-  );
-  const [selectedTags, setSelectedTags] = useState<string[]>(
-    order?.ratings?.customerTags || ['کیفیت عالی', 'وقت‌شناس'],
-  );
+  // فرم برای هر سفارش جدا ساخته می‌شود (OrdersScreen با key={order.id} آن را از نو می‌سازد).
+  const [initialDraft] = useState(() => initialRatingDraft(order));
+  const [selectedRating, setSelectedRating] = useState<number>(initialDraft.rating);
+  const [comment, setComment] = useState<string>(initialDraft.comment);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialDraft.tags);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -153,7 +150,9 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
                       ? 'معمولی'
                       : selectedRating === 2
                         ? 'ضعیف'
-                        : 'خیلی ضعیف'}
+                        : selectedRating === 1
+                          ? 'خیلی ضعیف'
+                          : 'امتیاز خود را انتخاب کنید'}
               </Text>
             </View>
 

@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { apiFetch } from '../../api/apiClient';
+import { formatJalaliDateTime } from '../../utils/jalaliDisplay';
+import { CUSTOMER_ORDER_STATUS_LABELS } from '../orders/orderStatusLabels';
+import { notificationOrderTarget } from './notificationsUnread';
 
 type AppNotification = {
   id: string;
@@ -11,15 +14,7 @@ type AppNotification = {
   readAt: string | null;
 };
 
-const STATUS_TEXT: Record<string, string> = {
-  PENDING: 'در انتظار تأیید',
-  ACCEPTED: 'در حال انجام',
-  CONFIRMED: 'تأیید شده',
-  ASSIGNED: 'تخصیص متخصص',
-  IN_PROGRESS: 'در حال انجام',
-  COMPLETED: 'انجام شده',
-  CANCELLED: 'لغو شده',
-};
+const STATUS_TEXT: Record<string, string> = CUSTOMER_ORDER_STATUS_LABELS;
 
 /**
  * فقط برای نمایش: کد فنی سفارش (ORD-…) را حذف و وضعیت انگلیسی را به فارسی تبدیل می‌کند.
@@ -35,7 +30,12 @@ function formatNotificationText(text: unknown): string {
     .trim();
 }
 
-export const NativeNotificationsScreen: React.FC = () => {
+type NativeNotificationsScreenProps = {
+  /** اگر داده شود، لمس اعلانِ مربوط به یک سفارش همان سفارش را باز می‌کند (اپ مشتری). */
+  onOpenOrder?: (orderId: string) => void;
+};
+
+export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps> = ({ onOpenOrder }) => {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +60,12 @@ export const NativeNotificationsScreen: React.FC = () => {
     setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, readAt: new Date().toISOString() } : row)));
   };
 
+  const openNotification = async (item: AppNotification) => {
+    await markRead(item);
+    const orderId = notificationOrderTarget(item);
+    if (orderId && onOpenOrder) onOpenOrder(orderId);
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>اعلان‌های سفارش</Text>
@@ -67,10 +73,10 @@ export const NativeNotificationsScreen: React.FC = () => {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {items.length === 0 ? <Text style={styles.empty}>اعلانی ثبت نشده است.</Text> : null}
       {items.map((item) => (
-        <Pressable key={item.id} onPress={() => void markRead(item)} style={[styles.card, !item.readAt && styles.unread]}>
+        <Pressable key={item.id} onPress={() => void openNotification(item)} style={[styles.card, !item.readAt && styles.unread]}>
           <Text style={styles.cardTitle}>{formatNotificationText(item.title)}</Text>
           <Text style={styles.body}>{formatNotificationText(item.body)}</Text>
-          <Text style={styles.meta}>{new Date(item.createdAt).toLocaleString('fa-IR')}</Text>
+          <Text style={styles.meta}>{formatJalaliDateTime(item.createdAt, { withTime: true })}</Text>
         </Pressable>
       ))}
     </ScrollView>

@@ -223,7 +223,7 @@ export const AdminPanelScreen: React.FC = () => {
                     {ord.status === 'COMPLETED'
                       ? 'تکمیل شده'
                       : ord.status === 'ACCEPTED'
-                        ? 'پذیرفته شده'
+                        ? 'پذیرفته‌شده'
                         : 'در انتظار متخصص'}
                   </span>
                 </div>
