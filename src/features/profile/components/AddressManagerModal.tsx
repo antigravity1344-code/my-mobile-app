@@ -113,7 +113,7 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             <div className={styles.formGroup}>
-              <label className={styles.label}>نام تحویل‌گیرنده</label>
+              <label className={styles.label}>نام مشتری</label>
               <input
                 type="text"
                 className={styles.input}
@@ -124,7 +124,7 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             <div className={styles.formGroup}>
-              <label className={styles.label}>شماره همراه تحویل‌گیرنده</label>
+              <label className={styles.label}>موبایل مشتری</label>
               <input
                 type="text"
                 className={styles.input}

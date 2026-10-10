@@ -12,7 +12,9 @@ import {
 import type { OrderItem } from '../types/order';
 import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
+import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { orderAmountLabel } from '../orderStatusLabels';
+import { displayServiceTitle } from '../serviceTitleDisplay';
 
 interface OrderCardProps {
   order: OrderItem;
@@ -60,7 +62,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
       {/* Service Title */}
       <View style={styles.serviceRow}>
-        <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
+        <Text style={styles.serviceTitle}>{displayServiceTitle(order.serviceTitle)}</Text>
         {Boolean(order.serviceSubtitle) && (
           <Text style={styles.serviceSubtitle}>{order.serviceSubtitle}</Text>
         )}
@@ -87,7 +89,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             {order.timeSlot?.label ||
               [order.timeSlot?.startTime, order.timeSlot?.endTime].filter(Boolean).join(' تا ') ||
               '—'}
-            {order.durationHours ? ` (${order.durationHours} ساعت)` : ''}
+            {order.durationHours ? ` (${toPersianDigits(order.durationHours)} ساعت)` : ''}
           </Text>
         </View>
 
@@ -107,7 +109,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               <User size={13} color="#0284c7" />
             </View>
             <Text style={styles.cleanerName}>
-              {order.cleaner?.name || order.cleaner?.phone || 'اطلاعات متخصص ثبت نشده'}
+              {order.cleaner?.name || 'اطلاعات متخصص ثبت نشده'}
             </Text>
             {typeof order.cleaner?.rating === 'number' ? (
               <View style={styles.ratingBadge}>
@@ -148,7 +150,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 fill={hasRated ? '#f59e0b' : 'transparent'}
               />
               <Text style={styles.rateBtnText}>
-                {hasRated ? `امتیاز: ${order.ratings?.customerRating}` : 'ثبت امتیاز'}
+                {hasRated ? `امتیاز: ${toPersianDigits(order.ratings?.customerRating ?? '')}` : 'ثبت امتیاز'}
               </Text>
             </Pressable>
           )}
@@ -198,7 +200,8 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 8,
     alignItems: 'center',
     marginBottom: 10,
   },
@@ -222,23 +225,25 @@ const styles = StyleSheet.create({
     color: '#0369a1',
   },
   serviceRow: {
+    alignItems: 'center',
     marginBottom: 12,
   },
   serviceTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#0f172a',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   serviceSubtitle: {
     fontSize: 11,
     color: '#64748b',
-    textAlign: 'right',
+    textAlign: 'center',
     marginTop: 2,
   },
   specsContainer: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 12,
     backgroundColor: '#f8fafc',
     borderRadius: 12,
@@ -254,10 +259,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#475569',
+    textAlign: 'center',
   },
   cleanerStrip: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 10,
     alignItems: 'center',
     backgroundColor: '#f0f9ff',
     borderWidth: 1,
@@ -284,6 +291,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#0369a1',
+    textAlign: 'center',
   },
   ratingBadge: {
     flexDirection: 'row-reverse',
@@ -303,6 +311,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
+    textAlign: 'center',
   },
   footerRow: {
     flexDirection: 'row-reverse',
@@ -313,16 +322,18 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   priceWrap: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   priceLabel: {
     fontSize: 10,
     color: '#64748b',
+    textAlign: 'center',
   },
   priceValue: {
     fontSize: 14,
     fontWeight: '900',
     color: '#059669',
+    textAlign: 'center',
   },
   actionsWrap: {
     flexDirection: 'row-reverse',

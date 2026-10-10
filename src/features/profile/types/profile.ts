@@ -22,7 +22,7 @@ export interface SavedAddress {
   fullAddress: string; // نشانی دقیق متنی
   plaque: string; // شماره پلاک
   unit?: string; // شماره واحد (اختیاری)
-  recipientName: string; // نام و نام خانوادگی تحویل‌گیرنده
+  recipientName: string; // نام و نام خانوادگی مشتری
   contactPhone: string; // شماره تماس
   isDefault: boolean; // آیا آدرس پیش‌فرض است؟
 }

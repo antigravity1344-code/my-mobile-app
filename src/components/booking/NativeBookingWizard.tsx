@@ -18,7 +18,7 @@ import { useBooking } from '../../context/BookingContext';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { calculateFinalPrice, customerTierLabel, type FinalPrice } from '../../utils/pricing';
-import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
+import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
@@ -29,6 +29,8 @@ import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from
 import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
 import { createSubmitGuard } from './submitGuard';
 import { computeRevealDelta } from './keyboardReveal';
+import { addressFieldTone, firstAddressHint } from './addressFieldTone';
+import { RTL_SINGLE_LINE_INPUT } from '../native/rtlInput';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -283,11 +285,10 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const addressErrors = getAddressValidationErrors(booking.addressDetails);
   const getInputStyle = (field: keyof typeof booking.addressDetails) => {
     const hasError = !!(addressErrors as Partial<Record<keyof typeof booking.addressDetails, unknown>>)[field];
-    const value = booking.addressDetails[field];
-    if (!value) return styles.inputError;
-    if (hasError) return styles.inputError;
-    return styles.inputSuccess;
+    const tone = addressFieldTone(booking.addressDetails[field], hasError);
+    return tone === 'error' ? styles.inputError : tone === 'ok' ? styles.inputSuccess : null;
   };
+  const addressHint = firstAddressHint(addressErrors);
   const submitCurrentBooking = async () => {
     if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot) return;
     // دو لمس سریع قبل از رندر بعدی هر دو از disabled رد می‌شوند؛ این قفل همزمان فقط یکی را می‌فرستد.
@@ -440,11 +441,11 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           <Text style={styles.earlyBirdHint}>با رزرو برای ۷ روز آینده یا بیشتر، تا ۱۰٪ تخفیف برنامه‌ریزی زودهنگام بگیرید.</Text>
           <Text style={styles.label}>تاریخ اعزام</Text>
           <ScrollView ref={dateStripRef} horizontal showsHorizontalScrollIndicator={false} onContentSizeChange={dateStripScroll.onContentSizeChange} contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}>
-            {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{date.dayOfMonth}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
+            {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{toPersianDigits(date.dayOfMonth)}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
           <Text style={styles.label}>بازه زمانی</Text>
-          {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color="#0284c7" /><Text style={styles.flex}>{slot.label} ({slot.startTime} تا {slot.endTime})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color="#059669" />}</Pressable>)}
-          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان (حداقل ۴ ساعت)</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{hours} ساعت</Text></Pressable>)}</View></>}
+          {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color="#0284c7" /><Text style={styles.flex}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color="#059669" />}</Pressable>)}
+          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان (حداقل ۴ ساعت)</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
           <Text style={styles.label}>تکرار سفارش</Text>
           <View style={styles.choiceRow}>
             {[
@@ -487,7 +488,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         </View>}
 
         {booking.step === 3 && <View style={styles.section}>
-          <Text style={styles.heading}>آدرس و تحویل‌گیرنده</Text>
+          <Text style={styles.heading}>آدرس و مشخصات مشتری</Text>
           {savedAddresses.length > 0 ? (
             <View style={styles.savedAddressBlock}>
               <Text style={styles.label}>آدرس‌های ذخیره‌شده</Text>
@@ -525,26 +526,28 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color="#0284c7" /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color="#0284c7" />}</Pressable>
           <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView ref={districtStripRef} horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} onContentSizeChange={districtStripScroll.onContentSizeChange} contentContainerStyle={[{ paddingHorizontal: 16 }, styles.rtlStrip]}>{rtlOrder(filteredDistricts).map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
-          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: خیابان، کوچه، بن‌بست" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
+          <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثال: ۴" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput {...RTL_SINGLE_LINE_INPUT} value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
+            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput {...RTL_SINGLE_LINE_INPUT} value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۳" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
           </View>
-          <Text style={styles.label}>نام و نام خانوادگی</Text>
+          <Text style={styles.label}>نام مشتری</Text>
           <TextInput
+            {...RTL_SINGLE_LINE_INPUT}
             value={booking.addressDetails.recipientName}
             onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('recipientName', value); }}
             onFocus={scrollFocusedFieldIntoView}
-            placeholder="نام و نام خانوادگی"
+            placeholder="مثلاً علی رضایی"
             placeholderTextColor="#94a3b8"
             style={[styles.input, getInputStyle('recipientName')]}
           />
-          <Text style={styles.label}>شماره موبایل</Text>
+          <Text style={styles.label}>موبایل مشتری</Text>
           <TextInput
+            {...RTL_SINGLE_LINE_INPUT}
             value={booking.addressDetails.contactPhone}
             onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('contactPhone', value); }}
             onFocus={scrollFocusedFieldIntoView}
-            placeholder="مثال: 09121111111"
+            placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
             placeholderTextColor="#94a3b8"
             keyboardType="phone-pad"
             style={[styles.input, getInputStyle('contactPhone')]}
@@ -559,12 +562,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           <Text style={styles.heading}>بازبینی و ثبت سفارش</Text>
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
-            <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {booking.selectedDate?.dayOfMonth} {booking.selectedTimeSlot?.label}</Text>
+            <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedTimeSlot?.label}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
             <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
             {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
-            {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({Math.round(pricing.earlyBirdDiscountRate * 100)}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
+            {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({toPersianDigits(Math.round(pricing.earlyBirdDiscountRate * 100))}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان (سطح {customerTierLabel(booking.customerTier) || '—'})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
             {pricing.recurringDiscountDeferred && <Text style={styles.recurringHint}>فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.</Text>}
             {pricing.recurringDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text><Text style={styles.discountAmount}>-{pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
@@ -606,6 +609,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           )}
         </View>}
 
+        {booking.step === 3 && !canContinue && addressHint ? <Text style={[styles.muted, styles.addressHint]}>{addressHint}</Text> : null}
         {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} accessibilityRole="button" accessibilityState={{ disabled: booking.step === 1 }} style={[styles.back, booking.step === 1 && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
         {booking.step === 4 && !isSubmitted && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={isSubmitting} accessibilityRole="button" accessibilityState={{ disabled: isSubmitting }} style={[styles.back, isSubmitting && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable></View>}
       </ScrollView>
@@ -639,6 +643,6 @@ const styles = StyleSheet.create({
   savedAddressMeta: { textAlign: 'right', color: '#64748b', fontSize: 11, lineHeight: 16 },
   saveAddressButton: { alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#bae6fd', backgroundColor: '#f0f9ff' },
   saveAddressButtonText: { color: '#0369a1', fontWeight: '800', fontSize: 13 },
-  saveAddressMessage: { textAlign: 'right', color: '#0369a1', fontSize: 12 }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
+  saveAddressMessage: { textAlign: 'right', color: '#0369a1', fontSize: 12 }, addressHint: { fontSize: 12, marginTop: 16 }, chipText: { color: '#475569', fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, borderWidth: 1, borderColor: '#e2e8f0' }, summaryTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 }, summaryLine: { textAlign: 'right', color: '#475569', fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 10 }, totalLabel: { color: '#0f172a', fontWeight: '800', fontSize: 14 }, total: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0' }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' }, mockHint: { textAlign: 'right', color: '#0369a1', fontSize: 11, lineHeight: 18 }, pendingMessage: { color: '#92400e', backgroundColor: '#fef3c7', padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: '#0284c7' }, primaryText: { color: '#fff', fontWeight: '800' }, disabled: { opacity: 0.45 }, back: { padding: 13 }, backText: { color: '#475569', fontWeight: '700' },
 });
 

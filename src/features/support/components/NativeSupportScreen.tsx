@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,17 @@ import {
   Linking,
   Alert,
   TextInput,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { HelpCircle, Phone, MessageCircle, ChevronDown, ChevronUp, X, Send } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
+import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { apiFetch } from '../../../api/apiClient';
 import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
 import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE_DISPLAY, SUPPORT_TEL_URL } from '../supportConfig';
+import { SUPPORT_GREETING, supportSenderLine } from '../supportGreeting';
 
 export interface SupportUser {
   id: string;
@@ -43,6 +46,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const sheetKb = useSheetKeyboard(composeOpen);
 
   React.useEffect(() => {
     let alive = true;
@@ -62,7 +66,18 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
     };
   }, [user?.id]);
 
-  const displayName = useMemo(() => (user.name || '').trim(), [user.name]);
+  // After a successful send the sheet closes and the page scrolls to «پیام‌های شما», where the new
+  // message is the first item (the list sits below the FAQ, out of view on most phones).
+  const pageScrollRef = useRef<ScrollView>(null);
+  const messagesYRef = useRef(0);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    },
+    [],
+  );
+  const senderLine = supportSenderLine(user.phone);
 
   const callSupport = () => {
     void Linking.openURL(SUPPORT_TEL_URL).catch(() => {
@@ -92,19 +107,22 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
       setSubject('');
       setBody('');
       setError(null);
+      Keyboard.dismiss();
       setComposeOpen(false);
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(() => {
+        pageScrollRef.current?.scrollTo({ y: Math.max(0, messagesYRef.current - 8), animated: true });
+      }, 350);
     })();
   };
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={pageScrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <HelpCircle size={22} color="#0284c7" />
           <Text style={styles.heroTitle}>پشتیبانی پاکشو</Text>
-          <Text style={styles.heroSub}>
-            {displayName} عزیز، سوال‌های متداول را ببینید یا با پشتیبانی تماس بگیرید.
-          </Text>
+          <Text style={styles.heroSub}>{SUPPORT_GREETING}</Text>
           <Text style={styles.meta}>ساعات پاسخگویی: {SUPPORT_HOURS}</Text>
         </View>
 
@@ -138,7 +156,14 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
           );
         })}
 
-        <Text style={styles.sectionTitle}>پیام‌های شما</Text>
+        <Text
+          style={styles.sectionTitle}
+          onLayout={(e) => {
+            messagesYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
+          پیام‌های شما
+        </Text>
         {messages.length === 0 ? (
           <Text style={styles.empty}>هنوز پیامی ثبت نشده است.</Text>
         ) : (
@@ -156,16 +181,22 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
       </ScrollView>
 
       <BottomSheetModal visible={composeOpen} onRequestClose={() => setComposeOpen(false)}>
-        {(bottomInset) => (
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.modalCard, { paddingBottom: 16 + bottomInset }]}>
+        {(bottomInset) => {
+        const sheetLayout = sheetKb.layout(bottomInset);
+        return (
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { paddingBottom: sheetLayout.liftBottom }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          onLayout={sheetKb.onOverlayLayout}
+        >
+          <View style={[styles.modalCard, { paddingBottom: 16 + sheetLayout.contentBottomInset }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>پیام به پشتیبانی</Text>
               <Pressable onPress={() => setComposeOpen(false)} style={styles.closeBtn}>
                 <X size={20} color="#64748b" />
               </Pressable>
             </View>
-            <Text style={styles.modalHint}>از طرف {displayName} · {user.phone}</Text>
+            {senderLine ? <Text style={styles.modalHint}>{supportSenderLine(user.phone)}</Text> : null}
             <TextInput
               value={subject}
               onChangeText={setSubject}
@@ -182,13 +213,14 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
               multiline
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Pressable onPress={submitMessage} style={styles.primaryBtn}>
+            <Pressable onPress={submitMessage} style={[styles.primaryBtn, styles.submitBtn]}>
               <Send size={16} color="#fff" />
               <Text style={styles.primaryBtnText}>ثبت پیام</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
-        )}
+        );
+        }}
       </BottomSheetModal>
     </View>
   );
@@ -204,6 +236,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row-reverse', gap: 8 },
   primaryBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 13 },
   primaryBtnText: { color: '#fff', fontWeight: '800' },
+  submitBtn: { flex: 0, minHeight: 48 },
   secondaryBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e0f2fe', borderRadius: 13, paddingVertical: 13 },
   secondaryBtnText: { color: '#0369a1', fontWeight: '800' },
   phoneHint: { textAlign: 'right', color: '#64748b', fontSize: 12 },
@@ -227,6 +260,6 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 6 },
   modalHint: { textAlign: 'right', color: '#64748b', fontSize: 12 },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right' },
-  textArea: { minHeight: 110, textAlignVertical: 'top' },
+  textArea: { minHeight: 110, maxHeight: 160, textAlignVertical: 'top' },
   error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10, textAlign: 'right' },
 });

@@ -4,9 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
 import { NativeAddressManagerModal } from './NativeAddressManagerModal';
+import { findMainAddress } from '../mainAddress';
+import type { SavedAddress } from '../types/profile';
 import { apiFetch } from '../../../api/apiClient';
 import { attachStoredAuthToken } from '../../../api/authToken';
 import { appStorage } from '../../../utils/storage';
+import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { CUSTOMER_TOKEN_KEY, saveCustomerSession } from '../../../components/native/customerLoginStorage';
 
 interface Props {
@@ -17,6 +20,15 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
   const { profile, removeSavedAddress, setDefaultAddress, syncAuthenticatedUser } = useProfile();
   const { bottom: bottomInset } = useSafeAreaInsets();
   const [addressModalOpen, setAddressModalOpen] = useState(false);
+  const [addressModalMode, setAddressModalMode] = useState<'main' | 'extra'>('extra');
+  const [addressToEdit, setAddressToEdit] = useState<SavedAddress | null>(null);
+  const mainAddress = findMainAddress(profile.savedAddresses);
+  const otherAddresses = profile.savedAddresses.filter((addr) => addr !== mainAddress);
+  const openAddressModal = (mode: 'main' | 'extra', edit: SavedAddress | null = null) => {
+    setAddressModalMode(mode);
+    setAddressToEdit(edit);
+    setAddressModalOpen(true);
+  };
   const [editName, setEditName] = useState(profile.fullName || '');
   const [editBirthDate, setEditBirthDate] = useState('');
   const [editNationalId, setEditNationalId] = useState('');
@@ -67,7 +79,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <View style={styles.userMeta}>
             <Text style={styles.name}>{profile.fullName || ''}</Text>
-            <Text style={styles.phone}>{profile.phoneNumber}</Text>
+            <Text style={styles.phone}>{toPersianDigits(profile.phoneNumber || '')}</Text>
           </View>
         </View>
 
@@ -99,10 +111,64 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             placeholder="تاریخ تولد (اختیاری)"
             placeholderTextColor="#94a3b8"
           />
+
+          <View style={styles.mainAddressBlock}>
+            <View style={styles.sectionHeader}>
+              <MapPin size={16} color="#0284c7" />
+              <Text style={styles.sectionTitle}>آدرس اصلی</Text>
+            </View>
+            {mainAddress ? (
+              <View style={[styles.addressCard, styles.addressDefault]}>
+                <View style={styles.addressTop}>
+                  <Text style={styles.addressTitle}>{mainAddress.title}</Text>
+                  <Pressable onPress={() => openAddressModal('main', mainAddress)} style={styles.secondaryBtn}>
+                    <Text style={styles.secondaryBtnText}>ویرایش</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.addressLine}>{mainAddress.district} · {mainAddress.fullAddress}</Text>
+                <Text style={styles.addressLine}>پلاک {mainAddress.plaque}{mainAddress.unit ? ` · واحد ${mainAddress.unit}` : ''}</Text>
+                <Text style={styles.addressLine}>{mainAddress.recipientName} · {toPersianDigits(mainAddress.contactPhone || '')}</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => openAddressModal('main')} style={styles.mainAddressBtn}>
+                <Text style={styles.mainAddressBtnText}>ثبت آدرس اصلی</Text>
+              </Pressable>
+            )}
+          </View>
           {profileMessage ? <Text style={styles.muted}>{profileMessage}</Text> : null}
           <Pressable onPress={() => void saveIdentity()} disabled={savingProfile} style={styles.saveBtn}>
             {savingProfile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>ذخیره اطلاعات</Text>}
           </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.subSectionTitle}>آدرس‌های دیگر</Text>
+            <Pressable onPress={() => openAddressModal('extra')} style={styles.addBtn}>
+              <Plus size={14} color="#fff" />
+              <Text style={styles.addBtnText}>افزودن</Text>
+            </Pressable>
+          </View>
+          {otherAddresses.length === 0 ? (
+            <Text style={styles.muted}>آدرس دیگری ثبت نشده است.</Text>
+          ) : (
+            otherAddresses.map((addr) => (
+              <View key={addr.id} style={styles.addressCard}>
+                <Text style={styles.addressTitle}>{addr.title}</Text>
+                <Text style={styles.addressLine}>{addr.district} · {addr.fullAddress}</Text>
+                <Text style={styles.addressLine}>پلاک {addr.plaque}{addr.unit ? ` · واحد ${addr.unit}` : ''}</Text>
+                <View style={styles.addressActions}>
+                  <Pressable onPress={() => setDefaultAddress(addr.id)} style={styles.secondaryBtn}>
+                    <Text style={styles.secondaryBtnText}>اصلی شود</Text>
+                  </Pressable>
+                  <Pressable onPress={() => removeSavedAddress(addr.id)} style={styles.dangerBtn}>
+                    <Trash2 size={14} color="#b91c1c" />
+                    <Text style={styles.dangerBtnText}>حذف</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         <View style={styles.section}>
@@ -112,10 +178,10 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <Text style={styles.loyaltyTitle}>{profile.loyalty.title}</Text>
           <Text style={styles.muted}>
-            {profile.loyalty.completedOrdersCount} سفارش تکمیل‌شده · تخفیف {profile.loyalty.discountPercentage}٪
+            {toPersianDigits(profile.loyalty.completedOrdersCount)} سفارش تکمیل‌شده · تخفیف {toPersianDigits(profile.loyalty.discountPercentage)}٪
           </Text>
           <Text style={styles.muted}>
-            سطح بعدی پس از {profile.loyalty.nextTierOrderTarget} سفارش تکمیل‌شده و امتیاز کافی محاسبه می‌شود.
+            سطح بعدی پس از {toPersianDigits(profile.loyalty.nextTierOrderTarget)} سفارش تکمیل‌شده و امتیاز کافی محاسبه می‌شود.
           </Text>
         </View>
 
@@ -130,53 +196,13 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeader}>
-              <MapPin size={16} color="#0284c7" />
-              <Text style={styles.sectionTitle}>آدرس‌های ذخیره‌شده</Text>
-            </View>
-            <Pressable onPress={() => setAddressModalOpen(true)} style={styles.addBtn}>
-              <Plus size={14} color="#fff" />
-              <Text style={styles.addBtnText}>افزودن</Text>
-            </Pressable>
-          </View>
-
-          {profile.savedAddresses.length === 0 ? (
-            <Text style={styles.muted}>هنوز آدرسی ذخیره نشده است.</Text>
-          ) : (
-            profile.savedAddresses.map((addr) => (
-              <View key={addr.id} style={[styles.addressCard, addr.isDefault && styles.addressDefault]}>
-                <View style={styles.addressTop}>
-                  <Text style={styles.addressTitle}>{addr.title}</Text>
-                  {addr.isDefault ? <Text style={styles.defaultBadge}>پیش‌فرض</Text> : null}
-                </View>
-                <Text style={styles.addressLine}>{addr.district} · {addr.fullAddress}</Text>
-                <Text style={styles.addressLine}>پلاک {addr.plaque}{addr.unit ? ` · واحد ${addr.unit}` : ''}</Text>
-                <Text style={styles.addressLine}>{addr.recipientName} · {addr.contactPhone}</Text>
-                <View style={styles.addressActions}>
-                  {!addr.isDefault ? (
-                    <Pressable onPress={() => setDefaultAddress(addr.id)} style={styles.secondaryBtn}>
-                      <Text style={styles.secondaryBtnText}>پیش‌فرض</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable onPress={() => removeSavedAddress(addr.id)} style={styles.dangerBtn}>
-                    <Trash2 size={14} color="#b91c1c" />
-                    <Text style={styles.dangerBtnText}>حذف</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
         <Pressable onPress={onLogout} style={styles.logoutBtn}>
           <LogOut size={16} color="#b91c1c" />
           <Text style={styles.logoutText}>خروج از حساب</Text>
         </Pressable>
       </ScrollView>
 
-      <NativeAddressManagerModal visible={addressModalOpen} onClose={() => setAddressModalOpen(false)} />
+      <NativeAddressManagerModal visible={addressModalOpen} onClose={() => setAddressModalOpen(false)} mode={addressModalMode} editAddress={addressToEdit} />
     </View>
   );
 };
@@ -216,6 +242,10 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#fff', fontWeight: '800' },
   addBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#0284c7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  mainAddressBlock: { marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 8 },
+  mainAddressBtn: { alignSelf: 'stretch', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc', paddingVertical: 13, borderRadius: 12 },
+  mainAddressBtnText: { color: '#0369a1', fontWeight: '800', fontSize: 14 },
+  subSectionTitle: { textAlign: 'right', color: '#334155', fontWeight: '700', fontSize: 13 },
   addressCard: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#e2e8f0' },
   addressDefault: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
   addressTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },

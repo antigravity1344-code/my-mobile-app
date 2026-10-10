@@ -27,6 +27,7 @@ import { formatOrderAmount } from '../services/orderService';
 import { startOrderStatusWatch } from '../services/orderStatusWatch';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderRatingModal } from './OrderRatingModal';
+import { formatTomanAmount } from '../services/money';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
@@ -83,11 +84,16 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
     ? allOrders.find((item) => item.id === ratingModalOrderId)
     : undefined;
 
+  // true only when the detail was opened from the card's «لغو» button (opens with the cancel prompt).
+  const [openWithCancel, setOpenWithCancel] = useState(false);
+
   const handleOpenDetail = (order: OrderItem) => {
+    setOpenWithCancel(false);
     selectOrder(order.id);
   };
 
   const handleCloseDetail = () => {
+    setOpenWithCancel(false);
     selectOrder(null);
   };
 
@@ -159,8 +165,13 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
             <View style={styles.statIconWrap}>
               <Wallet size={16} color="#64748b" />
             </View>
-            <Text style={[styles.statNumber, { fontSize: 13, color: '#334155' }]}>
-              {formatOrderAmount((stats.totalSpent || 0) / 1000)} هـ.ت
+            <Text
+              style={[styles.statNumber, { fontSize: 13, color: '#334155' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
+              {formatTomanAmount(stats.totalSpent)}
             </Text>
             <Text style={styles.statTitle}>مجموع خرید</Text>
           </View>
@@ -253,6 +264,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
                 onPressDetails={handleOpenDetail}
                 onPressRate={() => openRatingModal(item.id)}
                 onPressCancel={(ord) => {
+                  setOpenWithCancel(true);
                   selectOrder(ord.id);
                 }}
               />
@@ -263,7 +275,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
 
       {/* Order Detail Modal */}
       <OrderDetailModal
-        key={selectedOrder?.id ?? 'no-order'}
+        key={selectedOrder?.id ?? 'no-order-detail'}
         order={selectedOrder}
         visible={Boolean(selectedOrder)}
         onClose={handleCloseDetail}
@@ -272,11 +284,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
           openRatingModal(orderId);
         }}
         onCancelOrder={cancelOrder}
+        openCancelPrompt={openWithCancel}
       />
 
       {/* Order Rating Modal */}
       <OrderRatingModal
-        key={activeRatingOrder?.id ?? 'no-order'}
+        key={activeRatingOrder?.id ?? 'no-order-rating'}
         order={activeRatingOrder}
         visible={Boolean(activeRatingOrder)}
         onClose={closeRatingModal}
@@ -357,6 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statIconWrap: {
+    alignItems: 'center',
     marginBottom: 4,
   },
   statNumber: {
@@ -364,11 +378,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0284c7',
     marginBottom: 2,
+    textAlign: 'center',
   },
   statTitle: {
     fontSize: 10,
     fontWeight: '600',
     color: '#64748b',
+    textAlign: 'center',
   },
   searchRow: {
     flexDirection: 'row-reverse',

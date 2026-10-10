@@ -187,7 +187,7 @@ export function MainDashboard() {
                     <span className="text-sky-400 font-bold">{addressDetails.district}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">گیرنده:</span>
+                    <span className="text-slate-400">مشتری:</span>
                     <span className="text-slate-200 font-medium">{addressDetails.recipientName || 'وارد نشده'}</span>
                   </div>
                   <div className="flex justify-between">

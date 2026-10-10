@@ -306,7 +306,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   {addressDetails.unit ? `، واحد ${addressDetails.unit}` : ''}
                   {addressDetails.floor ? `، طبقه ${addressDetails.floor}` : ''}
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    تحویل‌گیرنده: {addressDetails.recipientName} ({addressDetails.contactPhone})
+                    مشتری: {addressDetails.recipientName} ({addressDetails.contactPhone})
                   </div>
                   {addressDetails.addressNotes ? (
                     <div className="text-[11px] text-slate-500 mt-0.5">یادداشت آدرس: {addressDetails.addressNotes}</div>

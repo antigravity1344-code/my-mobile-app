@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,26 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
+import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { useProfile } from '../context/ProfileContext';
+import { extraAddressIsDefault } from '../mainAddress';
+import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
+import type { SavedAddress } from '../types/profile';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  /** 'main' saves the main (default) address; 'extra' adds another address. */
+  mode?: 'main' | 'extra';
+  /** When set (main mode), the modal is prefilled and saving replaces this address. */
+  editAddress?: SavedAddress | null;
 }
 
-export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose }) => {
-  const { addSavedAddress, profile } = useProfile();
+export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, mode = 'extra', editAddress = null }) => {
+  const { addSavedAddress, saveMainAddress, profile } = useProfile();
   const [title, setTitle] = useState('');
   const [district, setDistrict] = useState('');
   const [fullAddress, setFullAddress] = useState('');
@@ -29,6 +36,21 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose })
   const [recipientName, setRecipientName] = useState(profile.fullName || '');
   const [contactPhone, setContactPhone] = useState(profile.phoneNumber || '');
   const [error, setError] = useState<string | null>(null);
+  const sheetKb = useSheetKeyboard(visible);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (editAddress) {
+      setTitle(editAddress.title || '');
+      setDistrict(editAddress.district || '');
+      setFullAddress(editAddress.fullAddress || '');
+      setPlaque(editAddress.plaque || '');
+      setUnit(editAddress.unit || '');
+      setRecipientName(editAddress.recipientName || '');
+      setContactPhone(editAddress.contactPhone || '');
+      setError(null);
+    }
+  }, [visible, editAddress]);
 
   const resetAndClose = () => {
     setTitle('');
@@ -47,66 +69,69 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose })
       setError('لطفا تمامی فیلدهای ضروری را پر کنید.');
       return;
     }
-    addSavedAddress({
-      title,
-      district,
-      fullAddress,
-      plaque,
-      unit,
-      recipientName,
-      contactPhone,
-      isDefault: profile.savedAddresses.length === 0,
-    });
+    const fields = { title, district, fullAddress, plaque, unit, recipientName, contactPhone };
+    if (mode === 'main') {
+      saveMainAddress(fields, editAddress?.id);
+    } else {
+      addSavedAddress({ ...fields, isDefault: extraAddressIsDefault(profile.savedAddresses) });
+    }
     resetAndClose();
   };
 
   return (
     <BottomSheetModal visible={visible} onRequestClose={resetAndClose}>
-      {(bottomInset) => (
+      {(bottomInset) => {
+      const sheetLayout = sheetKb.layout(bottomInset);
+      const cardMaxHeight = sheetLayout.maxHeight(0.88);
+      return (
       <KeyboardAvoidingView
-        style={styles.overlay}
+        style={[styles.overlay, { paddingBottom: sheetLayout.liftBottom }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        onLayout={sheetKb.onOverlayLayout}
       >
-        <View style={[styles.card, { maxHeight: Math.round(Dimensions.get('window').height * 0.88) }]}>
+        <View style={[styles.card, { maxHeight: cardMaxHeight }]}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>افزودن آدرس جدید</Text>
+            <Text style={styles.headerTitle}>{mode === 'main' ? (editAddress ? 'ویرایش آدرس اصلی' : 'ثبت آدرس اصلی') : 'افزودن آدرس دیگر'}</Text>
             <Pressable onPress={resetAndClose} style={styles.closeBtn}>
               <X size={20} color="#64748b" />
             </Pressable>
           </View>
           <ScrollView
-            style={{ maxHeight: Math.round(Dimensions.get('window').height * 0.88) - 64 }}
-            contentContainerStyle={[styles.body, { paddingBottom: 16 + bottomInset }]}
+            ref={sheetKb.scrollRef}
+            onScroll={sheetKb.onScroll}
+            scrollEventThrottle={16}
+            style={{ maxHeight: cardMaxHeight - 64 }}
+            contentContainerStyle={[styles.body, { paddingBottom: 16 + sheetLayout.contentBottomInset }]}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
           >
             <View style={styles.field}>
               <Text style={styles.label}>عنوان آدرس</Text>
-              <TextInput value={title} onChangeText={setTitle} placeholder="خانه" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={title} onChangeText={setTitle} placeholder="مثلاً خانه" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>محله</Text>
-              <TextInput value={district} onChangeText={setDistrict} placeholder="سعادت‌آباد" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={district} onChangeText={setDistrict} placeholder="مثلاً سعادت‌آباد" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>نشانی دقیق</Text>
-              <TextInput value={fullAddress} onChangeText={setFullAddress} placeholder="خیابان، کوچه" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput multiline value={fullAddress} onChangeText={setFullAddress} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>پلاک</Text>
-              <TextInput value={plaque} onChangeText={setPlaque} placeholder="۱۲" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={plaque} onChangeText={setPlaque} placeholder="مثلاً ۱۲" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>واحد</Text>
-              <TextInput value={unit} onChangeText={setUnit} placeholder="۴" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={unit} onChangeText={setUnit} placeholder="مثلاً ۳" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>نام گیرنده</Text>
-              <TextInput value={recipientName} onChangeText={setRecipientName} placeholder="نام و نام خانوادگی" placeholderTextColor="#94a3b8" style={styles.input} />
+              <Text style={styles.label}>نام مشتری</Text>
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={recipientName} onChangeText={setRecipientName} placeholder="مثلاً علی رضایی" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>موبایل</Text>
-              <TextInput value={contactPhone} onChangeText={setContactPhone} placeholder="0912..." placeholderTextColor="#94a3b8" style={styles.input} keyboardType="phone-pad" />
+              <Text style={styles.label}>موبایل مشتری</Text>
+              <TextInput {...RTL_SINGLE_LINE_INPUT} value={contactPhone} onChangeText={setContactPhone} placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹" placeholderTextColor="#94a3b8" style={styles.input} keyboardType="phone-pad" />
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable onPress={handleSubmit} style={styles.submit}>
@@ -115,7 +140,8 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose })
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-      )}
+      );
+      }}
     </BottomSheetModal>
   );
 };

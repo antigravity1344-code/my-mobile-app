@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -10,6 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
+import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { SUPPORT_TEL_URL } from '../../support';
 import {
   X,
@@ -21,7 +22,6 @@ import {
   Star,
   Receipt,
   AlertTriangle,
-  Headphones,
   CheckCircle2,
   Sparkles,
 } from 'lucide-react-native';
@@ -32,6 +32,8 @@ import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 import { orderAmountLabel, paymentStatusDisplay } from '../orderStatusLabels';
 import { customerTierLabel } from '../../../utils/pricing';
 import { describeServiceOptions } from '../../../components/native/workerServiceCategory';
+import { toPersianDigits } from '../../../utils/jalaliDateOptions';
+import { displayServiceTitle } from '../serviceTitleDisplay';
 
 interface OrderDetailModalProps {
   order: OrderItem | undefined;
@@ -39,6 +41,8 @@ interface OrderDetailModalProps {
   onClose: () => void;
   onOpenRating: (orderId: string) => void;
   onCancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  /** Opened from the card's «لغو»: start with the cancel prompt open. */
+  openCancelPrompt?: boolean;
 }
 
 const RECURRING_TITLES: Record<string, string> = {
@@ -60,10 +64,21 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onClose,
   onOpenRating,
   onCancelOrder,
+  openCancelPrompt,
 }) => {
-  const [showCancelPrompt, setShowCancelPrompt] = useState(false);
+  const [showCancelPrompt, setShowCancelPrompt] = useState(Boolean(openCancelPrompt) && isOrderCancellable(order?.status ?? 'UNKNOWN'));
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const sheetKb = useSheetKeyboard(visible);
+  const sheetScrollRef = sheetKb.scrollRef;
+
+  // The cancel box is appended at the end of the details; bring it (and its reason input) into view.
+  useEffect(() => {
+    if (!showCancelPrompt) return undefined;
+    // Second try: when opened straight from the card the sheet is still sliding in at 120 ms.
+    const timers = [120, 450].map((ms) => setTimeout(() => sheetScrollRef.current?.scrollToEnd({ animated: true }), ms));
+    return () => timers.forEach(clearTimeout);
+  }, [showCancelPrompt, sheetScrollRef]);
 
   if (!order) return null;
 
@@ -88,7 +103,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     order.timeSlot?.label ||
     [order.timeSlot?.startTime, order.timeSlot?.endTime].filter(Boolean).join(' الی ') ||
     '—';
-  const durationLabel = order.durationHours > 0 ? ` (${order.durationHours} ساعت)` : '';
+  const durationLabel = order.durationHours > 0 ? ` (${toPersianDigits(order.durationHours)} ساعت)` : '';
   const addressLine = [
     order.address?.district,
     order.address?.fullAddress,
@@ -99,16 +114,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     .join('، ') || '—';
   const recipientLabel = [
     order.address?.recipientName || '—',
-    order.address?.contactPhone ? `(${order.address.contactPhone})` : '',
+    order.address?.contactPhone ? `(${toPersianDigits(order.address.contactPhone)})` : '',
   ]
     .filter(Boolean)
     .join(' ');
-
-  const handleCallCleaner = () => {
-    if (order.cleaner?.phone) {
-      void Linking.openURL(`tel:${order.cleaner.phone}`);
-    }
-  };
 
   const handleCallSupport = () => {
     void Linking.openURL(SUPPORT_TEL_URL);
@@ -131,9 +140,16 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   return (
     <BottomSheetModal visible={visible} onRequestClose={onClose}>
-      {(bottomInset) => (
-      <View style={styles.overlay}>
-        <View style={[styles.container, { paddingBottom: bottomInset }]}>
+      {(bottomInset) => {
+      const sheetLayout = sheetKb.layout(bottomInset);
+      // Keyboard open (Android): the sheet sits on the keyboard and only uses the space above it
+      // (measured overlay, so it also fits when the system itself resized the window).
+      const keyboardSize = sheetLayout.keyboardOpen
+        ? { height: sheetLayout.maxHeight(0.92), maxHeight: sheetLayout.maxHeight(0.92) }
+        : null;
+      return (
+      <View style={[styles.overlay, { paddingBottom: sheetLayout.liftBottom }]} onLayout={sheetKb.onOverlayLayout}>
+        <View style={[styles.container, { paddingBottom: sheetLayout.contentBottomInset }, keyboardSize]}>
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -148,14 +164,21 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             </View>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={sheetKb.scrollRef}
+            onScroll={sheetKb.onScroll}
+            scrollEventThrottle={16}
+            keyboardShouldPersistTaps="handled"
+            style={styles.body}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Service Title Box */}
             <View style={styles.serviceBox}>
               <View style={styles.serviceIconWrap}>
                 <Sparkles size={20} color="#0284c7" />
               </View>
               <View style={styles.serviceTextWrap}>
-                <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
+                <Text style={styles.serviceTitle}>{displayServiceTitle(order.serviceTitle)}</Text>
                 {Boolean(order.serviceSubtitle) && (
                   <Text style={styles.serviceSubtitle}>{order.serviceSubtitle}</Text>
                 )}
@@ -178,11 +201,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   </View>
                   <View style={styles.cleanerInfo}>
                     <Text style={styles.cleanerName}>
-                      {order.cleaner?.name || order.cleaner?.phone || 'اطلاعات متخصص روی سفارش ثبت نشده'}
+                      {order.cleaner?.name || 'اطلاعات متخصص روی سفارش ثبت نشده'}
                     </Text>
-                    {order.cleaner?.name && order.cleaner.phone ? (
-                      <Text style={styles.cleanerJobsText}>{order.cleaner.phone}</Text>
-                    ) : null}
                     {typeof order.cleaner?.rating === 'number' || typeof order.cleaner?.completedJobsCount === 'number' ? (
                       <View style={styles.cleanerRatingRow}>
                         {typeof order.cleaner?.rating === 'number' ? (
@@ -201,10 +221,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                       </View>
                     ) : null}
                   </View>
-                  <Pressable onPress={handleCallCleaner} style={styles.callCleanerBtn}>
-                    <Phone size={16} color="#fff" />
-                    <Text style={styles.callCleanerText}>تماس</Text>
-                  </Pressable>
                 </View>
               </View>
             )}
@@ -253,7 +269,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               </View>
               <View style={styles.infoRow}>
                 <User size={15} color="#0284c7" />
-                <Text style={styles.infoLabel}>تحویل‌گیرنده:</Text>
+                <Text style={styles.infoLabel}>مشتری:</Text>
                 <Text style={styles.infoValue}>{recipientLabel}</Text>
               </View>
               {order.notes?.trim() ? (
@@ -280,7 +296,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               {earlyBirdAmount > 0 && (
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>
-                    تخفیف رزرو زودهنگام ({Math.round(earlyBirdRate * 100)}٪)
+                    تخفیف رزرو زودهنگام ({toPersianDigits(Math.round(earlyBirdRate * 100))}٪)
                   </Text>
                   <Text style={styles.discountValue}>
                     -{formatOrderAmount(earlyBirdAmount)} تومان
@@ -351,7 +367,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     />
                   ))}
                   <Text style={styles.ratingScoreText}>
-                    {order.ratings?.customerRating} از ۵
+                    {toPersianDigits(order.ratings?.customerRating ?? '')} از ۵
                   </Text>
                 </View>
                 {Boolean(order.ratings?.customerComment) && (
@@ -372,7 +388,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             )}
 
             {/* Cancel Prompt Inline */}
-            {showCancelPrompt && (
+            {showCancelPrompt && isCancellable && (
               <View style={styles.cancelBox}>
                 <View style={styles.cancelBoxTitleRow}>
                   <AlertTriangle size={18} color="#b91c1c" />
@@ -437,13 +453,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             )}
 
             <Pressable onPress={handleCallSupport} style={styles.footerSupportBtn}>
-              <Headphones size={16} color="#0369a1" />
-              <Text style={styles.footerSupportText}>پشتیبانی</Text>
+              <Phone size={16} color="#0369a1" />
+              <Text style={styles.footerSupportText}>تماس با پشتیبانی</Text>
             </Pressable>
           </View>
         </View>
       </View>
-      )}
+      );
+      }}
     </BottomSheetModal>
   );
 };
@@ -594,20 +611,6 @@ const styles = StyleSheet.create({
   cleanerJobsText: {
     fontSize: 10,
     color: '#64748b',
-  },
-  callCleanerBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  callCleanerText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
   },
   infoRow: {
     flexDirection: 'row-reverse',
@@ -851,7 +854,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f9ff',
     borderWidth: 1,
     borderColor: '#bae6fd',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
   },

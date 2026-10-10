@@ -84,7 +84,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
       <div>
         <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
           <MapPin className="w-5 h-5 text-sky-600" />
-          <span>۳. موقعیت مکانی، آدرس و مشخصات تحویل‌گیرنده</span>
+          <span>۳. موقعیت مکانی، آدرس و مشخصات مشتری</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
           موقعیت خود را روی نقشه مشخص نموده و آدرس دقیق و شماره همراه جهت هماهنگی با متخصص را وارد کنید.

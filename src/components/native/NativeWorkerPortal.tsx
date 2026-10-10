@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { UserData } from '../../types/user';
 import { appStorage } from '../../utils/storage';
+import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { isAccountBlockedResponse } from '../../api/accountBlocked';
@@ -295,7 +296,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               style={styles.callButton}
             >
               <Phone size={16} color="#fff" />
-              <Text style={styles.callButtonText}>تماس با مشتری ({order.phone})</Text>
+              <Text style={styles.callButtonText}>تماس با مشتری ({toPersianDigits(order.phone || '')})</Text>
             </Pressable>
           </View>
         ) : null}
@@ -374,7 +375,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           style={[styles.tabItem, activeTab === 'available' && styles.tabItemActive]}
         >
           <Text style={[styles.tabText, activeTab === 'available' && styles.tabTextActive]}>
-            سفارش‌های جدید ({availableOrders.length})
+            سفارش‌های جدید ({toPersianDigits(availableOrders.length)})
           </Text>
         </Pressable>
         <Pressable
@@ -382,7 +383,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           style={[styles.tabItem, activeTab === 'my_jobs' && styles.tabItemActive]}
         >
           <Text style={[styles.tabText, activeTab === 'my_jobs' && styles.tabTextActive]}>
-            کارهای من ({activeJobs.length})
+            کارهای من ({toPersianDigits(activeJobs.length)})
           </Text>
         </Pressable>
       </View>

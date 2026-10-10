@@ -44,7 +44,7 @@ export const ProfileScreen: React.FC = () => {
 
         <div className="space-y-2 text-xs">
           <div>
-            <label className="text-[11px] text-slate-500 block mb-1">نام گیرنده / تحویل‌دهنده:</label>
+            <label className="text-[11px] text-slate-500 block mb-1">نام مشتری:</label>
             <input
               type="text"
               value={addressDetails.recipientName}

@@ -26,6 +26,7 @@ import {
   IconStatusClock,
   IconTabUser,
 } from './icons/CustomerIcons';
+import { displayServiceTitle } from '../../features/orders/serviceTitleDisplay';
 
 const STATUS_LABEL: Record<OrderStatus, string> = CUSTOMER_ORDER_STATUS_LABELS;
 
@@ -324,9 +325,9 @@ function ActiveOrderHero({
       </View>
       <View style={styles.heroTop}>
         <Text style={styles.heroTitle} numberOfLines={2}>
-          {order.serviceTitle}
+          {displayServiceTitle(order.serviceTitle)}
         </Text>
-        <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
+        <View style={[styles.statusPill, styles.heroStatusPill, { backgroundColor: tone.bg }]}>
           <IconStatusClock color={tone.icon} />
           <Text style={[styles.statusText, { color: tone.text }]}>{STATUS_LABEL[order.status]}</Text>
         </View>
@@ -382,7 +383,7 @@ function ReorderHero({ order, onReorder }: { order: OrderItem; onReorder: () => 
         <View style={styles.reorderCopy}>
           <Text style={styles.reorderLabel}>آخرین خدمت</Text>
           <Text style={styles.reorderTitle} numberOfLines={2}>
-            {order.serviceTitle}
+            {displayServiceTitle(order.serviceTitle)}
           </Text>
           {when ? <Text style={styles.reorderDate}>{`آخرین سفارش: ${when}`}</Text> : null}
         </View>
@@ -565,7 +566,10 @@ const styles = StyleSheet.create({
     ...shadowCtaBtn,
   },
   heroCtaBtn: {
-    alignSelf: 'flex-end',
+    alignSelf: 'center',
+  },
+  heroStatusPill: {
+    alignSelf: 'center',
   },
   ctaBtnText: {
     ...type.bold,
@@ -820,22 +824,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   heroTop: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 8,
     marginBottom: 8,
   },
   heroTitle: {
     ...type.bold,
     ...fa,
-    flex: 1,
     marginTop: 0,
     marginBottom: 0,
     fontSize: 17,
     lineHeight: 24,
     color: colors.white,
-    textAlign: 'right',
+    textAlign: 'center',
     textAlignVertical: 'center',
   },
   heroLine: {

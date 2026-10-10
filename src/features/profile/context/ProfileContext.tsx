@@ -4,6 +4,7 @@ import { appStorage } from '../../../utils/storage';
 import { apiFetch } from '../../../api/apiClient';
 import { attachStoredAuthToken } from '../../../api/authToken';
 import { CUSTOMER_TOKEN_KEY } from '../../../components/native/customerLoginStorage';
+import { applyMainAddress, type AddressFields } from '../mainAddress';
 
 const EMPTY_LOYALTY = {
   tier: 'NEW' as const,
@@ -43,6 +44,7 @@ interface ProfileContextType {
   profile: UserProfile;
   transactions: WalletTransaction[];
   addSavedAddress: (address: Omit<SavedAddress, 'id'>) => void;
+  saveMainAddress: (address: AddressFields, replaceId?: string) => void;
   removeSavedAddress: (addressId: string) => void;
   setDefaultAddress: (addressId: string) => void;
   chargeWallet: (amount: number) => void;
@@ -167,6 +169,13 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
+  const saveMainAddress = (addr: AddressFields, replaceId?: string) => {
+    setProfile((prev) => ({
+      ...prev,
+      savedAddresses: applyMainAddress(prev.savedAddresses, addr, replaceId, `addr_${Date.now()}`),
+    }));
+  };
+
   const removeSavedAddress = (addressId: string) => {
     setProfile((prev) => ({
       ...prev,
@@ -232,6 +241,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         profile,
         transactions,
         addSavedAddress,
+        saveMainAddress,
         removeSavedAddress,
         setDefaultAddress,
         chargeWallet,
