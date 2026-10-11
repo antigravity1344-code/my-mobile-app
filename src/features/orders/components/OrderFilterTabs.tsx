@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { OrderFilterTab, OrderStats } from '../types/order';
+import { colors, fontFamily, ui, TOUCH_MIN } from '../../../theme';
 
 interface OrderFilterTabsProps {
   activeTab: OrderFilterTab;
@@ -56,12 +57,13 @@ export const OrderFilterTabs: React.FC<OrderFilterTabsProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row-reverse',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.bg,
     borderRadius: 14,
     padding: 4,
     gap: 4,
   },
   tab: {
+    minHeight: TOUCH_MIN,
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -81,28 +83,28 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
+    fontFamily: fontFamily.semibold,
+    color: colors.muted,
   },
   tabTextActive: {
-    color: '#0284c7',
-    fontWeight: '800',
+    color: colors.teal,
+    fontFamily: fontFamily.bold,
   },
   countBadge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: ui.neutralBg,
   },
   countBadgeActive: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
   },
   countText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.muted,
   },
   countTextActive: {
-    color: '#0369a1',
+    color: colors.tealDark,
   },
 });

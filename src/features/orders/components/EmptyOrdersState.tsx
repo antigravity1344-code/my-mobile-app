@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Sparkles, Calendar, RotateCcw } from 'lucide-react-native';
 import type { OrderFilterTab } from '../types/order';
+import { colors, fontFamily, ui, TOUCH_MIN } from '../../../theme';
 
 interface EmptyOrdersStateProps {
   filterTab: OrderFilterTab;
@@ -52,7 +53,7 @@ export const EmptyOrdersState: React.FC<EmptyOrdersStateProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
-        <Calendar size={36} color="#0284c7" />
+        <Calendar size={36} color={colors.teal} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{desc}</Text>
@@ -60,14 +61,14 @@ export const EmptyOrdersState: React.FC<EmptyOrdersStateProps> = ({
       <View style={styles.actions}>
         {isSearching || filterTab !== 'ALL' ? (
           <Pressable onPress={onResetFilters} style={styles.resetButton}>
-            <RotateCcw size={16} color="#0369a1" />
+            <RotateCcw size={16} color={colors.tealDark} />
             <Text style={styles.resetButtonText}>نمایش همه سفارش‌ها</Text>
           </Pressable>
         ) : null}
 
         {Boolean(onBookService) && (
           <Pressable onPress={onBookService} style={styles.primaryButton}>
-            <Sparkles size={16} color="#fff" />
+            <Sparkles size={16} color={colors.white} />
             <Text style={styles.primaryButtonText}>رزرو سرویس جدید</Text>
           </Pressable>
         )}
@@ -82,30 +83,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
     marginVertical: 24,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: ui.divider,
   },
   iconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
   title: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 6,
   },
   description: {
+    fontFamily: fontFamily.regular,
     fontSize: 12,
-    color: '#64748b',
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 280,
@@ -117,6 +119,7 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
   resetButton: {
+    minHeight: TOUCH_MIN,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -124,16 +127,17 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: ui.tealBorder,
   },
   resetButtonText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0369a1',
+    fontFamily: fontFamily.bold,
+    color: colors.tealDark,
   },
   primaryButton: {
+    minHeight: TOUCH_MIN,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -141,11 +145,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   primaryButtonText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#fff',
+    fontFamily: fontFamily.bold,
+    color: colors.white,
   },
 });
