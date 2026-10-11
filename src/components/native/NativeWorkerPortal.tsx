@@ -64,7 +64,7 @@ interface NativeOrder {
   address: string;
   date: string;
   timeSlot: string;
-  wageTotal: number;
+  grossOrderAmount: number;
   startReported: boolean | null;
   paymentMethod: 'ONLINE' | 'CASH';
   detailsNote: string;
@@ -132,7 +132,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       address: o.address || '',
       date: o.date || 'امروز',
       timeSlot: o.time || 'نامشخص',
-      wageTotal: typeof o.price === 'number' ? o.price : 0,
+      grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
       startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
@@ -347,7 +347,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
             <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-            <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
+            <Text style={styles.wageValue}>{(Number(order.grossOrderAmount) || 0).toLocaleString('fa-IR')} تومان</Text>
           </View>
         </View>
         {canReportWorkerStart(order.status, order.startReported) ? (
@@ -362,7 +362,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             <Text style={styles.completeButtonText}>{busy ? 'در حال ثبت...' : 'ثبت شروع کار'}</Text>
           </Pressable>
         ) : active && order.startReported ? (
-          <Text style={styles.startStatusText}>شروع کار اعلام شده است؛ منتظر تأیید مشتری بمانید.</Text>
+          <Text style={styles.startStatusText}>شروع کار اعلام شده است.</Text>
         ) : null}
         {canCompleteWorkerOrder(order.status) ? (
           <Pressable
@@ -544,7 +544,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
                     <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-                    <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
+                    <Text style={styles.wageValue}>{(Number(order.grossOrderAmount) || 0).toLocaleString('fa-IR')} تومان</Text>
                   </View>
 
                   {canAcceptWorkerOrder(order.status) ? (
