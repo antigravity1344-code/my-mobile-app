@@ -4,6 +4,7 @@ import { BottomSheetModal } from '../native/BottomSheetModal';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { calculatePrice, type PricingOptions } from '../../utils/pricing';
 import type { CleaningService } from '../../types/service';
+import { colors, fontFamily, ui, TOUCH_MIN } from '../../theme';
 
 interface PricingTableProps {
   visible: boolean;
@@ -25,7 +26,7 @@ export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) 
       <View style={[styles.modal, { paddingBottom: 20 + bottomInset }]}>
         <View style={styles.header}>
           <Text style={styles.heading}>جدول شفاف تعرفه‌ها</Text>
-          <Pressable onPress={onClose} accessibilityLabel="بستن جدول تعرفه‌ها"><X size={20} color="#475569" /></Pressable>
+          <Pressable onPress={onClose} accessibilityLabel="بستن جدول تعرفه‌ها"><X size={20} color={colors.muted} /></Pressable>
         </View>
         <Text style={styles.subtitle}>مبالغ نمونه‌اند و قبل از پرداخت با جزئیات سفارش محاسبه می‌شوند.</Text>
         {SCENARIOS.map((scenario) => {
@@ -50,12 +51,12 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
   modal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 20, gap: 12 },
   header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  heading: { color: '#0f172a', fontSize: 20, fontWeight: '800', textAlign: 'right' },
-  subtitle: { color: '#64748b', fontSize: 12, textAlign: 'right', lineHeight: 19 },
-  row: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  heading: { color: colors.text, fontSize: 20, fontFamily: fontFamily.bold, textAlign: 'right' },
+  subtitle: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12, textAlign: 'right', lineHeight: 19 },
+  row: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: ui.divider },
   rowText: { flex: 1, gap: 4 },
-  title: { color: '#0f172a', fontWeight: '700', textAlign: 'right' },
-  amount: { color: '#059669', fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  button: { backgroundColor: '#e0f2fe', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  buttonText: { color: '#0369a1', fontSize: 12, fontWeight: '800' },
+  title: { color: colors.text, fontFamily: fontFamily.bold, textAlign: 'right' },
+  amount: { color: colors.teal, fontSize: 13, fontFamily: fontFamily.bold, textAlign: 'right' },
+  button: { minHeight: TOUCH_MIN, backgroundColor: colors.tealSoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  buttonText: { color: colors.tealDark, fontSize: 12, fontFamily: fontFamily.bold },
 });

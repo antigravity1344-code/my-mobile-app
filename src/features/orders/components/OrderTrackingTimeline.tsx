@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Check, Clock, CircleDot, AlertCircle } from 'lucide-react-native';
 import type { OrderTimelineEvent } from '../types/order';
 import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
+import { colors, fontFamily, ui } from '../../../theme';
 
 interface OrderTrackingTimelineProps {
   events: OrderTimelineEvent[];
@@ -30,13 +31,13 @@ export const OrderTrackingTimeline: React.FC<OrderTrackingTimelineProps> = ({ ev
                 ]}
               >
                 {isCancelled ? (
-                  <AlertCircle size={14} color="#dc2626" />
+                  <AlertCircle size={14} color={ui.dangerText} />
                 ) : event.isCompleted && !event.isCurrent ? (
-                  <Check size={12} color="#fff" />
+                  <Check size={12} color={colors.white} />
                 ) : event.isCurrent ? (
-                  <CircleDot size={14} color="#0284c7" />
+                  <CircleDot size={14} color={colors.teal} />
                 ) : (
-                  <Clock size={12} color="#94a3b8" />
+                  <Clock size={12} color={colors.mutedLight} />
                 )}
               </View>
               {!isLast && (
@@ -90,34 +91,34 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: ui.neutralBg,
     borderWidth: 2,
-    borderColor: '#cbd5e1',
+    borderColor: ui.inputBorder,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
   },
   circleCompleted: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: colors.teal,
+    borderColor: colors.teal,
   },
   circleCurrent: {
-    backgroundColor: '#e0f2fe',
-    borderColor: '#0284c7',
+    backgroundColor: colors.tealSoft,
+    borderColor: colors.teal,
   },
   circleCancelled: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: ui.dangerBg,
     borderColor: '#dc2626',
   },
   line: {
     flex: 1,
     width: 2,
     minHeight: 28,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: ui.neutralBg,
     marginVertical: 2,
   },
   lineCompleted: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.teal,
   },
   contentCol: {
     flex: 1,
@@ -132,26 +133,27 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     textAlign: 'right',
   },
   titleCurrent: {
-    color: '#0284c7',
-    fontWeight: '800',
+    color: colors.teal,
+    fontFamily: fontFamily.bold,
   },
   titleCancelled: {
-    color: '#dc2626',
-    fontWeight: '800',
+    color: ui.dangerText,
+    fontFamily: fontFamily.bold,
   },
   timestamp: {
-    fontSize: 11,
-    color: '#94a3b8',
+    fontSize: 12,
+    color: colors.mutedLight,
     fontFamily: 'monospace',
   },
   description: {
-    fontSize: 11,
-    color: '#64748b',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
     textAlign: 'right',
     lineHeight: 17,
   },

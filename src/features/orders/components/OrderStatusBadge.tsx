@@ -1,3 +1,4 @@
+import { colors, fontFamily, ui } from '../../../theme';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import {
@@ -35,16 +36,16 @@ const STATUS_CONFIG: Record<
   },
   ACCEPTED: {
     label: CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED,
-    bg: '#e0f2fe',
-    text: '#0369a1',
-    border: '#bae6fd',
+    bg: colors.tealSoft,
+    text: colors.tealDark,
+    border: ui.tealBorder,
     Icon: CheckCircle2,
   },
   CONFIRMED: {
     label: CUSTOMER_ORDER_STATUS_LABELS.CONFIRMED,
-    bg: '#e0f2fe',
-    text: '#0369a1',
-    border: '#bae6fd',
+    bg: colors.tealSoft,
+    text: colors.tealDark,
+    border: ui.tealBorder,
     Icon: CheckCircle2,
   },
   ASSIGNED: {
@@ -139,11 +140,11 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     textAlign: 'right',
   },
   textSm: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: fontFamily.semibold,
   },
 });
