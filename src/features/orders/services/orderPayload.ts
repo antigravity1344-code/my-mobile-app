@@ -108,8 +108,7 @@ export function selectCustomerOrders(
         item.serviceTitle.toLowerCase().includes(q) ||
         item.address.district.toLowerCase().includes(q) ||
         item.address.fullAddress.toLowerCase().includes(q) ||
-        (item.cleaner?.name || '').toLowerCase().includes(q) ||
-        (item.cleaner?.phone || '').toLowerCase().includes(q),
+        (item.cleaner?.name || '').toLowerCase().includes(q),
     );
   }
 

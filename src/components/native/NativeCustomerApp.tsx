@@ -24,6 +24,7 @@ import {
   type CustomerSessionUser,
 } from './customerLoginStorage';
 import { useAccountBlockedLogout } from './useAccountBlockedLogout';
+import { useSessionExpiredLogout } from './useSessionExpiredLogout';
 
 type UserData = CustomerSessionUser;
 
@@ -111,6 +112,8 @@ export const NativeCustomerApp: React.FC = () => {
 
   // حساب مسدودشده توسط مدیر: پیام سرور، سپس خروج با همین handleLogout.
   useAccountBlockedLogout(isLoggedIn, handleLogout);
+  // نشست منقضی (۴۰۱): پیام کوتاه، سپس خروج و پاک شدن سفارش‌ها و پروفایل با همین handleLogout.
+  useSessionExpiredLogout(isLoggedIn, handleLogout);
 
   if (isLoading) {
     return <View style={styles.loadingContainer} />;

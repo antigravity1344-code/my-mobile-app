@@ -48,6 +48,7 @@ const ADMIN_SESSION_MS = 12 * 60 * 60 * 1000;
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_RESEND_MS = 30 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
+const CLIENT_REQUEST_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const ADMIN_ORDER_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const ADMIN_USER_STATUSES = ['REGISTERED', 'PENDING_VERIFICATION', 'APPROVED', 'ACTIVE', 'REJECTED', 'BLOCKED'];
 // برچسب فارسی وضعیت کاربر برای پیام‌ها؛ وضعیت خام انگلیسی به کاربر نشان داده نمی‌شود (D-06).
@@ -662,11 +663,22 @@ app.post('/api/orders', (req, res) => {
     customerTier,
     pricing,
     expectedStartAt,
+    clientRequestId,
   } = req.body || {};
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'ثبت سفارش برای کاربر دیگر مجاز نیست.' });
   }
   const user = authUser;
+  // کلید تکرارنشدنی ثبت سفارش (D-07): اختیاری برای اپ‌های قدیمی؛ مقدار بدشکل رد می‌شود.
+  let storedClientRequestId = null;
+  if (clientRequestId !== undefined && clientRequestId !== null && clientRequestId !== '') {
+    if (typeof clientRequestId !== 'string' || !CLIENT_REQUEST_ID_PATTERN.test(clientRequestId)) {
+      return res.status(400).json({ success: false, message: 'درخواست ثبت سفارش معتبر نیست. لطفاً دوباره تلاش کنید.' });
+    }
+    storedClientRequestId = clientRequestId;
+    const existing = store.findOrderByClientRequest(user.id, storedClientRequestId);
+    if (existing) return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
+  }
   const orderAddress = typeof address === 'string' ? address.trim().slice(0, 500) : '';
   if (!orderAddress) {
     return res.status(400).json({ success: false, message: 'آدرس سفارش الزامی است.' });
@@ -738,10 +750,14 @@ app.post('/api/orders', (req, res) => {
     cleanerAvatar: null,
     cleanerPhone: null,
     expectedStartAt: storedExpectedStartAt,
+    clientRequestId: storedClientRequestId,
     createdAt: new Date().toISOString()
   };
 
   const savedOrder = store.transaction(() => {
+    // بررسی دوباره داخل تراکنش: دو درخواست هم‌زمان با یک کلید فقط یک سفارش می‌سازند.
+    const repeated = store.findOrderByClientRequest(user.id, storedClientRequestId);
+    if (repeated) return repeated;
     const order = store.createOrder(newOrder);
     store.addNotification(
       user.id,
@@ -753,8 +769,16 @@ app.post('/api/orders', (req, res) => {
     return order;
   });
 
-  res.json({ success: true, order: savedOrder });
+  res.json({ success: true, order: customerOrderView(savedOrder) });
 });
+
+// ------------------- نمای سفارش برای مشتری -------------------
+// مشتری فقط با پشتیبانی تماس می‌گیرد؛ شماره متخصص در هیچ پاسخ مشتری فرستاده نمی‌شود (D-05).
+function customerOrderView(order) {
+  if (!order) return order;
+  const { cleanerPhone, ...rest } = order;
+  return rest;
+}
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
 // تلفن و آدرس دقیق مشتری فقط بعد از پذیرش موفق و فقط برای کار فعالِ همان متخصص فرستاده می‌شود.
@@ -862,7 +886,7 @@ app.get('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   if (authUser.role === 'CUSTOMER') {
-    return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }) });
+    return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }).map(customerOrderView) });
   }
   if (authUser.role === 'WORKER') {
     return res.json({ success: true, orders: store.getOrders({ cleanerId: authUser.id }).map(workerAssignedOrderView) });
@@ -933,7 +957,7 @@ app.put('/api/orders/:orderId/cancel', (req, res) => {
   if (cancelled.code === 'bad-status') {
     return res.status(400).json({ success: false, message: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' });
   }
-  res.json({ success: true, order: cancelled.order });
+  res.json({ success: true, order: customerOrderView(cancelled.order) });
 });
 
 // تکمیل سفارش توسط متخصص پذیرنده (ACCEPTED → COMPLETED)
@@ -1001,7 +1025,7 @@ app.put('/api/orders/:orderId/rate', (req, res) => {
   if (rated.code === 'duplicate') {
     return res.status(400).json({ success: false, message: 'برای این سفارش قبلاً امتیاز ثبت شده است.' });
   }
-  res.json({ success: true, order: rated.order });
+  res.json({ success: true, order: customerOrderView(rated.order) });
 });
 
 // ------------------- API اختصاصی پنل مدیریت (ADMIN API) -------------------
@@ -1288,6 +1312,11 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       if (status === 'COMPLETED' && !order.completedAt) {
         order.completedAt = new Date().toISOString();
       }
+      // لغو توسط مدیر هم زمان و انجام‌دهنده لغو را ثبت می‌کند.
+      if (status === 'CANCELLED' && previousStatus !== 'CANCELLED') {
+        order.cancelledAt = new Date().toISOString();
+        order.cancelledBy = 'admin';
+      }
     }
     // سفارشی که هنوز پذیرفته نشده مستقیم تکمیل‌شده ثبت نمی‌شود (D-50).
     if (previousStatus === 'PENDING' && order.status === 'COMPLETED') return { code: 'not-accepted' };
@@ -1302,6 +1331,8 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     if (workerChanged && (order.status === 'COMPLETED' || order.status === 'CANCELLED')) {
       return { code: 'worker-change-on-close' };
     }
+    // ثبت سفارش لغوشده به‌عنوان انجام‌شده تا تصمیم نهایی (بخش ۱۰ سند) مجاز نیست.
+    if (previousStatus === 'CANCELLED' && order.status === 'COMPLETED') return { code: 'cancelled-to-completed' };
     const isAcceptance = isActive && (!wasActive || workerChanged);
     // سفارش PENDING متخصص ندارد: هر ذخیره در PENDING پذیرش و متخصص را در همین تراکنش پاک می‌کند
     // (تاریخچه در order_events می‌ماند).
@@ -1328,7 +1359,12 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       saved = store.getOrder(saved.id);
     }
     if (savesAsPending) {
-      saved = store.clearAcceptanceForReturnToPending(saved.id);
+      saved = store.clearAcceptanceForReturnToPending(
+        saved.id,
+        previousStatus === 'PENDING'
+          ? undefined
+          : { actorRole: 'admin', actorId: null, previousWorkerId: previousCleanerId || null }
+      );
     }
 
     const isWorkerReassigned =
@@ -1390,6 +1426,12 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     return res.status(400).json({
       success: false,
       message: 'این سفارش هنوز توسط متخصصی پذیرفته نشده است و نمی‌توان آن را تکمیل‌شده ثبت کرد.'
+    });
+  }
+  if (updated.code === 'cancelled-to-completed') {
+    return res.status(400).json({
+      success: false,
+      message: 'سفارش لغوشده را نمی‌توان انجام‌شده ثبت کرد.'
     });
   }
   if (updated.code === 'worker-change-on-close') {

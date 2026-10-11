@@ -9,6 +9,7 @@ import { formatJalaliDateTime } from '../../utils/jalaliDisplay';
 import { CUSTOMER_ORDER_STATUS_LABELS } from '../../features/orders/orderStatusLabels';
 import { apiFetch } from '../../api/apiClient';
 import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
+import { startForegroundOrderStatusWatch } from '../../features/orders/services/orderStatusWatch';
 import {
   IconBell,
   IconClock,
@@ -136,15 +137,18 @@ export function CustomerHomeScreen({
     void loadUnreadCount();
   }, [refreshOrders, loadUnreadCount]);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') {
-        void refreshOrders({ silent: true });
-        void loadUnreadCount();
-      }
-    });
-    return () => subscription.remove();
-  }, [refreshOrders, loadUnreadCount]);
+  // خانه فقط وقتی دیده می‌شود mount است؛ تازه‌سازی دوره‌ای فقط در پیش‌زمینه (همان watch صفحه سفارش‌ها).
+  useEffect(
+    () =>
+      startForegroundOrderStatusWatch({
+        refresh: async () => {
+          await Promise.all([refreshOrders({ silent: true }), loadUnreadCount()]);
+        },
+        currentState: () => AppState.currentState,
+        subscribe: (listener) => AppState.addEventListener('change', listener),
+      }),
+    [refreshOrders, loadUnreadCount],
+  );
 
   const hero = useMemo(
     () =>

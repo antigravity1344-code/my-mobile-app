@@ -75,6 +75,8 @@ const ORDER_EVENT_KINDS = Object.freeze([
   'EXPECTED_TIME_CHANGED',
   // تاریخچه پذیرش‌ها (تصمیم صاحب محصول در مرحله ۱): هر پذیرش موفق یک رکورد؛ acceptedAt روی سفارش آخرین پذیرش است.
   'ORDER_ACCEPTED',
+  // برگشت سفارش پذیرفته‌شده یا بسته به PENDING توسط مدیر (D-50): پاک شدن پذیرش و متخصص قابل بازسازی می‌شود.
+  'ORDER_RETURNED_TO_PENDING',
 ]);
 const ORDER_EVENT_ACTOR_ROLES = Object.freeze(['customer', 'worker', 'admin', 'system']);
 // مدیر فعلاً حساب کاربری و شناسه ندارد؛ برای مدیر و سیستم actorId می‌تواند خالی باشد.
@@ -230,12 +232,18 @@ function createDataStore(filename) {
     ['expectedStartAt', 'expectedStartAt TEXT'],
     ['agreedStartAt', 'agreedStartAt TEXT'],
     ['startStatus', "startStatus TEXT NOT NULL DEFAULT 'not_recorded'"],
+    // کلید تکرارنشدنی ثبت سفارش از طرف اپ (D-07): فقط با createOrder نوشته می‌شود و در پاسخ‌ها فرستاده نمی‌شود.
+    ['clientRequestId', 'clientRequestId TEXT'],
   ];
   for (const [name, definition] of addedOrderColumns) {
     if (!orderColumnNames.has(name)) {
       database.exec(`ALTER TABLE orders ADD COLUMN ${definition}`);
     }
   }
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_client_request
+    ON orders(customerId, clientRequestId) WHERE clientRequestId IS NOT NULL
+  `);
 
   // رویدادهای سفارش (D-02، D-52): فقط درج. orderId عمداً کلید خارجی ندارد.
   database.exec(`
@@ -268,6 +276,10 @@ function createDataStore(filename) {
       SELECT RAISE(ABORT, 'order_events is append-only');
     END;
   `);
+  // متخصصِ موضوع رویداد به‌صورت ساختاریافته (D-06/D-52)، نه در note: متخصص پذیرنده در ORDER_ACCEPTED
+  // و متخصص کنارگذاشته‌شده در ORDER_RETURNED_TO_PENDING. ردیف‌های قدیمی خالی می‌مانند.
+  const eventColumnNames = new Set(database.prepare('PRAGMA table_info(order_events)').all().map((c) => c.name));
+  if (!eventColumnNames.has('workerId')) database.exec('ALTER TABLE order_events ADD COLUMN workerId TEXT');
 
   let depth = 0;
 
@@ -418,6 +430,13 @@ function createDataStore(filename) {
   const nextOrderSeq = database.prepare('SELECT COALESCE(MIN(seq), 0) - 1 AS seq FROM orders');
   const deleteOrderStmt = database.prepare('DELETE FROM orders WHERE id = ?');
   const setExpectedStartAtStmt = database.prepare('UPDATE orders SET expectedStartAt = ? WHERE id = ?');
+  const setClientRequestIdStmt = database.prepare('UPDATE orders SET clientRequestId = ? WHERE id = ?');
+  const selectOrderByClientRequestStmt = database.prepare(
+    'SELECT * FROM orders WHERE customerId = ? AND clientRequestId = ?'
+  );
+  const countReturnEventsStmt = database.prepare(
+    "SELECT COUNT(*) AS n FROM order_events WHERE orderId = ? AND kind = 'ORDER_RETURNED_TO_PENDING'"
+  );
   const recordAcceptanceStmt = database.prepare('UPDATE orders SET acceptedAt = ? WHERE id = ?');
   const countAcceptanceEventsStmt = database.prepare(
     "SELECT COUNT(*) AS n FROM order_events WHERE orderId = ? AND kind = 'ORDER_ACCEPTED'"
@@ -429,8 +448,8 @@ function createDataStore(filename) {
   `);
   const insertOrderEventStmt = database.prepare(`
     INSERT INTO order_events (
-      id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectOrderEventStmt = database.prepare('SELECT * FROM order_events WHERE id = ?');
   const selectOrderEventByKeyStmt = database.prepare('SELECT * FROM order_events WHERE idempotencyKey = ?');
@@ -583,6 +602,12 @@ function createDataStore(filename) {
       });
   }
 
+  /** سفارش قبلی همان مشتری با همان کلید ثبت (D-07)، یا null. */
+  function findOrderByClientRequest(customerId, clientRequestId) {
+    if (!customerId || !clientRequestId) return null;
+    return orderFromRow(selectOrderByClientRequestStmt.get(customerId, clientRequestId));
+  }
+
   function getOrders(filter) {
     return listOrders(filter);
   }
@@ -595,6 +620,9 @@ function createDataStore(filename) {
         const expectedStartAt = normalizeIsoTimestamp(order.expectedStartAt);
         if (!expectedStartAt) throw new Error('INVALID_EXPECTED_START_AT');
         setExpectedStartAtStmt.run(expectedStartAt, order.id);
+      }
+      if (typeof order.clientRequestId === 'string' && order.clientRequestId) {
+        setClientRequestIdStmt.run(order.clientRequestId, order.id);
       }
       return getOrder(order.id);
     });
@@ -624,6 +652,8 @@ function createDataStore(filename) {
         actorRole: info.actorRole,
         kind: 'ORDER_ACCEPTED',
         claimedAt: acceptedAt,
+        // متخصص اختصاص‌یافته به‌صورت ساختاریافته ثبت می‌شود (مسیر مدیر actorId ندارد).
+        workerId: row.cleanerId,
         idempotencyKey: 'accept:' + orderId + ':' + acceptanceNumber,
       });
       if (event.code !== 'ok') throw new Error('ACCEPTANCE_EVENT_NOT_RECORDED');
@@ -634,14 +664,29 @@ function createDataStore(filename) {
   /**
    * برگشت سفارش فعال به PENDING (تصمیم صاحب محصول، D-50): acceptedAt و متخصص اختصاص‌یافته
    * در یک دستور پاک می‌شوند. این تنها مسیر پاک کردن acceptedAt است و نوشتن آن فقط در recordAcceptance است.
-   * تاریخچه پذیرش‌ها در order_events می‌ماند و رویدادی اضافه نمی‌شود. سفارش باید از قبل PENDING باشد.
+   * تاریخچه پذیرش‌ها در order_events می‌ماند. سفارش باید از قبل PENDING باشد.
+   * returnEvent ({ actorRole, actorId, previousWorkerId }) وقتی داده شود که سفارش از وضعیت دیگری به PENDING
+   * برگشته است؛ در همان تراکنش یک رویداد ORDER_RETURNED_TO_PENDING ثبت می‌شود.
    */
-  function clearAcceptanceForReturnToPending(orderId) {
+  function clearAcceptanceForReturnToPending(orderId, returnEvent) {
     return transaction(() => {
       const row = selectOrder.get(orderId);
       if (!row) throw new Error('ORDER_NOT_FOUND');
       if (row.status !== 'PENDING') throw new Error('ORDER_NOT_PENDING');
       clearAcceptanceStmt.run(orderId);
+      if (returnEvent && typeof returnEvent === 'object') {
+        const returnNumber = countReturnEventsStmt.get(orderId).n + 1;
+        const event = appendOrderEvent({
+          orderId,
+          actorId: typeof returnEvent.actorId === 'string' ? returnEvent.actorId : null,
+          actorRole: returnEvent.actorRole,
+          kind: 'ORDER_RETURNED_TO_PENDING',
+          claimedAt: new Date().toISOString(),
+          workerId: returnEvent.previousWorkerId || null,
+          idempotencyKey: 'return-pending:' + orderId + ':' + returnNumber,
+        });
+        if (event.code !== 'ok') throw new Error('RETURN_EVENT_NOT_RECORDED');
+      }
       return getOrder(orderId);
     });
   }
@@ -917,6 +962,7 @@ function createDataStore(filename) {
       correctsEventId: row.correctsEventId == null ? null : row.correctsEventId,
       note: row.note == null ? null : row.note,
       idempotencyKey: row.idempotencyKey,
+      workerId: row.workerId == null ? null : row.workerId,
     };
   }
 
@@ -959,9 +1005,14 @@ function createDataStore(filename) {
       }
       note = data.note;
     }
+    let workerId = null;
+    if (data.workerId != null) {
+      if (typeof data.workerId !== 'string' || !data.workerId.trim()) return { code: 'invalid', field: 'workerId' };
+      workerId = data.workerId.trim();
+    }
 
     return transaction(() => {
-      const candidate = { orderId, actorId, actorRole, kind, claimedAt, correctsEventId, note, idempotencyKey };
+      const candidate = { orderId, actorId, actorRole, kind, claimedAt, correctsEventId, note, idempotencyKey, workerId };
       const sameContent = (event) =>
         event.orderId === candidate.orderId &&
         event.actorId === candidate.actorId &&
@@ -969,7 +1020,8 @@ function createDataStore(filename) {
         event.kind === candidate.kind &&
         event.claimedAt === candidate.claimedAt &&
         event.correctsEventId === candidate.correctsEventId &&
-        event.note === candidate.note;
+        event.note === candidate.note &&
+        event.workerId === candidate.workerId;
 
       const existing = orderEventFromRow(selectOrderEventByKeyStmt.get(idempotencyKey));
       if (existing) return { code: sameContent(existing) ? 'duplicate' : 'key-conflict', event: existing };
@@ -983,7 +1035,7 @@ function createDataStore(filename) {
       const id = newRecordId('EVT-');
       const recordedAt = new Date().toISOString();
       insertOrderEventStmt.run(
-        id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey
+        id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId
       );
       return { code: 'ok', event: orderEventFromRow(selectOrderEventStmt.get(id)) };
     });
@@ -1201,6 +1253,7 @@ function createDataStore(filename) {
     migrateSensitiveFields,
     recordAcceptance,
     clearAcceptanceForReturnToPending,
+    findOrderByClientRequest,
     appendOrderEvent,
     listOrderEvents,
     tryAcceptOrder,

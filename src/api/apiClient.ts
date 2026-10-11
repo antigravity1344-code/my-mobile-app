@@ -1,6 +1,7 @@
 ﻿import Constants from 'expo-constants';
 import { getApiAuthToken } from './authToken';
 import { accountBlockedMessage, emitAccountBlocked, isAccountBlockedResponse } from './accountBlocked';
+import { emitSessionExpired, isSessionExpiredResponse } from './sessionExpired';
 
 function resolveApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -66,6 +67,8 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       }
       // حساب مسدود: اپ (مشتری/متخصص) پیام را نشان می‌دهد و کاربر را خارج می‌کند.
       if (isAccountBlockedResponse(parsed)) emitAccountBlocked(accountBlockedMessage(parsed));
+      // نشست منقضی (۴۰۱ روی درخواستی که توکن داشت): اپ مشتری پیام می‌دهد و خارج می‌کند.
+      if (isSessionExpiredResponse(parsed, { hadToken: Boolean(token), endpoint })) emitSessionExpired();
       return parsed;
     } catch {
       return {

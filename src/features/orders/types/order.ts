@@ -74,6 +74,8 @@ export interface OrderItem {
   timeline: OrderTimelineEvent[];
   ratings?: OrderRatingData;
   notes?: string;
+  /** فقط برای ارسال سفارش جدید: کلید تکرارنشدنی رزرو (D-07). */
+  clientRequestId?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -31,6 +31,7 @@ import { createSubmitGuard } from './submitGuard';
 import { computeRevealDelta } from './keyboardReveal';
 import { addressFieldTone, firstAddressHint } from './addressFieldTone';
 import { RTL_SINGLE_LINE_INPUT } from '../native/rtlInput';
+import { createClientRequestId } from '../../features/orders/services/clientRequestId';
 
 const TIME_SLOTS: TimeSlot[] = [
   { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
@@ -72,6 +73,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const submitGuard = useRef(createSubmitGuard());
+  // یک کلید برای همین رزرو؛ بعد از خطا (مثلاً قطع شبکه) ارسال دوباره همان کلید را می‌فرستد تا سفارش تکراری ساخته نشود.
+  const clientRequestKey = useRef<string | null>(null);
   const [districtSearch, setDistrictSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const dateStripRef = useRef<ScrollView>(null);
@@ -304,6 +307,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
     };
 
+    if (!clientRequestKey.current) clientRequestKey.current = createClientRequestId();
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
@@ -334,6 +338,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         },
       ],
       notes: booking.notes,
+      clientRequestId: clientRequestKey.current,
       createdAt: now,
       updatedAt: now,
     };
@@ -345,6 +350,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       result = { success: false };
     }
     submitGuard.current.finish(result.success);
+    if (result.success) clientRequestKey.current = null;
     if (result.success) {
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);

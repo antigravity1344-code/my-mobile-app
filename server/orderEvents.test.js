@@ -9,6 +9,17 @@ if (!isMainThread) {
 } else {
   const { test, after } = require('node:test');
   const assert = require('node:assert/strict');
+
+// برگشت به PENDING توسط مدیر (batch4): رویدادهای قبلی دست‌نخورده می‌مانند و دقیقاً یک رویداد برگشت اضافه می‌شود.
+function assertReturnAppended(after, before, previousWorkerId, label) {
+  assert.deepEqual(after.slice(0, before.length), before, label + ': earlier events untouched');
+  assert.equal(after.length, before.length + 1, label + ': one return event');
+  const added = after[after.length - 1];
+  assert.equal(added.kind, 'ORDER_RETURNED_TO_PENDING', label);
+  assert.equal(added.actorRole, 'admin', label);
+  assert.equal(added.workerId, previousWorkerId, label);
+  assert.equal(added.note, null, label);
+}
   const fs = require('node:fs');
   const http = require('node:http');
   const os = require('node:os');
@@ -192,13 +203,13 @@ if (!isMainThread) {
     assert.equal(names.includes('trigger:order_events_no_overwrite'), true);
     const columns = raw.prepare('PRAGMA table_info(order_events)').all().map((column) => column.name);
     assert.deepEqual(columns, [
-      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey',
+      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey', 'workerId',
     ]);
     const foreignKeys = raw.prepare('PRAGMA foreign_key_list(order_events)').all();
     assert.equal(foreignKeys.some((fk) => fk.table === 'orders'), false, 'orderId must not reference orders');
     const orderColumns = raw.prepare('PRAGMA table_info(orders)').all();
     const byName = Object.fromEntries(orderColumns.map((column) => [column.name, column]));
-    for (const name of ['acceptedAt', 'expectedStartAt', 'agreedStartAt', 'startStatus']) {
+    for (const name of ['acceptedAt', 'expectedStartAt', 'agreedStartAt', 'startStatus', 'clientRequestId']) {
       assert.ok(byName[name], 'missing orders.' + name);
     }
     assert.equal(byName.startStatus.notnull, 1);
@@ -305,7 +316,8 @@ if (!isMainThread) {
     assert.equal(db.appendOrderEvent(sampleEvent('ORD-MISSING')).code, 'missing-order');
     assert.equal(db.appendOrderEvent(null).code, 'invalid');
     assert.equal(db.listOrderEvents('ORD-EVT-3').length, 0);
-    assert.equal(ORDER_EVENT_KINDS.length, 13);
+    assert.equal(ORDER_EVENT_KINDS.length, 14);
+    assert.equal(ORDER_EVENT_KINDS.includes('ORDER_RETURNED_TO_PENDING'), true);
     assert.equal(ORDER_EVENT_KINDS.includes('ORDER_ACCEPTED'), true);
     assert.equal(Object.isFrozen(ORDER_EVENT_KINDS), true);
     db.close();
@@ -393,10 +405,10 @@ if (!isMainThread) {
     assert.equal(db.getOrder('ORD-EVT-7').acceptedAt, '2026-10-08T06:00:00.000Z', 'the order keeps the last acceptance');
     const events = db.listOrderEvents('ORD-EVT-7');
     assert.deepEqual(
-      events.map((event) => [event.kind, event.actorRole, event.actorId, event.claimedAt, event.idempotencyKey, event.note]),
+      events.map((event) => [event.kind, event.actorRole, event.actorId, event.claimedAt, event.idempotencyKey, event.note, event.workerId]),
       [
-        ['ORDER_ACCEPTED', 'worker', 'W1', '2026-10-08T05:00:00.000Z', 'accept:ORD-EVT-7:1', null],
-        ['ORDER_ACCEPTED', 'admin', null, '2026-10-08T06:00:00.000Z', 'accept:ORD-EVT-7:2', null],
+        ['ORDER_ACCEPTED', 'worker', 'W1', '2026-10-08T05:00:00.000Z', 'accept:ORD-EVT-7:1', null, 'W1'],
+        ['ORDER_ACCEPTED', 'admin', null, '2026-10-08T06:00:00.000Z', 'accept:ORD-EVT-7:2', null, 'W1'],
       ]
     );
 
@@ -519,7 +531,8 @@ if (!isMainThread) {
     assert.equal(afterReset.cleanerPhone, null);
     assert.equal(reset.json.order.acceptedAt, null);
     assert.equal(reset.json.order.cleanerId, null);
-    assert.deepEqual(store.listOrderEvents(orderId), firstEvents, 'the history stays and a reset adds no event');
+    const afterResetEvents = store.listOrderEvents(orderId);
+    assertReturnAppended(afterResetEvents, firstEvents, worker1.user.id, 'reset');
 
     // متخصص قبلی دیگر سفارش را مال خود نمی‌بیند؛ فقط در فهرست سفارش‌های باز و بدون اطلاعات خصوصی دیده می‌شود.
     const mine = await request(server, { pathname: '/api/orders', token: worker1.token });
@@ -537,7 +550,7 @@ if (!isMainThread) {
     assert.equal(reactivated.status, 400, 're-activation without a worker is rejected');
     assert.equal(reactivated.json.message, 'برای فعال کردن این سفارش، اول یک متخصص تأییدشده به آن اختصاص دهید.');
     assert.deepEqual(store.getOrder(orderId), afterReset, 'the rejected re-activation changes nothing');
-    assert.deepEqual(store.listOrderEvents(orderId), firstEvents);
+    assert.deepEqual(store.listOrderEvents(orderId), afterResetEvents);
 
     await new Promise((resolve) => setTimeout(resolve, 5));
     const second = await request(server, { method: 'PUT', pathname: '/api/orders/' + orderId + '/accept', token: worker2.token, body: {} });
@@ -552,6 +565,7 @@ if (!isMainThread) {
       events.map((event) => [event.kind, event.actorRole, event.actorId, event.claimedAt]),
       [
         ['ORDER_ACCEPTED', 'worker', worker1.user.id, firstAcceptedAt],
+        ['ORDER_RETURNED_TO_PENDING', 'admin', null, afterResetEvents[afterResetEvents.length - 1].claimedAt],
         ['ORDER_ACCEPTED', 'worker', worker2.user.id, order.acceptedAt],
       ]
     );
@@ -801,7 +815,7 @@ if (!isMainThread) {
     const reset = await adminPut(activeId, { cleanerId: worker2.user.id, status: 'PENDING' });
     assert.equal(reset.status, 200);
     assertNoWorker(store.getOrder(activeId), 'active → PENDING with another cleanerId');
-    assert.deepEqual(store.listOrderEvents(activeId), activeEvents);
+    assertReturnAppended(store.listOrderEvents(activeId), activeEvents, worker1.user.id, 'active → PENDING');
     await assertNotInWorkerList(worker1, activeId, 'previous worker');
     await assertNotInWorkerList(worker2, activeId, 'worker in the request');
     assert.equal((await adminPut(activeId, { status: 'ASSIGNED' })).status, 400);
@@ -815,7 +829,7 @@ if (!isMainThread) {
       const back = await adminPut(id, { status: 'PENDING' });
       assert.equal(back.status, 200, closed + ' → PENDING');
       assertNoWorker(store.getOrder(id), closed + ' → PENDING');
-      assert.deepEqual(store.listOrderEvents(id), events, closed + ': history kept');
+      assertReturnAppended(store.listOrderEvents(id), events, worker1.user.id, closed + ': history kept');
       const told = store.listNotifications(worker1.user.id).filter((item) => item.orderId === id && item.kind === 'ORDER_STATUS');
       assert.equal(told.length, 2, closed + ': the removed worker is told about both changes');
       await assertNotInWorkerList(worker1, id, closed + ' → PENDING');

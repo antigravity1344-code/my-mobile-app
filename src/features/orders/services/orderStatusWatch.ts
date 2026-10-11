@@ -29,6 +29,52 @@ export function createOrderStatusTicker(refresh: () => Promise<void>) {
   };
 }
 
+type AppStateLike = string;
+
+/**
+ * همان watch بالا، ولی فقط وقتی اپ در پیش‌زمینه است. با برگشت به پیش‌زمینه یک بار فوراً تازه می‌کند
+ * و watch را دوباره راه می‌اندازد؛ در پس‌زمینه هیچ درخواستی فرستاده نمی‌شود.
+ */
+export function startForegroundOrderStatusWatch(options: {
+  refresh: () => Promise<void>;
+  currentState: () => AppStateLike;
+  subscribe: (listener: (state: AppStateLike) => void) => { remove: () => void };
+  intervalMs?: number;
+  setIntervalFn?: (callback: () => void, intervalMs: number) => unknown;
+  clearIntervalFn?: (timer: unknown) => void;
+}): () => void {
+  let stopWatch: (() => void) | null = null;
+  const start = () => {
+    if (stopWatch) return;
+    stopWatch = startOrderStatusWatch({
+      refresh: options.refresh,
+      intervalMs: options.intervalMs,
+      setIntervalFn: options.setIntervalFn,
+      clearIntervalFn: options.clearIntervalFn,
+    });
+  };
+  const stop = () => {
+    if (!stopWatch) return;
+    stopWatch();
+    stopWatch = null;
+  };
+  if (options.currentState() === 'active') start();
+  const subscription = options.subscribe((next) => {
+    if (next === 'active') {
+      if (!stopWatch) {
+        void options.refresh();
+        start();
+      }
+    } else {
+      stop();
+    }
+  });
+  return () => {
+    stop();
+    subscription.remove();
+  };
+}
+
 export function startOrderStatusWatch(options: {
   refresh: () => Promise<void>;
   intervalMs?: number;

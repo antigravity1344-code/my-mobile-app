@@ -176,7 +176,8 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
           id: o.cleanerId,
           name: typeof o.cleanerName === 'string' ? o.cleanerName.trim() : '',
           avatar: o.cleanerAvatar || undefined,
-          phone: typeof o.cleanerPhone === 'string' ? o.cleanerPhone.trim() : '',
+          // مشتری فقط با پشتیبانی تماس می‌گیرد؛ شماره متخصص نگاشت نمی‌شود (سرور هم آن را نمی‌فرستد).
+          phone: '',
         }
       : undefined,
     ratings: o.ratings
@@ -425,6 +426,8 @@ export const orderService = {
         notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
         // شروع بازه انتخاب‌شده به وقت تهران، به‌صورت UTC؛ اگر قابل ساختن نباشد فرستاده نمی‌شود.
         ...(expectedStartAt ? { expectedStartAt } : {}),
+        // کلید تکرارنشدنی همین رزرو: تکرار ارسال (مثلاً بعد از قطع شبکه) سفارش دوم نمی‌سازد.
+        ...(newOrder.clientRequestId ? { clientRequestId: newOrder.clientRequestId } : {}),
       };
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
