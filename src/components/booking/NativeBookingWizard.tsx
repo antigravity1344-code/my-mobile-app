@@ -332,7 +332,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           step: 'SUBMITTED',
           title: 'ثبت درخواست',
           timestamp: now,
-          description: 'درخواست شما ثبت شد و در انتظار تأیید است.',
+          description: 'درخواست شما ثبت شد و در انتظار متخصص است.',
           isCompleted: true,
           isCurrent: true,
         },
@@ -355,7 +355,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');
-      setSubmissionMessage(`درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار تأیید است.`);
+      setSubmissionMessage(`درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
     } else {
       setSubmissionState('error');
       setSubmissionMessage(result.error || 'ثبت سفارش انجام نشد.');

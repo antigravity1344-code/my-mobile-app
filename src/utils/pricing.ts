@@ -155,9 +155,8 @@ export const getRecurringDiscountRate = (frequency: RecurringFrequency = 'ONE_TI
 };
 
 export const getCustomerTierDiscountRate = (tier: CustomerTier = 'NEW'): number => {
-  if (tier === 'VIP') return 0.08;
-  if (tier === 'GOLD') return 0.05;
-  if (tier === 'SILVER') return 0.03;
+  // D-40: سطح هنوز روی قیمت اثر ندارد.
+  if (tier === 'NEW' || tier === 'SILVER' || tier === 'GOLD' || tier === 'VIP') return 0;
   return 0;
 };
 

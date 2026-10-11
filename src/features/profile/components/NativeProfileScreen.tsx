@@ -178,7 +178,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
           </View>
           <Text style={styles.loyaltyTitle}>{profile.loyalty.title}</Text>
           <Text style={styles.muted}>
-            {toPersianDigits(profile.loyalty.completedOrdersCount)} سفارش تکمیل‌شده · تخفیف {toPersianDigits(profile.loyalty.discountPercentage)}٪
+            {toPersianDigits(profile.loyalty.completedOrdersCount)} سفارش تکمیل‌شده
           </Text>
           <Text style={styles.muted}>
             سطح بعدی پس از {toPersianDigits(profile.loyalty.nextTierOrderTarget)} سفارش تکمیل‌شده و امتیاز کافی محاسبه می‌شود.

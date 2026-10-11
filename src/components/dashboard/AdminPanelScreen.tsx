@@ -12,6 +12,21 @@ import {
 import { apiFetch } from '../../api/apiClient';
 import type { ApiAdminStats, ApiAdminUser, ApiOrder } from '../../api/types';
 
+const ADMIN_ORDER_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'در انتظار متخصص',
+  ACCEPTED: 'پذیرفته‌شده',
+  CONFIRMED: 'تأیید شده',
+  ASSIGNED: 'تخصیص متخصص',
+  IN_PROGRESS: 'در حال انجام',
+  COMPLETED: 'انجام شده',
+  CANCELLED: 'لغو شده',
+};
+
+function adminOrderStatusLabel(status: string | null | undefined): string {
+  if (status && ADMIN_ORDER_STATUS_LABEL[status]) return ADMIN_ORDER_STATUS_LABEL[status];
+  return 'وضعیت نامشخص';
+}
+
 export const AdminPanelScreen: React.FC = () => {
   const [adminTab, setAdminTab] = useState<'orders' | 'cleaners' | 'stats'>('orders');
   const [stats, setStats] = useState<ApiAdminStats | null>(null);
@@ -216,15 +231,13 @@ export const AdminPanelScreen: React.FC = () => {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                     ord.status === 'COMPLETED'
                       ? 'bg-sky-100 text-sky-800'
-                      : ord.status === 'ACCEPTED'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
+                      : ord.status === 'CANCELLED'
+                        ? 'bg-rose-100 text-rose-800'
+                        : ord.status === 'PENDING'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-800'
                   }`}>
-                    {ord.status === 'COMPLETED'
-                      ? 'تکمیل شده'
-                      : ord.status === 'ACCEPTED'
-                        ? 'پذیرفته‌شده'
-                        : 'در انتظار متخصص'}
+                    {adminOrderStatusLabel(ord.status)}
                   </span>
                 </div>
 

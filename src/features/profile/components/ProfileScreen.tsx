@@ -82,7 +82,7 @@ export const ProfileScreen: React.FC<Props> = ({ onOpenLoginModal }) => {
           </div>
           <div className={styles.cardValue}>{profile.loyalty.title}</div>
           <div className={styles.cardSubtext}>
-            {profile.loyalty.discountPercentage}٪ تخفیف روی تمام خدمات
+            {profile.loyalty.completedOrdersCount} سفارش تکمیل‌شده
           </div>
         </div>
       </div>

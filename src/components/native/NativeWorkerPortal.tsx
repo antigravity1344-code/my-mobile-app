@@ -130,7 +130,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       address: o.address || '',
       date: o.date || 'امروز',
       timeSlot: o.time || 'نامشخص',
-      wageTotal: o.price ? Math.round(o.price * 0.8) : 0,
+      wageTotal: typeof o.price === 'number' ? o.price : 0,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
       status: normalizeWorkerOrderStatus(o.status),
@@ -154,7 +154,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         mine = classifyWorkerOrdersResponse(await apiFetch('/orders'));
       }
       if (fetchId !== latestFetchId.current) return;
-      // سفارش باز: فقط محدوده؛ تلفن، نام، یادداشت و نشانی دقیق قبل از پذیرش نگه داشته نمی‌شود.
+      // سفارش باز: نام مشتری می‌ماند؛ تلفن، یادداشت و نشانی دقیق قبل از پذیرش نمی‌ماند.
       const availableMapped: WorkerOrdersResponse =
         available.kind === 'ok'
           ? { kind: 'ok', orders: (available.orders as ApiOrder[]).map((o) => mapBackendOrder(preAcceptOrderView(o))) }
@@ -303,7 +303,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
-            <Text style={styles.wageLabel}>مبلغ تسویه:</Text>
+            <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
             <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
           </View>
         </View>
@@ -486,7 +486,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
-                    <Text style={styles.wageLabel}>دستمزد کارگر:</Text>
+                    <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
                     <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
                   </View>
 

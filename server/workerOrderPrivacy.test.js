@@ -161,7 +161,7 @@ test('worker order views hide customer contact data until an active accept', asy
   const open = available.json.orders.find((item) => item.id === order.id);
   assert.ok(open, 'pending order is listed');
   assert.equal(open.status, 'PENDING');
-  assert.equal(open.customerName, '');
+  assert.equal(open.customerName, 'گیرنده خصوصی', 'customer name is visible before accept');
   assert.equal(Object.hasOwn(open, 'customerId'), false);
   assert.equal(open.serviceId, 'home_unit_cleaning');
   assert.equal(open.serviceTitle, 'نظافت منزل');
@@ -176,7 +176,7 @@ test('worker order views hide customer contact data until an active accept', asy
   assert.equal(available.text.includes('وسایل نظافت'), false, 'notes text leaked');
   assertNoPrivateCustomerData(open, 'available');
   assert.equal(available.text.includes(CUSTOMER_PHONE), false);
-  assert.equal(available.text.includes('گیرنده خصوصی'), false);
+  assert.equal(available.text.includes('گیرنده خصوصی'), true);
   const numberedOpen = available.json.orders.find((item) => item.id === numbered.id);
   assert.equal(numberedOpen.area, '', 'an address segment with digits is never sent as area');
   assert.equal(numberedOpen.address, '');

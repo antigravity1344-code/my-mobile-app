@@ -1023,7 +1023,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       [{ status: 'IN_PROGRESS' }, 'در حال انجام'],
       [{ status: 'COMPLETED' }, 'انجام شده'],
       [{ status: 'CANCELLED' }, 'لغو شده'],
-      [{ status: 'PENDING' }, 'در انتظار تأیید'],
+      [{ status: 'PENDING' }, 'در انتظار متخصص'],
     ];
     const RAW = /\b(PENDING|ACCEPTED|CONFIRMED|ASSIGNED|IN_PROGRESS|COMPLETED|CANCELLED)\b/;
     const statusNotifications = (userId) =>
@@ -1144,5 +1144,56 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       'points_ledger_no_update',
     ]);
     raw.close();
+  });
+
+  test('worker completes an active order, missing schedule is rejected, and orders are not deleted', async (t) => {
+    const server = await startServer(t);
+    const adminToken = await adminLogin(server);
+    const customer = await login(server, '09130000401', 'CUSTOMER');
+    const worker = await approvedWorker(server, '09130000402', adminToken);
+    const orderId = (await postOrder(server, customer.token)).json.order.id;
+    await request(server, { method: 'PUT', pathname: '/api/orders/' + orderId + '/accept', token: worker.token, body: {} });
+    const moved = await request(server, {
+      method: 'PUT',
+      pathname: '/api/admin/orders/' + orderId,
+      token: adminToken,
+      body: { status: 'IN_PROGRESS' },
+    });
+    assert.equal(moved.status, 200);
+    const completed = await request(server, {
+      method: 'PUT',
+      pathname: '/api/orders/' + orderId + '/complete',
+      token: worker.token,
+      body: {},
+    });
+    assert.equal(completed.status, 200);
+    assert.equal(store.getOrder(orderId).status, 'COMPLETED');
+
+    const pendingId = (await postOrder(server, customer.token)).json.order.id;
+    const tooEarly = await request(server, {
+      method: 'PUT',
+      pathname: '/api/orders/' + pendingId + '/complete',
+      token: worker.token,
+      body: {},
+    });
+    assert.equal(tooEarly.status, 400);
+    assert.equal(store.getOrder(pendingId).status, 'PENDING');
+
+    const missingSchedule = await request(server, {
+      method: 'POST',
+      pathname: '/api/orders',
+      token: customer.token,
+      body: { address: 'تهران، خیابان تست', price: 800000 },
+    });
+    assert.equal(missingSchedule.status, 400);
+    assert.match(missingSchedule.json.message, /تاریخ و ساعت/);
+
+    const removed = await request(server, {
+      method: 'DELETE',
+      pathname: '/api/admin/orders/' + pendingId,
+      token: adminToken,
+    });
+    assert.equal(removed.status, 405);
+    assert.equal(store.getOrder(pendingId).status, 'PENDING');
   });
 }

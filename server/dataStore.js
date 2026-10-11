@@ -429,7 +429,6 @@ function createDataStore(filename) {
   const selectOrder = database.prepare('SELECT * FROM orders WHERE id = ?');
   const listOrdersStmt = database.prepare('SELECT * FROM orders ORDER BY seq ASC');
   const nextOrderSeq = database.prepare('SELECT COALESCE(MIN(seq), 0) - 1 AS seq FROM orders');
-  const deleteOrderStmt = database.prepare('DELETE FROM orders WHERE id = ?');
   const setExpectedStartAtStmt = database.prepare('UPDATE orders SET expectedStartAt = ? WHERE id = ?');
   const setClientRequestIdStmt = database.prepare('UPDATE orders SET clientRequestId = ? WHERE id = ?');
   const selectOrderByClientRequestStmt = database.prepare(
@@ -736,8 +735,8 @@ function createDataStore(filename) {
     return getOrder(order.id);
   }
 
-  function deleteOrder(id) {
-    return deleteOrderStmt.run(id).changes > 0;
+  function deleteOrder() {
+    return false;
   }
 
   function getAddresses(userId) {
@@ -903,7 +902,7 @@ function createDataStore(filename) {
     return transaction(() => {
       const order = getOrder(orderId);
       if (!order) return { code: 'missing' };
-      if (order.status !== 'ACCEPTED') return { code: 'bad-status' };
+      if (!['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'].includes(order.status)) return { code: 'bad-status' };
       if (order.cleanerId !== cleaner.id) return { code: 'forbidden' };
       order.status = 'COMPLETED';
       order.completedAt = new Date().toISOString();

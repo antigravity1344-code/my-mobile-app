@@ -122,5 +122,9 @@ describe('batch4 #5: one idempotency key per booking', () => {
     expect(wizard).toMatch(/if \(!clientRequestKey\.current\) clientRequestKey\.current = createClientRequestId\(\)/);
     expect(wizard).toMatch(/clientRequestId: clientRequestKey\.current/);
     expect(wizard).toMatch(/if \(result\.success\) clientRequestKey\.current = null/);
+    const webWizard = read('components/booking/BookingWizardContainer.tsx');
+    expect(webWizard).toMatch(/if \(!clientRequestKey\.current\) clientRequestKey\.current = createClientRequestId\(\)/);
+    expect(webWizard).toMatch(/clientRequestId: clientRequestKey\.current/);
+    expect(webWizard).toMatch(/clientRequestKey\.current = null/);
   });
 });

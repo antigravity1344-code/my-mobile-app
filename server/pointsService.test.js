@@ -561,7 +561,7 @@ if (!isMainThread) {
       method: 'POST',
       pathname: '/api/orders',
       token: customer.token,
-      body: { address: 'سعادت‌آباد، کوچه ۱', price: 800000, serviceTitle: 'نظافت' },
+      body: { address: 'سعادت‌آباد، کوچه ۱', date: 'مهر 20', time: '10:00', price: 800000, serviceTitle: 'نظافت' },
     });
     assert.equal(made.status, 200);
     const accepted = await request(server, {

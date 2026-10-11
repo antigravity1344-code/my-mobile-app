@@ -96,11 +96,11 @@ function visibleServiceId(serviceId: string): string | undefined {
 }
 
 function statusLine(status: OrderStatus): string {
-  if (status === 'PENDING') return 'سفارش ثبت شده و در انتظار تأیید است.';
+  if (status === 'PENDING') return 'سفارش ثبت شده و در انتظار متخصص است.';
   if (status === 'ACCEPTED') return 'سفارش شما در حال پیگیری است.';
   if (status === 'CONFIRMED') return 'سفارش تأیید شده است.';
   if (status === 'ASSIGNED') return 'متخصص برای این سفارش مشخص شده است.';
-  if (status === 'IN_PROGRESS') return 'انجام خدمت آغاز شده است.';
+  if (status === 'IN_PROGRESS') return 'وضعیت این سفارش در حال انجام است.';
   return '';
 }
 

@@ -10,7 +10,7 @@ describe('customer order status labels (E6)', () => {
 
   it('has a Persian label for every status', () => {
     expect(CUSTOMER_ORDER_STATUS_LABELS).toEqual({
-      PENDING: 'در انتظار تأیید',
+      PENDING: 'در انتظار متخصص',
       ACCEPTED: 'پذیرفته‌شده',
       CONFIRMED: 'تأیید شده',
       ASSIGNED: 'تخصیص متخصص',

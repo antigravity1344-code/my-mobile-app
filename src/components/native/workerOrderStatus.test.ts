@@ -50,7 +50,7 @@ describe('workerOrderStatus', () => {
 
   it('allows actions only where the server allows them', () => {
     expect(ALL.filter(canAcceptWorkerOrder)).toEqual(['PENDING']);
-    expect(ALL.filter(canCompleteWorkerOrder)).toEqual(['ACCEPTED']);
+    expect(ALL.filter(canCompleteWorkerOrder)).toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
     expect(ALL.filter(isActiveWorkerJob)).toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
     for (const status of ['CANCELLED', 'COMPLETED', 'UNKNOWN', 'PENDING'] as WorkerOrderStatus[]) {
       expect(canCompleteWorkerOrder(status)).toBe(false);
@@ -103,7 +103,7 @@ describe('workerOrderStatus', () => {
     expect(view.address).toBe('سعادت‌آباد');
     expect(view.addressNotes).toBeNull();
     expect(view.notes).toBe('');
-    expect(view.customerName).toBe('');
+    expect(view.customerName).toBe('نام مشتری');
     expect(view.customerPhone).toBe('');
     expect(view.customerAvatar).toBe('');
     expect(view.serviceTitle).toBe('نظافت منزل');

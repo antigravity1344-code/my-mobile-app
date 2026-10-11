@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useBooking } from '../../context/BookingContext';
 import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
@@ -6,6 +6,7 @@ import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { calculateFinalPrice, calculatePrice, type RecurringFrequency } from '../../utils/pricing';
 import { useOrders, type OrderItem } from '../../features/orders';
+import { createClientRequestId } from '../../features/orders/services/clientRequestId';
 import { normalizePersianDigits } from '../../utils/bookingValidation';
 import { Sparkles, Calendar, MapPin, Check, Clock, ShieldCheck, Loader2, CheckCircle, AlertCircle, ClipboardList } from 'lucide-react';
 
@@ -65,6 +66,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
   const { addNewOrder } = useOrders();
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const clientRequestKey = useRef<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
   const canSubmit =
@@ -75,6 +77,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     setSubmissionState('submitting');
     setSubmissionMessage(null);
 
+    if (!clientRequestKey.current) clientRequestKey.current = createClientRequestId();
     const now = new Date().toISOString();
     const normalizedAddress = {
       ...addressDetails,
@@ -107,18 +110,20 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
           step: 'SUBMITTED',
           title: 'ثبت درخواست',
           timestamp: now,
-          description: 'درخواست شما ثبت شد و در انتظار تأیید است.',
+          description: 'درخواست شما ثبت شد و در انتظار متخصص است.',
           isCompleted: true,
           isCurrent: true,
         },
       ],
       notes,
+      clientRequestId: clientRequestKey.current,
       createdAt: now,
       updatedAt: now,
     };
 
     const result = await addNewOrder(newOrder);
     if (result.success) {
+      clientRequestKey.current = null;
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');

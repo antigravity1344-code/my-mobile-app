@@ -5,7 +5,7 @@ import type { OrderStatus } from './types/order';
  * ACCEPTED یعنی متخصص سفارش را پذیرفته، نه این‌که کار شروع شده؛ شروع واقعی کار هنوز ساخته نشده (D-51).
  */
 export const CUSTOMER_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  PENDING: 'در انتظار تأیید',
+  PENDING: 'در انتظار متخصص',
   ACCEPTED: 'پذیرفته‌شده',
   CONFIRMED: 'تأیید شده',
   ASSIGNED: 'تخصیص متخصص',

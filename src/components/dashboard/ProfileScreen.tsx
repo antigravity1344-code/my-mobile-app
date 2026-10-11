@@ -8,11 +8,11 @@ export const ProfileScreen: React.FC = () => {
   const getTierBadge = () => {
     switch (customerTier) {
       case 'VIP':
-        return { label: 'مشتری VIP (۸٪ تخفیف)', color: 'bg-amber-500 text-white' };
+        return { label: 'مشتری ویژه', color: 'bg-amber-500 text-white' };
       case 'GOLD':
-        return { label: 'مشتری طلایی (۵٪ تخفیف)', color: 'bg-amber-400 text-slate-900' };
+        return { label: 'مشتری طلایی', color: 'bg-amber-400 text-slate-900' };
       case 'SILVER':
-        return { label: 'مشتری نقره‌ای (۳٪ تخفیف)', color: 'bg-slate-300 text-slate-900' };
+        return { label: 'مشتری نقره‌ای', color: 'bg-slate-300 text-slate-900' };
       default:
         return { label: 'مشتری جدید', color: 'bg-sky-100 text-sky-800 border border-sky-300' };
     }

@@ -54,17 +54,20 @@ type ServerOrderLike = ApiOrder & {
   badge?: string;
 };
 
-function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder {
+const WORKER_ACTIVE_API_STATUSES = ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
+
+function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
   const serviceId = order.serviceId || 'home_unit_cleaning';
   const addressText = typeof order.address === 'string' ? order.address : '';
   const district =
     (addressText ? addressText.split('،')[0] || addressText.split(' ')[0] : '') || '—';
 
-  let status: OpenOrder['status'] = 'OPEN';
-  if (order.status === 'ACCEPTED' || order.status === 'ASSIGNED') status = 'ACCEPTED';
+  let status: OpenOrder['status'];
+  if (order.status === 'PENDING') status = 'OPEN';
+  else if (order.status === 'ACCEPTED' || order.status === 'ASSIGNED' || order.status === 'CONFIRMED') status = 'ACCEPTED';
   else if (order.status === 'IN_PROGRESS') status = 'IN_PROGRESS';
   else if (order.status === 'COMPLETED') status = 'COMPLETED';
-  else status = 'OPEN';
+  else return null;
 
   const details: Record<string, string | number | boolean> = {};
   if (typeof order.durationHours === 'number' && order.durationHours > 0) {
@@ -75,7 +78,6 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder {
       if (v !== undefined && v !== null) details[k] = v as string | number | boolean;
     }
   }
-  if (order.notes) details['یادداشت سفارش'] = String(order.notes);
   if (order.addressNotes) details['یادداشت آدرس'] = String(order.addressNotes);
 
   return {
@@ -154,8 +156,9 @@ export const SpecialistPortalScreen: React.FC = () => {
         const mineRes = await apiFetch('/orders');
         if (mineRes.success && Array.isArray(mineRes.orders)) {
           const active = (mineRes.orders as ApiOrder[])
-            .filter((o) => o.status === 'ACCEPTED')
-            .map(mapApiOrderToOpenOrder);
+            .filter((o) => WORKER_ACTIVE_API_STATUSES.includes(String(o.status)))
+            .map(mapApiOrderToOpenOrder)
+            .filter((order): order is OpenOrder => order != null);
           setMyActiveOrders(active);
         } else {
           setMyActiveOrders([]);
@@ -182,7 +185,7 @@ export const SpecialistPortalScreen: React.FC = () => {
   const filteredOrders = useMemo(() => {
     return availableOrdersRaw
       .map(mapApiOrderToOpenOrder)
-      .filter((order) => order.roleRequired === activeRole && order.status === 'OPEN');
+      .filter((order): order is OpenOrder => order != null && order.roleRequired === activeRole && order.status === 'OPEN');
   }, [availableOrdersRaw, activeRole]);
 
   const handleCompleteOrder = async (orderId: string) => {
@@ -347,7 +350,7 @@ export const SpecialistPortalScreen: React.FC = () => {
             <div key={'mine-' + order.id} className="bg-white border border-emerald-200 rounded-xl p-3 space-y-2 text-right">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-700">کار فعال</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">پذیرفته‌شده</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">{order.status === 'IN_PROGRESS' ? 'در حال انجام' : 'پذیرفته‌شده'}</span>
               </div>
               <p className="text-xs text-slate-700">{order.serviceTitle}</p>
               <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>

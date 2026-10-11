@@ -690,6 +690,14 @@ app.post('/api/orders', (req, res) => {
       message: `مبلغ سفارش باید عدد صحیح بین ${MIN_ORDER_PRICE} و ${MAX_ORDER_PRICE} تومان باشد.`
     });
   }
+  const storedDate = typeof date === 'string' ? date.trim().slice(0, 40) : '';
+  const storedTime = typeof time === 'string' ? time.trim().slice(0, 40) : '';
+  if (!storedDate || !storedTime) {
+    return res.status(400).json({
+      success: false,
+      message: 'تاریخ و ساعت سفارش الزامی است.',
+    });
+  }
   const title =
     typeof serviceTitle === 'string' && serviceTitle.trim()
       ? serviceTitle.trim().slice(0, 120)
@@ -738,8 +746,8 @@ app.post('/api/orders', (req, res) => {
     customerTier: storedTier,
     pricing: storedPricing,
     address: orderAddress,
-    date: typeof date === 'string' ? date.trim().slice(0, 40) : 'امروز',
-    time: typeof time === 'string' ? time.trim().slice(0, 40) : '14:00',
+    date: storedDate,
+    time: storedTime,
     price: parsedPrice,
     notes: typeof notes === 'string' ? notes.trim().slice(0, 500) : '',
     status: 'PENDING',
@@ -812,7 +820,7 @@ function workerAvailableOrderView(order) {
     area,
     address: area,
     addressNotes: null,
-    customerName: '',
+    customerName: typeof order.customerName === 'string' ? order.customerName : '',
     customerPhone: '',
     customerAvatar: '',
     cleanerId: null,
@@ -850,7 +858,7 @@ function workerAssignedOrderView(order) {
 
 // برچسب فارسی وضعیت برای متن اعلان تغییر وضعیت (D-06)؛ همان برچسب‌های صفحه اعلان‌های اپ.
 const ORDER_STATUS_LABELS = {
-  PENDING: 'در انتظار تأیید',
+  PENDING: 'در انتظار متخصص',
   ACCEPTED: 'پذیرفته‌شده',
   CONFIRMED: 'تأیید شده',
   ASSIGNED: 'تخصیص متخصص',
@@ -961,7 +969,7 @@ app.put('/api/orders/:orderId/cancel', (req, res) => {
   res.json({ success: true, order: customerOrderView(cancelled.order) });
 });
 
-// تکمیل سفارش توسط متخصص پذیرنده (ACCEPTED → COMPLETED)
+// تکمیل سفارش توسط متخصص پذیرنده، از هر وضعیت فعال
 app.put('/api/orders/:orderId/complete', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
@@ -982,7 +990,7 @@ app.put('/api/orders/:orderId/complete', (req, res) => {
   const completed = store.tryCompleteOrder(orderId, cleaner);
   if (completed.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
   if (completed.code === 'bad-status') {
-    return res.status(400).json({ success: false, message: 'فقط سفارش‌های پذیرفته‌شده قابل تکمیل هستند.' });
+    return res.status(400).json({ success: false, message: 'این سفارش در وضعیت فعلی قابل تکمیل نیست.' });
   }
   if (completed.code === 'forbidden') {
     return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
@@ -1479,12 +1487,11 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
   res.json({ success: true, order: updated.order });
 });
 
-app.delete('/api/admin/orders/:orderId', (req, res) => {
-  const { orderId } = req.params;
-  if (!store.deleteOrder(orderId)) {
-    return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
-  }
-  res.json({ success: true, message: 'سفارش با موفقیت حذف شد.' });
+app.delete('/api/admin/orders/:orderId', (_req, res) => {
+  res.status(405).json({
+    success: false,
+    message: 'حذف سفارش ممکن نیست. برای بستن سفارش، وضعیت آن را لغو کنید.',
+  });
 });
 
 // ------------------- مسیر وب داشبورد ادمین (ADMIN WEB DASHBOARD) -------------------
@@ -1713,7 +1720,12 @@ app.get('/admin', (req, res) => {
     function getOrderStatusTitle(status) {
       if (status === 'ACCEPTED') return 'پذیرفته‌شده';
       if (status === 'PENDING') return 'در انتظار متخصص';
-      return status;
+      if (status === 'CONFIRMED') return 'تأیید شده';
+      if (status === 'ASSIGNED') return 'تخصیص متخصص';
+      if (status === 'IN_PROGRESS') return 'در حال انجام';
+      if (status === 'COMPLETED') return 'انجام شده';
+      if (status === 'CANCELLED') return 'لغو شده';
+      return 'وضعیت نامشخص';
     }
 
     async function updateWorkerStatus(userId, status) {

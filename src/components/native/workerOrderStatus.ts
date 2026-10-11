@@ -69,9 +69,9 @@ export function canAcceptWorkerOrder(status: WorkerOrderStatus): boolean {
   return status === 'PENDING';
 }
 
-/** سرور فقط ACCEPTED را تکمیل می‌کند؛ دکمه «اتمام کار» فقط همان‌جا نمایش داده می‌شود. */
+/** تکمیل از هر وضعیت فعال؛ PENDING و سفارش بسته دکمه «اتمام کار» ندارند. */
 export function canCompleteWorkerOrder(status: WorkerOrderStatus): boolean {
-  return status === 'ACCEPTED';
+  return isActiveWorkerJob(status);
 }
 
 /** تماس فقط برای کار فعال و وقتی شماره واقعاً موجود است. */
@@ -92,8 +92,8 @@ export function workerOrderArea(order: { area?: unknown; address?: unknown }): s
 }
 
 /**
- * سفارش باز (قبل از پذیرش): فقط محدوده نگه داشته می‌شود.
- * سرور این فیلدها را نمی‌فرستد؛ این فقط احتیاط سمت اپ است تا اگر روزی فرستاده شد هم نمایش داده نشود.
+ * سفارش باز (قبل از پذیرش): نام مشتری می‌ماند.
+ * تلفن، یادداشت و نشانی دقیق حتی اگر در پاسخ باشند نمایش داده نمی‌شوند.
  */
 export function preAcceptOrderView(order: ApiOrder): ApiOrder {
   const area = workerOrderArea(order);
@@ -102,7 +102,6 @@ export function preAcceptOrderView(order: ApiOrder): ApiOrder {
     address: area,
     addressNotes: null,
     notes: '',
-    customerName: '',
     customerPhone: '',
     customerAvatar: '',
   };
