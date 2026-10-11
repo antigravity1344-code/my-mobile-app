@@ -1687,72 +1687,121 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    // All API values remain data: text nodes, validated image URLs and event closures.
+    function adminElement(tag, className, text) {
+      const element = document.createElement(tag);
+      element.className = className;
+      if (arguments.length === 3) element.textContent = String(text);
+      return element;
+    }
+
+    function safeWorkerAvatar(value) {
+      const fallback = 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150';
+      if (typeof value !== 'string' || !value.trim()) return fallback;
+      const source = value.trim();
+      // Do not reinterpret markup, control characters or backslashes as a URL.
+      if (/[<>"']/.test(source) || source.includes(String.fromCharCode(92)) ||
+          Array.from(source).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) {
+        return fallback;
+      }
+      const rasterPrefixes = ['data:image/png;base64,', 'data:image/jpeg;base64,',
+        'data:image/jpg;base64,', 'data:image/webp;base64,'];
+      const prefix = rasterPrefixes.find(candidate => source.toLowerCase().startsWith(candidate));
+      if (prefix) {
+        const data = source.slice(prefix.length);
+        return data.length % 4 === 0 && new RegExp('^[A-Za-z0-9+/]+={0,2}$').test(data)
+          ? source : fallback;
+      }
+      try {
+        const url = new URL(source, window.location.href);
+        return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password
+          ? url.href : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
     function renderWorkers(workers) {
       const container = document.getElementById('workersList');
       if (!workers || workers.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400">هیچ متخصصی ثبت‌نام نکرده است.</p>';
+        container.replaceChildren(adminElement('p', 'text-xs text-slate-400', 'هیچ متخصصی ثبت‌نام نکرده است.'));
         return;
       }
 
-      container.innerHTML = workers.map(w => \`
-        <div class="bg-slate-800 border \${w.status === 'PENDING_VERIFICATION' ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-700'} rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div class="flex items-center gap-3">
-            <img src="\${w.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150'}" class="w-12 h-12 rounded-full border-2 border-emerald-500 object-cover" />
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-white text-base">\${w.name || 'متخصص بدون نام'}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold \${getStatusBadge(w.status)}">\${getStatusTitle(w.status)}</span>
-              </div>
-              <p class="text-xs text-slate-400 mt-1">تلفن: \${w.phone} | کد ملی: \${w.nationalId || 'ثبت نشده'} | شبا: \${w.bankSheba || 'ثبت نشده'}</p>
-              <p class="text-xs text-slate-400">آدرس: \${w.address || 'ثبت نشده'}</p>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            \${w.status !== 'APPROVED' ? \`
-              <button onclick="updateWorkerStatus('\${w.id}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition">
-                ✅ تایید مدارک و فعال‌سازی
-              </button>
-            \` : \`
-              <button onclick="updateWorkerStatus('\${w.id}', 'BLOCKED')" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition">
-                ⛔ غیرفعال‌سازی
-              </button>
-            \`}
-          </div>
-        </div>
-      \`).join('');
+      const rows = document.createDocumentFragment();
+      for (const w of workers) {
+        const card = adminElement('div', 'bg-slate-800 border ' +
+          (w.status === 'PENDING_VERIFICATION' ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-700') +
+          ' rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
+        const identity = adminElement('div', 'flex items-center gap-3');
+        const avatar = adminElement('img', 'w-12 h-12 rounded-full border-2 border-emerald-500 object-cover');
+        avatar.src = safeWorkerAvatar(w.avatar);
+        const details = adminElement('div', '');
+        const heading = adminElement('div', 'flex items-center gap-2');
+        heading.append(
+          adminElement('span', 'font-bold text-white text-base', w.name || 'متخصص بدون نام'),
+          adminElement('span', 'text-[10px] px-2 py-0.5 rounded-full font-bold ' + getStatusBadge(w.status), getStatusTitle(w.status))
+        );
+        details.append(
+          heading,
+          adminElement('p', 'text-xs text-slate-400 mt-1', 'تلفن: ' + w.phone + ' | کد ملی: ' + (w.nationalId || 'ثبت نشده') + ' | شبا: ' + (w.bankSheba || 'ثبت نشده')),
+          adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + (w.address || 'ثبت نشده'))
+        );
+        identity.append(avatar, details);
+        const actions = adminElement('div', 'flex gap-2');
+        const approve = w.status !== 'APPROVED';
+        const button = adminElement('button',
+          (approve ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500') +
+          ' text-white text-xs font-bold px-3 py-2 rounded-xl transition',
+          approve ? '✅ تایید مدارک و فعال‌سازی' : '⛔ غیرفعال‌سازی');
+        button.addEventListener('click', () => updateWorkerStatus(w.id, approve ? 'APPROVED' : 'BLOCKED'));
+        actions.append(button);
+        card.append(identity, actions);
+        rows.append(card);
+      }
+      container.replaceChildren(rows);
     }
 
     function renderOrders(orders) {
       const container = document.getElementById('ordersList');
       if (!orders || orders.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400">هیچ سفارشی وجود ندارد.</p>';
+        container.replaceChildren(adminElement('p', 'text-xs text-slate-400', 'هیچ سفارشی وجود ندارد.'));
         return;
       }
 
-      container.innerHTML = orders.map(o => \`
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-sky-400 font-mono">\${o.id}</span>
-              <span class="font-bold text-white">\${o.serviceTitle}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold \${getOrderStatusBadge(o.status)}">\${getOrderStatusTitle(o.status)}</span>
-            </div>
-            <p class="text-xs text-slate-400 mt-1">مشتری: \${o.customerName} (\${o.customerPhone})</p>
-            <p class="text-xs text-slate-400">آدرس: \${o.address} | تاریخ: \${o.date} ساعت \${o.time}</p>
-            \${o.cleanerName ? \`<p class="text-xs text-emerald-400 mt-1">متخصص پذیرنده: \${o.cleanerName}</p>\` : ''}
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            \${o.status === 'CANCEL_REQUESTED' ? \`<button onclick="confirmCustomerCancel('\${o.id}')" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl">تأیید لغو</button>\` : ''}
-          <div class="text-left font-bold text-purple-400 text-sm">
-            \${(o.price || 0).toLocaleString('fa-IR')} تومان
-          </div>
-          </div>
-        </div>
-      \`).join('');
+      const rows = document.createDocumentFragment();
+      for (const o of orders) {
+        const card = adminElement('div', 'bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
+        const details = adminElement('div', '');
+        const heading = adminElement('div', 'flex items-center gap-2');
+        heading.append(
+          adminElement('span', 'font-bold text-sky-400 font-mono', o.id),
+          adminElement('span', 'font-bold text-white', o.serviceTitle),
+          adminElement('span', 'text-[10px] px-2 py-0.5 rounded-full font-bold ' + getOrderStatusBadge(o.status), getOrderStatusTitle(o.status))
+        );
+        details.append(
+          heading,
+          adminElement('p', 'text-xs text-slate-400 mt-1', 'مشتری: ' + o.customerName + ' (' + o.customerPhone + ')'),
+          adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + o.address + ' | تاریخ: ' + o.date + ' ساعت ' + o.time)
+        );
+        if (o.cleanerName) {
+          details.append(adminElement('p', 'text-xs text-emerald-400 mt-1', 'متخصص پذیرنده: ' + o.cleanerName));
+        }
+        const actions = adminElement('div', 'flex flex-col items-end gap-2');
+        if (o.status === 'CANCEL_REQUESTED') {
+          const button = adminElement('button', 'bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl', 'تأیید لغو');
+          button.addEventListener('click', () => confirmCustomerCancel(o.id));
+          actions.append(button);
+        }
+        actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' تومان'));
+        card.append(details, actions);
+        rows.append(card);
+      }
+      container.replaceChildren(rows);
     }
 
     async function confirmCustomerCancel(orderId) {
-      const res = await fetch(\`/api/admin/orders/\${orderId}\`, {
+      const res = await fetch('/api/admin/orders/' + encodeURIComponent(orderId), {
         method: 'PUT',
         headers: adminHeaders(),
         body: JSON.stringify({ status: 'CANCELLED' })
@@ -1792,7 +1841,7 @@ app.get('/admin', (req, res) => {
     }
 
     async function updateWorkerStatus(userId, status) {
-      const res = await fetch(\`/api/admin/users/\${userId}/status\`, {
+      const res = await fetch('/api/admin/users/' + encodeURIComponent(userId) + '/status', {
         method: 'PUT',
         headers: adminHeaders(),
         body: JSON.stringify({ status })
