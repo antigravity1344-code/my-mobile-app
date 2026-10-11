@@ -41,3 +41,4 @@ jobs:
           server/cancelRequest.test.js
           server/orderEvents.test.js
           server/workerOrderPrivacy.test.js
+          server/startIntegration.test.js

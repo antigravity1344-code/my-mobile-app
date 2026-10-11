@@ -135,6 +135,7 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     serviceTitle: o.serviceTitle || 'سرویس نظافت',
     pricingType: 'hourly',
     status: normalizeOrderStatus(o.status),
+    startPrompt: o.startPrompt === 'confirm_report' || o.startPrompt === 'ask_started' ? o.startPrompt : null,
     paymentStatus: o.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
     paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
     date: {
@@ -372,6 +373,22 @@ export const orderService = {
     return { success: true, order: updatedOrder, refundAmount: 0 };
   },
 
+  async respondToStart(orderId: string, answer: 'yes' | 'no'):
+    Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/start-response', {
+      method: 'PUT',
+      body: JSON.stringify({ answer }),
+    });
+    if (!res.success || !res.order) {
+      return { success: false, error: res.message || 'ثبت پاسخ شروع کار انجام نشد.' };
+    }
+    const updatedOrder = mapApiOrderForCustomer(res.order);
+    const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
+    if (index >= 0) ordersMemoryStore[index] = updatedOrder;
+    return { success: true, order: updatedOrder };
+  },
+
   async rateOrder(
     orderId: string,
     customerRating: number,
@@ -506,4 +523,3 @@ export const orderService = {
     }
   },
 };
-

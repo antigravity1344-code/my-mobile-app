@@ -79,6 +79,10 @@ export interface ApiOrder {
   cancelledBy?: string;
   cancelReason?: string;
   ratings?: ApiOrderRatings;
+  /** Customer-only pending start verification question. */
+  startPrompt?: 'confirm_report' | 'ask_started' | null;
+  /** Worker-only flag provided after assignment. */
+  startReported?: boolean;
 }
 
 export interface ApiAdminStats {

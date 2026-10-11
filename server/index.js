@@ -785,7 +785,7 @@ app.post('/api/orders', (req, res) => {
 function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  return rest;
+  return { ...rest, startPrompt: store.startPromptFor(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -844,7 +844,7 @@ function workerAssignedOrderView(order) {
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
-    return { ...workerVisible, area };
+    return { ...workerVisible, area, startReported: store.workerStartReported(order) };
   }
   return {
     ...workerVisible,
@@ -944,6 +944,40 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
     return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
   }
   res.json({ success: true, order: workerAssignedOrderView(accepted.order) });
+});
+
+// ثبت شروع کار: رویدادی مستقل از وضعیت اصلی سفارش و مستقل از سیاست مالی.
+const START_ERROR_RESPONSES = {
+  missing: [404, 'سفارش یافت نشد.'],
+  forbidden: [403, 'این کار فقط برای طرف همین سفارش مجاز است.'],
+  'bad-status': [400, 'این سفارش در وضعیت مجاز شروع کار نیست.'],
+  invalid: [400, 'پاسخ نامعتبر است.'],
+  'already-answered': [409, 'پاسخ قبلاً ثبت شده و تغییر آن نیازمند پشتیبانی است.'],
+  'no-question': [409, 'در حال حاضر سؤالی درباره شروع کار ثبت نشده است.'],
+  resolved: [409, 'موضوع شروع کار توسط پشتیبانی بررسی شده است.'],
+};
+function sendStartError(res, code) {
+  const [status, message] = START_ERROR_RESPONSES[code] || [400, 'درخواست انجام نشد.'];
+  return res.status(status).json({ success: false, message });
+}
+
+app.put('/api/orders/:orderId/start', (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (user.role !== 'WORKER') return sendStartError(res, 'forbidden');
+  if (user.status !== 'APPROVED' && user.status !== 'ACTIVE') return sendStartError(res, 'forbidden');
+  const result = store.reportStart(req.params.orderId, user);
+  if (result.code !== 'ok' && result.code !== 'duplicate') return sendStartError(res, result.code);
+  return res.json({ success: true, order: workerAssignedOrderView(result.order) });
+});
+
+app.put('/api/orders/:orderId/start-response', (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (user.role !== 'CUSTOMER') return sendStartError(res, 'forbidden');
+  const result = store.respondStart(req.params.orderId, user.id, req.body && req.body.answer);
+  if (result.code !== 'ok' && result.code !== 'duplicate') return sendStartError(res, result.code);
+  return res.json({ success: true, order: customerOrderView(result.order) });
 });
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -1169,6 +1203,13 @@ app.get('/api/loyalty', (req, res) => {
 });
 
 app.use('/api/admin', requireAdmin);
+
+// تصمیم مدیر تنها بعد از میان‌افزار احراز هویت مدیریتی در دسترس است.
+app.put('/api/admin/orders/:orderId/start-decision', (req, res) => {
+  const result = store.adminStartDecision(req.params.orderId, req.body && req.body.started);
+  if (result.code !== 'ok') return sendStartError(res, result.code);
+  return res.json({ success: true, order: result.order });
+});
 
 app.get('/api/admin/support/messages', (req, res) => {
   res.json({ success: true, messages: store.listAllSupportMessages() });
