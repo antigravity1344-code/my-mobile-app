@@ -30,6 +30,7 @@ import {
   canAcceptWorkerOrder,
   canCallWorkerCustomer,
   canCompleteWorkerOrder,
+  canReportWorkerStart,
   isActiveWorkerJob,
   normalizeWorkerOrderStatus,
   partitionWorkerJobs,
@@ -64,6 +65,7 @@ interface NativeOrder {
   date: string;
   timeSlot: string;
   wageTotal: number;
+  startReported: boolean | null;
   paymentMethod: 'ONLINE' | 'CASH';
   detailsNote: string;
   /** وضعیت خام سرور (CANCELLED/CONFIRMED دیگر به OPEN تبدیل نمی‌شوند). */
@@ -131,6 +133,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       date: o.date || 'امروز',
       timeSlot: o.time || 'نامشخص',
       wageTotal: typeof o.price === 'number' ? o.price : 0,
+      startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
       status: normalizeWorkerOrderStatus(o.status),
@@ -206,6 +209,40 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       // بعد از موفقیت یا خطا (مثلاً سفارشی که مشتری لغو کرده) فهرست‌ها تازه می‌شوند تا کارت کهنه نماند.
       void fetchOrders('after-action');
     }
+  };
+
+  const reportWorkerStart = async (order: NativeOrder) => {
+    if (!user?.id || !canReportWorkerStart(order.status, order.startReported)) return;
+    if (!beginOrderAction(order.id)) return;
+    try {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+      const res = await apiFetch('/orders/' + encodeURIComponent(order.id) + '/start', {
+        method: 'PUT',
+      });
+      if (res.success) {
+        setSuccessAlert('شروع کار ثبت شد. مشتری می‌تواند شروع کار را تأیید یا رد کند.');
+        setTimeout(() => setSuccessAlert(null), 5000);
+      } else if (!isAccountBlockedResponse(res)) {
+        showActionError(res.message || 'شروع کار ثبت نشد.');
+      }
+    } catch {
+      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید.');
+    } finally {
+      endOrderAction(order.id);
+      void fetchOrders('after-action');
+    }
+  };
+
+  const confirmReportStart = (order: NativeOrder) => {
+    if (!canReportWorkerStart(order.status, order.startReported) || busyOrderIds.includes(order.id)) return;
+    Alert.alert(
+      'ثبت شروع کار',
+      'آیا کار این سفارش را شروع کرده‌اید؟ این اعلام برای تأیید مشتری فرستاده می‌شود.',
+      [
+        { text: 'انصراف', style: 'cancel' },
+        { text: 'بله، شروع کردم', onPress: () => void reportWorkerStart(order) },
+      ],
+    );
   };
 
   const confirmCompleteOrder = (order: NativeOrder) => {
@@ -313,6 +350,20 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             <Text style={styles.wageValue}>{(Number(order.wageTotal) || 0).toLocaleString('fa-IR')} تومان</Text>
           </View>
         </View>
+        {canReportWorkerStart(order.status, order.startReported) ? (
+          <Pressable
+            onPress={() => confirmReportStart(order)}
+            disabled={busy}
+            style={[styles.startButtonFull, busy && styles.buttonDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel="ثبت شروع کار"
+            accessibilityState={{ disabled: busy }}
+          >
+            <Text style={styles.completeButtonText}>{busy ? 'در حال ثبت...' : 'ثبت شروع کار'}</Text>
+          </Pressable>
+        ) : active && order.startReported ? (
+          <Text style={styles.startStatusText}>شروع کار اعلام شده است؛ منتظر تأیید مشتری بمانید.</Text>
+        ) : null}
         {canCompleteWorkerOrder(order.status) ? (
           <Pressable
             onPress={() => confirmCompleteOrder(order)}
@@ -615,6 +666,8 @@ const styles = StyleSheet.create({
   acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
   acceptButtonText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   completeButton: { backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  startButtonFull: { marginTop: 10, backgroundColor: '#0f766e', borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  startStatusText: { marginTop: 10, fontSize: 12, color: '#0f766e', textAlign: 'right' },
   completeButtonFull: {
     marginTop: 10,
     backgroundColor: '#0284c7',

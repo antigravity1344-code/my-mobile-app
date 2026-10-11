@@ -58,6 +58,8 @@ interface OrdersContextValue {
     message?: string;
     quote?: CancelQuote;
   }>;
+  respondToStart: (orderId: string, answer: 'yes' | 'no') =>
+    Promise<{ success: boolean; error?: string }>;
   rateOrder: (
     orderId: string,
     rating: number,
@@ -172,6 +174,12 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [fetchOrders],
   );
 
+  const respondToStart = useCallback(async (orderId: string, answer: 'yes' | 'no') => {
+    const result = await orderService.respondToStart(orderId, answer);
+    if (result.success) await fetchOrders();
+    return { success: result.success, error: result.error };
+  }, [fetchOrders]);
+
   const rateOrder = useCallback(
     async (orderId: string, rating: number, comment?: string, tags?: string[]) => {
       const result = await orderService.rateOrder(orderId, rating, comment, tags);
@@ -246,6 +254,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         closeRatingModal,
         cancelOrder,
         rateOrder,
+        respondToStart,
         addNewOrder,
         resetOrders,
       }}

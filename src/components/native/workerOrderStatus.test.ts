@@ -5,6 +5,7 @@ import {
   canAcceptWorkerOrder,
   canCallWorkerCustomer,
   canCompleteWorkerOrder,
+  canReportWorkerStart,
   isActiveWorkerJob,
   normalizeWorkerOrderStatus,
   partitionWorkerJobs,
@@ -64,6 +65,16 @@ describe('workerOrderStatus', () => {
     expect(canCallWorkerCustomer('ACCEPTED', '09121234567')).toBe(true);
     expect(canCallWorkerCustomer('IN_PROGRESS', '09121234567')).toBe(true);
     expect(canCallWorkerCustomer('ACCEPTED', '')).toBe(false);
+  });
+
+  it('offers start reporting only on active jobs explicitly marked unreported', () => {
+    expect(canReportWorkerStart('ACCEPTED', false)).toBe(true);
+    expect(canReportWorkerStart('IN_PROGRESS', false)).toBe(true);
+    expect(canReportWorkerStart('ACCEPTED', true)).toBe(false);
+    expect(canReportWorkerStart('ACCEPTED', null)).toBe(false);
+    expect(canReportWorkerStart('PENDING', false)).toBe(false);
+    expect(canReportWorkerStart('CANCEL_REQUESTED', false)).toBe(false);
+    expect(canReportWorkerStart('COMPLETED', false)).toBe(false);
   });
 
   it('puts active jobs first (newest first) and keeps cancelled/completed in history', () => {

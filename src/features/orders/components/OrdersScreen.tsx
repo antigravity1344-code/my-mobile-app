@@ -62,6 +62,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
     closeRatingModal,
     cancelOrder,
     rateOrder,
+    respondToStart,
     allOrders,
   } = useOrders();
 
@@ -284,6 +285,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
           openRatingModal(orderId);
         }}
         onCancelOrder={cancelOrder}
+        onRespondToStart={respondToStart}
         openCancelPrompt={openWithCancel}
       />
 

@@ -75,6 +75,8 @@ export interface OrderItem {
   cleaner?: CleanerInfo;
   timeline: OrderTimelineEvent[];
   ratings?: OrderRatingData;
+  /** Pending start verification from the server, independent of order.status. */
+  startPrompt?: 'confirm_report' | 'ask_started' | null;
   notes?: string;
   /** فقط برای ارسال سفارش جدید: کلید تکرارنشدنی رزرو (D-07). */
   clientRequestId?: string;
