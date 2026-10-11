@@ -66,6 +66,7 @@ interface NativeOrder {
   timeSlot: string;
   grossOrderAmount: number;
   startReported: boolean | null;
+  startAcceptanceKey: string | null;
   paymentMethod: 'ONLINE' | 'CASH';
   detailsNote: string;
   /** وضعیت خام سرور (CANCELLED/CONFIRMED دیگر به OPEN تبدیل نمی‌شوند). */
@@ -134,6 +135,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       timeSlot: o.time || 'نامشخص',
       grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
       startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
+      startAcceptanceKey: typeof o.startAcceptanceKey === 'string' ? o.startAcceptanceKey : null,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
       status: normalizeWorkerOrderStatus(o.status),
@@ -212,12 +214,13 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const reportWorkerStart = async (order: NativeOrder) => {
-    if (!user?.id || !canReportWorkerStart(order.status, order.startReported)) return;
+    if (!user?.id || !canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey)) return;
     if (!beginOrderAction(order.id)) return;
     try {
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
       const res = await apiFetch('/orders/' + encodeURIComponent(order.id) + '/start', {
         method: 'PUT',
+        body: JSON.stringify({ acceptanceKey: order.startAcceptanceKey }),
       });
       if (res.success) {
         setSuccessAlert('شروع کار ثبت شد. مشتری می‌تواند شروع کار را تأیید یا رد کند.');
@@ -234,7 +237,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const confirmReportStart = (order: NativeOrder) => {
-    if (!canReportWorkerStart(order.status, order.startReported) || busyOrderIds.includes(order.id)) return;
+    if (!canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey) || busyOrderIds.includes(order.id)) return;
     Alert.alert(
       'ثبت شروع کار',
       'آیا کار این سفارش را شروع کرده‌اید؟ این اعلام برای تأیید مشتری فرستاده می‌شود.',
@@ -350,7 +353,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             <Text style={styles.wageValue}>{(Number(order.grossOrderAmount) || 0).toLocaleString('fa-IR')} تومان</Text>
           </View>
         </View>
-        {canReportWorkerStart(order.status, order.startReported) ? (
+        {canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey) ? (
           <Pressable
             onPress={() => confirmReportStart(order)}
             disabled={busy}

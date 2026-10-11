@@ -77,6 +77,8 @@ export interface OrderItem {
   ratings?: OrderRatingData;
   /** Pending start verification from the server, independent of order.status. */
   startPrompt?: 'confirm_report' | 'ask_started' | null;
+  /** The immutable event reference paired with the displayed startPrompt. */
+  startPromptEventId?: string | null;
   notes?: string;
   /** فقط برای ارسال سفارش جدید: کلید تکرارنشدنی رزرو (D-07). */
   clientRequestId?: string;

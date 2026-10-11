@@ -206,7 +206,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.equal(names.includes('trigger:order_events_no_overwrite'), true);
     const columns = raw.prepare('PRAGMA table_info(order_events)').all().map((column) => column.name);
     assert.deepEqual(columns, [
-      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey', 'workerId',
+      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey', 'workerId', 'dataJson',
     ]);
     const foreignKeys = raw.prepare('PRAGMA foreign_key_list(order_events)').all();
     assert.equal(foreignKeys.some((fk) => fk.table === 'orders'), false, 'orderId must not reference orders');

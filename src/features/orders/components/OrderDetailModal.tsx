@@ -45,7 +45,7 @@ interface OrderDetailModalProps {
     reason?: string,
     confirmQuote?: CancelQuote,
   ) => Promise<{ success: boolean; error?: string; needsConfirmation?: boolean; message?: string; quote?: CancelQuote }>;
-  onRespondToStart: (orderId: string, answer: 'yes' | 'no') => Promise<{ success: boolean; error?: string }>;
+  onRespondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) => Promise<{ success: boolean; error?: string }>;
   /** Opened from the card's «لغو»: start with the cancel prompt open. */
   openCancelPrompt?: boolean;
 }
@@ -138,10 +138,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   };
 
   const respondToStart = async (answer: 'yes' | 'no') => {
-    if (isRespondingToStart || !order.startPrompt || order.status === 'CANCEL_REQUESTED') return;
+    if (isRespondingToStart || !order.startPrompt || !order.startPromptEventId || order.status === 'CANCEL_REQUESTED') return;
     setIsRespondingToStart(true);
     try {
-      const result = await onRespondToStart(order.id, answer);
+      const result = await onRespondToStart(order.id, answer, order.startPromptEventId);
       if (!result.success) Alert.alert('ثبت پاسخ انجام نشد', result.error || 'لطفاً دوباره تلاش کنید.');
     } catch {
       Alert.alert('خطای ارتباط', 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.');
@@ -458,7 +458,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           </ScrollView>
 
           {/* Customer confirmation is independent of cancellation and completion. */}
-          {order.startPrompt && order.status !== 'CANCEL_REQUESTED' ? (
+          {order.startPrompt && order.startPromptEventId && order.status !== 'CANCEL_REQUESTED' ? (
             <View style={styles.startPromptBox}>
               <Text style={styles.startPromptTitle}>تأیید شروع کار</Text>
               <Text style={styles.startPromptDescription}>

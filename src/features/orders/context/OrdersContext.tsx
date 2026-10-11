@@ -58,7 +58,7 @@ interface OrdersContextValue {
     message?: string;
     quote?: CancelQuote;
   }>;
-  respondToStart: (orderId: string, answer: 'yes' | 'no') =>
+  respondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) =>
     Promise<{ success: boolean; error?: string }>;
   rateOrder: (
     orderId: string,
@@ -174,9 +174,17 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [fetchOrders],
   );
 
-  const respondToStart = useCallback(async (orderId: string, answer: 'yes' | 'no') => {
-    const result = await orderService.respondToStart(orderId, answer);
-    if (result.success) await fetchOrders();
+  const respondToStart = useCallback(async (orderId: string, answer: 'yes' | 'no', promptEventId: string) => {
+    const result = await orderService.respondToStart(orderId, answer, promptEventId);
+    // A conflict can carry a newer question. Show that order, but never resend the old answer.
+    if (result.order) {
+      setAllOrders((prev) => {
+        const next = prev.map((item) => item.id === orderId ? result.order! : item);
+        allOrdersRef.current = next;
+        return next;
+      });
+    }
+    if (result.success || result.needsRefresh) await fetchOrders();
     return { success: result.success, error: result.error };
   }, [fetchOrders]);
 

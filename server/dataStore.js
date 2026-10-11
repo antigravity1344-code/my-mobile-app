@@ -90,6 +90,8 @@ const ORDER_EVENT_ACTOR_ROLES = Object.freeze(['customer', 'worker', 'admin', 's
 const ACTOR_ROLES_WITHOUT_ID = Object.freeze(['admin', 'system']);
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const MAX_EVENT_NOTE_LENGTH = 500;
+const MAX_EVENT_DATA_BYTES = 4096;
+const MAX_EVENT_DATA_DEPTH = 16;
 const ISO_TIMESTAMP_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -114,6 +116,44 @@ function normalizeIsoTimestamp(value) {
   const ms = Date.parse(text);
   if (!Number.isFinite(ms)) return null;
   return new Date(ms).toISOString();
+}
+
+// Metadata is optional, bounded JSON, never free-form text in note. Sorted object keys
+// give retries a stable content comparison without rewriting historical event rows.
+function encodeOrderEventData(value) {
+  if (value == null) return null;
+  const plain = (item) => item && typeof item === 'object' &&
+    (Object.getPrototypeOf(item) === Object.prototype || Object.getPrototypeOf(item) === null);
+  if (!plain(value) || Array.isArray(value)) throw new Error('INVALID_EVENT_DATA');
+  const ancestors = new Set();
+  function normalize(item, depth) {
+    if (depth > MAX_EVENT_DATA_DEPTH) throw new Error('INVALID_EVENT_DATA');
+    if (item === null || typeof item === 'string' || typeof item === 'boolean') return item;
+    if (typeof item === 'number' && Number.isFinite(item)) return item;
+    if (typeof item !== 'object' || (!Array.isArray(item) && !plain(item)) || ancestors.has(item)) {
+      throw new Error('INVALID_EVENT_DATA');
+    }
+    ancestors.add(item);
+    const normalized = Array.isArray(item)
+      ? item.map(entry => normalize(entry, depth + 1))
+      : Object.fromEntries(Object.keys(item).sort().map(key => [key, normalize(item[key], depth + 1)]));
+    ancestors.delete(item);
+    return normalized;
+  }
+  const encoded = JSON.stringify(normalize(value, 0));
+  if (Buffer.byteLength(encoded, 'utf8') > MAX_EVENT_DATA_BYTES) throw new Error('INVALID_EVENT_DATA');
+  return encoded;
+}
+
+function readOrderEventData(raw) {
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const encoded = encodeOrderEventData(JSON.parse(raw));
+    return encoded === null ? null : JSON.parse(encoded);
+  } catch (error) {
+    // Legacy or malformed metadata is unknown; it is never guessed or repaired.
+    return null;
+  }
 }
 
 function createDataStore(filename) {
@@ -292,6 +332,7 @@ function createDataStore(filename) {
   // و متخصص کنارگذاشته‌شده در ORDER_RETURNED_TO_PENDING. ردیف‌های قدیمی خالی می‌مانند.
   const eventColumnNames = new Set(database.prepare('PRAGMA table_info(order_events)').all().map((c) => c.name));
   if (!eventColumnNames.has('workerId')) database.exec('ALTER TABLE order_events ADD COLUMN workerId TEXT');
+  if (!eventColumnNames.has('dataJson')) database.exec('ALTER TABLE order_events ADD COLUMN dataJson TEXT');
 
   let depth = 0;
 
@@ -482,19 +523,22 @@ function createDataStore(filename) {
   const listCancelRequestsStmt = database.prepare(
     "SELECT id, cancelRequestedAt FROM orders WHERE status = 'CANCEL_REQUESTED' AND cancelRequestedAt IS NOT NULL"
   );
-  const recordAcceptanceStmt = database.prepare('UPDATE orders SET acceptedAt = ? WHERE id = ?');
+  const recordAcceptanceStmt = database.prepare(
+    "UPDATE orders SET acceptedAt = ?, startStatus = 'not_recorded', agreedStartAt = NULL WHERE id = ?"
+  );
   const countAcceptanceEventsStmt = database.prepare(
     "SELECT COUNT(*) AS n FROM order_events WHERE orderId = ? AND kind = 'ORDER_ACCEPTED'"
   );
   // تنها مسیر پاک کردن پذیرش: برگشت سفارش فعال به PENDING (پذیرش و متخصص اختصاص‌یافته با هم پاک می‌شوند).
   const clearAcceptanceStmt = database.prepare(`
-    UPDATE orders SET acceptedAt = NULL, cleanerId = NULL, cleanerName = NULL, cleanerAvatar = NULL, cleanerPhone = NULL
+    UPDATE orders SET acceptedAt = NULL, cleanerId = NULL, cleanerName = NULL, cleanerAvatar = NULL, cleanerPhone = NULL,
+      startStatus = 'not_recorded', agreedStartAt = NULL
     WHERE id = ?
   `);
   const insertOrderEventStmt = database.prepare(`
     INSERT INTO order_events (
-      id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId, dataJson
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const selectOrderEventStmt = database.prepare('SELECT * FROM order_events WHERE id = ?');
   const selectOrderEventByKeyStmt = database.prepare('SELECT * FROM order_events WHERE idempotencyKey = ?');
@@ -1329,6 +1373,7 @@ function createDataStore(filename) {
       note: row.note == null ? null : row.note,
       idempotencyKey: row.idempotencyKey,
       workerId: row.workerId == null ? null : row.workerId,
+      data: readOrderEventData(row.dataJson),
     };
   }
 
@@ -1376,6 +1421,12 @@ function createDataStore(filename) {
       if (typeof data.workerId !== 'string' || !data.workerId.trim()) return { code: 'invalid', field: 'workerId' };
       workerId = data.workerId.trim();
     }
+    let eventDataJson;
+    try {
+      eventDataJson = encodeOrderEventData(data.data);
+    } catch (error) {
+      return { code: 'invalid', field: 'data' };
+    }
 
     return transaction(() => {
       const candidate = { orderId, actorId, actorRole, kind, claimedAt, correctsEventId, note, idempotencyKey, workerId };
@@ -1387,7 +1438,8 @@ function createDataStore(filename) {
         event.claimedAt === candidate.claimedAt &&
         event.correctsEventId === candidate.correctsEventId &&
         event.note === candidate.note &&
-        event.workerId === candidate.workerId;
+        event.workerId === candidate.workerId &&
+        encodeOrderEventData(event.data) === eventDataJson;
 
       const existing = orderEventFromRow(selectOrderEventByKeyStmt.get(idempotencyKey));
       if (existing) return { code: sameContent(existing) ? 'duplicate' : 'key-conflict', event: existing };
@@ -1401,7 +1453,7 @@ function createDataStore(filename) {
       const id = newRecordId('EVT-');
       const recordedAt = new Date().toISOString();
       insertOrderEventStmt.run(
-        id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId
+        id, orderId, actorId, actorRole, kind, claimedAt, recordedAt, correctsEventId, note, idempotencyKey, workerId, eventDataJson
       );
       return { code: 'ok', event: orderEventFromRow(selectOrderEventStmt.get(id)) };
     });
@@ -1596,6 +1648,7 @@ function createDataStore(filename) {
   // Start-of-work events remain separate from the order's primary status and pricing.
   const orderStart = createOrderStart({
     database, transaction, getOrder, appendOrderEvent, addNotification, rulesFor: pointsApi.rulesFor,
+    readEventData: readOrderEventData,
   });
 
   return {
