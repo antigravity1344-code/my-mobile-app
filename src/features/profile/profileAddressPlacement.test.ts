@@ -28,6 +28,7 @@ describe('profile: main address right after identity', () => {
     expect(src).not.toContain('افزودن آدرس جدید');
     expect(src).not.toContain('آدرس‌های ذخیره‌شده');
     expect(src).not.toContain('هنوز آدرسی ذخیره نشده است.');
+    expect(src).not.toContain('سطح بعدی پس از');
   });
   it('modal: main mode saves via saveMainAddress (default), extra keeps first-is-default, edit prefills', () => {
     expect(modal).toContain('saveMainAddress(fields, editAddress?.id)');

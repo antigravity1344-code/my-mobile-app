@@ -358,11 +358,22 @@ if (!isMainThread) {
     assert.equal(db.getUserPoints('USER-C').freeCancelsRemaining, 4);
     assert.equal(db.tryCompleteOrder('ORD-2', { id: 'USER-W', name: 'متخصص' }).code, 'bad-status');
     assert.equal(db.getUserPoints('USER-C').balance, 14, 'a repeated completion does not award twice');
+    assert.equal(db.getUserPoints('USER-W').balance, 12);
+    assert.equal(db.listLedger('USER-C').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:customer').length, 1);
+    assert.equal(db.listLedger('USER-W').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:worker').length, 1);
+    const replay = db.onOrderEvent({ name: 'completed', order: db.getOrder('ORD-2') });
+    assert.equal(replay.code, 'ok');
+    assert.equal(db.listLedger('USER-C').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:customer').length, 1);
+    assert.equal(db.listLedger('USER-W').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:worker').length, 1);
+    assert.equal(db.getUserPoints('USER-C').balance, 14);
+    assert.equal(db.getUserPoints('USER-W').balance, 12);
 
     const rated = db.createRating('ORD-2', 'USER-C', { customerRating: 5, customerComment: 'خوب بود' });
     assert.equal(rated.code, 'ok');
     assert.equal(db.listLedger('USER-C').some((row) => row.reasonCode === 'rating'), false);
+    assert.equal(db.listLedger('USER-W').some((row) => row.reasonCode === 'rating'), false);
     assert.equal(db.getUserPoints('USER-C').balance, 14);
+    assert.equal(db.getUserPoints('USER-W').balance, 12);
 
     publish(db, 'cancel.penalty', { amount: 4 });
     const beforeCancel = db.getUserPoints('USER-C').balance;
@@ -603,5 +614,77 @@ if (!isMainThread) {
     });
     assert.equal(repeat.status, 200);
     assert.equal(store.getUserPoints(customer.user.id).balance, 2);
+    assert.equal(
+      store.listLedger(customer.user.id).filter((row) => row.idempotencyKey === 'earn:completed:' + made.json.order.id + ':customer').length,
+      1
+    );
+    assert.equal(
+      store.listLedger(worker.user.id).filter((row) => row.idempotencyKey === 'earn:completed:' + made.json.order.id + ':worker').length,
+      1
+    );
+  });
+
+  test('loyalty tier follows user_points and ignores stars the customer gave', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    const empty = db.loyaltyFor('USER-C');
+    assert.equal(empty.tier, 'NEW');
+    assert.equal(empty.title, 'عضو جدید');
+    assert.equal(empty.discountPercentage, 0);
+    assert.equal(empty.nextTierOrderTarget, 0);
+    assert.equal(empty.completedOrdersCount, 0);
+
+    for (const id of ['ORD-LOY-1', 'ORD-LOY-2', 'ORD-LOY-3']) {
+      accept(db, id);
+      assert.equal(db.tryCompleteOrder(id, { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+      assert.equal(db.createRating(id, 'USER-C', { customerRating: 5, customerComment: 'خوب' }).code, 'ok');
+    }
+    const afterStars = db.loyaltyFor('USER-C');
+    assert.equal(afterStars.completedOrdersCount, 3);
+    assert.equal(afterStars.ratingCount, 3);
+    assert.equal(afterStars.ratingAverage, 5);
+    assert.equal(afterStars.tier, 'NEW', 'self-given stars do not promote');
+    assert.equal(afterStars.discountPercentage, 0);
+    assert.equal(afterStars.nextTierOrderTarget, 0);
+    assert.equal(db.getUserPoints('USER-C'), null);
+    assert.equal(db.getUserPoints('USER-W'), null);
+    assert.equal(db.listLedger().length, 0);
+
+    publish(db, 'earn.orderCompleted', { customerAmount: 7, workerAmount: 6 });
+    publish(db, 'tiers.customer', {
+      levels: [{ tierKey: 'silver', minPoints: 4, minCompleted: 0 }],
+    });
+    accept(db, 'ORD-LOY-4');
+    assert.equal(db.tryCompleteOrder('ORD-LOY-4', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-C').tierKey, 'silver');
+    const silver = db.loyaltyFor('USER-C');
+    assert.equal(silver.tier, 'SILVER');
+    assert.equal(silver.title, 'نقره‌ای');
+    assert.equal(silver.discountPercentage, 0);
+    assert.equal(silver.nextTierOrderTarget, 0);
+    assert.equal(silver.completedOrdersCount, 4);
+
+    publish(db, 'tiers.customer', {
+      levels: [{ tierKey: 'gold', minPoints: 4, minCompleted: 0 }],
+    });
+    const goldTier = db.recomputeTier('USER-C');
+    assert.equal(goldTier.tierKey, 'gold');
+    const gold = db.loyaltyFor('USER-C');
+    assert.equal(gold.tier, 'GOLD');
+    assert.equal(gold.title, 'طلایی');
+    assert.equal(gold.discountPercentage, 0);
+
+    publish(db, 'tiers.customer', {
+      levels: [{ tierKey: 'gold_plus', minPoints: 4, minCompleted: 0 }],
+    });
+    const promoted = db.recomputeTier('USER-C');
+    assert.equal(promoted.tierKey, 'gold_plus');
+    const top = db.loyaltyFor('USER-C');
+    assert.equal(top.tier, 'VIP');
+    assert.equal(top.title, 'ویژه');
+    assert.equal(top.discountPercentage, 0);
+    assert.equal(db.getUserPoints('USER-W').balance, 6);
+    assert.equal(db.listLedger().some((row) => row.reasonCode === 'rating'), false);
+    db.close();
   });
 }

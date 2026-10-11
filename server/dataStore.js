@@ -1509,6 +1509,13 @@ function createDataStore(filename) {
     return { balance, transactions };
   }
 
+  const LOYALTY_TIER_FROM_POINTS = {
+    gray: { tier: 'NEW', title: 'عضو جدید' },
+    silver: { tier: 'SILVER', title: 'نقره‌ای' },
+    gold: { tier: 'GOLD', title: 'طلایی' },
+    gold_plus: { tier: 'VIP', title: 'ویژه' },
+  };
+
   function loyaltyFor(userId) {
     const completed = getOrders({ customerId: userId, status: 'COMPLETED' });
     const ratings = completed
@@ -1517,20 +1524,14 @@ function createDataStore(filename) {
     const average = ratings.length
       ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
       : 0;
-    const count = completed.length;
-    let tier = 'NEW';
-    if (count >= 20 && average >= 4.7) tier = 'VIP';
-    else if (count >= 10 && average >= 4.5) tier = 'GOLD';
-    else if (count >= 3 && average >= 4) tier = 'SILVER';
-    const titles = { NEW: 'عضو جدید', SILVER: 'نقره‌ای', GOLD: 'طلایی', VIP: 'ویژه' };
-    const discounts = { NEW: 0, SILVER: 3, GOLD: 5, VIP: 8 };
-    const nextTarget = { NEW: 3, SILVER: 10, GOLD: 20, VIP: 20 };
+    const account = pointsApi.getUserPoints(userId);
+    const legacy = (account && LOYALTY_TIER_FROM_POINTS[account.tierKey]) || LOYALTY_TIER_FROM_POINTS.gray;
     return {
-      tier,
-      title: titles[tier],
-      discountPercentage: discounts[tier],
-      completedOrdersCount: count,
-      nextTierOrderTarget: nextTarget[tier],
+      tier: legacy.tier,
+      title: legacy.title,
+      discountPercentage: 0,
+      completedOrdersCount: completed.length,
+      nextTierOrderTarget: 0,
       ratingAverage: Math.round(average * 10) / 10,
       ratingCount: ratings.length,
     };

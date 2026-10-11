@@ -139,7 +139,9 @@ test('support, notifications, wallet and loyalty stay on sqlite', async (t) => {
   const loyalty = await request(server, { pathname: '/api/loyalty', token: customer.token });
   assert.equal(loyalty.json.loyalty.completedOrdersCount, 1);
   assert.equal(loyalty.json.loyalty.tier, 'NEW');
+  assert.equal(loyalty.json.loyalty.title, 'عضو جدید');
   assert.equal(loyalty.json.loyalty.discountPercentage, 0);
+  assert.equal(loyalty.json.loyalty.nextTierOrderTarget, 0);
 
   const other = await login(server, '09131110003', 'CUSTOMER');
   const otherWorker = await login(server, '09131110004', 'WORKER');

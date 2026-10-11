@@ -11,7 +11,7 @@ const EMPTY_LOYALTY = {
   title: 'عضو جدید',
   discountPercentage: 0,
   completedOrdersCount: 0,
-  nextTierOrderTarget: 3,
+  nextTierOrderTarget: 0,
 };
 
 const EMPTY_PROFILE: UserProfile = {
