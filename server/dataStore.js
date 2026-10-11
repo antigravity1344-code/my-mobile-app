@@ -865,7 +865,8 @@ function createDataStore(filename) {
   }
 
   function getSession(token) {
-    if (!token) return null;
+    // A database digest is storage metadata, never an external bearer credential.
+    if (typeof token !== 'string' || !token || fieldCrypto.isHashed(token)) return null;
     const row = selectSession.get(fieldCrypto.hashSecret(token));
     if (!row) return null;
     return { userId: row.userId, role: row.role, expires: row.expires };
@@ -876,7 +877,7 @@ function createDataStore(filename) {
   }
 
   function deleteSession(token) {
-    if (!token) return false;
+    if (typeof token !== 'string' || !token || fieldCrypto.isHashed(token)) return false;
     return deleteSessionStmt.run(fieldCrypto.hashSecret(token)).changes > 0;
   }
 

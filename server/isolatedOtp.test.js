@@ -98,3 +98,23 @@ test('sessions reject missing, wrong, expired and revoked tokens', async (t) => 
   assert.equal((await request(server, { method: 'POST', pathname: '/api/auth/logout', token: revoked.token })).status, 200);
   assert.equal((await request(server, { pathname: '/api/users/me', token: revoked.token })).status, 401);
 });
+
+
+test('a stored session hash cannot be used as a bearer credential', async (t) => {
+  const server = await harness.serverFor(t);
+  const customer = await harness.login(server, '09120006508');
+  const storedHash = require('./fieldCrypto').hashSecret(customer.token);
+  const replay = await request(server, { pathname: '/api/users/me', token: storedHash });
+  assert.equal(replay.status, 401);
+  assert.equal((await request(server, { pathname: '/api/users/me', token: customer.token })).status, 200);
+});
+
+test('a stored session hash cannot revoke the original opaque session', async (t) => {
+  const server = await harness.serverFor(t);
+  const customer = await harness.login(server, '09120006509');
+  const storedHash = require('./fieldCrypto').hashSecret(customer.token);
+  await request(server, { method: 'POST', pathname: '/api/auth/logout', token: storedHash });
+  assert.equal((await request(server, { pathname: '/api/users/me', token: customer.token })).status, 200);
+  assert.equal((await request(server, { method: 'POST', pathname: '/api/auth/logout', token: customer.token })).status, 200);
+  assert.equal((await request(server, { pathname: '/api/users/me', token: customer.token })).status, 401);
+});
