@@ -6,6 +6,7 @@ export const SMART_HERO_ACTIVE_STATUSES: OrderStatus[] = [
   'CONFIRMED',
   'ASSIGNED',
   'IN_PROGRESS',
+  'CANCEL_REQUESTED',
 ];
 
 export type SmartHeroOrder = {

@@ -24,7 +24,7 @@ function formatNotificationText(text: unknown): string {
   if (typeof text !== 'string') return '';
   return text
     .replace(/\bORD-[A-Za-z0-9-]+/g, '')
-    .replace(/\b(IN_PROGRESS|PENDING|ACCEPTED|CONFIRMED|ASSIGNED|COMPLETED|CANCELLED)\b/g, (status) => `«${STATUS_TEXT[status]}»`)
+    .replace(/\b(IN_PROGRESS|PENDING|ACCEPTED|CONFIRMED|ASSIGNED|COMPLETED|CANCELLED|CANCEL_REQUESTED)\b/g, (status) => `«${STATUS_TEXT[status]}»`)
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/[ \t]+([.،,!؟])/g, '$1')
     .trim();

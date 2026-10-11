@@ -507,7 +507,7 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
   }
 
   function cancelPhase(order) {
-    if (order.status === 'COMPLETED' || order.status === 'CANCELLED') return 'closed';
+    if (order.status === 'COMPLETED' || order.status === 'CANCELLED' || order.status === 'CANCEL_REQUESTED') return 'closed';
     if (order.status === 'PENDING') return 'before_accept';
     if (ACTIVE_ORDER_STATUSES.includes(order.status) || order.acceptedAt) return 'after_accept';
     return 'closed';

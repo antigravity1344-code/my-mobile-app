@@ -214,8 +214,10 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     }
     assert.equal(byName.startStatus.notnull, 1);
     assert.equal(byName.startStatus.dflt_value, "'not_recorded'");
-    assert.equal(byName.cancelInitiator, undefined);
-    assert.equal(byName.cancelFault, undefined);
+    for (const name of ['cancelInitiator', 'cancelFault', 'cancelRequestedAt', 'cancelQuoteJson']) {
+      assert.equal(byName[name].notnull, 0, name);
+      assert.equal(byName[name].dflt_value, null, name);
+    }
     raw.close();
   });
 
@@ -316,7 +318,9 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.equal(db.appendOrderEvent(sampleEvent('ORD-MISSING')).code, 'missing-order');
     assert.equal(db.appendOrderEvent(null).code, 'invalid');
     assert.equal(db.listOrderEvents('ORD-EVT-3').length, 0);
-    assert.equal(ORDER_EVENT_KINDS.length, 14);
+    assert.equal(ORDER_EVENT_KINDS.length, 16);
+    assert.equal(ORDER_EVENT_KINDS.includes('CANCEL_REQUESTED'), true);
+    assert.equal(ORDER_EVENT_KINDS.includes('ORDER_CANCELLED'), true);
     assert.equal(ORDER_EVENT_KINDS.includes('ORDER_RETURNED_TO_PENDING'), true);
     assert.equal(ORDER_EVENT_KINDS.includes('ORDER_ACCEPTED'), true);
     assert.equal(Object.isFrozen(ORDER_EVENT_KINDS), true);
@@ -572,7 +576,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.deepEqual(events[0], firstEvents[0], 'the first acceptance event is untouched');
   });
 
-  test('complete, rate and cancel do not emit order events', async (t) => {
+  test('complete and rate do not emit order events; a pending cancel records the final cancel', async (t) => {
     const server = await startServer(t);
     const adminToken = await adminLogin(server);
     const customer = await login(server, '09130000324', 'CUSTOMER');
@@ -587,7 +591,9 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     const cancelled = await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledId + '/cancel', token: customer.token, body: {} });
     assert.equal(cancelled.status, 200);
     assert.deepEqual(store.listOrderEvents(orderId).map((event) => event.kind), ['ORDER_ACCEPTED']);
-    assert.deepEqual(store.listOrderEvents(cancelledId), []);
+    assert.deepEqual(store.listOrderEvents(cancelledId).map((event) => event.kind), ['ORDER_CANCELLED']);
+    assert.equal(store.getOrder(cancelledId).status, 'CANCELLED');
+    assert.equal(store.getOrder(cancelledId).cancelFault, 'customer');
   });
 
   test('admin activation into each active status is an acceptance that needs a worker', async (t) => {
@@ -715,7 +721,22 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     // CANCELLED → فعال: متخصص قبلی بعد از لغو مسدود شده است.
     const cancelledId = (await postOrder(server, customer.token)).json.order.id;
     assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledId + '/accept', token: worker1.token, body: {} })).status, 200);
-    assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledId + '/cancel', token: customer.token, body: {} })).status, 200);
+    const cancelPreview = await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledId + '/cancel', token: customer.token, body: {} });
+    assert.equal(cancelPreview.status, 409);
+    const cancelRequested = await request(server, {
+      method: 'PUT',
+      pathname: '/api/orders/' + cancelledId + '/cancel',
+      token: customer.token,
+      body: { confirmQuote: cancelPreview.json.quote },
+    });
+    assert.equal(cancelRequested.status, 200);
+    assert.equal(cancelRequested.json.order.status, 'CANCEL_REQUESTED');
+    const rejectedCancel = await adminPut(cancelledId, { status: 'ACCEPTED' });
+    assert.equal(rejectedCancel.status, 400);
+    assert.equal(rejectedCancel.json.message, 'درخواست لغو مشتری رد نمی‌شود. فقط تأیید آن ممکن است.');
+    assert.equal(store.getOrder(cancelledId).status, 'CANCEL_REQUESTED');
+    assert.equal((await adminPut(cancelledId, { status: 'CANCELLED' })).status, 200);
+    assert.equal(store.getOrder(cancelledId).status, 'CANCELLED');
     assert.equal((await setUserStatus(worker1.user.id, 'BLOCKED')).status, 200);
     for (const status of ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']) {
       await assertRejected(cancelledId, { status }, 'متخصص هنوز تایید نشده است.', 'CANCELLED → ' + status + ' with a blocked worker');
@@ -893,7 +914,17 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       assert.equal(saved.status, status);
       assert.equal(saved.cleanerId, worker1.user.id);
       assert.equal(saved.acceptedAt, acceptedAt);
-      assert.deepEqual(store.listOrderEvents(id), events);
+      const afterEvents = store.listOrderEvents(id);
+      if (status === 'CANCELLED') {
+        assert.equal(afterEvents.length, events.length + 1);
+        assert.equal(afterEvents.at(-1).kind, 'ORDER_CANCELLED');
+        assert.equal(afterEvents.at(-1).actorRole, 'admin');
+        assert.deepEqual(afterEvents.slice(0, events.length), events);
+        assert.equal(saved.cancelInitiator, 'admin');
+        assert.equal(saved.cancelFault, 'none');
+      } else {
+        assert.deepEqual(afterEvents, events);
+      }
     }
 
     // مسیر معتبر: اول اختصاص متخصص جدید (پذیرش تازه)، بعد تکمیل.

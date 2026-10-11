@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
+import { formatOrderAmount, isOrderCancellable, type CancelQuote } from '../services/orderService';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 import { orderAmountLabel, paymentStatusDisplay } from '../orderStatusLabels';
@@ -40,7 +40,11 @@ interface OrderDetailModalProps {
   visible: boolean;
   onClose: () => void;
   onOpenRating: (orderId: string) => void;
-  onCancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  onCancelOrder: (
+    orderId: string,
+    reason?: string,
+    confirmQuote?: CancelQuote,
+  ) => Promise<{ success: boolean; error?: string; needsConfirmation?: boolean; message?: string; quote?: CancelQuote }>;
   /** Opened from the card's «لغو»: start with the cancel prompt open. */
   openCancelPrompt?: boolean;
 }
@@ -69,10 +73,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const [showCancelPrompt, setShowCancelPrompt] = useState(Boolean(openCancelPrompt) && isOrderCancellable(order?.status ?? 'UNKNOWN'));
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelPreview, setCancelPreview] = useState('');
+  const [pendingQuote, setPendingQuote] = useState<CancelQuote | null>(null);
   const sheetKb = useSheetKeyboard(visible);
   const sheetScrollRef = sheetKb.scrollRef;
 
   // The cancel box is appended at the end of the details; bring it (and its reason input) into view.
+  useEffect(() => {
+    setCancelPreview('');
+    setPendingQuote(null);
+  }, [order?.id]);
+
   useEffect(() => {
     if (!showCancelPrompt) return undefined;
     // Second try: when opened straight from the card the sheet is still sliding in at 120 ms.
@@ -126,10 +137,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const handleConfirmCancel = async () => {
     setIsCancelling(true);
     try {
-      const res = await onCancelOrder(order.id, cancelReason.trim() || undefined);
+      const res = await onCancelOrder(order.id, cancelReason.trim() || undefined, pendingQuote || undefined);
       if (res.success) {
         setShowCancelPrompt(false);
         setCancelReason('');
+        setCancelPreview('');
+        setPendingQuote(null);
+      } else if (res.needsConfirmation && res.quote) {
+        setPendingQuote(res.quote);
+        setCancelPreview(res.message || '');
       } else {
         Alert.alert('خطا', res.error || 'امکان لغو سفارش وجود ندارد.');
       }
@@ -395,7 +411,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   <Text style={styles.cancelBoxTitle}>تأیید لغو سفارش</Text>
                 </View>
                 <Text style={styles.cancelBoxDesc}>
-                  آیا از لغو این سفارش اطمینان دارید؟ در صورت لغو، هماهنگی‌های انجام شده با کارشناس متوقف خواهد شد.
+                  {cancelPreview || 'آیا از لغو این سفارش اطمینان دارید؟ در صورت لغو، هماهنگی‌های انجام شده با کارشناس متوقف خواهد شد.'}
                 </Text>
                 <TextInput
                   value={cancelReason}
@@ -411,7 +427,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     style={styles.confirmCancelBtn}
                   >
                     <Text style={styles.confirmCancelText}>
-                      {isCancelling ? 'در حال لغو...' : 'بله، سفارش لغو شود'}
+                      {isCancelling ? 'در حال لغو...' : pendingQuote ? 'تأیید و ثبت درخواست' : 'بله، سفارش لغو شود'}
                     </Text>
                   </Pressable>
                   <Pressable

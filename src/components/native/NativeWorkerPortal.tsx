@@ -251,6 +251,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const { active: activeJobs, history: jobHistory } = partitionWorkerJobs(myAcceptedOrders);
+  const reviewJobs = jobHistory.filter((order) => order.status === 'CANCEL_REQUESTED');
+  const closedJobs = jobHistory.filter((order) => order.status !== 'CANCEL_REQUESTED');
 
   const badgeStyleFor = (tone: WorkerStatusTone) =>
     tone === 'cancelled' ? styles.cancelledBadge : tone === 'completed' ? styles.completedBadge : tone === 'active' ? styles.inProgressBadge : styles.neutralBadge;
@@ -288,6 +290,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           <Clock size={16} color={active ? '#059669' : '#94a3b8'} />
           <Text style={styles.infoText}>{order.date} | {order.timeSlot}</Text>
         </View>
+
+        {order.status === 'CANCEL_REQUESTED' ? (
+          <Text style={styles.noteText}>درخواست لغو این سفارش در حال بررسی است. تا پایان بررسی کار را ادامه ندهید.</Text>
+        ) : null}
 
         {canCallWorkerCustomer(order.status, order.phone) ? (
           <View style={styles.actionButtonsRow}>
@@ -517,7 +523,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             </View>
           ) : (
             <>
-              {activeJobs.length === 0 ? (
+              {reviewJobs.map(renderJobCard)}
+              {activeJobs.length === 0 && reviewJobs.length === 0 ? (
                 <View style={styles.emptyBox}>
                   <Briefcase size={40} color="#94a3b8" />
                   <Text style={styles.emptyTitle}>کار فعالی ندارید</Text>
@@ -525,10 +532,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               ) : (
                 activeJobs.map(renderJobCard)
               )}
-              {jobHistory.length > 0 ? (
+              {closedJobs.length > 0 ? (
                 <>
                   <Text style={styles.historyTitle}>سوابق (انجام‌شده و لغوشده)</Text>
-                  {jobHistory.map(renderJobCard)}
+                  {closedJobs.map(renderJobCard)}
                 </>
               ) : null}
             </>

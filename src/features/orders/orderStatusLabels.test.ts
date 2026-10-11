@@ -17,6 +17,7 @@ describe('customer order status labels (E6)', () => {
       IN_PROGRESS: 'در حال انجام',
       COMPLETED: 'انجام شده',
       CANCELLED: 'لغو شده',
+      CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
       UNKNOWN: 'وضعیت نامشخص',
     });
   });

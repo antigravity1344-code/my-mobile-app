@@ -261,15 +261,39 @@ test('worker order views hide customer contact data until an active accept', asy
   });
   assert.equal(back.status, 200);
 
-  // --- customer cancels: phone and precise address disappear for the worker ---
-  const cancelled = await request(server, {
+  // --- customer cancels after accept: preview, then review hides the phone, then admin confirms ---
+  const preview = await request(server, {
     method: 'PUT',
     pathname: '/api/orders/' + order.id + '/cancel',
     token: customer.token,
     body: { reason: 'تست' },
   });
+  assert.equal(preview.status, 409);
+  assert.equal(Object.hasOwn(preview.json.quote, 'ruleKey'), false);
+  assert.equal(store.getOrder(order.id).status, 'ACCEPTED');
+  const requested = await request(server, {
+    method: 'PUT',
+    pathname: '/api/orders/' + order.id + '/cancel',
+    token: customer.token,
+    body: { reason: 'تست', confirmQuote: preview.json.quote },
+  });
+  assert.equal(requested.status, 200);
+  assert.equal(requested.json.order.status, 'CANCEL_REQUESTED');
+  assert.equal(requested.json.order.customerPhone, CUSTOMER_PHONE, 'customer route unchanged');
+  mine = await request(server, { pathname: '/api/orders', token: workerA.token });
+  job = mine.json.orders.find((item) => item.id === order.id);
+  assert.equal(job.status, 'CANCEL_REQUESTED');
+  assert.equal(job.customerPhone, '', 'phone stays hidden while the cancel is under review');
+  assert.notEqual(job.address, FULL_ADDRESS);
+  assert.equal(job.addressNotes, null);
+  assert.equal(Object.hasOwn(job, 'cancelQuote'), false);
+  const cancelled = await request(server, {
+    method: 'PUT',
+    pathname: '/api/admin/orders/' + order.id,
+    token: adminToken,
+    body: { status: 'CANCELLED' },
+  });
   assert.equal(cancelled.status, 200);
-  assert.equal(cancelled.json.order.customerPhone, CUSTOMER_PHONE, 'customer route unchanged');
   mine = await request(server, { pathname: '/api/orders', token: workerA.token });
   job = mine.json.orders.find((item) => item.id === order.id);
   assert.equal(job.status, 'CANCELLED');
@@ -484,7 +508,20 @@ test('customer free-text notes never reach the worker but stay for the customer 
 
   const cancelledOrder = await createOrder(server, customer.token);
   assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledOrder.id + '/accept', token: worker.token, body: {} })).status, 200);
-  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledOrder.id + '/cancel', token: customer.token, body: {} })).status, 200);
+  const cancelPreview = await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledOrder.id + '/cancel', token: customer.token, body: {} });
+  assert.equal(cancelPreview.status, 409);
+  assert.equal((await request(server, {
+    method: 'PUT',
+    pathname: '/api/orders/' + cancelledOrder.id + '/cancel',
+    token: customer.token,
+    body: { confirmQuote: cancelPreview.json.quote },
+  })).status, 200);
+  assert.equal((await request(server, {
+    method: 'PUT',
+    pathname: '/api/admin/orders/' + cancelledOrder.id,
+    token: adminToken,
+    body: { status: 'CANCELLED' },
+  })).status, 200);
   assertNoNotes(await request(server, { pathname: '/api/orders', token: worker.token }), 'worker list CANCELLED');
   assertNoNotes(await request(server, { pathname: '/api/notifications', token: worker.token }), 'worker notifications');
 

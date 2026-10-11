@@ -12,6 +12,7 @@ export const CUSTOMER_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   IN_PROGRESS: 'در حال انجام',
   COMPLETED: 'انجام شده',
   CANCELLED: 'لغو شده',
+  CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
   UNKNOWN: 'وضعیت نامشخص',
 };
 

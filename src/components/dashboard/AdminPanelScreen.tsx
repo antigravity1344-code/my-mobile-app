@@ -20,6 +20,7 @@ const ADMIN_ORDER_STATUS_LABEL: Record<string, string> = {
   IN_PROGRESS: 'در حال انجام',
   COMPLETED: 'انجام شده',
   CANCELLED: 'لغو شده',
+  CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
 };
 
 function adminOrderStatusLabel(status: string | null | undefined): string {
@@ -97,6 +98,16 @@ export const AdminPanelScreen: React.FC = () => {
     const res = await adminFetch('/admin/orders/' + orderId, {
       method: 'PUT',
       body: JSON.stringify({ status: 'COMPLETED' }),
+    });
+    setLoading(false);
+    if (res.success) loadData();
+  };
+
+  const handleConfirmCancel = async (orderId: string) => {
+    setLoading(true);
+    const res = await adminFetch('/admin/orders/' + orderId, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'CANCELLED' }),
     });
     setLoading(false);
     if (res.success) loadData();
@@ -233,7 +244,7 @@ export const AdminPanelScreen: React.FC = () => {
                       ? 'bg-sky-100 text-sky-800'
                       : ord.status === 'CANCELLED'
                         ? 'bg-rose-100 text-rose-800'
-                        : ord.status === 'PENDING'
+                        : ord.status === 'CANCEL_REQUESTED' || ord.status === 'PENDING'
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-emerald-100 text-emerald-800'
                   }`}>
@@ -260,6 +271,16 @@ export const AdminPanelScreen: React.FC = () => {
                     className="w-full bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
                   >
                     اتمام سفارش
+                  </button>
+                )}
+                {ord.status === 'CANCEL_REQUESTED' && (
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmCancel(ord.id)}
+                    disabled={loading}
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
+                  >
+                    تأیید لغو
                   </button>
                 )}
               </div>

@@ -366,9 +366,24 @@ if (!isMainThread) {
 
     publish(db, 'cancel.penalty', { amount: 4 });
     const beforeCancel = db.getUserPoints('USER-C').balance;
+    const freeBefore = db.getUserPoints('USER-C').freeCancelsRemaining;
     accept(db, 'ORD-X');
-    assert.equal(db.tryCancelOrder('ORD-X', 'USER-C', ['PENDING', 'ACCEPTED'], 'انصراف').code, 'ok');
-    assert.equal(db.getUserPoints('USER-C').balance, beforeCancel, 'the current cancel path does not apply the new penalty');
+    const preview = db.tryCancelOrder('ORD-X', 'USER-C', ['PENDING', 'ACCEPTED'], 'انصراف');
+    assert.equal(preview.code, 'needs-confirmation');
+    assert.equal(preview.quote.usesFreeCancel, true);
+    assert.equal(db.getOrder('ORD-X').status, 'ACCEPTED');
+    assert.equal(db.getUserPoints('USER-C').balance, beforeCancel);
+    const requested = db.tryCancelOrder('ORD-X', 'USER-C', ['PENDING', 'ACCEPTED'], 'انصراف', { confirmQuote: preview.quote });
+    assert.equal(requested.code, 'ok');
+    assert.equal(requested.order.status, 'CANCEL_REQUESTED');
+    assert.equal(db.getUserPoints('USER-C').balance, beforeCancel, 'requesting a cancel does not charge points');
+    assert.equal(db.listLedger('USER-C').some((row) => row.reasonCode === 'cancel_penalty'), false);
+    const finalized = db.finalizeCancelRequest('ORD-X', { actor: 'admin' });
+    assert.equal(finalized.code, 'ok');
+    assert.equal(finalized.order.status, 'CANCELLED');
+    assert.equal(db.getUserPoints('USER-C').balance, beforeCancel, 'a free cancel does not transfer points');
+    assert.equal(db.getUserPoints('USER-C').freeCancelsRemaining, freeBefore - 1);
+    assert.equal(db.listLedger('USER-C').some((row) => row.reasonCode === 'free_cancel_use'), true);
     assert.equal(db.listLedger('USER-C').some((row) => row.reasonCode === 'cancel_penalty'), false);
 
     const notes = db.listNotifications('USER-C').concat(db.listNotifications('USER-W'));

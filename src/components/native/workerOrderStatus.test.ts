@@ -23,6 +23,7 @@ const ALL: WorkerOrderStatus[] = [
   'IN_PROGRESS',
   'COMPLETED',
   'CANCELLED',
+  'CANCEL_REQUESTED',
   'UNKNOWN',
 ];
 
@@ -40,6 +41,10 @@ describe('workerOrderStatus', () => {
     const labels = ALL.map(workerStatusLabel);
     expect(new Set(labels).size).toBe(ALL.length);
     expect(workerStatusLabel('CANCELLED')).toBe('لغو شده');
+    expect(workerStatusLabel('CANCEL_REQUESTED')).toBe('درخواست لغو در حال بررسی');
+    expect(isActiveWorkerJob('CANCEL_REQUESTED')).toBe(false);
+    expect(canCompleteWorkerOrder('CANCEL_REQUESTED')).toBe(false);
+    expect(canCallWorkerCustomer('CANCEL_REQUESTED', '09120000000')).toBe(false);
     expect(workerStatusLabel('ACCEPTED')).toBe('پذیرفته‌شده');
     expect(workerStatusLabel('ACCEPTED')).toBe(CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED);
     expect(workerStatusLabel('COMPLETED')).toBe('انجام شده');

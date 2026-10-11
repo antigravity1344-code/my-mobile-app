@@ -39,6 +39,7 @@ const STATUS_TONE: Record<OrderStatus, { bg: string; text: string; icon: string 
   IN_PROGRESS: { bg: '#DCFCE7', text: '#15803D', icon: '#15803D' },
   COMPLETED: { bg: '#CCFBF1', text: '#0F766E', icon: '#0F766E' },
   CANCELLED: { bg: '#FEE2E2', text: '#B91C1C', icon: '#B91C1C' },
+  CANCEL_REQUESTED: { bg: colors.amberBg, text: colors.amberText, icon: colors.amberIcon },
   UNKNOWN: { bg: '#F1F5F9', text: '#475569', icon: '#64748B' },
 };
 
@@ -101,6 +102,7 @@ function statusLine(status: OrderStatus): string {
   if (status === 'CONFIRMED') return 'سفارش تأیید شده است.';
   if (status === 'ASSIGNED') return 'متخصص برای این سفارش مشخص شده است.';
   if (status === 'IN_PROGRESS') return 'وضعیت این سفارش در حال انجام است.';
+  if (status === 'CANCEL_REQUESTED') return 'درخواست ثبت شده و در حال بررسی است.';
   return '';
 }
 

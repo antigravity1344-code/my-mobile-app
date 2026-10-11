@@ -158,8 +158,17 @@ test('batch4 #1: no customer-facing order response carries the specialist phone'
   assert.equal(Object.hasOwn(mine, 'cleanerPhone'), false);
   assert.equal(mine.cleanerName, store.getOrder(order.id).cleanerName, 'name still shown');
 
-  const cancelled = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/cancel', token: customer.token, body: { reason: 'تست' } });
+  const preview = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/cancel', token: customer.token, body: { reason: 'تست' } });
+  assert.equal(preview.status, 409);
+  assert.equal(preview.text.includes(WORKER_PHONE), false, 'cancel preview leaks specialist phone');
+  const cancelled = await request(server, {
+    method: 'PUT',
+    pathname: '/api/orders/' + order.id + '/cancel',
+    token: customer.token,
+    body: { reason: 'تست', confirmQuote: preview.json.quote },
+  });
   assert.equal(cancelled.status, 200);
+  assert.equal(cancelled.json.order.status, 'CANCEL_REQUESTED');
   assert.equal(cancelled.text.includes(WORKER_PHONE), false, 'cancel response leaks specialist phone');
 
   const done = await createOrder(server, customer.token);

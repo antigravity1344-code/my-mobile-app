@@ -75,6 +75,13 @@ const STATUS_CONFIG: Record<
     border: '#fecaca',
     Icon: AlertTriangle,
   },
+  CANCEL_REQUESTED: {
+    label: CUSTOMER_ORDER_STATUS_LABELS.CANCEL_REQUESTED,
+    bg: '#fef3c7',
+    text: '#92400e',
+    border: '#fde68a',
+    Icon: Clock,
+  },
   UNKNOWN: {
     label: CUSTOMER_ORDER_STATUS_LABELS.UNKNOWN,
     bg: '#f1f5f9',

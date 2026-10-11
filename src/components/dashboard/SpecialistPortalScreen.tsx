@@ -38,7 +38,7 @@ interface OpenOrder {
   priceTotal: number;
   paymentMethod: 'ONLINE' | 'CASH';
   details: Record<string, string | number | boolean>;
-  status: 'OPEN' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'OPEN' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCEL_REQUESTED';
 }
 
 function roleForService(serviceId: string): SpecialistRole {
@@ -67,6 +67,7 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
   else if (order.status === 'ACCEPTED' || order.status === 'ASSIGNED' || order.status === 'CONFIRMED') status = 'ACCEPTED';
   else if (order.status === 'IN_PROGRESS') status = 'IN_PROGRESS';
   else if (order.status === 'COMPLETED') status = 'COMPLETED';
+  else if (order.status === 'CANCEL_REQUESTED') status = 'CANCEL_REQUESTED';
   else return null;
 
   const details: Record<string, string | number | boolean> = {};
@@ -156,7 +157,7 @@ export const SpecialistPortalScreen: React.FC = () => {
         const mineRes = await apiFetch('/orders');
         if (mineRes.success && Array.isArray(mineRes.orders)) {
           const active = (mineRes.orders as ApiOrder[])
-            .filter((o) => WORKER_ACTIVE_API_STATUSES.includes(String(o.status)))
+            .filter((o) => WORKER_ACTIVE_API_STATUSES.includes(String(o.status)) || o.status === 'CANCEL_REQUESTED')
             .map(mapApiOrderToOpenOrder)
             .filter((order): order is OpenOrder => order != null);
           setMyActiveOrders(active);
@@ -350,10 +351,13 @@ export const SpecialistPortalScreen: React.FC = () => {
             <div key={'mine-' + order.id} className="bg-white border border-emerald-200 rounded-xl p-3 space-y-2 text-right">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-700">کار فعال</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">{order.status === 'IN_PROGRESS' ? 'در حال انجام' : 'پذیرفته‌شده'}</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">{order.status === 'CANCEL_REQUESTED' ? 'درخواست لغو در حال بررسی' : order.status === 'IN_PROGRESS' ? 'در حال انجام' : 'پذیرفته‌شده'}</span>
               </div>
               <p className="text-xs text-slate-700">{order.serviceTitle}</p>
               <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>
+              {order.status === 'CANCEL_REQUESTED' ? (
+                <p className="text-[11px] text-amber-800">درخواست لغو این سفارش در حال بررسی است. تا پایان بررسی کار را ادامه ندهید.</p>
+              ) : (
               <button
                 type="button"
                 onClick={() => handleCompleteOrder(order.id)}
@@ -362,6 +366,7 @@ export const SpecialistPortalScreen: React.FC = () => {
               >
                 {completingId === order.id ? 'در حال تکمیل...' : 'اتمام کار'}
               </button>
+              )}
             </div>
           ))}
         </div>

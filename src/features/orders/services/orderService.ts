@@ -31,6 +31,7 @@ const ORDER_STATUSES: OrderStatus[] = [
   'IN_PROGRESS',
   'COMPLETED',
   'CANCELLED',
+  'CANCEL_REQUESTED',
 ];
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -215,6 +216,18 @@ function buildTimelineFromApiOrder(o: ApiOrder, status: OrderStatus): OrderTimel
       },
     ];
   }
+  if (status === 'CANCEL_REQUESTED') {
+    return [
+      { ...submitted, isCurrent: false },
+      {
+        step: 'CANCELLED',
+        title: 'درخواست لغو در حال بررسی است',
+        timestamp: o.cancelledAt || '',
+        isCompleted: false,
+        isCurrent: true,
+      },
+    ];
+  }
   if (status === 'PENDING') return [submitted];
   // وضعیت ناشناخته: مرحله‌ای که رخ نداده («متخصص پذیرفت») نشان داده نمی‌شود.
   if (status === 'UNKNOWN') return [{ ...submitted, isCurrent: false }];
@@ -245,6 +258,26 @@ function buildTimelineFromApiOrder(o: ApiOrder, status: OrderStatus): OrderTimel
 
 export const isOrderCancellable = (status: OrderStatus): boolean =>
   CANCELLABLE_ORDER_STATUSES.includes(status);
+
+/** پیش‌نمایش اثر امتیازی لغو که سرور برای تأیید دوباره برمی‌گرداند. کلید قانون در آن نیست. */
+export interface CancelQuote {
+  phase?: string;
+  quotedPoints?: number;
+  deductiblePoints?: number;
+  usesFreeCancel?: boolean;
+  ruleVersion?: number | null;
+  reasonCode?: string;
+}
+
+export interface CancelOrderResult {
+  success: boolean;
+  error?: string;
+  order?: OrderItem;
+  refundAmount?: number;
+  needsConfirmation?: boolean;
+  message?: string;
+  quote?: CancelQuote;
+}
 
 export const orderService = {
   getLastOrdersLoadError,
@@ -301,7 +334,8 @@ export const orderService = {
     orderId: string,
     reason: string = 'لغو توسط کاربر',
     userId: string,
-  ): Promise<{ success: boolean; error?: string; order?: OrderItem; refundAmount?: number }> {
+    confirmQuote?: CancelQuote,
+  ): Promise<CancelOrderResult> {
     const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
     if (!trimmedUserId) {
       return { success: false, error: 'برای لغو سفارش، لطفاً دوباره وارد حساب خود شوید.' };
@@ -310,8 +344,21 @@ export const orderService = {
     await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
     const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/cancel', {
       method: 'PUT',
-      body: JSON.stringify({ userId: trimmedUserId, reason }),
+      body: JSON.stringify({
+        userId: trimmedUserId,
+        reason,
+        ...(confirmQuote ? { confirmQuote } : {}),
+      }),
     });
+
+    if (res.needsConfirmation && res.quote && typeof res.quote === 'object') {
+      return {
+        success: false,
+        needsConfirmation: true,
+        message: typeof res.message === 'string' ? res.message : '',
+        quote: res.quote as CancelQuote,
+      };
+    }
 
     if (!res.success || !res.order) {
       return { success: false, error: res.message || 'لغو سفارش انجام نشد. لطفاً دوباره تلاش کنید.' };
@@ -320,7 +367,7 @@ export const orderService = {
     const updatedOrder = mapApiOrderForCustomer(res.order) as OrderItem;
     const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
     if (index >= 0) {
-      ordersMemoryStore[index] = { ...ordersMemoryStore[index], ...updatedOrder, status: 'CANCELLED' };
+      ordersMemoryStore[index] = { ...ordersMemoryStore[index], ...updatedOrder, status: updatedOrder.status };
     }
     return { success: true, order: updatedOrder, refundAmount: 0 };
   },

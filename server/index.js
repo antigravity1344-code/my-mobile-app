@@ -784,7 +784,7 @@ app.post('/api/orders', (req, res) => {
 // مشتری فقط با پشتیبانی تماس می‌گیرد؛ شماره متخصص در هیچ پاسخ مشتری فرستاده نمی‌شود (D-05).
 function customerOrderView(order) {
   if (!order) return order;
-  const { cleanerPhone, ...rest } = order;
+  const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   return rest;
 }
 
@@ -841,7 +841,7 @@ function workerAssignedOrderView(order) {
   const area = orderAreaFromAddress(order.address);
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
   // سطح و ریز قیمت مشتری، شناسه مشتری و شناسه لغوکننده به متخصص فرستاده نمی‌شود (D-05، D-41، D-06).
-  const { notes, ratings, customerId, customerTier, pricing, cancelledBy, ...rest } = order;
+  const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area };
@@ -865,6 +865,7 @@ const ORDER_STATUS_LABELS = {
   IN_PROGRESS: 'در حال انجام',
   COMPLETED: 'انجام شده',
   CANCELLED: 'لغو شده',
+  CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
 };
 
 function orderStatusLabel(status) {
@@ -894,6 +895,7 @@ function acceptConflictMessage(order, cleanerId) {
 app.get('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
+  store.finalizeDueCancelRequests();
   if (authUser.role === 'CUSTOMER') {
     return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }).map(customerOrderView) });
   }
@@ -912,6 +914,7 @@ app.get('/api/orders/available', (req, res) => {
   if (authUser.status !== 'APPROVED' && authUser.status !== 'ACTIVE') {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
+  store.finalizeDueCancelRequests();
   const availableOrders = store.getOrders({ status: 'PENDING' }).map(workerAvailableOrderView);
   res.json({ success: true, orders: availableOrders });
 });
@@ -958,13 +961,24 @@ app.put('/api/orders/:orderId/cancel', (req, res) => {
   }
   const trimmedUserId = authUser.id;
   const cancelReason = typeof reason === 'string' && reason.trim() ? reason.trim() : 'لغو توسط کاربر';
-  const cancelled = store.tryCancelOrder(orderId, trimmedUserId, CUSTOMER_CANCELLABLE_STATUSES, cancelReason);
+  store.finalizeDueCancelRequests();
+  const cancelled = store.tryCancelOrder(orderId, trimmedUserId, CUSTOMER_CANCELLABLE_STATUSES, cancelReason, {
+    confirmQuote: req.body && req.body.confirmQuote,
+  });
   if (cancelled.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
   if (cancelled.code === 'forbidden') {
     return res.status(403).json({ success: false, message: 'فقط صاحب سفارش می‌تواند آن را لغو کند.' });
   }
   if (cancelled.code === 'bad-status') {
     return res.status(400).json({ success: false, message: 'این سفارش در وضعیتی نیست که قابل لغو باشد.' });
+  }
+  if (cancelled.code === 'needs-confirmation') {
+    return res.status(409).json({
+      success: false,
+      needsConfirmation: true,
+      message: cancelled.message,
+      quote: cancelled.quote,
+    });
   }
   res.json({ success: true, order: customerOrderView(cancelled.order) });
 });
@@ -1285,6 +1299,7 @@ app.put('/api/admin/approve-worker/:userId', (req, res) => {
 });
 
 app.get('/api/admin/orders', (req, res) => {
+  store.finalizeDueCancelRequests();
   res.json({ success: true, orders: store.listOrders() });
 });
 
@@ -1309,11 +1324,26 @@ app.post('/api/admin/point-rules', (req, res) => {
 
 app.put('/api/admin/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
-  const { status, cleanerId } = req.body || {};
+  const { status, cleanerId, cancelFault } = req.body || {};
+  store.finalizeDueCancelRequests();
 
   const updated = store.transaction(() => {
     const order = store.getOrder(orderId);
     if (!order) return { code: 'missing' };
+    if (order.status === 'CANCEL_REQUESTED') {
+      if (cleanerId && cleanerId !== order.cleanerId) return { code: 'worker-change-on-close' };
+      if (status && status !== 'CANCELLED') return { code: 'cancel-request-locked' };
+      if (cancelFault != null) {
+        const faulted = store.setCancelFault(order.id, cancelFault, 'CANCEL_REQUESTED');
+        if (faulted.code === 'invalid') return { code: 'bad-fault' };
+        if (faulted.code !== 'ok') return faulted;
+      }
+      if (status === 'CANCELLED') return store.finalizeCancelRequest(order.id, { actor: 'admin' });
+      return { code: 'ok', order: store.getOrder(order.id) };
+    }
+    if (order.status === 'CANCELLED' && cancelFault != null && (!status || status === 'CANCELLED') && !cleanerId) {
+      return store.relaxCancelFault(order.id, cancelFault);
+    }
     const previousStatus = order.status;
     // سفارش PENDING متخصص ندارد؛ اطلاعات متخصص باقی‌مانده روی یک ردیف PENDING قدیمی نادیده گرفته می‌شود
     // تا هیچ تغییر وضعیتی سفارش را بی‌صدا با آن متخصص فعال یا بسته نکند.
@@ -1396,6 +1426,10 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     }
     if (previousStatus !== 'COMPLETED' && saved.status === 'COMPLETED') {
       store.onOrderEvent({ name: 'completed', order: saved });
+    }
+    if (previousStatus !== 'CANCELLED' && saved.status === 'CANCELLED') {
+      store.recordImmediateAdminCancel(saved.id);
+      saved = store.getOrder(saved.id);
     }
 
     const isWorkerReassigned =
@@ -1482,6 +1516,21 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       success: false,
       message: 'وضعیت سفارش معتبر نیست.',
       allowed: ADMIN_ORDER_STATUSES
+    });
+  }
+  if (updated.code === 'cancel-request-locked') {
+    return res.status(400).json({
+      success: false,
+      message: 'درخواست لغو مشتری رد نمی‌شود. فقط تأیید آن ممکن است.'
+    });
+  }
+  if (updated.code === 'bad-fault') {
+    return res.status(400).json({ success: false, message: 'مسئول لغو معتبر نیست.' });
+  }
+  if (updated.code === 'fault-increase-unsupported') {
+    return res.status(400).json({
+      success: false,
+      message: 'افزایش جریمه بعد از لغو نهایی در این نسخه انجام نمی‌شود.'
     });
   }
   res.json({ success: true, order: updated.order });
@@ -1692,11 +1741,24 @@ app.get('/admin', (req, res) => {
             <p class="text-xs text-slate-400">آدرس: \${o.address} | تاریخ: \${o.date} ساعت \${o.time}</p>
             \${o.cleanerName ? \`<p class="text-xs text-emerald-400 mt-1">متخصص پذیرنده: \${o.cleanerName}</p>\` : ''}
           </div>
+          <div class="flex flex-col items-end gap-2">
+            \${o.status === 'CANCEL_REQUESTED' ? \`<button onclick="confirmCustomerCancel('\${o.id}')" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl">تأیید لغو</button>\` : ''}
           <div class="text-left font-bold text-purple-400 text-sm">
             \${(o.price || 0).toLocaleString('fa-IR')} تومان
           </div>
+          </div>
         </div>
       \`).join('');
+    }
+
+    async function confirmCustomerCancel(orderId) {
+      const res = await fetch(\`/api/admin/orders/\${orderId}\`, {
+        method: 'PUT',
+        headers: adminHeaders(),
+        body: JSON.stringify({ status: 'CANCELLED' })
+      });
+      const data = await res.json();
+      if (data.success) loadAllData();
     }
 
     function getStatusBadge(status) {
@@ -1725,6 +1787,7 @@ app.get('/admin', (req, res) => {
       if (status === 'IN_PROGRESS') return 'در حال انجام';
       if (status === 'COMPLETED') return 'انجام شده';
       if (status === 'CANCELLED') return 'لغو شده';
+      if (status === 'CANCEL_REQUESTED') return 'درخواست لغو در حال بررسی';
       return 'وضعیت نامشخص';
     }
 

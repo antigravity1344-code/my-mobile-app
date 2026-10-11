@@ -10,6 +10,7 @@ export type WorkerOrderStatus =
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'CANCELLED'
+  | 'CANCEL_REQUESTED'
   | 'UNKNOWN';
 
 export type WorkerStatusTone = 'open' | 'active' | 'completed' | 'cancelled' | 'neutral';
@@ -22,6 +23,7 @@ const KNOWN_STATUSES: readonly WorkerOrderStatus[] = [
   'IN_PROGRESS',
   'COMPLETED',
   'CANCELLED',
+  'CANCEL_REQUESTED',
 ];
 
 /** کارهای فعالِ متخصص: همان وضعیت‌هایی که سرور برایشان تلفن و آدرس کامل می‌فرستد. */
@@ -40,6 +42,7 @@ export const WORKER_STATUS_LABEL: Record<WorkerOrderStatus, string> = {
   IN_PROGRESS: 'در حال انجام',
   COMPLETED: 'انجام شده',
   CANCELLED: 'لغو شده',
+  CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
   UNKNOWN: 'وضعیت نامشخص',
 };
 

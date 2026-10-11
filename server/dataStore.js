@@ -78,7 +78,12 @@ const ORDER_EVENT_KINDS = Object.freeze([
   'ORDER_ACCEPTED',
   // برگشت سفارش پذیرفته‌شده یا بسته به PENDING توسط مدیر (D-50): پاک شدن پذیرش و متخصص قابل بازسازی می‌شود.
   'ORDER_RETURNED_TO_PENDING',
+  // مرحله ۳: درخواست لغو و لغو نهایی، هر کدام در همان تراکنش تغییر وضعیت (D-11، D-12).
+  'CANCEL_REQUESTED',
+  'ORDER_CANCELLED',
 ]);
+const CANCEL_REVIEW_MS = 10 * 60 * 1000;
+const CANCEL_FAULTS = Object.freeze(['customer', 'worker', 'none']);
 const ORDER_EVENT_ACTOR_ROLES = Object.freeze(['customer', 'worker', 'admin', 'system']);
 // مدیر فعلاً حساب کاربری و شناسه ندارد؛ برای مدیر و سیستم actorId می‌تواند خالی باشد.
 const ACTOR_ROLES_WITHOUT_ID = Object.freeze(['admin', 'system']);
@@ -235,6 +240,11 @@ function createDataStore(filename) {
     ['startStatus', "startStatus TEXT NOT NULL DEFAULT 'not_recorded'"],
     // کلید تکرارنشدنی ثبت سفارش از طرف اپ (D-07): فقط با createOrder نوشته می‌شود و در پاسخ‌ها فرستاده نمی‌شود.
     ['clientRequestId', 'clientRequestId TEXT'],
+    // مرحله ۳ (D-13، D-14): فقط با دستورهای لغو نوشته می‌شوند، نه با updateOrder عمومی.
+    ['cancelInitiator', 'cancelInitiator TEXT'],
+    ['cancelFault', 'cancelFault TEXT'],
+    ['cancelRequestedAt', 'cancelRequestedAt TEXT'],
+    ['cancelQuoteJson', 'cancelQuoteJson TEXT'],
   ];
   for (const [name, definition] of addedOrderColumns) {
     if (!orderColumnNames.has(name)) {
@@ -333,6 +343,16 @@ function createDataStore(filename) {
     };
   }
 
+  function parseCancelQuote(raw) {
+    if (typeof raw !== 'string' || !raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function orderFromRow(row) {
     if (!row) return null;
     const order = {
@@ -358,6 +378,10 @@ function createDataStore(filename) {
       expectedStartAt: row.expectedStartAt == null ? null : row.expectedStartAt,
       agreedStartAt: row.agreedStartAt == null ? null : row.agreedStartAt,
       startStatus: row.startStatus || 'not_recorded',
+      cancelInitiator: row.cancelInitiator == null ? null : row.cancelInitiator,
+      cancelFault: row.cancelFault == null ? null : row.cancelFault,
+      cancelRequestedAt: row.cancelRequestedAt == null ? null : row.cancelRequestedAt,
+      cancelQuote: parseCancelQuote(row.cancelQuoteJson),
     };
     const optional = [
       'customerAvatar',
@@ -436,6 +460,26 @@ function createDataStore(filename) {
   );
   const countReturnEventsStmt = database.prepare(
     "SELECT COUNT(*) AS n FROM order_events WHERE orderId = ? AND kind = 'ORDER_RETURNED_TO_PENDING'"
+  );
+  const claimCancelRequestStmt = database.prepare(`
+    UPDATE orders
+    SET status = 'CANCEL_REQUESTED', cancelRequestedAt = ?, cancelInitiator = 'customer',
+        cancelFault = 'customer', cancelReason = ?, cancelQuoteJson = ?
+    WHERE id = ? AND status = ?
+  `);
+  const finalizeCancelRequestStmt = database.prepare(`
+    UPDATE orders
+    SET status = 'CANCELLED', cancelledAt = ?, cancelledBy = ?
+    WHERE id = ? AND status = 'CANCEL_REQUESTED'
+  `);
+  const setCancelMetaStmt = database.prepare(
+    'UPDATE orders SET cancelInitiator = ?, cancelFault = ? WHERE id = ?'
+  );
+  const setCancelFaultStmt = database.prepare(
+    'UPDATE orders SET cancelFault = ? WHERE id = ? AND status = ?'
+  );
+  const listCancelRequestsStmt = database.prepare(
+    "SELECT id, cancelRequestedAt FROM orders WHERE status = 'CANCEL_REQUESTED' AND cancelRequestedAt IS NOT NULL"
   );
   const recordAcceptanceStmt = database.prepare('UPDATE orders SET acceptedAt = ? WHERE id = ?');
   const countAcceptanceEventsStmt = database.prepare(
@@ -917,21 +961,340 @@ function createDataStore(filename) {
     });
   }
 
-  function tryCancelOrder(orderId, customerId, allowedStatuses, reason) {
+  function requireOrderEvent(result) {
+    if (!result || (result.code !== 'ok' && result.code !== 'duplicate')) {
+      throw new Error('ORDER_EVENT_FAILED');
+    }
+  }
+
+  function publicCancelQuote(quote) {
+    return {
+      phase: quote.phase,
+      quotedPoints: quote.quotedPoints,
+      deductiblePoints: quote.deductiblePoints,
+      usesFreeCancel: Boolean(quote.usesFreeCancel),
+      ruleVersion: quote.ruleVersion == null ? null : quote.ruleVersion,
+      reasonCode: quote.reasonCode,
+    };
+  }
+
+  function cancelPreviewMessage(quote) {
+    if (quote.reasonCode === 'free_cancel') {
+      const left = Number.isInteger(quote.freeCancelsAfter) ? quote.freeCancelsAfter : 0;
+      return 'این لغو از فرصت‌های لغو بدون کسر امتیاز شما استفاده می‌کند؛ ' + left + ' فرصت باقی می‌ماند.';
+    }
+    if (quote.reasonCode === 'cancel_penalty') {
+      const points = Number.isInteger(quote.deductiblePoints) ? quote.deductiblePoints : 0;
+      return 'با لغو این سفارش ' + points + ' امتیاز از امتیاز شما کسر می‌شود. آیا موافقید؟';
+    }
+    return 'برای این لغو قانون امتیاز فعالی ثبت نشده است و امتیازی کسر نمی‌شود.';
+  }
+
+  function quotesMatch(confirmQuote, quote) {
+    if (!confirmQuote || typeof confirmQuote !== 'object') return false;
+    const shown = publicCancelQuote(quote);
+    return confirmQuote.phase === shown.phase
+      && confirmQuote.quotedPoints === shown.quotedPoints
+      && confirmQuote.deductiblePoints === shown.deductiblePoints
+      && Boolean(confirmQuote.usesFreeCancel) === shown.usesFreeCancel
+      && (confirmQuote.ruleVersion == null ? null : confirmQuote.ruleVersion) === shown.ruleVersion
+      && confirmQuote.reasonCode === shown.reasonCode;
+  }
+
+  /** پیش‌نمایش مشتری. قانونِ نبودِ جریمه لغو را مسدود نمی‌کند و به قفل صفر تبدیل می‌شود (D-10). */
+  function customerCancelQuote(orderId, customerId) {
+    const raw = pointsApi.quoteCancelPenalty({ orderId, userId: customerId });
+    if (raw.code === 'rule-missing') {
+      return {
+        code: 'ok',
+        phase: raw.phase || 'after_accept',
+        quotedPoints: 0,
+        deductiblePoints: 0,
+        usesFreeCancel: false,
+        reasonCode: 'no_penalty_rule',
+        ruleKey: null,
+        ruleVersion: null,
+      };
+    }
+    return raw;
+  }
+
+  function quoteResponse(quote) {
+    return { code: 'needs-confirmation', quote: publicCancelQuote(quote), message: cancelPreviewMessage(quote) };
+  }
+
+  function lockedQuote(quote) {
+    return {
+      quotedPoints: quote.quotedPoints,
+      deductiblePoints: quote.deductiblePoints,
+      usesFreeCancel: Boolean(quote.usesFreeCancel),
+      reasonCode: quote.reasonCode,
+      ruleKey: quote.ruleKey || null,
+      ruleVersion: Number.isInteger(quote.ruleVersion) ? quote.ruleVersion : null,
+    };
+  }
+
+  function notifyCancelRequested(order) {
+    addNotification(order.customerId, order.id, 'CANCEL_REQUESTED', 'درخواست لغو', 'درخواست ثبت شده و در حال بررسی است.');
+    if (order.cleanerId) {
+      addNotification(
+        order.cleanerId,
+        order.id,
+        'CANCEL_REQUESTED',
+        'درخواست لغو',
+        'درخواست لغو این سفارش در حال بررسی است. تا پایان بررسی کار را ادامه ندهید.'
+      );
+    }
+    addNotification('admin', order.id, 'CANCEL_REQUESTED', 'درخواست لغو', 'درخواست لغو یک سفارش ثبت شده و در حال بررسی است.');
+  }
+
+  function notifyCancelFinal(order) {
+    addNotification(order.customerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'سفارش شما لغو شد.');
+    if (order.cleanerId) {
+      addNotification(
+        order.cleanerId,
+        order.id,
+        'ORDER_CANCELLED',
+        'سفارش لغو شد',
+        'این سفارش لغو شد. کار را ادامه ندهید.'
+      );
+    }
+  }
+
+  function pointsOutcomeOk(result) {
+    return result && (result.code === 'ok' || result.code === 'duplicate' || result.code === 'nothing' || result.code === 'insufficient');
+  }
+
+  /** اثر قفل‌شده، فقط وقتی تقصیر با مشتری است. نتیجه هیچ‌وقت از عدد قفل‌شده بیشتر نمی‌شود (D-14، D-15، D-20). */
+  function applyLockedCancelEffect(order, actor) {
+    if (order.cancelFault !== 'customer') return;
+    const lock = order.cancelQuote;
+    if (!lock || !lock.ruleKey || !Number.isInteger(lock.ruleVersion)) return;
+    if (lock.usesFreeCancel) {
+      const account = pointsApi.getUserPoints(order.customerId);
+      if (!account || account.freeCancelsRemaining <= 0) return;
+      const used = pointsApi.postEntry({
+        userId: order.customerId,
+        role: 'CUSTOMER',
+        unit: 'free_cancel',
+        delta: -1,
+        reasonCode: 'free_cancel_use',
+        orderId: order.id,
+        ruleKey: lock.ruleKey,
+        ruleVersion: lock.ruleVersion,
+        idempotencyKey: 'free_cancel:use:' + order.id,
+        actor,
+        skipGrant: true,
+      });
+      if (!pointsOutcomeOk(used)) throw new Error('CANCEL_POINTS_FAILED');
+      return;
+    }
+    const lockedPoints = Number.isInteger(lock.deductiblePoints) ? lock.deductiblePoints : 0;
+    if (lockedPoints <= 0) return;
+    const account = pointsApi.getUserPoints(order.customerId);
+    const balance = account ? account.balance : 0;
+    const amount = Math.min(lockedPoints, Math.max(0, balance));
+    if (amount <= 0) return;
+    const worker = order.cleanerId ? getUser(order.cleanerId) : null;
+    if (worker && worker.role === 'WORKER') {
+      const moved = pointsApi.postTransfer({
+        points: amount,
+        fromUserId: order.customerId,
+        fromRole: 'CUSTOMER',
+        toUserId: worker.id,
+        toRole: 'WORKER',
+        orderId: order.id,
+        ruleKey: lock.ruleKey,
+        ruleVersion: lock.ruleVersion,
+        transferGroupId: 'cancel:' + order.id + ':transfer',
+        debitKey: 'cancel:' + order.id + ':penalty',
+        creditKey: 'cancel:' + order.id + ':credit',
+        debitReasonCode: 'cancel_penalty',
+        creditReasonCode: 'cancel_penalty_credit',
+        actor,
+      });
+      if (!pointsOutcomeOk(moved)) throw new Error('CANCEL_POINTS_FAILED');
+      return;
+    }
+    const debit = pointsApi.postEntry({
+      userId: order.customerId,
+      role: 'CUSTOMER',
+      unit: 'points',
+      delta: -amount,
+      reasonCode: 'cancel_penalty',
+      orderId: order.id,
+      ruleKey: lock.ruleKey,
+      ruleVersion: lock.ruleVersion,
+      idempotencyKey: 'cancel:' + order.id + ':penalty',
+      actor,
+      skipGrant: true,
+    });
+    if (!pointsOutcomeOk(debit)) throw new Error('CANCEL_POINTS_FAILED');
+  }
+
+  function cancelImmediately(order, customerId, reason, nowIso) {
+    order.status = 'CANCELLED';
+    order.cancelledAt = nowIso;
+    order.cancelledBy = customerId;
+    order.cancelReason = reason;
+    updateOrder(order);
+    setCancelMetaStmt.run('customer', 'customer', order.id);
+    requireOrderEvent(appendOrderEvent({
+      orderId: order.id,
+      actorId: customerId,
+      actorRole: 'customer',
+      kind: 'ORDER_CANCELLED',
+      idempotencyKey: 'cancel-final:' + order.id,
+      workerId: order.cleanerId || null,
+    }));
+    addNotification(order.customerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'سفارش شما لغو شد.');
+    if (order.cleanerId) {
+      addNotification(order.cleanerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'مشتری این سفارش را لغو کرد.');
+    }
+    return { code: 'ok', order: getOrder(order.id) };
+  }
+
+  function tryCancelOrder(orderId, customerId, allowedStatuses, reason, options) {
+    const requested = getOrder(orderId);
+    if (!requested) return { code: 'missing' };
+    if (requested.customerId !== customerId) return { code: 'forbidden' };
+    if (!allowedStatuses.includes(requested.status)) return { code: 'bad-status' };
+    if (requested.status === 'PENDING') {
+      const nowIso = new Date().toISOString();
+      return transaction(() => {
+        const order = getOrder(orderId);
+        if (!order) return { code: 'missing' };
+        if (order.customerId !== customerId) return { code: 'forbidden' };
+        if (order.status !== 'PENDING') return { code: 'bad-status' };
+        return cancelImmediately(order, customerId, reason, nowIso);
+      });
+    }
+
+    const quoted = customerCancelQuote(orderId, customerId);
+    if (quoted.code !== 'ok') return { code: quoted.code === 'forbidden' ? 'forbidden' : 'bad-status' };
+    const confirmQuote = options && options.confirmQuote;
+    if (!quotesMatch(confirmQuote, quoted)) return quoteResponse(quoted);
+
     return transaction(() => {
       const order = getOrder(orderId);
       if (!order) return { code: 'missing' };
       if (order.customerId !== customerId) return { code: 'forbidden' };
-      if (!allowedStatuses.includes(order.status)) return { code: 'bad-status' };
-      order.status = 'CANCELLED';
-      order.cancelledAt = new Date().toISOString();
-      order.cancelledBy = customerId;
-      order.cancelReason = reason;
-      updateOrder(order);
-      addNotification(order.customerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'سفارش شما لغو شد.');
-      if (order.cleanerId) {
-        addNotification(order.cleanerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'مشتری این سفارش را لغو کرد.');
+      if (!allowedStatuses.includes(order.status) || order.status === 'PENDING') return { code: 'bad-status' };
+      const fresh = customerCancelQuote(orderId, customerId);
+      if (fresh.code !== 'ok') return { code: 'bad-status' };
+      if (!quotesMatch(confirmQuote, fresh)) return quoteResponse(fresh);
+      const requestedAt = new Date().toISOString();
+      const claimed = claimCancelRequestStmt.run(
+        requestedAt,
+        reason,
+        JSON.stringify(lockedQuote(fresh)),
+        orderId,
+        order.status
+      );
+      if (claimed.changes !== 1) return { code: 'bad-status' };
+      const saved = getOrder(orderId);
+      requireOrderEvent(appendOrderEvent({
+        orderId,
+        actorId: customerId,
+        actorRole: 'customer',
+        kind: 'CANCEL_REQUESTED',
+        idempotencyKey: 'cancel-request:' + orderId,
+        workerId: saved.cleanerId || null,
+      }));
+      notifyCancelRequested(saved);
+      return { code: 'ok', order: getOrder(orderId) };
+    });
+  }
+
+  function finalizeCancelRequest(orderId, options) {
+    const actor = options && options.actor === 'admin' ? 'admin' : 'system';
+    const nowMs = options && Number.isFinite(options.nowMs) ? options.nowMs : Date.now();
+    return transaction(() => {
+      const order = getOrder(orderId);
+      if (!order) return { code: 'missing' };
+      if (order.status === 'CANCELLED') return { code: 'already-final', order };
+      if (order.status !== 'CANCEL_REQUESTED') return { code: 'not-requested', order };
+      const cancelledBy = order.cancelInitiator === 'customer' ? order.customerId : actor;
+      const claimed = finalizeCancelRequestStmt.run(new Date(nowMs).toISOString(), cancelledBy, orderId);
+      if (claimed.changes !== 1) {
+        const current = getOrder(orderId);
+        return { code: current && current.status === 'CANCELLED' ? 'already-final' : 'conflict', order: current };
       }
+      const saved = getOrder(orderId);
+      applyLockedCancelEffect(saved, actor);
+      requireOrderEvent(appendOrderEvent({
+        orderId,
+        actorRole: actor,
+        kind: 'ORDER_CANCELLED',
+        idempotencyKey: 'cancel-final:' + orderId,
+        workerId: saved.cleanerId || null,
+      }));
+      notifyCancelFinal(saved);
+      return { code: 'ok', order: getOrder(orderId) };
+    });
+  }
+
+  function finalizeDueCancelRequests(nowMs) {
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    const due = listCancelRequestsStmt.all().filter((row) => {
+      const requestedAt = Date.parse(row.cancelRequestedAt);
+      return Number.isFinite(requestedAt) && now >= requestedAt + CANCEL_REVIEW_MS;
+    });
+    return due.map((row) => finalizeCancelRequest(row.id, { actor: 'system', nowMs: now }));
+  }
+
+  function setCancelFault(orderId, fault, onlyStatus) {
+    if (!CANCEL_FAULTS.includes(fault)) return { code: 'invalid' };
+    return transaction(() => {
+      const claimed = setCancelFaultStmt.run(fault, orderId, onlyStatus);
+      if (claimed.changes !== 1) return { code: 'conflict', order: getOrder(orderId) };
+      return { code: 'ok', order: getOrder(orderId) };
+    });
+  }
+
+  function relaxCancelFault(orderId, fault) {
+    if (!CANCEL_FAULTS.includes(fault)) return { code: 'invalid' };
+    return transaction(() => {
+      const order = getOrder(orderId);
+      if (!order || order.status !== 'CANCELLED') return { code: 'bad-status' };
+      if (fault === 'customer' && order.cancelFault !== 'customer') return { code: 'fault-increase-unsupported' };
+      if (order.cancelFault === 'customer' && fault !== 'customer') {
+        const rows = pointsApi.listLedger().filter((entry) =>
+          entry.orderId === orderId &&
+          !entry.reversalOf &&
+          (entry.idempotencyKey === 'free_cancel:use:' + orderId ||
+            entry.idempotencyKey === 'cancel:' + orderId + ':penalty' ||
+            entry.idempotencyKey === 'cancel:' + orderId + ':credit')
+        );
+        for (const entry of rows) {
+          const reversed = pointsApi.reverseEntry({
+            entryId: entry.id,
+            idempotencyKey: 'reversal:' + entry.idempotencyKey,
+            reasonCode: 'cancel_fault_reversed',
+            actor: 'admin',
+          });
+          if (!reversed || (reversed.code !== 'ok' && reversed.code !== 'duplicate')) {
+            throw new Error('CANCEL_REVERSE_FAILED');
+          }
+        }
+      }
+      if (order.cancelFault !== fault) setCancelFaultStmt.run(fault, orderId, 'CANCELLED');
+      return { code: 'ok', order: getOrder(orderId) };
+    });
+  }
+
+  function recordImmediateAdminCancel(orderId) {
+    return transaction(() => {
+      const order = getOrder(orderId);
+      if (!order || order.status !== 'CANCELLED') return { code: 'bad-status' };
+      if (!order.cancelInitiator) setCancelMetaStmt.run('admin', 'none', orderId);
+      requireOrderEvent(appendOrderEvent({
+        orderId,
+        actorRole: 'admin',
+        kind: 'ORDER_CANCELLED',
+        idempotencyKey: 'cancel-final:' + orderId,
+        workerId: order.cleanerId || null,
+      }));
       return { code: 'ok', order: getOrder(orderId) };
     });
   }
@@ -1263,6 +1626,11 @@ function createDataStore(filename) {
     tryAcceptOrder,
     tryCompleteOrder,
     tryCancelOrder,
+    finalizeCancelRequest,
+    finalizeDueCancelRequests,
+    setCancelFault,
+    relaxCancelFault,
+    recordImmediateAdminCancel,
     createRating,
     addSupportMessage,
     listSupportMessages,
@@ -1288,4 +1656,10 @@ function createDataStore(filename) {
   };
 }
 
-module.exports = { createDataStore, ORDER_EVENT_KINDS, ORDER_EVENT_ACTOR_ROLES, normalizeIsoTimestamp };
+module.exports = {
+  createDataStore,
+  ORDER_EVENT_KINDS,
+  ORDER_EVENT_ACTOR_ROLES,
+  CANCEL_REVIEW_MS,
+  normalizeIsoTimestamp,
+};

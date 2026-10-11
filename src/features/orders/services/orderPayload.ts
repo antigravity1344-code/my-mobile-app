@@ -9,6 +9,7 @@ const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
   'CONFIRMED',
   'ASSIGNED',
   'IN_PROGRESS',
+  'CANCEL_REQUESTED',
 ];
 
 export function formatSubmittedAddress(address?: Partial<AddressDetails> | null): string {

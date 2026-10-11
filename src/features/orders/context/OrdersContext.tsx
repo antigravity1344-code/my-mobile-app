@@ -5,7 +5,7 @@ import type {
   OrderSortOption,
   OrderStats,
 } from '../types/order';
-import { orderService } from '../services/orderService';
+import { orderService, type CancelQuote } from '../services/orderService';
 import { applyOrdersFetch, shouldStartOrdersRefresh } from '../services/ordersFetch';
 import { createLatestRequestGuard } from '../services/orderStatusWatch';
 import { selectCustomerOrders } from '../services/orderPayload';
@@ -47,7 +47,17 @@ interface OrdersContextValue {
   selectOrder: (orderId: string | null) => void;
   openRatingModal: (orderId: string) => void;
   closeRatingModal: () => void;
-  cancelOrder: (orderId: string, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  cancelOrder: (
+    orderId: string,
+    reason?: string,
+    confirmQuote?: CancelQuote,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    needsConfirmation?: boolean;
+    message?: string;
+    quote?: CancelQuote;
+  }>;
   rateOrder: (
     orderId: string,
     rating: number,
@@ -144,19 +154,17 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const cancelOrder = useCallback(
-    async (orderId: string, reason?: string) => {
+    async (orderId: string, reason?: string, confirmQuote?: CancelQuote) => {
       const userId = await resolveCustomerUserId();
-      const result = await orderService.cancelOrder(orderId, reason, userId);
+      const result = await orderService.cancelOrder(orderId, reason, userId, confirmQuote);
       if (result.success && result.order) {
-        // Patch local state immediately so UI shows CANCELLED even if refetch fails/stale-guards.
         setAllOrders((prev) => {
           const next = prev.map((item) =>
-            item.id === orderId ? { ...item, ...result.order!, status: 'CANCELLED' as const } : item,
+            item.id === orderId ? { ...item, ...result.order!, status: result.order!.status } : item,
           );
           allOrdersRef.current = next;
           return next;
         });
-        // Sync remaining list from server (optional; local CANCELLED already applied).
         await fetchOrders();
       }
       return result;
