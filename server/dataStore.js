@@ -4,6 +4,7 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const fieldCrypto = require('./fieldCrypto');
 const { createPointsService } = require('./pointsService');
+const { createOrderStart } = require('./orderStart');
 
 const USER_FIELDS = new Set([
   'id',
@@ -1592,8 +1593,13 @@ function createDataStore(filename) {
   }
 
   const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
+  // Start-of-work events remain separate from the order's primary status and pricing.
+  const orderStart = createOrderStart({
+    database, transaction, getOrder, appendOrderEvent, addNotification, rulesFor: pointsApi.rulesFor,
+  });
 
   return {
+    ...orderStart,
     transaction,
     getUser,
     getUserByPhone,
