@@ -9,36 +9,210 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    # A failed command must remain failed when its output is copied with tee.
+    shell: bash
+
 jobs:
   verify-ui-and-server:
-    name: Typecheck and regression tests (no SMS)
+    name: Typecheck, lint and all regression tests (no SMS)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       NODE_ENV: test
       PAKSHO_SMS_MODE: fake
-      PAKSHO_DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      KAVENEGAR_API_KEY: ''
+      KAVENEGAR_OTP_TEMPLATE: ''
+      EXPO_NO_DOTENV: '1'
     steps:
       - name: Check out proposed changes
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - name: Prepare disposable test data and logs
+        run: |
+          mkdir -p "$RUNNER_TEMP/paksho-ci-data" "$RUNNER_TEMP/paksho-ci-logs"
+          git rev-parse HEAD > "$RUNNER_TEMP/paksho-ci-logs/commit.txt"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          // This key belongs only to the disposable test database; never log it.
+          fs.appendFileSync(process.env.GITHUB_ENV, [
+            'PAKSHO_DATA_ENCRYPTION_KEY=' + crypto.randomBytes(32).toString('base64'),
+            'PAKSHO_SQLITE_PATH=' + path.join(process.env.RUNNER_TEMP, 'paksho-ci-data/paksho.sqlite'),
+            'PAKSHO_WORKER_DOC_DIR=' + path.join(process.env.RUNNER_TEMP, 'paksho-ci-data/worker-docs'),
+          ].join('\n') + '\n');
+          NODE
       - name: Install app dependencies from lockfile
-        run: npm ci
+        id: install-app
+        run: npm ci 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/app-install.log"
       - name: Install server dependencies from lockfile
-        run: npm ci --prefix server
+        id: install-server
+        if: ${{ !cancelled() }}
+        run: npm ci --prefix server 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/server-install.log"
+      - name: Install the lockfile-pinned Chromium and Linux dependencies
+        id: install-browser
+        if: ${{ !cancelled() && steps.install-server.outcome == 'success' }}
+        working-directory: server
+        run: npx --no-install playwright-core install --with-deps chromium 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/chromium-install.log"
+      - name: Resolve the installed Chromium executable
+        id: browser-path
+        if: ${{ !cancelled() && steps.install-browser.outcome == 'success' }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { chromium } = require('./server/node_modules/playwright-core');
+          const executable = chromium.executablePath();
+          fs.accessSync(executable, fs.constants.X_OK);
+          fs.appendFileSync(process.env.GITHUB_ENV, 'PAKSHO_TEST_CHROMIUM_PATH=' + executable + '\n');
+          NODE
       - name: TypeScript type checking
-        run: npm run typecheck
+        if: ${{ !cancelled() && steps.install-app.outcome == 'success' }}
+        run: npm run typecheck 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/typecheck.log"
+      - name: Lint
+        if: ${{ !cancelled() && steps.install-app.outcome == 'success' }}
+        run: npm run lint 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/lint.log"
       - name: App unit tests
-        run: npm test -- --reporter=dot
-      - name: Server regression tests (fake SMS, no real SMS)
-        run: >
-          node --test --test-concurrency=2
-          server/accountFeatures.test.js
-          server/cancelRequest.test.js
-          server/orderEvents.test.js
-          server/workerOrderPrivacy.test.js
-          server/startIntegration.test.js
+        if: ${{ !cancelled() && steps.install-app.outcome == 'success' }}
+        run: npm test -- --reporter=dot 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/app-tests.log"
+      - name: All server regression tests including browser XSS (fake SMS)
+        if: ${{ !cancelled() && steps.install-server.outcome == 'success' && steps.browser-path.outcome == 'success' }}
+        env:
+          # The isolated XSS fixture alone opts out of Chromium's sandbox because
+          # the hosted Ubuntu runner restricts downloaded-browser user namespaces.
+          # This changes no application, operating-system, network or TLS setting.
+          PAKSHO_TEST_CHROMIUM_SANDBOX: '0'
+        run: node --test --test-concurrency=2 server/*.test.js 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/server-tests.log"
+      - name: Preserve verification logs even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/paksho-ci-logs/
+          retention-days: 14
+          if-no-files-found: warn
+
+  android-debug:
+    name: Android ${{ matrix.flavor }} Debug ARM64
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: customer
+            variant: Customer
+          - flavor: worker
+            variant: Worker
+    env:
+      # Build validation only: no backend or device test is started by this job.
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3000
+      EXPO_PUBLIC_APP_FLAVOR: ${{ matrix.flavor }}
+      EXPO_NO_DOTENV: '1'
+      EXPO_NO_TELEMETRY: '1'
+      CMAKE_BUILD_PARALLEL_LEVEL: '2'
+    steps:
+      - name: Check out proposed changes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android command-line tools
+        uses: android-actions/setup-android@v3
+      - name: Prepare build logs and narrow Maven content filter
+        run: |
+          mkdir -p "$RUNNER_TEMP/paksho-android-logs"
+          git rev-parse HEAD > "$RUNNER_TEMP/paksho-android-logs/commit.txt"
+          # Keep dependency coordinates and versions unchanged. Only Bouncy Castle
+          # metadata bypasses JitPack in favour of the existing Maven Central repo.
+          cat > "$RUNNER_TEMP/paksho-central-bouncycastle.init.gradle" <<'GRADLE'
+          import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+          gradle.projectsEvaluated {
+              gradle.rootProject.allprojects { project ->
+                  project.repositories.withType(MavenArtifactRepository).configureEach { repository ->
+                      def host = repository.url.host
+                      if (host == 'www.jitpack.io' || host == 'jitpack.io') {
+                          repository.content { excludeGroup('org.bouncycastle') }
+                      }
+                  }
+              }
+          }
+          GRADLE
+      - name: Install the SDK packages required by the current native project
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1' 2>&1 | tee "$RUNNER_TEMP/paksho-android-logs/sdk-install.log"
+      - name: Install app dependencies from lockfile
+        run: npm ci 2>&1 | tee "$RUNNER_TEMP/paksho-android-logs/app-install.log"
+      - name: Rebuild the flavor bundle with the explicit test API URL
+        working-directory: android
+        run: |
+          # Invoke the checked-in wrapper via bash because its Git mode is 100644.
+          # Re-run this task so an earlier environment URL cannot survive in a bundle.
+          bash ./gradlew :app:createBundle${{ matrix.variant }}DebugJsAndAssets \
+            --rerun-tasks --no-daemon --console=plain --max-workers=2 \
+            -PreactNativeArchitectures=arm64-v8a \
+            --init-script "$RUNNER_TEMP/paksho-central-bouncycastle.init.gradle" \
+            --stacktrace 2>&1 | tee "$RUNNER_TEMP/paksho-android-logs/bundle.log"
+      - name: Build the flavor Debug APK for ARM64
+        working-directory: android
+        run: |
+          bash ./gradlew :app:assemble${{ matrix.variant }}Debug \
+            --no-daemon --console=plain --max-workers=2 \
+            -PreactNativeArchitectures=arm64-v8a \
+            --init-script "$RUNNER_TEMP/paksho-central-bouncycastle.init.gradle" \
+            --stacktrace 2>&1 | tee "$RUNNER_TEMP/paksho-android-logs/assemble.log"
+      - name: Record APK checksum, package metadata and signature verification
+        env:
+          APK_FLAVOR: ${{ matrix.flavor }}
+        run: |
+          apk='android/app/build/outputs/apk/${{ matrix.flavor }}/debug/app-${{ matrix.flavor }}-debug.apk'
+          sha256sum "$apk" | tee "$RUNNER_TEMP/paksho-android-logs/apk-sha256.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/paksho-android-logs/apk-badging.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk" 2>&1 | tee "$RUNNER_TEMP/paksho-android-logs/apk-signature.log"
+          python3 <<'PY'
+          import os, pathlib, re, zipfile
+          flavor = os.environ['APK_FLAVOR']
+          badging = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'paksho-android-logs/apk-badging.txt').read_text()
+          package = re.search(r"^package: name='([^']+)'", badging, re.MULTILINE)
+          native_code = re.search(r'^native-code: (.+)$', badging, re.MULTILINE)
+          assert package and package.group(1) == 'com.paksho.' + flavor, 'Unexpected APK application ID'
+          assert native_code and native_code.group(1).strip() == "'arm64-v8a'", 'Unexpected APK architecture'
+          apk = pathlib.Path('android/app/build/outputs/apk') / flavor / 'debug' / ('app-' + flavor + '-debug.apk')
+          with zipfile.ZipFile(apk) as archive:
+              assert 'assets/index.android.bundle' in archive.namelist(), 'Missing embedded JavaScript bundle'
+          print('APK application ID, ARM64 architecture and embedded bundle verified')
+          PY
+      - name: Preserve Android build logs even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.flavor }}-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/paksho-android-logs/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Preserve the generated flavor APK
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.flavor }}-debug-arm64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: android/app/build/outputs/apk/${{ matrix.flavor }}/debug/app-${{ matrix.flavor }}-debug.apk
+          retention-days: 14
+          if-no-files-found: warn
