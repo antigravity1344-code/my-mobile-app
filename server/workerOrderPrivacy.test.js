@@ -232,6 +232,11 @@ test('worker order views hide customer contact data until an active accept', asy
   assert.equal(Object.hasOwn(job, 'notes'), false, 'customer free-text notes are not in the worker work view');
   assert.equal(mine.text.includes('وسایل نظافت'), false, 'worker list: notes text');
   assert.equal(job.area, 'سعادت‌آباد');
+  assert.equal(job.customerName, 'گیرنده خصوصی', 'customer name stays visible after accept');
+  assert.equal(Object.hasOwn(job, 'customerId'), false, 'customer id is not sent to the worker');
+  assert.equal(Object.hasOwn(job, 'customerTier'), false, 'customer tier is not sent to the worker');
+  assert.equal(Object.hasOwn(job, 'pricing'), false, 'pricing breakdown is not sent to the worker');
+  assert.equal(Object.hasOwn(job, 'cancelledBy'), false);
 
   // admin-set active statuses also keep contact data for the assigned worker
   for (const status of ['IN_PROGRESS', 'CONFIRMED', 'ASSIGNED']) {
@@ -268,6 +273,9 @@ test('worker order views hide customer contact data until an active accept', asy
   mine = await request(server, { pathname: '/api/orders', token: workerA.token });
   job = mine.json.orders.find((item) => item.id === order.id);
   assert.equal(job.status, 'CANCELLED');
+  assert.equal(job.customerName, 'گیرنده خصوصی', 'cancelled history keeps the customer name');
+  assert.equal(job.cancelReason, 'تست', 'the customer cancel reason stays visible');
+  assert.equal(Object.hasOwn(job, 'cancelledBy'), false, 'cancel actor id is not sent');
   assertNoPrivateCustomerData(job, 'cancelled');
   assert.equal(mine.text.includes(CUSTOMER_PHONE), false);
 
@@ -299,6 +307,7 @@ test('worker order views hide customer contact data until an active accept', asy
   mine = await request(server, { pathname: '/api/orders', token: workerA.token });
   job = mine.json.orders.find((item) => item.id === done.id);
   assert.equal(job.status, 'COMPLETED');
+  assert.equal(job.customerName, 'گیرنده خصوصی', 'completed history keeps the customer name');
   assertNoPrivateCustomerData(job, 'completed');
   assert.equal(mine.text.includes(CUSTOMER_PHONE), false);
 

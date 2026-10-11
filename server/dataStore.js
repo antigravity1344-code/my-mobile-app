@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const fieldCrypto = require('./fieldCrypto');
+const { createPointsService } = require('./pointsService');
 
 const USER_FIELDS = new Set([
   'id',
@@ -892,8 +893,8 @@ function createDataStore(filename) {
       order.cleanerPhone = cleaner.phone || '';
       updateOrder(order);
       recordAcceptance(order.id, { actorRole: 'worker', actorId: cleaner.id });
-      addNotification(order.customerId, order.id, 'ORDER_ACCEPTED', 'سفارش پذیرفته شد', 'سفارش ' + order.id + ' توسط متخصص پذیرفته شد.');
-      addNotification(cleaner.id, order.id, 'ORDER_ACCEPTED', 'پذیرش سفارش', 'سفارش ' + order.id + ' را پذیرفتید.');
+      addNotification(order.customerId, order.id, 'ORDER_ACCEPTED', 'سفارش پذیرفته شد', 'متخصص سفارش شما را پذیرفت.');
+      addNotification(cleaner.id, order.id, 'ORDER_ACCEPTED', 'پذیرش سفارش', 'این سفارش را پذیرفتید.');
       return { code: 'ok', order: getOrder(orderId) };
     });
   }
@@ -910,8 +911,9 @@ function createDataStore(filename) {
       order.cleanerAvatar = cleaner.avatar || '';
       order.cleanerPhone = cleaner.phone || '';
       updateOrder(order);
-      addNotification(order.customerId, order.id, 'ORDER_COMPLETED', 'سفارش تکمیل شد', 'سفارش ' + order.id + ' تکمیل شد.');
-      addNotification(cleaner.id, order.id, 'ORDER_COMPLETED', 'تکمیل سفارش', 'سفارش ' + order.id + ' را تکمیل کردید.');
+      pointsApi.onOrderEvent({ name: 'completed', order: getOrder(orderId) });
+      addNotification(order.customerId, order.id, 'ORDER_COMPLETED', 'سفارش تکمیل شد', 'سفارش شما تکمیل شد.');
+      addNotification(cleaner.id, order.id, 'ORDER_COMPLETED', 'تکمیل سفارش', 'این سفارش را تکمیل کردید.');
       return { code: 'ok', order: getOrder(orderId) };
     });
   }
@@ -927,9 +929,9 @@ function createDataStore(filename) {
       order.cancelledBy = customerId;
       order.cancelReason = reason;
       updateOrder(order);
-      addNotification(order.customerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'سفارش ' + order.id + ' لغو شد.');
+      addNotification(order.customerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'سفارش شما لغو شد.');
       if (order.cleanerId) {
-        addNotification(order.cleanerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'مشتری سفارش ' + order.id + ' را لغو کرد.');
+        addNotification(order.cleanerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'مشتری این سفارش را لغو کرد.');
       }
       return { code: 'ok', order: getOrder(orderId) };
     });
@@ -945,6 +947,7 @@ function createDataStore(filename) {
       if (order.ratings && order.ratings.customerRating) return { code: 'duplicate' };
       order.ratings = { ...ratings, cleanerId: order.cleanerId };
       updateOrder(order);
+      pointsApi.onOrderEvent({ name: 'rated', order: getOrder(orderId), raterUserId: customerId });
       return { code: 'ok', order: getOrder(orderId) };
     });
   }
@@ -1225,6 +1228,8 @@ function createDataStore(filename) {
     database.close();
   }
 
+  const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
+
   return {
     transaction,
     getUser,
@@ -1268,6 +1273,18 @@ function createDataStore(filename) {
     markNotificationRead,
     walletFor,
     loyaltyFor,
+    publishRule: pointsApi.publishRule,
+    rulesFor: pointsApi.rulesFor,
+    listPointRules: pointsApi.listPointRules,
+    postEntry: pointsApi.postEntry,
+    postTransfer: pointsApi.postTransfer,
+    reverseEntry: pointsApi.reverseEntry,
+    recomputeTier: pointsApi.recomputeTier,
+    quoteCancelPenalty: pointsApi.quoteCancelPenalty,
+    onOrderEvent: pointsApi.onOrderEvent,
+    ensureAccount: pointsApi.ensureAccount,
+    getUserPoints: pointsApi.getUserPoints,
+    listLedger: pointsApi.listLedger,
     close,
   };
 }

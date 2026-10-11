@@ -1132,7 +1132,17 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       assert.equal(columns.filter((column) => column === name).length, 1, name);
     }
     const triggers = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all().map((row) => row.name).sort();
-    assert.deepEqual(triggers, ['order_events_no_delete', 'order_events_no_overwrite', 'order_events_no_update']);
+    assert.deepEqual(triggers, [
+      'order_events_no_delete',
+      'order_events_no_overwrite',
+      'order_events_no_update',
+      'point_rules_no_delete',
+      'point_rules_no_overwrite',
+      'point_rules_no_update',
+      'points_ledger_no_delete',
+      'points_ledger_no_overwrite',
+      'points_ledger_no_update',
+    ]);
     raw.close();
   });
 }

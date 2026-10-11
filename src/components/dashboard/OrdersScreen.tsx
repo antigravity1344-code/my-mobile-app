@@ -26,7 +26,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onStartBooking }) =>
         <div className="space-y-3">
           <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-2.5">
             <div className="flex justify-between items-center text-xs">
-              <span className="font-mono text-slate-500">{paymentReceipt.orderId}</span>
+              <span className="font-bold text-slate-700">رسید پرداخت</span>
               <span
                 className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                   paymentReceipt.status === 'PAID'

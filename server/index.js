@@ -764,7 +764,7 @@ app.post('/api/orders', (req, res) => {
       order.id,
       'ORDER_CREATED',
       'سفارش ثبت شد',
-      'سفارش ' + order.id + ' ثبت شد و در انتظار متخصص است.'
+      'سفارش ثبت شد و در انتظار متخصص است.'
     );
     return order;
   });
@@ -832,7 +832,8 @@ function workerVisibleRatings(ratings) {
 function workerAssignedOrderView(order) {
   const area = orderAreaFromAddress(order.address);
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
-  const { notes, ratings, ...rest } = order;
+  // سطح و ریز قیمت مشتری، شناسه مشتری و شناسه لغوکننده به متخصص فرستاده نمی‌شود (D-05، D-41، D-06).
+  const { notes, ratings, customerId, customerTier, pricing, cancelledBy, ...rest } = order;
   const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area };
@@ -1279,6 +1280,25 @@ app.get('/api/admin/orders', (req, res) => {
   res.json({ success: true, orders: store.listOrders() });
 });
 
+// قوانین امتیاز فقط از مسیر مدیر و فقط با نسخه جدید ثبت می‌شوند (D-04). ویرایش و حذف وجود ندارد.
+app.get('/api/admin/point-rules', (req, res) => {
+  res.json({ success: true, rules: store.listPointRules() });
+});
+
+app.post('/api/admin/point-rules', (req, res) => {
+  const body = req.body || {};
+  const published = store.publishRule({
+    ruleKey: body.ruleKey,
+    value: body.value,
+    active: body.active,
+    actor: 'admin',
+  });
+  if (published.code !== 'ok') {
+    return res.status(400).json({ success: false, message: 'قانون امتیاز معتبر نیست.' });
+  }
+  res.json({ success: true, rule: published.rule });
+});
+
 app.put('/api/admin/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
   const { status, cleanerId } = req.body || {};
@@ -1366,6 +1386,9 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
           : { actorRole: 'admin', actorId: null, previousWorkerId: previousCleanerId || null }
       );
     }
+    if (previousStatus !== 'COMPLETED' && saved.status === 'COMPLETED') {
+      store.onOrderEvent({ name: 'completed', order: saved });
+    }
 
     const isWorkerReassigned =
       Boolean(previousCleanerId) &&
@@ -1380,21 +1403,21 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
         saved.id,
         'ORDER_REASSIGNED',
         'تغییر متخصص سفارش',
-        'سفارش ' + saved.id + ' توسط پشتیبانی به متخصص دیگری واگذار شد.'
+        'این سفارش توسط پشتیبانی به متخصص دیگری واگذار شد.'
       );
       store.addNotification(
         saved.cleanerId,
         saved.id,
         'ORDER_ASSIGNED',
         'واگذاری سفارش جدید',
-        'سفارش ' + saved.id + ' توسط پشتیبانی به شما واگذار شد.'
+        'این سفارش توسط پشتیبانی به شما واگذار شد.'
       );
     }
 
     // متخصصی که با برگشت به PENDING کنار گذاشته شده، اعلان تغییر وضعیت را می‌گیرد (فقط اگر قبلاً متخصصی منتسب بوده باشد).
     const notifiedWorkerId = savesAsPending ? previousCleanerId : saved.cleanerId;
     if (saved.status !== previousStatus) {
-      const statusText = 'وضعیت سفارش ' + saved.id + ' به «' + orderStatusLabel(saved.status) + '» تغییر کرد.';
+      const statusText = 'وضعیت سفارش به «' + orderStatusLabel(saved.status) + '» تغییر کرد.';
       store.addNotification(
         saved.customerId,
         saved.id,

@@ -346,7 +346,7 @@ export const SpecialistPortalScreen: React.FC = () => {
           {myActiveOrders.map((order) => (
             <div key={'mine-' + order.id} className="bg-white border border-emerald-200 rounded-xl p-3 space-y-2 text-right">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-mono font-bold text-slate-500">{order.id}</span>
+                <span className="font-bold text-slate-700">کار فعال</span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">پذیرفته‌شده</span>
               </div>
               <p className="text-xs text-slate-700">{order.serviceTitle}</p>
@@ -399,7 +399,6 @@ export const SpecialistPortalScreen: React.FC = () => {
                 {/* هدر سفارش */}
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-400">{order.id}</span>
                     <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       {order.badge}
                     </span>
