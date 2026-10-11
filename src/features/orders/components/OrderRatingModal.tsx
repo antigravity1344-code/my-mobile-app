@@ -13,6 +13,7 @@ import type { OrderItem } from '../types/order';
 import { customerTierLabel } from '../../../utils/pricing';
 import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { initialRatingDraft } from './ratingDraft';
+import { colors, fontFamily, ui, TOUCH_MIN } from '../../../theme';
 
 interface OrderRatingModalProps {
   order: OrderItem | undefined;
@@ -85,7 +86,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color="#64748b" />
+              <X size={20} color={colors.muted} />
             </Pressable>
             <View style={styles.headerTitleWrap}>
               <Text style={styles.headerTitle}>ثبت نظر و امتیاز</Text>
@@ -98,7 +99,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
             {Boolean(order.cleaner) && (
               <View style={styles.cleanerCard}>
                 <View style={styles.cleanerAvatar}>
-                  <User size={22} color="#0284c7" />
+                  <User size={22} color={colors.teal} />
                 </View>
                 <View style={styles.cleanerInfo}>
                   <Text style={styles.cleanerName}>{order.cleaner?.name}</Text>
@@ -114,7 +115,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
             {/* Two-way Rating Badge (Cleaner Rating to Customer) */}
             {order.ratings?.cleanerRating ? (
               <View style={styles.reciprocalRatingBox}>
-                <Award size={18} color="#059669" />
+                <Award size={18} color={colors.teal} />
                 <View style={styles.reciprocalTextWrap}>
                   <Text style={styles.reciprocalTitle}>امتیاز متخصص به شما به عنوان مشتری:</Text>
                   <Text style={styles.reciprocalScore}>
@@ -172,7 +173,7 @@ export const OrderRatingModal: React.FC<OrderRatingModalProps> = ({
                       <Text style={[styles.tagText, isSelected && styles.tagTextSelected]}>
                         {tag}
                       </Text>
-                      {isSelected && <Check size={12} color="#0284c7" />}
+                      {isSelected && <Check size={12} color={colors.teal} />}
                     </Pressable>
                   );
                 })}
@@ -237,25 +238,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: ui.divider,
   },
   headerTitleWrap: {
     alignItems: 'flex-end',
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
   },
   headerSubtitle: {
-    fontSize: 11,
-    color: '#64748b',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
     marginTop: 2,
   },
   closeBtn: {
+    minHeight: TOUCH_MIN,
     padding: 6,
     borderRadius: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: ui.surfaceMuted,
   },
   body: {
     padding: 18,
@@ -264,10 +267,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: ui.surfaceMuted,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: ui.divider,
     marginBottom: 16,
     gap: 10,
   },
@@ -275,7 +278,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -285,12 +288,13 @@ const styles = StyleSheet.create({
   },
   cleanerName: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
   },
   cleanerRole: {
-    fontSize: 11,
-    color: '#64748b',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
     marginTop: 2,
   },
   ratingBadge: {
@@ -306,16 +310,16 @@ const styles = StyleSheet.create({
   },
   ratingBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#d97706',
+    fontFamily: fontFamily.bold,
+    color: colors.amberIcon,
   },
   reciprocalRatingBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: ui.tealBorder,
     borderRadius: 14,
     padding: 12,
     marginBottom: 16,
@@ -325,14 +329,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   reciprocalTitle: {
-    fontSize: 11,
-    color: '#065f46',
-    fontWeight: '600',
+    fontSize: 12,
+    color: colors.tealDark,
+    fontFamily: fontFamily.semibold,
   },
   reciprocalScore: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#047857',
+    fontFamily: fontFamily.bold,
+    color: colors.tealDark,
     marginTop: 2,
   },
   starsSection: {
@@ -342,8 +346,8 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     textAlign: 'right',
     alignSelf: 'stretch',
     marginBottom: 8,
@@ -353,12 +357,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   starTouch: {
+    minHeight: TOUCH_MIN,
     padding: 4,
   },
   ratingHint: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#d97706',
+    fontFamily: fontFamily.bold,
+    color: colors.amberIcon,
     marginTop: 4,
   },
   tagsSection: {
@@ -370,65 +375,70 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tag: {
+    minHeight: TOUCH_MIN,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: ui.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: ui.divider,
   },
   tagSelected: {
-    backgroundColor: '#e0f2fe',
-    borderColor: '#0284c7',
+    backgroundColor: colors.tealSoft,
+    borderColor: colors.teal,
   },
   tagText: {
-    fontSize: 11,
-    color: '#475569',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
   },
   tagTextSelected: {
-    color: '#0369a1',
-    fontWeight: '700',
+    color: colors.tealDark,
+    fontFamily: fontFamily.bold,
   },
   commentSection: {
     marginBottom: 16,
   },
   commentInput: {
-    backgroundColor: '#f8fafc',
+    fontFamily: fontFamily.regular,
+    backgroundColor: ui.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: ui.inputBorder,
     borderRadius: 14,
     padding: 12,
     fontSize: 12,
-    color: '#0f172a',
+    color: colors.text,
     textAlign: 'right',
     minHeight: 70,
     textAlignVertical: 'top',
   },
   errorText: {
-    color: '#dc2626',
-    fontSize: 11,
+    fontFamily: fontFamily.regular,
+    color: ui.dangerText,
+    fontSize: 12,
     textAlign: 'right',
     marginBottom: 8,
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: ui.divider,
   },
   submitBtn: {
-    backgroundColor: '#0284c7',
+    minHeight: TOUCH_MIN,
+    backgroundColor: colors.teal,
     paddingVertical: 13,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: fontFamily.bold,
   },
   btnDisabled: {
     opacity: 0.6,

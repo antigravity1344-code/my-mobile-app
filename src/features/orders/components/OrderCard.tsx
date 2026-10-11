@@ -15,6 +15,7 @@ import { OrderStatusBadge } from './OrderStatusBadge';
 import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { orderAmountLabel } from '../orderStatusLabels';
 import { displayServiceTitle } from '../serviceTitleDisplay';
+import { colors, fontFamily, ui, TOUCH_MIN } from '../../../theme';
 
 interface OrderCardProps {
   order: OrderItem;
@@ -51,7 +52,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.orderNumberWrap}>
           {isRecurring && (
             <View style={styles.recurringTag}>
-              <Repeat size={10} color="#0284c7" />
+              <Repeat size={10} color={colors.teal} />
               <Text style={styles.recurringText}>
                 {RECURRING_LABELS[order.recurringFrequency] || 'دوره‌ای'}
               </Text>
@@ -71,7 +72,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       {/* Meta Specs: Date, Time Slot, Location */}
       <View style={styles.specsContainer}>
         <View style={styles.specItem}>
-          <Calendar size={13} color="#64748b" />
+          <Calendar size={13} color={colors.muted} />
           <Text style={styles.specText}>
             {[
               order.date?.dayOfWeek,
@@ -84,7 +85,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </View>
 
         <View style={styles.specItem}>
-          <Clock size={13} color="#64748b" />
+          <Clock size={13} color={colors.muted} />
           <Text style={styles.specText}>
             {order.timeSlot?.label ||
               [order.timeSlot?.startTime, order.timeSlot?.endTime].filter(Boolean).join(' تا ') ||
@@ -94,7 +95,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         </View>
 
         <View style={styles.specItem}>
-          <MapPin size={13} color="#64748b" />
+          <MapPin size={13} color={colors.muted} />
           <Text style={styles.specText} numberOfLines={1}>
             {order.address?.district || order.address?.fullAddress || '—'}
           </Text>
@@ -106,7 +107,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.cleanerStrip}>
           <View style={styles.cleanerDetails}>
             <View style={styles.cleanerAvatar}>
-              <User size={13} color="#0284c7" />
+              <User size={13} color={colors.teal} />
             </View>
             <Text style={styles.cleanerName}>
               {order.cleaner?.name || 'اطلاعات متخصص ثبت نشده'}
@@ -172,7 +173,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             style={[styles.actionBtn, styles.detailsBtn]}
           >
             <Text style={styles.detailsBtnText}>جزئیات و پیگیری</Text>
-            <ChevronLeft size={14} color="#0284c7" />
+            <ChevronLeft size={14} color={colors.teal} />
           </Pressable>
         </View>
       </View>
@@ -187,8 +188,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    borderColor: ui.divider,
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -214,15 +215,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
   },
   recurringText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#0369a1',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.tealDark,
   },
   serviceRow: {
     alignItems: 'center',
@@ -230,13 +231,14 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     textAlign: 'center',
   },
   serviceSubtitle: {
-    fontSize: 11,
-    color: '#64748b',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
     textAlign: 'center',
     marginTop: 2,
   },
@@ -245,7 +247,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: ui.surfaceMuted,
     borderRadius: 12,
     padding: 10,
     marginBottom: 12,
@@ -256,9 +258,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   specText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
+    fontSize: 12,
+    fontFamily: fontFamily.semibold,
+    color: colors.muted,
     textAlign: 'center',
   },
   cleanerStrip: {
@@ -266,9 +268,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     alignItems: 'center',
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
+    borderColor: ui.tealBorder,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -283,34 +285,34 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#bae6fd',
+    backgroundColor: ui.tealBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cleanerName: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0369a1',
+    fontFamily: fontFamily.bold,
+    color: colors.tealDark,
     textAlign: 'center',
   },
   ratingBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.amberBg,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 6,
   },
   ratingText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#b45309',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.amberText,
   },
   cleanerRole: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '600',
+    fontSize: 12,
+    color: colors.muted,
+    fontFamily: fontFamily.semibold,
     textAlign: 'center',
   },
   footerRow: {
@@ -318,21 +320,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: ui.divider,
     paddingTop: 12,
   },
   priceWrap: {
     alignItems: 'center',
   },
   priceLabel: {
-    fontSize: 10,
-    color: '#64748b',
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.muted,
     textAlign: 'center',
   },
   priceValue: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#059669',
+    fontFamily: fontFamily.bold,
+    color: colors.teal,
     textAlign: 'center',
   },
   actionsWrap: {
@@ -341,6 +344,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionBtn: {
+    minHeight: TOUCH_MIN,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
@@ -349,29 +353,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   detailsBtn: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
   },
   detailsBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0284c7',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.teal,
   },
   rateBtn: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.amberBg,
     borderWidth: 1,
     borderColor: '#fde68a',
   },
   rateBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#92400e',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: colors.amberText,
   },
   cancelBtn: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: ui.dangerBg,
   },
   cancelBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#b91c1c',
+    fontSize: 12,
+    fontFamily: fontFamily.bold,
+    color: ui.dangerText,
   },
 });
