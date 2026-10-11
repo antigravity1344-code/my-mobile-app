@@ -18,7 +18,10 @@ process.env.PAKSHO_WORKER_DOC_DIR = path.join(tmp, 'docs');
 process.env.PAKSHO_ADMIN_PASSWORD = 'paksho-test-admin';
 process.env.NODE_ENV = 'test';
 
+const { installTestSmsCapture } = require('./testAuthHarness');
+const smsCapture = installTestSmsCapture();
 const { app, store } = require('./index.js');
+require('node:test').after(() => smsCapture.restore());
 
 const PHONE = '09120000099';
 const NATIONAL_ID = '0012345678';
@@ -83,7 +86,7 @@ before(async () => {
   server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   await request(server, { method: 'POST', pathname: '/api/auth/send-otp', body: { phone: PHONE } });
-  const code = store.getOtp(PHONE).code;
+  const code = smsCapture.codeFor(PHONE);
   const verified = await request(server, {
     method: 'POST',
     pathname: '/api/auth/verify-otp',

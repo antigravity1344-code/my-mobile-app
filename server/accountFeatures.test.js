@@ -12,7 +12,10 @@ process.env.PAKSHO_WORKER_DOC_DIR = path.join(tmp, 'docs');
 process.env.PAKSHO_ADMIN_PASSWORD = 'paksho-test-admin';
 process.env.NODE_ENV = 'test';
 
+const { installTestSmsCapture } = require('./testAuthHarness');
+const smsCapture = installTestSmsCapture();
 const { app, store } = require('./index.js');
+require('node:test').after(() => smsCapture.restore());
 after(() => {
   store.close();
   fs.rmSync(tmp, { recursive: true, force: true });
@@ -57,7 +60,7 @@ async function login(server, phone, role) {
   const verified = await request(server, {
     method: 'POST',
     pathname: '/api/auth/verify-otp',
-    body: { phone, code: store.getOtp(phone).code, role },
+    body: { phone, code: smsCapture.codeFor(phone), role },
   });
   assert.equal(verified.status, 200);
   return verified.json;

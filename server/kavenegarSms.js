@@ -19,7 +19,7 @@ function normalizeIranMobile(phone) {
 }
 
 function useFakeSms(env = process.env) {
-  return env.NODE_ENV === 'test' || env.PAKSHO_SMS_MODE === 'fake';
+  return env.NODE_ENV !== 'production' && (env.NODE_ENV === 'test' || env.PAKSHO_SMS_MODE === 'fake');
 }
 
 function sendOtp(phone, code, options = {}) {

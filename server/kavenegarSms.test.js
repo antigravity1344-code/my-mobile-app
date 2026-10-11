@@ -76,3 +76,8 @@ test('test mode is the fake sender and does not imply production', () => {
   assert.equal(useFakeSms({ NODE_ENV: 'production' }), false);
   assert.equal(useFakeSms({ NODE_ENV: 'development', PAKSHO_SMS_MODE: 'fake' }), true);
 });
+
+
+test('production cannot enable the fake sender through configuration', () => {
+  assert.equal(useFakeSms({ NODE_ENV: 'production', PAKSHO_SMS_MODE: 'fake' }), false);
+});

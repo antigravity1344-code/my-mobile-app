@@ -381,10 +381,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // 2. بررسی OTP
 app.post('/api/auth/verify-otp', (req, res) => {
   const phone = kavenegarSms.normalizeIranMobile(req.body?.phone);
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const code = typeof req.body?.code === 'string'
+    ? req.body.code.trim()
+      .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+      .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    : '';
   const role = req.body?.role;
 
-  if (!phone || !code) {
+  // Only a human-entered four-digit OTP is a valid credential; stored HMACs are never input codes.
+  if (!phone || !/^\d{4}$/.test(code)) {
     return res.status(400).json({ success: false, message: 'شماره تلفن و کد تایید الزامی است.' });
   }
 
