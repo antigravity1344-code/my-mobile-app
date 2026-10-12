@@ -8,14 +8,14 @@ import { ProfileProvider } from './src/features/profile';
 import { CleanersProvider } from './src/features/cleaners';
 import { NativeWorkerApp } from './src/components/native/NativeWorkerApp';
 
-function ProductionApp() {
+function ProductionApp({ onPreviewExit }: { onPreviewExit?: () => void } = {}) {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <WorkerBookingProvider>
       {/* Provider سفارش‌های مشتری عمداً اینجا نیست: هیچ صفحه متخصص از آن استفاده نمی‌کند و توکن/کاربر مشتری را می‌خواند. */}
       <ProfileProvider>
         <CleanersProvider>
-          <NativeWorkerApp />
+          <NativeWorkerApp onPreviewExit={onPreviewExit} />
         </CleanersProvider>
       </ProfileProvider>
     </WorkerBookingProvider>
@@ -27,7 +27,7 @@ function ProductionApp() {
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
   if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { endPreview(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
+  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { endPreview(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} onPreviewExit={() => { endPreview(); DevSettings.reload(); }} />} />;
   if (mode === 'real') return <ProductionApp />;
   return (
     <View style={previewStyle.container}>
