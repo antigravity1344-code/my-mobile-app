@@ -1,4 +1,5 @@
 ﻿import Constants from 'expo-constants';
+import { previewActive, previewApi } from '../components/native/previewRuntime';
 import { getApiAuthToken } from './authToken';
 import { accountBlockedMessage, emitAccountBlocked, isAccountBlockedResponse } from './accountBlocked';
 import { emitSessionExpired, isSessionExpiredResponse } from './sessionExpired';
@@ -26,6 +27,7 @@ export const CONNECTION_ERROR_MESSAGE = 'ارتباط برقرار نشد. لط�
 export const GENERIC_ERROR_MESSAGE = 'مشکلی پیش آمد. لطفاً دوباره تلاش کنید.';
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  if (previewActive()) return previewApi(endpoint, options);
   try {
     const token = getApiAuthToken();
     const { headers: optionHeaders, ...rest } = options;

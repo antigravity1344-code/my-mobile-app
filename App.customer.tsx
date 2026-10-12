@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { IsolatedUiPreview, isUiPreviewEnabled } from './src/components/native/IsolatedUiPreview';
+import { beginPreview, endPreview, previewAvailable } from './src/components/native/previewRuntime';
+import { RealUiPreview } from './src/components/native/RealUiPreview';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { BookingProvider } from './src/context/BookingContext';
 import { OrdersProvider } from './src/features/orders';
@@ -24,17 +25,17 @@ function ProductionApp() {
 /** A preview never mounts production providers or contacts production APIs. */
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
-  if (!isUiPreviewEnabled()) return <ProductionApp />;
-  if (mode === 'preview') return <IsolatedUiPreview role="customer" onExit={() => setMode('select')} />;
+  if (!previewAvailable()) return <ProductionApp />;
+  if (mode === 'preview') return <RealUiPreview role="customer" onExit={() => setMode('select')} renderApp={(revision) => <ProductionApp key={revision} />} />;
   if (mode === 'real') return <ProductionApp />;
   return (
     <View style={previewStyle.container}>
       <Text style={previewStyle.title}>پاکشو — مشتری</Text>
       <Text style={previewStyle.note}>نسخه توسعه | حالت پیش‌نمایش کاملاً آزمایشی</Text>
-      <Pressable style={previewStyle.button} onPress={() => setMode('preview')}>
+      <Pressable style={previewStyle.button} onPress={() => { beginPreview('customer'); setMode('preview'); }}>
         <Text style={previewStyle.buttonText}>ورود به پیش‌نمایش بدون پیامک</Text>
       </Pressable>
-      <Pressable style={previewStyle.button} onPress={() => setMode('real')}>
+      <Pressable style={previewStyle.button} onPress={() => { endPreview(); setMode('real'); }}>
         <Text style={previewStyle.buttonText}>ورود واقعی با پیامک</Text>
       </Pressable>
     </View>

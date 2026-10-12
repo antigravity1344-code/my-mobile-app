@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { previewActive } from './previewRuntime';
 import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { CustomerAuthScreen } from './CustomerAuthScreen';
@@ -43,6 +44,14 @@ export const NativeCustomerApp: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const restoreState = async () => {
+      if (previewActive()) {
+        const demo: UserData = { id: 'PREVIEW-CUSTOMER', name: 'مشتری نمونه', phone: '09000000000', avatar: '', role: 'CUSTOMER', isProfileComplete: true };
+        setUserData(demo);
+        setIsLoggedIn(true);
+        syncAuthenticatedUser({ id: demo.id, name: demo.name, phone: demo.phone, avatar: demo.avatar });
+        setIsLoading(false);
+        return;
+      }
       const user = await loadCustomerSession(appStorage);
 
       if (!isMounted) return;

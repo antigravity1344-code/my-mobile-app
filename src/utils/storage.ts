@@ -1,9 +1,11 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import { previewActive, previewRead, previewWrite, previewRemove } from '../components/native/previewRuntime';
 
 class StorageService {
   private memoryFallback: Map<string, string> = new Map();
 
   private async readRaw(key: string): Promise<string | null> {
+    if (previewActive()) return previewRead(key);
     const cached = this.memoryFallback.get(key);
     if (cached !== undefined) return cached;
 
@@ -23,6 +25,7 @@ class StorageService {
   }
 
   async setItem<T>(key: string, value: T): Promise<void> {
+    if (previewActive()) { previewWrite(key, JSON.stringify(value)); return; }
     try {
       const serialized = JSON.stringify(value);
       this.memoryFallback.set(key, serialized);
@@ -33,6 +36,7 @@ class StorageService {
   }
 
   async removeItem(key: string): Promise<void> {
+    if (previewActive()) { previewRemove(key); return; }
     try {
       this.memoryFallback.delete(key);
       await AsyncStorage.removeItem(key);

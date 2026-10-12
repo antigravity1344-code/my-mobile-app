@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { previewActive } from './previewRuntime';
 import {
   View,
   Text,
@@ -64,6 +65,13 @@ export const NativeWorkerApp: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const restoreState = async () => {
+      if (previewActive()) {
+        const demo: UserData = { id: 'PREVIEW-WORKER', name: 'متخصص نمونه', phone: '09000000000', avatar: '', role: 'WORKER', status: 'ACTIVE' };
+        setUserData(demo);
+        setIsLoggedIn(true);
+        setIsLoading(false);
+        return;
+      }
       const user = await loadWorkerSession(appStorage);
 
       if (!isMounted) return;
