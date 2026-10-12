@@ -473,3 +473,36 @@ test('legacy active assignment can report start without inventing an acceptance 
   assert.deepEqual(f.store.listOrderEvents(f.orderId).map(e => e.kind), ['START_REPORTED_BY_WORKER']);
   assert.equal(f.store.reportStart(f.orderId, WORKER, startKey(f)).code, 'duplicate');
 });
+
+
+for (const status of ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']) {
+  test('admin can resolve actual start dispute on legacy ' + status + ' without inventing acceptance time', t => {
+    const f = fixture(t, { status, cleanerId: WORKER.id, cleanerName: WORKER.name }, false);
+    const report = f.store.reportStart(f.orderId, WORKER, startKey(f));
+    assert.equal(report.code, 'ok');
+    const event = startEvent(f.store, f.orderId, 'START_REPORTED_BY_WORKER');
+    assert.equal(f.store.respondStart(f.orderId, CUSTOMER, 'no', event.id).code, 'ok');
+    const history = f.store.listOrderEvents(f.orderId);
+    const before = f.store.getOrder(f.orderId);
+    const command = adminCommand(f);
+    assert.equal(f.store.adminStartDecision(f.orderId, true, command).code, 'ok');
+    const after = f.store.getOrder(f.orderId);
+    assert.equal(after.acceptedAt, null);
+    assert.equal(after.status, status);
+    assert.equal(after.price, before.price);
+    assert.deepEqual(after.pricing, before.pricing);
+    assert.deepEqual(f.store.listOrderEvents(f.orderId).slice(0, history.length), history);
+    assert.equal(f.store.listOrderEvents(f.orderId).filter(e => e.kind === 'ORDER_ACCEPTED').length, 0);
+    assert.equal(f.store.listLedger().length, 0);
+    f.reopen();
+    assert.equal(f.store.adminStartDecision(f.orderId, true, command).code, 'duplicate');
+    assert.equal(f.store.startCountsAsStarted(f.store.getOrder(f.orderId)), true);
+  });
+}
+
+test('legacy assignment without a current worker report cannot gain an invented start decision', t => {
+  const f = fixture(t, { status: 'ACCEPTED', cleanerId: WORKER.id, cleanerName: WORKER.name }, false);
+  assert.equal(f.store.adminStartDecision(f.orderId, true, adminCommand(f)).code, 'bad-status');
+  assert.equal(f.store.listOrderEvents(f.orderId).length, 0);
+  assert.equal(f.store.getOrder(f.orderId).acceptedAt, null);
+});

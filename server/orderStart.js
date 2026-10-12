@@ -172,10 +172,16 @@ function createOrderStart({ database, transaction, getOrder, appendOrderEvent, a
     return transaction(() => {
       const order = getOrder(orderId);
       if (!order) return { code: 'missing' };
-      if (!order.acceptedAt || !START_ACTIVE_STATUSES.concat(['CANCELLED', 'COMPLETED']).includes(order.status)) {
+      const k = keys(orderId);
+      // Legacy active assignments have no invented acceptedAt. An actual report by
+      // their current worker is sufficient evidence to let admin resolve this cycle.
+      const report = eventByKey.get(k.report);
+      const hasLegacyReport = order.cleanerId && report && report.kind === 'START_REPORTED_BY_WORKER' &&
+        report.actorRole === 'worker' && report.actorId === order.cleanerId && report.workerId === order.cleanerId;
+      if ((!order.acceptedAt && !hasLegacyReport) ||
+        !START_ACTIVE_STATUSES.concat(['CANCELLED', 'COMPLETED']).includes(order.status)) {
         return { code: 'bad-status' };
       }
-      const k = keys(orderId);
       const context = startDecisionContext(order);
       if (options.acceptanceKey !== context.acceptanceKey) return { code: 'stale-decision', order, context };
       const commandKey = k.adminPrefix + options.requestId;
