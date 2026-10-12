@@ -5,13 +5,25 @@ vi.mock('expo-constants', () => ({ default: { expoConfig: { hostUri: '' } } }));
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: spy.read, setItem: spy.write, removeItem: spy.remove },
 }));
-import { beginPreview, endPreview } from './previewRuntime';
-import { apiFetch } from '../../api/apiClient';
-import { appStorage } from '../../utils/storage';
-import { attachStoredAuthToken, getApiAuthToken, setApiAuthToken } from '../../api/authToken';
+import type * as Preview from './previewRuntime';
+import type * as Api from '../../api/apiClient';
+import type * as Storage from '../../utils/storage';
+import type * as Auth from '../../api/authToken';
+let beginPreview: typeof Preview.beginPreview;
+let endPreview: typeof Preview.endPreview;
+let apiFetch: typeof Api.apiFetch;
+let appStorage: typeof Storage.appStorage;
+let attachStoredAuthToken: typeof Auth.attachStoredAuthToken;
+let getApiAuthToken: typeof Auth.getApiAuthToken;
+let setApiAuthToken: typeof Auth.setApiAuthToken;
 
 const savedEnv = process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  ({beginPreview,endPreview} = await import('./previewRuntime'));
+  ({apiFetch} = await import('../../api/apiClient'));
+  ({appStorage} = await import('../../utils/storage'));
+  ({attachStoredAuthToken,getApiAuthToken,setApiAuthToken} = await import('../../api/authToken'));
   vi.stubGlobal('__DEV__', true);
   vi.stubGlobal('fetch', spy.network);
   process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = '1';
@@ -47,13 +59,17 @@ describe('preview transport and storage isolation', () => {
     await attachStoredAuthToken(appStorage, 'PREVIEW_TOKEN');
     expect(getApiAuthToken()).toBe('');
     endPreview();
-    expect(getApiAuthToken()).toBe('real-token-unchanged');
+    // Old preview context cannot disclose the pre-existing real token before reload.
+    expect(getApiAuthToken()).toBe('');
+    expect(spy.read).not.toHaveBeenCalled();
   });
   it('isolates preview cache from real persistent storage', async () => {
     beginPreview('worker');
     await appStorage.setItem('user', { id: 'preview' });
     endPreview();
     spy.read.mockResolvedValue(null);
+    // A quarantined preview reads no persistent storage until a new JS runtime starts.
     expect(await appStorage.getItem('user', 'real-default')).toBe('real-default');
+    expect(spy.read).not.toHaveBeenCalled();
   });
 });
