@@ -52,6 +52,8 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
   if (!previewActive()) throw new Error('Preview transport used outside preview');
   const method = (options.method || 'GET').toUpperCase();
   const path = endpoint.split('?')[0];
+  // Reject ALL mutations before any mock route, including wallet, addresses, alerts and logout.
+  if (method !== 'GET') return { success: false, message: 'این عملیات در پیش‌نمایش غیرفعال است؛ داده‌ای ارسال نشد.' };
   if (scenario === 'ERROR' && (path === '/orders' || path === '/orders/available')) {
     return { success: false, message: 'خطای آزمایشی دریافت سفارش‌ها' };
   }
@@ -61,7 +63,6 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     return { success: true, orders: scenario === 'EMPTY' ? [] : [order()] };
   if (path === '/notifications' && method === 'GET')
     return { success: true, notifications: [{ id: 'PREVIEW-N-1', orderId: 'PREVIEW-ORDER-1', title: 'اعلان نمایشی', body: 'این اعلان واقعی نیست.', createdAt: '2026-10-12T08:00:00.000Z', readAt: null }] };
-  if (path.startsWith('/notifications/') && method === 'POST') return { success: true };
   if (path === '/wallet') return { success: true, balance: 0, transactions: [] };
   if (path === '/loyalty') return { success: true, loyalty: { tier: 'NEW', title: 'عضو جدید', discountPercentage: 0, completedOrdersCount: 0, nextTierOrderTarget: 0 } };
   if (path === '/users/addresses') return { success: true, addresses: [] };
@@ -70,8 +71,5 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     phone: '09000000000', name: role === 'worker' ? 'متخصص نمونه' : 'مشتری نمونه',
     role: role === 'worker' ? 'WORKER' : 'CUSTOMER', status: 'ACTIVE'
   }};
-  if (path === '/auth/logout') return { success: true };
-  // Mutations return non-success: never claim a real operation was completed.
-  if (method !== 'GET') return { success: false, message: 'این عملیات در پیش‌نمایش غیرفعال است؛ داده‌ای ارسال نشد.' };
   return { success: false, message: 'اطلاعات این بخش هنوز در پیش‌نمایش نمونه‌سازی نشده است.' };
 }
