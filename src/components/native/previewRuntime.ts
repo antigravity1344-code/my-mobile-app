@@ -1,3 +1,4 @@
+import { previewAuditMock, startPreviewNetworkAudit, stopPreviewNetworkAudit } from './previewNetworkAudit';
 /** DEV-ONLY. No production auth or network data is used in preview. */
 type Role = 'customer' | 'worker';
 export type Scenario = 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'CANCEL_REQUESTED' | 'COMPLETED' | 'CANCELLED' | 'EMPTY' | 'ERROR';
@@ -11,11 +12,13 @@ export const previewAvailable = (): boolean =>
 export function beginPreview(nextRole: Role): void {
   if (!previewAvailable()) return;
   role = nextRole;
+  startPreviewNetworkAudit();
   scenario = 'PENDING';
   store.clear();
 }
 export function endPreview(): void {
   role = null;
+  stopPreviewNetworkAudit();
   scenario = 'PENDING';
   store.clear();
 }
@@ -51,6 +54,7 @@ const order = () => ({
 export async function previewApi(endpoint: string, options: RequestInit = {}): Promise<any> {
   if (!previewActive()) throw new Error('Preview transport used outside preview');
   const method = (options.method || 'GET').toUpperCase();
+  previewAuditMock(method);
   const path = endpoint.split('?')[0];
   // Reject ALL mutations before any mock route, including wallet, addresses, alerts and logout.
   if (method !== 'GET') return { success: false, message: 'این عملیات در پیش‌نمایش غیرفعال است؛ داده‌ای ارسال نشد.' };
