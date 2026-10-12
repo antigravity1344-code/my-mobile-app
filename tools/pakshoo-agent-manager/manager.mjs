@@ -243,9 +243,10 @@ export class Manager {
       } else {
         if (task.status !== 'RUNNING' || !['REVIEW', 'BLOCKED', 'FAILED'].includes(c.status)) fail('INVALID_TRANSITION');
         if (!c.report || typeof c.report !== 'object' || Array.isArray(c.report) || typeof c.report.summary !== 'string' || !c.report.summary.trim()) fail('REPORT_REQUIRED');
-        if (stable(c.report).length > 32768) fail('REPORT_TOO_LARGE');
+        const serializedReport = stable(c.report);
+        if (Buffer.byteLength(serializedReport, 'utf8') > 32768) fail('REPORT_TOO_LARGE');
         this.db.prepare('UPDATE tasks SET status=?,revision=revision+1,agent=NULL,run=NULL,lease_until=NULL,result=? WHERE id=?')
-          .run(c.status, stable(c.report), task.id);
+          .run(c.status, serializedReport, task.id);
         if (c.status !== 'REVIEW') this.#release(task.id);
         this.#event(task.id, c.status, now, { epoch: c.epoch, agentId: c.agentId, runId: c.runId, report: c.report });
       }

@@ -66,7 +66,9 @@ Get-Content -Raw examples/register.json | node cli.mjs "$env:TEMP\pakshoo-demo.s
 
 `spec` شامل taskId، repository، sourceCommentId، baseSha، role، dependencies، resources و actions است. فیلد ناشناخته رد می‌شود. شناسه و SHA فقط **ساختار** را اعتبارسنجی می‌کنند؛ وجود یا اصالت دستور در GitHub را تأیید نمی‌کنند. ثبت تعریف و تأیید مالک، مسئولیت درگاه قابل اعتماد آینده است. actions فقط READ_REPO/WRITE_ISOLATED_BRANCH/REPORT است. ابزار هیچ فرمان shell یا عملیات GitHub از آن‌ها اجرا نمی‌کند.
 
-برای `finish` حداقل `report.summary` غیرخالی لازم است. شواهد، نتایج آزمون، محدودیت‌ها و لینک‌ها را در همین شیء می‌توان ثبت کرد (حداکثر ۳۲ کیلوبایت JSON). اطلاعات محرمانه یا مقدار credential را در تعریف، گزارش یا DB نگذارید. actor/agent/run/epoch شناسه هستند، اعتبارنامه نیستند.
+برای `finish` حداقل `report.summary` غیرخالی لازم است. شواهد، نتایج آزمون، محدودیت‌ها و لینک‌ها را در همین شیء می‌توان ثبت کرد. سقف ثابت گزارش دقیقاً **32768 بایت UTF-8 از کل JSON canonical سریال‌شده** است؛ کلیدها، نشانه‌گذاری و escapeها نیز شمرده می‌شوند. اندازهٔ 32768 پذیرفته و 32769 با `REPORT_TOO_LARGE` رد می‌شود. اطلاعات محرمانه یا مقدار credential را در تعریف، گزارش یا DB نگذارید. actor/agent/run/epoch شناسه هستند، اعتبارنامه نیستند.
+
+پیشنهادهای امنیتی اجرا‌نشده برای F-02/F-03 در [SECURITY_PROPOSAL.fa.md](SECURITY_PROPOSAL.fa.md) آمده‌اند؛ این اصلاح، احراز هویت یا محدودیت ورودی CLI ایجاد نمی‌کند.
 
 ## وضعیت، قفل و بازیابی
 
