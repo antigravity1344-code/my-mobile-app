@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, DevSettings } from 'react-native';
-import { beginPreview, endPreview, previewAvailable } from './src/components/native/previewRuntime';
+import { beginPreview, endPreview, beginPreviewShutdown, previewAvailable } from './src/components/native/previewRuntime';
 import { RealUiPreview } from './src/components/native/RealUiPreview';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { WorkerBookingProvider } from './src/context/WorkerBookingContext';
@@ -27,7 +27,7 @@ function ProductionApp({ onPreviewExit }: { onPreviewExit?: () => void } = {}) {
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
   if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { endPreview(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} onPreviewExit={() => { endPreview(); DevSettings.reload(); }} />} />;
+  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { beginPreviewShutdown(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} onPreviewExit={() => { beginPreviewShutdown(); DevSettings.reload(); }} />} />;
   if (mode === 'real') return <ProductionApp />;
   return (
     <View style={previewStyle.container}>
