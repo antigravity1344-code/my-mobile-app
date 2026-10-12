@@ -1,14 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { beginPreview, endPreview, previewApi } from './previewRuntime';
+import type * as Preview from './previewRuntime';
+let beginPreview: typeof Preview.beginPreview;
+let endPreview: typeof Preview.endPreview;
+let previewApi: typeof Preview.previewApi;
+const saved = process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  ({beginPreview,endPreview,previewApi} = await import('./previewRuntime'));
   vi.stubGlobal('__DEV__', true);
   process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = '1';
   beginPreview('customer');
 });
 afterEach(() => {
   endPreview();
-  delete process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
+  if (saved === undefined) delete process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
+  else process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = saved;
   vi.unstubAllGlobals();
 });
 
