@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { IsolatedUiPreview, isUiPreviewEnabled } from './src/components/native/IsolatedUiPreview';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
