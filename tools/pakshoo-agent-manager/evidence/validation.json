@@ -1,0 +1,42 @@
+{
+  "recorded_at_utc": "2026-10-12T12:37:59.429524+00:00",
+  "task_id": "PAKSHO-AGENT-MANAGER-ARCH-001",
+  "agent_id": "CODEX-MANAGER",
+  "base_sha": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+  "runtime": "Node.js v24.19.0",
+  "test_command": "node --test test/*.test.mjs",
+  "test_exit_code": 0,
+  "tests": 27,
+  "pass": 27,
+  "fail": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "runner_duration_ms": 2923.816307,
+  "demo_command": "node demo.mjs",
+  "demo_exit_code": 0,
+  "demo_status": "COMPLETED",
+  "demo_events": 6,
+  "demo_simulated_reports": 6,
+  "demo_pending_reports": 0,
+  "live_agents_launched": 0,
+  "notes": [
+    "Summary transcribed from observed tool output; not a raw TAP capture.",
+    "No product app/server/Android tests were run.",
+    "Only temporary newly-created test fixtures were cleaned up."
+  ],
+  "file_sha256": {
+    ".gitignore": "b3d9f33c57eacd1a25e7960c96487df06628958b2f290fa7a2a7940dfc94b20e",
+    "ARCHITECTURE.fa.md": "08812d206ab7542183f12b961f790aa591ae202a8e7bc151545db5183b9d42f3",
+    "README.md": "8405792188302209a2228a4adb11a9b592c371185e6b66702303d5e5b22aaf53",
+    "cli.mjs": "b933d7a72b335f70ac3f509756e0433163f1149b1fa8da52d40c7cb5ab467945",
+    "demo.mjs": "88dc7126da2b40b0317e47060dd178cb2bf099b0b4d5ce97bf51f6b602c32624",
+    "examples/register.json": "1cf8cdbd9db7deddb9b1868cafa27450524643339c8538375e5ba5a8ed9dd736",
+    "examples/supervisors.json": "1b12a8f5a99a7f6d025064c7cae7831de90efc15b11b45fd5ff883114160230e",
+    "manager.mjs": "5dc0e52b9944efc27d9c6e00517f7af55f1c73e9e4b7a9833e3f8b699e6d10f4",
+    "package.json": "d25d0eaa6f96854f55ac85eb7eecca64b8ac20625251496158c974354e4dd025",
+    "simulator.mjs": "c33ebfa174cce7a1fb705f920d0617715d1ed94657b70b91b5b6c75ef795a719",
+    "test/manager.test.mjs": "4e66c82097e041c1f9ac28f174a5c6b35e719b307f8e53ada0b44f9ce93676af",
+    "test/process-worker.mjs": "f2722322d6a6451cb0ec53e40e3e455f514516525f2f6bee27ce48d8773d5da7"
+  }
+}

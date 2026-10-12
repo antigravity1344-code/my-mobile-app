@@ -1,0 +1,16 @@
+{
+  "commandId": "demo-register-001",
+  "type": "register",
+  "actor": "DEMO-SUPERVISOR",
+  "ownerApproved": true,
+  "spec": {
+    "taskId": "DEMO-CLI-001",
+    "repository": "antigravity1344-code/my-mobile-app",
+    "sourceCommentId": 6123734979,
+    "baseSha": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+    "role": "MAIN_CODEX",
+    "dependencies": [],
+    "resources": ["demo:cli-branch"],
+    "actions": ["READ_REPO", "WRITE_ISOLATED_BRANCH", "REPORT"]
+  }
+}
