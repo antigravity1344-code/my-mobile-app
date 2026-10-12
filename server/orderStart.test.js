@@ -475,13 +475,17 @@ test('legacy active assignment can report start without inventing an acceptance 
 });
 
 
-for (const status of ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']) {
+for (const status of ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS', 'CANCELLED', 'COMPLETED']) {
   test('admin can resolve actual start dispute on legacy ' + status + ' without inventing acceptance time', t => {
-    const f = fixture(t, { status, cleanerId: WORKER.id, cleanerName: WORKER.name }, false);
+    const initialStatus = ['CANCELLED', 'COMPLETED'].includes(status) ? 'ACCEPTED' : status;
+    const f = fixture(t, { status: initialStatus, cleanerId: WORKER.id, cleanerName: WORKER.name }, false);
     const report = f.store.reportStart(f.orderId, WORKER, startKey(f));
     assert.equal(report.code, 'ok');
     const event = startEvent(f.store, f.orderId, 'START_REPORTED_BY_WORKER');
     assert.equal(f.store.respondStart(f.orderId, CUSTOMER, 'no', event.id).code, 'ok');
+    // Simulate a historical order closed after the genuine report; adjudication
+    // preserves its closed primary status and never recomputes money or points.
+    if (initialStatus !== status) setStatus(f, status);
     const history = f.store.listOrderEvents(f.orderId);
     const before = f.store.getOrder(f.orderId);
     const command = adminCommand(f);
