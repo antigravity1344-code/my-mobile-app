@@ -296,7 +296,9 @@ test('CLI reads JSON, replays a registration and exposes pending reports with no
   assert.equal((await invoke(registration)).code, 0);
   assert.equal(JSON.parse((await invoke(registration)).stdout).replayed, true);
   const pending = await invoke({ type: 'pending-reports' });
-  assert.equal(JSON.parse(pending.stdout).length, 1);
+  // SECURITY-004: CLI collections now use a bounded page envelope.
+  assert.equal(JSON.parse(pending.stdout).items.length, 1);
+  assert.equal(JSON.parse(pending.stdout).nextCursor, null);
   const forbidden = await invoke({ commandId: 'cli-forbidden', type: 'merge', taskId: 'TASK-1' });
   assert.equal(forbidden.code, 1);
   assert.match(forbidden.stderr, /UNKNOWN_COMMAND/);

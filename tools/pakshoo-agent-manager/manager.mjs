@@ -1,5 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
+import { canonicalBounded, validateCommand } from './input.mjs';
+import { page } from './pagination.mjs';
 
 const ALLOWED = new Set(['READ_REPO', 'WRITE_ISOLATED_BRANCH', 'REPORT']);
 const ACTIVE = new Set(['CLAIMED', 'RUNNING']);
@@ -24,7 +26,7 @@ const list = (v) => {
   if (new Set(result).size !== result.length) fail('DUPLICATE_LIST_ITEM');
   return result;
 };
-function spec(input) {
+export function normalizeSpec(input) {
   if (!input || typeof input !== 'object') fail('INVALID_SPEC');
   const fields = new Set(['taskId','repository','sourceCommentId','baseSha','role','dependencies','resources','actions']);
   if (Object.keys(input).some(k => !fields.has(k))) fail('UNKNOWN_SPEC_FIELD');
@@ -103,13 +105,17 @@ export class Manager {
   }
   get(taskId) { return this.#task(taskId); }
   events(taskId) {
-    return this.db.prepare('SELECT * FROM events WHERE task_id=? ORDER BY seq').all(id(taskId))
-      .map(r => ({ ...r, data: JSON.parse(r.data) }));
+    const result = this.eventsPage(taskId);
+    if (result.nextCursor) fail('PAGINATION_REQUIRED');
+    return result.items;
   }
   pendingReports() {
-    return this.db.prepare('SELECT * FROM outbox WHERE receipt IS NULL ORDER BY id').all()
-      .map(r => ({ ...r, payload: JSON.parse(r.payload) }));
+    const result = this.pendingReportsPage();
+    if (result.nextCursor) fail('PAGINATION_REQUIRED');
+    return result.items;
   }
+  eventsPage(taskId, options) { return page(this.db, 'events', id(taskId), options); }
+  pendingReportsPage(options) { return page(this.db, 'pending-reports', null, options); }
   #supervisor(actor) {
     if (!this.supervisors.has(actor)) fail('SUPERVISOR_REQUIRED');
   }
@@ -147,10 +153,13 @@ export class Manager {
       .run(eventId, taskId, marker, stable(payload));
   }
   /** Every mutation, command receipt, event and report is one SQLite transaction. */
-  execute(c) {
-    if (!c || typeof c !== 'object') fail('INVALID_COMMAND');
+  execute(c, { binding = null } = {}) {
+    const serialized = canonicalBounded(c);
+    validateCommand(c);
     id(c.commandId);
-    const hash = fingerprint(c);
+    // Optional host-adapter binding is part of the durable replay fingerprint.
+    // This low-level method remains a trusted-process API, not authentication.
+    const hash = createHash('sha256').update(binding === null ? serialized : canonicalBounded({ command: c, binding })).digest('hex');
     const outcome = this.#tx(() => {
       // Read the clock AFTER obtaining the write lock. Preserve observed time on
       // rejected commands using a savepoint; state/events/receipts still roll back.
@@ -179,7 +188,7 @@ export class Manager {
     if (c.type === 'register') {
       this.#supervisor(c.actor);
       if (c.ownerApproved !== true) fail('OWNER_APPROVAL_REQUIRED');
-      const definition = spec(c.spec);
+      const definition = normalizeSpec(c.spec);
       const hash = fingerprint(definition);
       const existing = this.db.prepare('SELECT spec_hash FROM tasks WHERE id=?').get(definition.taskId);
       if (existing) {

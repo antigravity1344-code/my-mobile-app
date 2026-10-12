@@ -47,8 +47,8 @@ Get-Content -Raw examples/register.json | node cli.mjs "$env:TEMP\pakshoo-demo.s
 | `retry` | taskId، actor، expectedRevision، reason | ناظر؛ فقط BLOCKED/FAILED → NEW |
 | `report-receipt` | actor، reportId، receipt | ناظر؛ receipt فقط `simulated:...` |
 | `get` | taskId | خواندن snapshot؛ commandId لازم نیست |
-| `events` | taskId | خواندن تاریخچه |
-| `pending-reports` | — | خواندن outbox تحویل‌نشده |
+| `events` | taskId، limit اختیاری، cursor اختیاری | صفحهٔ محدود تاریخچه |
+| `pending-reports` | limit اختیاری، cursor اختیاری | صفحهٔ محدود outbox تحویل‌نشده |
 
 نمونه claim بعد از register مثال CLI:
 
@@ -68,7 +68,11 @@ Get-Content -Raw examples/register.json | node cli.mjs "$env:TEMP\pakshoo-demo.s
 
 برای `finish` حداقل `report.summary` غیرخالی لازم است. شواهد، نتایج آزمون، محدودیت‌ها و لینک‌ها را در همین شیء می‌توان ثبت کرد. سقف ثابت گزارش دقیقاً **32768 بایت UTF-8 از کل JSON canonical سریال‌شده** است؛ کلیدها، نشانه‌گذاری و escapeها نیز شمرده می‌شوند. اندازهٔ 32768 پذیرفته و 32769 با `REPORT_TOO_LARGE` رد می‌شود. اطلاعات محرمانه یا مقدار credential را در تعریف، گزارش یا DB نگذارید. actor/agent/run/epoch شناسه هستند، اعتبارنامه نیستند.
 
-پیشنهادهای امنیتی اجرا‌نشده برای F-02/F-03 در [SECURITY_PROPOSAL.fa.md](SECURITY_PROPOSAL.fa.md) آمده‌اند؛ این اصلاح، احراز هویت یا محدودیت ورودی CLI ایجاد نمی‌کند.
+طرح اولیهٔ F-02/F-03 در [SECURITY_PROPOSAL.fa.md](SECURITY_PROPOSAL.fa.md) محفوظ است. وضعیت پیاده‌سازی مرحلهٔ چهارم، قرارداد ورودی/صفحه‌بندی و آداپتور اعتماد آفلاین در [SECURITY_004.fa.md](SECURITY_004.fa.md) آمده است. احراز هویت واقعی همچنان ساخته نشده است.
+
+از مرحلهٔ چهارم، stdin و تنظیمات هرکدام پیش از parse حداکثر 262144 بایت UTF-8 و ۵۰۰۰ میلی‌ثانیه مهلت خواندن دارند. عمق پیش از parse حداکثر 32 است. نمایش canonical نیز سقف 262144 بایت دارد و مجموع عضوها/عنصرها حداکثر 10000 است. فیلد ناشناختهٔ فرمان رد می‌شود. این کنترل‌ها در CLI احراز هویت ایجاد نمی‌کنند.
+
+**تغییر قرارداد CLI:** خروجی `events` و `pending-reports` اکنون `{items, snapshot, nextCursor}` است، نه آرایه. اندازهٔ پیش‌فرض صفحه 100، حداکثر 500 و سقف پاسخ شامل newline برابر 1048576 بایت UTF-8 است. `nextCursor` را بدون تغییر در درخواست بعد بفرستید تا null شود؛ برای polling تازه cursor را حذف کنید. متدهای قدیمی آرایه‌ای در API محلی فقط یک صفحه را برمی‌گردانند و اگر ادامه لازم باشد `PAGINATION_REQUIRED` می‌دهند؛ از `eventsPage` و `pendingReportsPage` استفاده کنید. هیچ تاریخچه یا outbox حذف نمی‌شود.
 
 ## وضعیت، قفل و بازیابی
 
