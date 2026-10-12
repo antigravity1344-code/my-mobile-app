@@ -3,6 +3,20 @@ import { previewAuditMock, startPreviewNetworkAudit, stopPreviewNetworkAudit } f
 type Role = 'customer' | 'worker';
 export type Scenario = 'PENDING' | 'ACCEPTED' | 'IN_PROGRESS' | 'CANCEL_REQUESTED' | 'COMPLETED' | 'CANCELLED' | 'EMPTY' | 'ERROR';
 let role: Role | null = null;
+let closing = false;
+let generation = 0;
+/** A retired preview remains fenced until its entire JS runtime is destroyed by reload. */
+export function previewClosing(): boolean { return closing; }
+export function previewGeneration(): number { return generation; }
+export function previewCanCommit(epoch: number): boolean { return epoch === generation && !closing; }
+export function beginPreviewShutdown(): void {
+  if (role === null) return;
+  closing = true;
+  generation += 1;
+  store.clear();
+  console.info('[PAKSHO_PREVIEW_NETWORK_AUDIT]', 'preview_quarantined');
+}
+
 let scenario: Scenario = 'PENDING';
 const store = new Map<string, string>();
 
@@ -11,13 +25,17 @@ export const previewAvailable = (): boolean =>
 
 export function beginPreview(nextRole: Role): void {
   if (!previewAvailable()) return;
+  if (closing) return; // A retired JS context must reload before any new session.
   role = nextRole;
+  generation += 1;
   startPreviewNetworkAudit();
   scenario = 'PENDING';
   store.clear();
 }
 export function endPreview(): void {
+  if (closing) return; // Never disarm protections of an exiting preview context.
   role = null;
+  generation += 1;
   stopPreviewNetworkAudit();
   scenario = 'PENDING';
   store.clear();
@@ -26,9 +44,9 @@ export function previewActive(): boolean { return previewAvailable() && role !==
 export function previewRole(): Role | null { return previewActive() ? role : null; }
 export function previewScenario(): Scenario { return scenario; }
 export function setPreviewScenario(next: Scenario): void { if (previewActive()) scenario = next; }
-export function previewRead(key: string): string | null { return store.get(key) ?? null; }
-export function previewWrite(key: string, value: string): void { store.set(key, value); }
-export function previewRemove(key: string): void { store.delete(key); }
+export function previewRead(key: string): string | null { return closing ? null : store.get(key) ?? null; }
+export function previewWrite(key: string, value: string): void { if (!closing) store.set(key, value); }
+export function previewRemove(key: string): void { if (!closing) store.delete(key); }
 
 const order = () => ({
   id: 'PREVIEW-ORDER-1',
@@ -53,6 +71,7 @@ const order = () => ({
 /** All calls are handled in-memory; unknown URLs deliberately fail closed. */
 export async function previewApi(endpoint: string, options: RequestInit = {}): Promise<any> {
   if (!previewActive()) throw new Error('Preview transport used outside preview');
+  if (closing) return { success: false, message: 'نشست پیش‌نمایش پایان یافته است.' };
   const method = (options.method || 'GET').toUpperCase();
   previewAuditMock(method);
   const path = endpoint.split('?')[0];
