@@ -148,7 +148,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
       <View style={styles.roleBanner}>
         <View style={styles.userInfoRow}>
           <Image
-            source={{ uri: userData.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150' }}
+            source={previewActive() ? undefined : { uri: userData.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150' }}
             style={styles.avatarImage}
           />
           <View style={styles.userDetails}>
