@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough, Readable } from 'node:stream';
@@ -77,8 +78,8 @@ test('direct command shape, unknown fields, depth and byte rejection preserve ev
 });
 test('CLI malformed/oversize/UTF-8/config input fails before creating a database', t => {
   const f = fixture(t);
-  const cli = new URL('../cli.mjs', import.meta.url).pathname;
-  const config = new URL('../examples/supervisors.json', import.meta.url).pathname;
+  const cli = fileURLToPath(new URL('../cli.mjs', import.meta.url));
+  const config = fileURLToPath(new URL('../examples/supervisors.json', import.meta.url));
   const path = join(f.directory, 'must-not-exist.sqlite');
   for (const input of [Buffer.from('{'), Buffer.alloc(MAX_INPUT_BYTES + 1, 32), Buffer.from([0xff]),
     Buffer.from('{"type":"get","taskId":"SECURITY","actor":"spoof"}')]) {
@@ -91,8 +92,8 @@ test('CLI malformed/oversize/UTF-8/config input fails before creating a database
 });
 test('CLI actual 5000ms timeout terminates an open stdin without database creation', { timeout: 10000 }, async t => {
   const f = fixture(t), path = join(f.directory, 'timeout.sqlite');
-  const child = spawn(process.execPath, [new URL('../cli.mjs', import.meta.url).pathname,
-    path, new URL('../examples/supervisors.json', import.meta.url).pathname]);
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../cli.mjs', import.meta.url)),
+    path, fileURLToPath(new URL('../examples/supervisors.json', import.meta.url))]);
   t.after(() => { if (child.exitCode === null) child.kill(); });
   let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
   child.stdin.write('{');
@@ -103,8 +104,8 @@ test('CLI actual 5000ms timeout terminates an open stdin without database creati
 
 test('CLI exact raw byte boundary and page cursor round-trip preserve existing locked task', t => {
   const f = fixture(t); f.start();
-  const cli = new URL('../cli.mjs', import.meta.url).pathname;
-  const config = new URL('../examples/supervisors.json', import.meta.url).pathname;
+  const cli = fileURLToPath(new URL('../cli.mjs', import.meta.url));
+  const config = fileURLToPath(new URL('../examples/supervisors.json', import.meta.url));
   const invoke = input => spawnSync(process.execPath, [cli, f.path, config], { input, encoding: 'utf8' });
   const before = f.snapshot();
   const command = JSON.stringify({ type: 'events', taskId: 'SECURITY', limit: 1 });

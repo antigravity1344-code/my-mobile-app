@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,8 +22,8 @@ function fixture(t, cli = false) {
   const manager = new Manager(path, { supervisors: ['DEMO-SUPERVISOR'] });
   t.after(() => { manager.close(); rmSync(directory, { recursive: true }); });
   const execute = cli ? command => {
-    const result = spawnSync(process.execPath, [new URL('../cli.mjs', import.meta.url).pathname,
-      path, new URL('../examples/supervisors.json', import.meta.url).pathname],
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('../cli.mjs', import.meta.url)),
+      path, fileURLToPath(new URL('../examples/supervisors.json', import.meta.url))],
     { input: JSON.stringify(command), encoding: 'utf8' });
     assert.ifError(result.error);
     return result;

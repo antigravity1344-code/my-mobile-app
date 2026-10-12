@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -30,7 +31,7 @@ function fixture(t) {
   return { manager, path, run, register, claim, owned, time: v => { now = v; } };
 }
 function child(path, command, mode = 'normal') {
-  const process = spawn(globalThis.process.execPath, [worker.pathname, path, mode], { stdio: ['pipe','pipe','pipe'] });
+  const process = spawn(globalThis.process.execPath, [fileURLToPath(worker), path, mode], { stdio: ['pipe','pipe','pipe'] });
   process.stdin.end(JSON.stringify(command));
   let stdout = '', stderr = '';
   process.stdout.on('data', d => { stdout += d; });
@@ -281,8 +282,8 @@ test('a command waiting behind a write lock checks expiry after the lock is acqu
 
 test('CLI reads JSON, replays a registration and exposes pending reports with no transport', { timeout: 15000 }, async t => {
   const f = fixture(t);
-  const config = new URL('../examples/supervisors.json', import.meta.url).pathname;
-  const cli = new URL('../cli.mjs', import.meta.url).pathname;
+  const config = fileURLToPath(new URL('../examples/supervisors.json', import.meta.url));
+  const cli = fileURLToPath(new URL('../cli.mjs', import.meta.url));
   async function invoke(command) {
     const process = spawn(globalThis.process.execPath, [cli, f.path, config]);
     let stdout = '', stderr = '';
