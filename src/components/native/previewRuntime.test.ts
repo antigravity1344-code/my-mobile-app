@@ -1,9 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { beginPreview, endPreview, previewActive, previewApi, previewAvailable, previewRead, previewRemove, previewWrite, setPreviewScenario } from './previewRuntime';
+import type * as Preview from './previewRuntime';
+let runtime: typeof Preview;
+let beginPreview: typeof Preview.beginPreview;
+let endPreview: typeof Preview.endPreview;
+let previewActive: typeof Preview.previewActive;
+let previewApi: typeof Preview.previewApi;
+let previewAvailable: typeof Preview.previewAvailable;
+let previewRead: typeof Preview.previewRead;
+let previewRemove: typeof Preview.previewRemove;
+let previewWrite: typeof Preview.previewWrite;
+let setPreviewScenario: typeof Preview.setPreviewScenario;
 
 const oldValue = process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  runtime = await import('./previewRuntime');
+  ({ beginPreview, endPreview, previewActive, previewApi, previewAvailable, previewRead, previewRemove, previewWrite, setPreviewScenario } = runtime);
   vi.stubGlobal('__DEV__', true);
   process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = '1';
   endPreview();
