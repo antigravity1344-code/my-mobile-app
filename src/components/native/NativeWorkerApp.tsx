@@ -29,7 +29,7 @@ import { useAccountBlockedLogout } from './useAccountBlockedLogout';
 
 type UserData = WorkerSessionUser;
 
-export const NativeWorkerApp: React.FC = () => {
+export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPreviewExit }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -114,6 +114,7 @@ export const NativeWorkerApp: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    if (previewActive()) { onPreviewExit?.(); return; }
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
     await apiFetch('/auth/logout', { method: 'POST' });
     setIsLoggedIn(false);
