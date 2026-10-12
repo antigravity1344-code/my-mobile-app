@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet, TextInput } from 'react-native';
 
 export type PreviewRole = 'customer' | 'worker';
