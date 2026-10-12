@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { beginPreview, endPreview } from './previewRuntime';
-import { previewAuditCounts } from './previewNetworkAudit';
+import type * as Preview from './previewRuntime';
+import type * as Audit from './previewNetworkAudit';
+let beginPreview: typeof Preview.beginPreview;
+let endPreview: typeof Preview.endPreview;
+let previewAuditCounts: typeof Audit.previewAuditCounts;
 
 const saved = process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  ({beginPreview,endPreview} = await import('./previewRuntime'));
+  ({previewAuditCounts} = await import('./previewNetworkAudit'));
   vi.stubGlobal('__DEV__', true);
   process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = '1';
 });
@@ -23,7 +29,10 @@ describe('preview outbound network barrier', () => {
     expect(original).not.toHaveBeenCalled();
     expect(previewAuditCounts().blocked).toBe(1);
     endPreview();
-    expect(globalThis.fetch).toBe(original);
+    // Active-session exit is quarantined: it must NOT restore direct network access.
+    expect(globalThis.fetch).not.toBe(original);
+    await expect(fetch('https://api.example.test/api/orders')).rejects.toThrow('مسدود');
+    expect(original).not.toHaveBeenCalled();
   });
   it('permits only local development Metro port, and rejects other localhost ports', async () => {
     const native = vi.fn().mockResolvedValue({ ok: true });
@@ -43,6 +52,9 @@ describe('preview outbound network barrier', () => {
     expect(() => xhr.open('PUT', 'http://192.168.1.2:3000/api/orders')).toThrow('مسدود');
     expect(open).not.toHaveBeenCalled();
     endPreview();
-    expect(XMLHttpRequest.prototype.open).toBe(open);
+    // Until JS reload, the old runtime must keep the native transport guarded.
+    expect(XMLHttpRequest.prototype.open).not.toBe(open);
+    expect(() => new XMLHttpRequest().open('PUT', 'http://192.168.1.2:3000/api/orders')).toThrow('مسدود');
+    expect(open).not.toHaveBeenCalled();
   });
 });
