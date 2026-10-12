@@ -33,7 +33,10 @@ export function beginPreview(nextRole: Role): void {
   store.clear();
 }
 export function endPreview(): void {
-  if (closing) return; // Never disarm protections of an exiting preview context.
+  // An active preview can only retire into quarantine. Its pending callbacks must
+  // never fall through to real networking, tokens or persistent storage.
+  if (role !== null) { beginPreviewShutdown(); return; }
+  if (closing) return;
   role = null;
   generation += 1;
   stopPreviewNetworkAudit();
