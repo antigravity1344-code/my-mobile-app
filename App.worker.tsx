@@ -27,7 +27,7 @@ function ProductionApp() {
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
   if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => DevSettings.reload()} renderApp={(revision) => <ProductionApp key={revision} />} />;
+  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { endPreview(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
   if (mode === 'real') return <ProductionApp />;
   return (
     <View style={previewStyle.container}>
