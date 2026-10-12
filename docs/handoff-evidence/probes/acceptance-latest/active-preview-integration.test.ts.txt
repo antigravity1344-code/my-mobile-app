@@ -1,0 +1,196 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// These are explicit test placeholders: .invalid can never be a real backend.
+const fixture = vi.hoisted(() => ({
+  backend: 'https://paksho-production-sentinel.invalid',
+  token: 'TEST-ONLY-PERSISTED-SESSION-NOT-A-CREDENTIAL',
+  persisted: new Map<string, string>(),
+  network: vi.fn(),
+  read: vi.fn(),
+  write: vi.fn(),
+  remove: vi.fn(),
+}));
+vi.hoisted(() => { process.env.EXPO_PUBLIC_API_URL = 'https://paksho-production-sentinel.invalid'; });
+vi.mock('expo-constants', () => ({ default: { expoConfig: { hostUri: '' } } }));
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: fixture.read, setItem: fixture.write, removeItem: fixture.remove },
+}));
+
+// Real combined source imports: neither apiFetch nor orderService is mocked.
+import { apiFetch, API_BASE_URL } from '/workspace/pr9-pr10-integration-20261012/src/api/apiClient';
+import { previewAuditCounts } from '/workspace/pr9-pr10-integration-20261012/src/components/native/previewNetworkAudit';
+import { getApiAuthToken, setApiAuthToken } from '/workspace/pr9-pr10-integration-20261012/src/api/authToken';
+import { appStorage } from '/workspace/pr9-pr10-integration-20261012/src/utils/storage';
+import { CUSTOMER_TOKEN_KEY } from '/workspace/pr9-pr10-integration-20261012/src/components/native/customerLoginStorage';
+import {
+  beginPreview, endPreview, previewActive, previewAvailable, setPreviewScenario,
+} from '/workspace/pr9-pr10-integration-20261012/src/components/native/previewRuntime';
+import {
+  mapApiOrderForCustomer, orderService,
+} from '/workspace/pr9-pr10-integration-20261012/src/features/orders/services/orderService';
+import type { ApiOrder } from '/workspace/pr9-pr10-integration-20261012/src/api/types';
+
+const roles = ['customer', 'worker'] as const;
+const methods = ['POST', 'post', 'PUT', 'put', 'PATCH', 'patch', 'DELETE', 'delete'];
+const startOperations = [
+  { path: '/orders/PREVIEW-ORDER-1/start', body: { acceptanceKey: 'TEST-ONLY-CURRENT-ACCEPTANCE' } },
+  { path: '/orders/PREVIEW-ORDER-1/start-response', body: { answer: 'yes', promptEventId: 'TEST-ONLY-CURRENT-PROMPT' } },
+  { path: '/admin/orders/PREVIEW-ORDER-1/start-decision', body: {
+    started: true, requestId: 'TEST-ONLY-ADMIN-COMMAND',
+    acceptanceKey: 'TEST-ONLY-CURRENT-ACCEPTANCE', expectedDecisionEventId: null,
+  } },
+];
+
+beforeEach(async () => {
+  vi.stubGlobal('__DEV__', true);
+  vi.stubGlobal('fetch', fixture.network);
+  process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW = '1';
+  endPreview();
+  fixture.persisted.clear();
+  fixture.network.mockReset().mockImplementation(() => { throw new Error('Unexpected network call: isolated fixture prohibits network'); });
+  fixture.read.mockReset().mockImplementation(async (key: string) => fixture.persisted.get(key) ?? null);
+  fixture.write.mockReset().mockImplementation(async (key: string, value: string) => { fixture.persisted.set(key, value); });
+  fixture.remove.mockReset().mockImplementation(async (key: string) => { fixture.persisted.delete(key); });
+  fixture.persisted.set(CUSTOMER_TOKEN_KEY, JSON.stringify(fixture.token));
+  fixture.persisted.set('PAKSHO_USER_CUSTOMER', JSON.stringify(JSON.stringify({ id: 'TEST-ONLY-REAL-CUSTOMER' })));
+  setApiAuthToken(fixture.token);
+  await orderService.clearOrdersCache();
+  fixture.read.mockClear(); fixture.write.mockClear(); fixture.remove.mockClear();
+  expect(API_BASE_URL).toBe(`${fixture.backend}/api`);
+});
+
+afterEach(() => {
+  endPreview(); setApiAuthToken('');
+  delete process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
+  vi.unstubAllGlobals();
+});
+
+function expectIsolatedState(before: Array<[string, string]>) {
+  // The original throwing spy sits underneath the newly installed fetch wrapper.
+  expect(fixture.network).not.toHaveBeenCalled();
+  expect(previewAuditCounts().blocked).toBe(0);
+  expect(fixture.read).not.toHaveBeenCalled();
+  expect(fixture.write).not.toHaveBeenCalled();
+  expect(fixture.remove).not.toHaveBeenCalled();
+  expect([...fixture.persisted]).toEqual(before);
+  expect(getApiAuthToken()).toBe('');
+  endPreview();
+  expect(globalThis.fetch).toBe(fixture.network);
+  expect(getApiAuthToken()).toBe(fixture.token);
+}
+
+describe.each(roles)('combined PR9/PR10 active %s preview transport', (role) => {
+  for (const { path, body } of startOperations) {
+    it.each(methods)(`${path} rejects %s through actual apiFetch without network or session effects`, async (method) => {
+      const before = [...fixture.persisted];
+      beginPreview(role);
+      const result = await apiFetch(path, { method, body: JSON.stringify(body), headers: { Authorization: `Bearer ${fixture.token}` } });
+      expect(result.success).toBe(false);
+      expect(result.order).toBeUndefined();
+      expect(result.message).toContain('غیرفعال');
+      expectIsolatedState(before);
+    });
+  }
+
+  it.each(['POST', 'post', 'PUT', 'put', 'PATCH', 'patch', 'DELETE', 'delete', 'GET', 'get', 'HEAD', 'OPTIONS'])('unknown endpoint with %s fails closed before backend fallback', async (method) => {
+    const before = [...fixture.persisted];
+    beginPreview(role);
+    const result = await apiFetch('/future-unrecognized-financial-or-start-endpoint?version=next', { method });
+    expect(result.success).toBe(false);
+    expectIsolatedState(before);
+  });
+
+  it.each(['GET', 'get', undefined])('admin start-event read (%s) cannot fall through to the real backend', async (method) => {
+    const before = [...fixture.persisted];
+    beginPreview(role);
+    const result = await apiFetch('/admin/orders/PREVIEW-ORDER-1/start-events', method ? { method } : {});
+    expect(result.success).toBe(false);
+    expect(result.events).toBeUndefined();
+    expectIsolatedState(before);
+  });
+
+  it.each([
+    ['yes', 'TEST-ONLY-CURRENT-PROMPT'], ['no', 'TEST-ONLY-CURRENT-PROMPT'],
+    ['yes', 'TEST-ONLY-STALE-PROMPT'], ['no', 'TEST-ONLY-STALE-PROMPT'],
+  ] as const)('real orderService response %s for %s is denied without real persistence or backend activity', async (answer, promptEventId) => {
+    const before = [...fixture.persisted];
+    beginPreview(role); setPreviewScenario('ACCEPTED');
+    const loaded = await orderService.getOrders('ALL', '', 'NEWEST', 'PREVIEW-CUSTOMER');
+    expect(loaded.error).toBeNull();
+    expect(loaded.orders).toHaveLength(1);
+    const initial = loaded.orders[0];
+    const result = await orderService.respondToStart(initial.id, answer, promptEventId);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('غیرفعال');
+    expect(result.order).toBeUndefined();
+    expect(result.needsRefresh).toBeUndefined();
+    expect(await orderService.getOrderById(initial.id)).toEqual(initial);
+    expectIsolatedState(before);
+  });
+
+  it.each(['', '   '])('missing prompt %j is rejected before an authenticated operation', async (promptEventId) => {
+    const before = [...fixture.persisted];
+    beginPreview(role);
+    const result = await orderService.respondToStart('PREVIEW-ORDER-1', 'yes', promptEventId);
+    expect(result.success).toBe(false);
+    expect(result.needsRefresh).toBe(true);
+    expectIsolatedState(before);
+  });
+
+  it.each(['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const)('actual service maps %s preview DTO without inventing a start question or changing its amount/status', async (scenario) => {
+    const before = [...fixture.persisted];
+    beginPreview(role); setPreviewScenario(scenario);
+    const result = await orderService.getOrders('ALL', '', 'NEWEST', 'PREVIEW-CUSTOMER');
+    expect(result.error).toBeNull();
+    expect(result.orders).toHaveLength(1);
+    expect(result.orders[0].status).toBe(scenario);
+    expect(result.orders[0].startPrompt).toBeNull();
+    expect(result.orders[0].startPromptEventId).toBeNull();
+    // The preview amount is fixture data, retained as supplied; no inferred commission/net amount.
+    expect(result.orders[0].pricing.total).toBe(450000);
+    expect(result.orders[0].pricing.subtotal).toBe(450000);
+    expect(result.orders[0].pricing.discountAmount).toBe(0);
+    expectIsolatedState(before);
+  });
+});
+
+describe('build gate and DTO compatibility on the actual combined modules', () => {
+  it.each(roles)('release build cannot activate %s preview even when its switch is enabled', (role) => {
+    vi.stubGlobal('__DEV__', false);
+    expect(previewAvailable()).toBe(false);
+    beginPreview(role);
+    expect(previewActive()).toBe(false);
+    expect(getApiAuthToken()).toBe(fixture.token);
+    expect(fixture.network).not.toHaveBeenCalled();
+  });
+
+  it.each(roles)('development build cannot activate %s preview without the explicit switch', (role) => {
+    delete process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW;
+    beginPreview(role);
+    expect(previewActive()).toBe(false);
+    expect(getApiAuthToken()).toBe(fixture.token);
+    expect(fixture.network).not.toHaveBeenCalled();
+  });
+
+  it('new server question remains paired with its immutable reference; historical fields remain untouched', () => {
+    const historical = {
+      id: 'TEST-ONLY-HISTORICAL', customerId: 'TEST-ONLY-CUSTOMER', status: 'COMPLETED',
+      serviceTitle: 'TEST-ONLY-SERVICE', price: 719,
+      pricing: { subtotal: 843, discountAmount: 124, total: 719 },
+      completedAt: '2026-09-01T12:00:00.000Z', createdAt: '2026-09-01T08:00:00.000Z',
+      cleanerId: 'TEST-ONLY-WORKER', cleanerName: 'TEST-ONLY-NAME',
+      startPrompt: 'confirm_report', startPromptEventId: 'TEST-ONLY-IMMUTABLE-EVENT',
+    } as ApiOrder;
+    const original = structuredClone(historical);
+    const mapped = mapApiOrderForCustomer(historical);
+    expect(mapped.startPrompt).toBe('confirm_report');
+    expect(mapped.startPromptEventId).toBe('TEST-ONLY-IMMUTABLE-EVENT');
+    expect(mapped.status).toBe('COMPLETED');
+    expect(mapped.pricing.total).toBe(719);
+    expect(mapped.pricing.subtotal).toBe(843);
+    expect(mapped.pricing.discountAmount).toBe(124);
+    expect(historical).toEqual(original);
+    expect(mapped.timeline.at(-1)?.step).toBe('FINISHED');
+    expect(mapped.timeline.at(-1)?.timestamp).toBe(historical.completedAt);
+  });
+});

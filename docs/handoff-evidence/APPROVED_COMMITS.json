@@ -1,0 +1,47 @@
+[
+  {
+    "commit": "9c910c41d2677429ca10aac9d397ac3c07e414a8",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "2f211d7fd65cd7033130c3dfa734b75f37437f96",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "84e396d12303bf67d78e2f68e63ceef2fce06df4",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "5a4964a492729099b4172a062503aa2b186aea71",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "9283a779f5499ef53f3ec56e581cddf05fad1c00",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "88c952fd1c66d95852ae7e4c07be15a67bfa2bac",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "1d8adff3807bf897672144b7aff0f275dfeea5a0",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "14ec67249ac165634361f13c114583e1e6d8816d",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  },
+  {
+    "commit": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+    "github_api_verified": true,
+    "ancestor_of_published_pr9_head": true
+  }
+]

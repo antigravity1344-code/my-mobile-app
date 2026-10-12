@@ -1,0 +1,191 @@
+
+ RUN  v3.2.7 /workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 2
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 2 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 1 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 0 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 0 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 0 blocked_count 0
+
+stdout | integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_disabled mocked_count 0 blocked_count 0
+
+ ❯ integrationPreviewProbe.test.ts (14 tests | 4 failed) 43ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch 9ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch 1ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch 1ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch 1ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch 1ms
+   ✓ actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch 1ms
+   ✓ actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback 1ms
+   ✓ actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE 1ms
+   ✓ actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls 1ms
+   ✓ actual combined-source preview boundary > entrypoints clear boundary before reload without changing mounted preview mode 1ms
+   × actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes 14ms
+     → preview-origin start response reached real transport during exit: expected 1 to be +0 // Object.is equality
+   × actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload 5ms
+     → preview-origin poll reached real transport during deferred reload: expected 1 to be +0 // Object.is equality
+   × actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload 2ms
+     → preview-origin address timer reached authenticated real transport during deferred reload: expected 1 to be +0 // Object.is equality
+   × actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload 1ms
+     → preview-origin callback reached real persistent storage during deferred reload: expected 1 to be +0 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes
+AssertionError: preview-origin start response reached real transport during exit: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ integrationPreviewProbe.test.ts:100:107
+     98|     expect(sentAuthorization).toBe(true);
+     99|     // Security criterion deliberately RED on the current source.
+    100|     expect(network.mock.calls.length, 'preview-origin start response r…
+       |                                                                                                           ^
+    101|   });
+    102| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload
+AssertionError: preview-origin poll reached real transport during deferred reload: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ integrationPreviewProbe.test.ts:120:108
+    118|     expect(calls.read).toBe(1);
+    119|     expect(sentAuthorization).toBe(true);
+    120|     expect(network.mock.calls.length, 'preview-origin poll reached rea…
+       |                                                                                                            ^
+    121|   });
+    122| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload
+AssertionError: preview-origin address timer reached authenticated real transport during deferred reload: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ integrationPreviewProbe.test.ts:141:131
+    139|     expect(calls.read).toBe(1);
+    140|     expect(sentAuthorization).toBe(true);
+    141|     expect(network.mock.calls.length, 'preview-origin address timer re…
+       |                                                                                                                                   ^
+    142|   });
+    143| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  integrationPreviewProbe.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload
+AssertionError: preview-origin callback reached real persistent storage during deferred reload: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ integrationPreviewProbe.test.ts:151:107
+    149|     requestReload();
+    150|     await mountedPreviewCallback();
+    151|     expect(calls.write, 'preview-origin callback reached real persiste…
+       |                                                                                                           ^
+    152|   });
+    153| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 10 passed (14)
+   Start at  09:21:38
+   Duration  575ms (transform 206ms, setup 0ms, collect 266ms, tests 43ms, environment 0ms, prepare 80ms)
+

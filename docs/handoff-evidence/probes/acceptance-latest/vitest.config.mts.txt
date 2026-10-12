@@ -1,0 +1,10 @@
+export default {
+  root: '/workspace/reports/pr9-pr10-integration-20261012/acceptance-latest',
+  test: {
+    environment: 'node',
+    include: ['active-preview-integration.test.ts'],
+    fileParallelism: false,
+    maxWorkers: 1,
+    minWorkers: 1,
+  },
+};

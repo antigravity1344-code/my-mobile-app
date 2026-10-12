@@ -1,0 +1,9 @@
+export default {
+  root: '/workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest',
+  resolve: { alias: {
+    'expo-constants': '/workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest/expoMock.ts',
+    '@react-native-async-storage/async-storage': '/workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest/storageMock.ts',
+  } },
+  server: { fs: { allow: ['/workspace/pr9-pr10-integration-20261012', '/workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest', '/workspace/my-mobile-app/node_modules'] } },
+  test: { environment: 'node', include: ['*.test.ts'], maxWorkers: 1, minWorkers: 1 },
+};

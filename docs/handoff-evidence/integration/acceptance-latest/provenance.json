@@ -1,0 +1,41 @@
+{
+  "synthetic_commit": "b86a3512ed4833f48540f582a3626ba4a7d90072",
+  "tree": "7a7e575fc0da16615e595d60f252faeec42e3d24",
+  "pr9_head": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "pr10_head": "a447ac5f27cd8a7cea2958d6bd645c64a87c42ab",
+  "checkout_status": "",
+  "command": [
+    "node",
+    "/workspace/my-mobile-app/node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "/workspace/reports/pr9-pr10-integration-20261012/acceptance-latest/vitest.config.mts",
+    "--reporter=verbose",
+    "--reporter=json",
+    "--outputFile=/workspace/reports/pr9-pr10-integration-20261012/acceptance-latest/results.json"
+  ],
+  "cwd": "/workspace/pr9-pr10-integration-20261012",
+  "exit_code": 0,
+  "tests": {
+    "numTotalTests": 103,
+    "numPassedTests": 103,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "success": true
+  },
+  "network": "underlying fetch replaced by throwing spy before beginPreview installs actual global audit wrapper; original spy zero calls and audit blocked count zero for central routes; .invalid sentinel; no actual network",
+  "credentials": "only explicit TEST-ONLY literal placeholders; no real credential read or printed",
+  "persistence": "mocked AsyncStorage map; actual appStorage/authToken modules exercised",
+  "scope": "ACTIVE preview; exit/in-flight security separately reviewed by another agent",
+  "source_sha256": {
+    "src/api/apiClient.ts": "a24090728e689c5c15435f3b39429009c74f0ece6e6db02cbc761b9ac19e6f44",
+    "src/api/authToken.ts": "809f8d7d73be82981411ba046bb95e5510ce07b4a68a193b43b95d6437ac45cd",
+    "src/utils/storage.ts": "4a0c1d4a27f31d08877930ae72495c349db78ad18b6ca776cd5f6b17554ae14e",
+    "src/components/native/previewRuntime.ts": "172f24de78860fcc81474f8dbeb716ef8229009acba5b12c8bb48b263dd6230d",
+    "src/components/native/previewNetworkAudit.ts": "4c3cbe399b2cbf3b0beeab2484a2ac0ebce7bc4cd69eadb414a94b5a330278cb",
+    "src/features/orders/services/orderService.ts": "b6b4b8e08a1cb6140f25b4e6bdc4ecee818421924dc6f2774b93408d4b52c70f",
+    "src/features/orders/context/OrdersContext.tsx": "1043dccfe080cc3209634c66c396b88bfbe233744db7ae1b0dbf14c3ef07552b"
+  },
+  "probe_sha256": "97f8a25dfa2084323eb8f80dd1bd24a05c2c503a5e7d55135dc5fcec57fba8d6",
+  "previous_evidence": "../acceptance retained unchanged"
+}

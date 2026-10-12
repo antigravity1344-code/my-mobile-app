@@ -1,0 +1,34 @@
+
+> my-mobile-app@1.0.0 lint
+> eslint . --ext .ts,.tsx
+
+
+/workspace/pr9-pr10-integration-20261012/App.tsx
+  361:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/workspace/pr9-pr10-integration-20261012/src/components/booking/NativeBookingWizard.tsx
+  207:6  warning  React Hook useEffect has missing dependencies: 'applySavedAddressToWizard' and 'booking'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/pr9-pr10-integration-20261012/src/components/dashboard/AdminPanelScreen.tsx
+  70:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/pr9-pr10-integration-20261012/src/components/native/NativeCustomerApp.tsx
+  78:6  warning  React Hook useEffect has a missing dependency: 'syncAuthenticatedUser'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/pr9-pr10-integration-20261012/src/components/native/previewNetworkAudit.ts
+  17:3    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  36:113  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  42:41   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  45:3    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  49:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+/workspace/pr9-pr10-integration-20261012/src/components/native/previewRuntime.ts
+  54:88  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 10 problems (0 errors, 10 warnings)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

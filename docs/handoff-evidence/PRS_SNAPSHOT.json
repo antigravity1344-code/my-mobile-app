@@ -1,0 +1,120 @@
+[
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "ui/ux-ui-development",
+    "headRefOid": "556d2f4cd64d3825622222e6004d0e96ac6dffff",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergedAt": null,
+    "number": 10,
+    "state": "OPEN",
+    "title": "Draft: real customer and worker UI preview with isolated mock transport",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/10"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "integration/worker-start-followup-20261012",
+    "headRefOid": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergedAt": null,
+    "number": 9,
+    "state": "OPEN",
+    "title": "Harden worker start confirmation and lifecycle compatibility",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/9"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "integration/ui-safe-only-20261012",
+    "headRefOid": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "febe14ee679c4d71b177e3b65844be6b14ce9625"
+    },
+    "mergedAt": "2026-10-11T21:08:17Z",
+    "number": 8,
+    "state": "MERGED",
+    "title": "Merge tested visual UI improvements only (no worker lifecycle changes)",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/8"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "integration/ui-folder-reconcile-20261011",
+    "headRefOid": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergedAt": null,
+    "number": 7,
+    "state": "CLOSED",
+    "title": "Draft: reconcile prior UI and restore worker start / customer verification",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/7"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "fix/admin-dashboard-xss",
+    "headRefOid": "9c112e06c83e66ace70f5fb4bd1585c98bb77912",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "c88d58da9be609b89327b747641bb83a9cb88419"
+    },
+    "mergedAt": "2026-10-11T16:36:26Z",
+    "number": 6,
+    "state": "MERGED",
+    "title": "رفع XSS پنل HTML مدیر در فهرست متخصصان و سفارش‌ها",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/6"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "cursor/stage4-loyalty-tier-e352",
+    "headRefOid": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60",
+    "isDraft": false,
+    "mergeCommit": {
+      "oid": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60"
+    },
+    "mergedAt": "2026-10-11T12:51:06Z",
+    "number": 5,
+    "state": "MERGED",
+    "title": "مرحله ۴: سطح وفاداری از user_points",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/5"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "cursor/stage3-order-cancel-e352",
+    "headRefOid": "bf456381b2b367ca9ee9600a990f3465a1ab3bec",
+    "isDraft": true,
+    "mergeCommit": {
+      "oid": "bf456381b2b367ca9ee9600a990f3465a1ab3bec"
+    },
+    "mergedAt": "2026-10-11T12:14:40Z",
+    "number": 4,
+    "state": "MERGED",
+    "title": "مرحله ۳: پیش‌نمایش و مهلت بررسی لغو سفارش",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/4"
+  },
+  {
+    "baseRefName": "ui/customer-home-redesign",
+    "headRefName": "cursor/architecture-followup-e352",
+    "headRefOid": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69",
+    "isDraft": true,
+    "mergeCommit": {
+      "oid": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69"
+    },
+    "mergedAt": "2026-10-11T11:25:30Z",
+    "number": 3,
+    "state": "MERGED",
+    "title": "هسته امتیاز و رفع مغایرت‌های تأییدشده با سند معماری",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/3"
+  },
+  {
+    "baseRefName": "main",
+    "headRefName": "cursor/ui-redesign-f51e",
+    "headRefOid": "07a708d983711cbdb86963cd117ad6fd5147b7a7",
+    "isDraft": true,
+    "mergeCommit": null,
+    "mergedAt": null,
+    "number": 2,
+    "state": "CLOSED",
+    "title": "feat(ui): Paksho design system and Customer Home (phase 1)",
+    "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/2"
+  }
+]

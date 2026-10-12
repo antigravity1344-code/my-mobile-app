@@ -1,0 +1,42 @@
+{
+  "baseRefName": "ui/customer-home-redesign",
+  "headRefName": "integration/worker-start-followup-20261012",
+  "headRefOid": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "isDraft": true,
+  "mergeStateStatus": "CLEAN",
+  "mergeable": "MERGEABLE",
+  "state": "OPEN",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-12T05:32:23Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38208269197/job/114676490110",
+      "name": "Typecheck, lint and all regression tests (no SMS)",
+      "startedAt": "2026-10-12T05:31:01Z",
+      "status": "COMPLETED",
+      "workflowName": "Paksho UI safe integration"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-12T05:42:38Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38208269197/job/114676490325",
+      "name": "Android customer Debug ARM64",
+      "startedAt": "2026-10-12T05:31:01Z",
+      "status": "COMPLETED",
+      "workflowName": "Paksho UI safe integration"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-12T05:42:49Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38208269197/job/114676490291",
+      "name": "Android worker Debug ARM64",
+      "startedAt": "2026-10-12T05:31:02Z",
+      "status": "COMPLETED",
+      "workflowName": "Paksho UI safe integration"
+    }
+  ],
+  "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/9"
+}

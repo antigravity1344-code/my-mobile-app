@@ -1,0 +1,59 @@
+{
+  "combinedCommit": "b86a3512ed4833f48540f582a3626ba4a7d90072",
+  "combinedTree": "7a7e575fc0da16615e595d60f252faeec42e3d24",
+  "status": "",
+  "pr9": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "pr10": "a447ac5f27cd8a7cea2958d6bd645c64a87c42ab",
+  "priorPr10": "e92fa8932883066cb86e75d3ba7921fe8377804a",
+  "base": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+  "probe": {
+    "tests": 14,
+    "passed": 10,
+    "failed": 4,
+    "exitCode": 1,
+    "actualNetworkUsed": false,
+    "actualPersistentStorageUsed": false,
+    "repoModified": false,
+    "activeMutationGuardPassed": true,
+    "exitIsolationAcceptancePassed": false,
+    "nativeReloadMocked": true,
+    "schedulerMocked": true,
+    "hooksMounted": false,
+    "browserBuildOrRuntimeTested": false
+  },
+  "auditOnly": {
+    "tests": 3,
+    "passed": 3,
+    "failed": 0,
+    "exitCode": 0,
+    "actualNetworkUsed": false
+  },
+  "oldEvidenceSha256Verified": true,
+  "sourceSha256": {
+    "App.customer.tsx": "25de46de5b2160e3483fdbfe2a55db046a644db7b87123a6755e86f07403b9ae",
+    "App.worker.tsx": "9775a0e05d0b83fb7a862e4053298073608d020fab1b85da216487b324b74964",
+    "src/api/apiClient.ts": "a24090728e689c5c15435f3b39429009c74f0ece6e6db02cbc761b9ac19e6f44",
+    "src/api/authToken.ts": "809f8d7d73be82981411ba046bb95e5510ce07b4a68a193b43b95d6437ac45cd",
+    "src/components/native/previewRuntime.ts": "172f24de78860fcc81474f8dbeb716ef8229009acba5b12c8bb48b263dd6230d",
+    "src/components/native/previewNetworkAudit.ts": "4c3cbe399b2cbf3b0beeab2484a2ac0ebce7bc4cd69eadb414a94b5a330278cb",
+    "src/components/native/previewNetworkAudit.test.ts": "b2c489803a1be84875adee3e2f396dead13c56c1399b7ef8deb5cad3210eeef8",
+    "src/features/orders/services/orderService.ts": "b6b4b8e08a1cb6140f25b4e6bdc4ecee818421924dc6f2774b93408d4b52c70f",
+    "src/components/native/NativeWorkerPortal.tsx": "df5cc443daef9615e435171aea871617309e91d45d474ac7373bcaf7a47bf6a6",
+    "src/components/native/NativeWorkerApp.tsx": "aabdc6d53c185beafc392ec8298a3dca74e8a053ed68a41e369daf910010a553",
+    "src/features/orders/context/OrdersContext.tsx": "1043dccfe080cc3209634c66c396b88bfbe233744db7ae1b0dbf14c3ef07552b",
+    "src/features/profile/context/ProfileContext.tsx": "8b2560e35ee26fe6dabac530f7e8aab177e48fd02d84ebc521c4c5529f6d3106",
+    "src/utils/storage.ts": "4a0c1d4a27f31d08877930ae72495c349db78ad18b6ca776cd5f6b17554ae14e"
+  },
+  "commands": [
+    {
+      "command": "node /workspace/pr9-pr10-integration-20261012/node_modules/vitest/vitest.mjs run --config /workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest/vitest.config.mjs",
+      "exitCode": 1,
+      "log": "probe.log"
+    },
+    {
+      "command": "node /workspace/pr9-pr10-integration-20261012/node_modules/vitest/vitest.mjs run --config /workspace/reports/pr9-pr10-integration-20261012/independent-preview-latest/auditOnly.config.mjs",
+      "exitCode": 0,
+      "log": "audit-only.log"
+    }
+  ]
+}

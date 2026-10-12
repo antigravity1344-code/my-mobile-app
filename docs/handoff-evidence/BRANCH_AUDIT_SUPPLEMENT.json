@@ -1,0 +1,138 @@
+{
+  "observed_at": "2026-10-12T13:48:35.073222+03:30",
+  "initial_snapshot_unchanged": true,
+  "initial_branch_count": 19,
+  "initial_categories": {
+    "active_necessary": 5,
+    "backup_recovery": 4,
+    "merged_candidate_after_approval": 5,
+    "old_no_unique_candidate_after_approval": 2,
+    "unmerged_unique": 3
+  },
+  "original_report_sha256": "35fea134c8f01d77c648e54e60af9ac88b8e13f2759a171eb7a7bc9099733f7a",
+  "documentation_copy_byte_identical": true,
+  "documentation_copy_preserves_all_19_full_shas": true,
+  "deletion_review_candidate_count": 7,
+  "deletion_review_candidates": [
+    {
+      "name": "cursor/architecture-followup-e352",
+      "sha": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69",
+      "category": "merged_candidate_after_approval"
+    },
+    {
+      "name": "cursor/stage3-order-cancel-e352",
+      "sha": "bf456381b2b367ca9ee9600a990f3465a1ab3bec",
+      "category": "merged_candidate_after_approval"
+    },
+    {
+      "name": "cursor/stage4-loyalty-tier-e352",
+      "sha": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60",
+      "category": "merged_candidate_after_approval"
+    },
+    {
+      "name": "feature/profile-and-auth",
+      "sha": "fac145d19fd7d7d6fef49876d60e644275287e82",
+      "category": "old_no_unique_candidate_after_approval"
+    },
+    {
+      "name": "fix/admin-dashboard-xss",
+      "sha": "9c112e06c83e66ace70f5fb4bd1585c98bb77912",
+      "category": "merged_candidate_after_approval"
+    },
+    {
+      "name": "integration/ui-safe-only-20261012",
+      "sha": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+      "category": "merged_candidate_after_approval"
+    },
+    {
+      "name": "say_hello",
+      "sha": "3af65b63a07dc83442d4b7d4511882747f4e9846",
+      "category": "old_no_unique_candidate_after_approval"
+    }
+  ],
+  "current_ux_pr10": {
+    "name": "ui/ux-ui-development",
+    "sha": "556d2f4cd64d3825622222e6004d0e96ac6dffff",
+    "state": "OPEN",
+    "draft": true,
+    "category": "active_necessary",
+    "source": "prs-handoff-snapshot.json",
+    "previous_frozen_sha": "22832987836ca6448c82752d3c4816d91ea5cc57",
+    "tested_in_this_subtask": false,
+    "prior_test_results_do_not_apply_to_this_head": true,
+    "fresh_ancestry_and_exclusive_counts_not_claimed": true,
+    "object_availability": [
+      {
+        "repository": "/workspace/my-mobile-app",
+        "head_object_available": false
+      },
+      {
+        "repository": "/workspace/pr9-pr10-integration-20261012",
+        "head_object_available": false
+      }
+    ]
+  },
+  "documentation_branch": {
+    "name": "docs/project-handoff-20261012",
+    "base_sha": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+    "category": "active_necessary",
+    "only_readme_docs_intended": true,
+    "local_refs_observed": [],
+    "remote_publication_checked_in_this_subtask": false,
+    "initial_snapshot_does_not_include_this_new_branch": true,
+    "current_remote_branch_count_not_claimed": true
+  },
+  "published_rollback_tag": {
+    "tag": "rollback/pre-pr9-ui-20261012",
+    "target_commit": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+    "github_published_and_peeled_target_verified": true,
+    "tag_url": "https://github.com/antigravity1344-code/my-mobile-app/tree/rollback/pre-pr9-ui-20261012",
+    "force_push": false,
+    "official_branch_changed": false,
+    "initial_failure": "Isolated clone had no GitHub credential helper; read worked for public repo, write could not read Username. Reused primary origin authentication; no credential/config/network changes."
+  },
+  "local_documentation_links": [
+    {
+      "file": "README.md",
+      "label": "سند تحویل پروژه",
+      "target": "docs/PROJECT_HANDOFF.fa.md",
+      "exists_in_documentation_draft": true,
+      "inherited_from_official_base": false,
+      "resolved": true
+    },
+    {
+      "file": "docs/PROJECT_HANDOFF.fa.md",
+      "label": "لاگ و metadata ماندگار",
+      "target": "handoff-evidence/README.md",
+      "exists_in_documentation_draft": true,
+      "inherited_from_official_base": false,
+      "resolved": true
+    },
+    {
+      "file": "docs/PROJECT_HANDOFF.fa.md",
+      "label": "منبع و دستور",
+      "target": "handoff-evidence/probes/README.md",
+      "exists_in_documentation_draft": true,
+      "inherited_from_official_base": false,
+      "resolved": true
+    },
+    {
+      "file": "docs/PROJECT_HANDOFF.fa.md",
+      "label": "ADR رسمی",
+      "target": "ARCHITECTURE_DECISIONS.md",
+      "exists_in_documentation_draft": false,
+      "inherited_from_official_base": true,
+      "resolved": true
+    },
+    {
+      "file": "docs/PROJECT_HANDOFF.fa.md",
+      "label": "ممیزی",
+      "target": "PROJECT_BRANCH_AUDIT.fa.md",
+      "exists_in_documentation_draft": true,
+      "inherited_from_official_base": false,
+      "resolved": true
+    }
+  ],
+  "no_original_audit_modified": true,
+  "no_source_edits_tests_builds_pushes_or_fetches": true
+}

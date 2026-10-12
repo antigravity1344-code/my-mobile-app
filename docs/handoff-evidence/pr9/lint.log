@@ -1,0 +1,24 @@
+
+> my-mobile-app@1.0.0 lint
+> eslint . --ext .ts,.tsx
+
+
+/workspace/my-mobile-app/App.tsx
+  361:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/workspace/my-mobile-app/src/components/booking/NativeBookingWizard.tsx
+  207:6  warning  React Hook useEffect has missing dependencies: 'applySavedAddressToWizard' and 'booking'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/my-mobile-app/src/components/dashboard/AdminPanelScreen.tsx
+  70:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/workspace/my-mobile-app/src/components/native/NativeCustomerApp.tsx
+  69:6  warning  React Hook useEffect has a missing dependency: 'syncAuthenticatedUser'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 4 problems (0 errors, 4 warnings)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

@@ -1,0 +1,64 @@
+{
+  "commit": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "source_clean_before_and_after": true,
+  "completed_utc": "2026-10-12T05:36:04Z",
+  "results": {
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 19.05,
+      "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/lint.log"
+    },
+    "app": {
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--reporter=dot"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 23.06,
+      "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/app.log"
+    },
+    "typecheck": {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 23.06,
+      "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/typecheck.log"
+    },
+    "server": {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=2",
+        "server/accountFeatures.test.js",
+        "server/adminDashboard.xss.test.js",
+        "server/batch4.test.js",
+        "server/cancelRequest.test.js",
+        "server/isolatedOtp.test.js",
+        "server/kavenegarSms.test.js",
+        "server/orderEvents.test.js",
+        "server/orderStart.test.js",
+        "server/pointsService.test.js",
+        "server/sensitiveData.test.js",
+        "server/smsOtpFlow.test.js",
+        "server/sqliteFlow.test.js",
+        "server/startIntegration.test.js",
+        "server/workerCompletionIntegration.test.js",
+        "server/workerDocumentStorage.test.js",
+        "server/workerOrderPrivacy.test.js"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 38.09,
+      "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/server.log"
+    }
+  }
+}

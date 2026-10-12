@@ -1,0 +1,68 @@
+{
+  "synthetic_commit": "b86a3512ed4833f48540f582a3626ba4a7d90072",
+  "tree": "7a7e575fc0da16615e595d60f252faeec42e3d24",
+  "source_clean_before_and_after": true,
+  "sequential_checks": true,
+  "completed_utc": "2026-10-12T09:21:28Z",
+  "results": {
+    "typecheck": {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 8.79,
+      "log": "/workspace/reports/pr9-pr10-integration-20261012/tests-latest-a447ac5/typecheck.log"
+    },
+    "server": {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "server/accountFeatures.test.js",
+        "server/adminDashboard.xss.test.js",
+        "server/batch4.test.js",
+        "server/cancelRequest.test.js",
+        "server/isolatedOtp.test.js",
+        "server/kavenegarSms.test.js",
+        "server/orderEvents.test.js",
+        "server/orderStart.test.js",
+        "server/pointsService.test.js",
+        "server/sensitiveData.test.js",
+        "server/smsOtpFlow.test.js",
+        "server/sqliteFlow.test.js",
+        "server/startIntegration.test.js",
+        "server/workerCompletionIntegration.test.js",
+        "server/workerDocumentStorage.test.js",
+        "server/workerOrderPrivacy.test.js"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 28.51,
+      "log": "/workspace/reports/pr9-pr10-integration-20261012/tests-latest-a447ac5/server.log"
+    },
+    "app": {
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--reporter=dot",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 10.74,
+      "log": "/workspace/reports/pr9-pr10-integration-20261012/tests-latest-a447ac5/app.log"
+    },
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 4.53,
+      "log": "/workspace/reports/pr9-pr10-integration-20261012/tests-latest-a447ac5/lint.log"
+    }
+  }
+}

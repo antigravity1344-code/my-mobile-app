@@ -1,0 +1,159 @@
+{
+  "commit": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "tests": {
+    "commit": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+    "source_clean_before_and_after": true,
+    "completed_utc": "2026-10-12T05:36:04Z",
+    "results": {
+      "lint": {
+        "command": [
+          "npm",
+          "run",
+          "lint"
+        ],
+        "exit_code": 0,
+        "duration_seconds": 19.05,
+        "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/lint.log"
+      },
+      "app": {
+        "command": [
+          "npm",
+          "test",
+          "--",
+          "--reporter=dot"
+        ],
+        "exit_code": 0,
+        "duration_seconds": 23.06,
+        "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/app.log"
+      },
+      "typecheck": {
+        "command": [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        "exit_code": 0,
+        "duration_seconds": 23.06,
+        "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/typecheck.log"
+      },
+      "server": {
+        "command": [
+          "node",
+          "--test",
+          "--test-concurrency=2",
+          "server/accountFeatures.test.js",
+          "server/adminDashboard.xss.test.js",
+          "server/batch4.test.js",
+          "server/cancelRequest.test.js",
+          "server/isolatedOtp.test.js",
+          "server/kavenegarSms.test.js",
+          "server/orderEvents.test.js",
+          "server/orderStart.test.js",
+          "server/pointsService.test.js",
+          "server/sensitiveData.test.js",
+          "server/smsOtpFlow.test.js",
+          "server/sqliteFlow.test.js",
+          "server/startIntegration.test.js",
+          "server/workerCompletionIntegration.test.js",
+          "server/workerDocumentStorage.test.js",
+          "server/workerOrderPrivacy.test.js"
+        ],
+        "exit_code": 0,
+        "duration_seconds": 38.09,
+        "log": "/workspace/reports/worker-start-pr9-review-20261012/final-tests-8ac99c5/server.log"
+      }
+    }
+  },
+  "android": {
+    "commit": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+    "original_fresh_bundle_build_commit": "88c952fd1c66d95852ae7e4c07be15a67bfa2bac",
+    "apk_app_native_source_identical": true,
+    "apk_source_files_checked": 227,
+    "later_changed_files": [
+      ".github/workflows/verify-safe-ui.yml",
+      "docs/PR9_TECHNICAL_REVIEW.fa.md",
+      "server/orderStart.js",
+      "server/orderStart.test.js"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 40.82,
+    "command": [
+      "/workspace/android-tools/gradle/gradle-9.3.1/bin/gradle",
+      ":app:assembleCustomerDebug",
+      ":app:assembleWorkerDebug",
+      "--no-daemon",
+      "--console=plain",
+      "--max-workers=2",
+      "-PreactNativeArchitectures=arm64-v8a",
+      "--stacktrace",
+      "--init-script",
+      "/workspace/reports/server-pricing-d60-configurable/practical/android/central-bouncycastle.init.gradle",
+      "-Dhttps.proxyHost=proxy",
+      "-Dhttps.proxyPort=8080",
+      "-Dhttp.proxyHost=proxy",
+      "-Dhttp.proxyPort=8080",
+      "-Djavax.net.ssl.trustStore=/workspace/android-tools/cacerts"
+    ],
+    "device_test": false,
+    "artifacts": {
+      "customer": {
+        "sha256": "a9e236fd68b679a3658265e72d3db8a51c80249dd2f859ddffb13077c52140f9",
+        "bytes": 72218310,
+        "archived_apk_identical": true,
+        "package": "com.paksho.customer",
+        "architecture": "arm64-v8a",
+        "signature_verified": true,
+        "fresh_bundle_unchanged": true,
+        "isolated_api_marker_present": true,
+        "path": "/workspace/reports/worker-start-pr9-review-20261012/android/customer-debug.apk"
+      },
+      "worker": {
+        "sha256": "d18b4c3924b5e713248030bfda19339fac8a4814315acce620868126073d3f2d",
+        "bytes": 71740090,
+        "archived_apk_identical": true,
+        "package": "com.paksho.worker",
+        "architecture": "arm64-v8a",
+        "signature_verified": true,
+        "fresh_bundle_unchanged": true,
+        "isolated_api_marker_present": true,
+        "path": "/workspace/reports/worker-start-pr9-review-20261012/android/worker-debug.apk"
+      }
+    }
+  },
+  "ci_url": "https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38208269197",
+  "ci_conclusion": "success",
+  "ci_jobs": [
+    {
+      "name": "Typecheck, lint and all regression tests (no SMS)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Android worker Debug ARM64",
+      "conclusion": "success"
+    },
+    {
+      "name": "Android customer Debug ARM64",
+      "conclusion": "success"
+    }
+  ],
+  "server_tests": 196,
+  "app_tests": 228,
+  "app_test_files": 46,
+  "lint_errors": 0,
+  "existing_lint_warnings": 4,
+  "handset_test_performed": false,
+  "real_sms_sent": false,
+  "financial_implementation_performed": false,
+  "merge_performed": false,
+  "added_commits": 9,
+  "mission_changed_files": 32,
+  "full_pr_changed_files": 33,
+  "prepared_tehran": "2026-10-12T09:56:52.686683+03:30",
+  "pr_url": "https://github.com/antigravity1344-code/my-mobile-app/pull/9",
+  "pr_state": "OPEN",
+  "pr_draft": true,
+  "pr_body_verified": true,
+  "protected_refs_verified": true,
+  "prior_artifacts_verified": 120,
+  "review_archive": "/workspace/reports/paksho-pr9-review-8ac99c5.zip"
+}

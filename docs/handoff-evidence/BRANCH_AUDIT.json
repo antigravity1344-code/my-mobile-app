@@ -1,0 +1,3626 @@
+{
+  "repository": "antigravity1344-code/my-mobile-app",
+  "snapshot_date": "2026-10-12",
+  "official_reference": {
+    "branch": "ui/customer-home-redesign",
+    "sha": "febe14ee679c4d71b177e3b65844be6b14ce9625"
+  },
+  "current_default_branch": "feature/orders",
+  "remote_branch_count": 19,
+  "method": {
+    "ahead_behind": "git rev-list --left-right --count official_base...head; behind then ahead",
+    "exclusive_commits": "git rev-list head --not all other 18 frozen remote heads; all are retained now",
+    "patch_equivalence": "git cherry official_base head examines non-merge patches only; squash may combine multiple patches and appear +",
+    "no_patch_equivalence_is_not_proof_of_unique_behavior": true,
+    "snapshot_mutations": "none: read-only ancestry/tree/patch analysis; no source edits, checkout, commit, pushes or deletion"
+  },
+  "recovery_bundle": {
+    "path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+    "verified": true,
+    "complete_history": true,
+    "sha256": "be014f7a0165c05b8b0ee267bc1d228cfe4d9966f04d7bf7151de91815c9f1fb",
+    "ref_count": 19
+  },
+  "categories": {
+    "active_necessary": [
+      "feature/orders",
+      "integration/worker-start-followup-20261012",
+      "main",
+      "ui/customer-home-redesign",
+      "ui/ux-ui-development"
+    ],
+    "backup_recovery": [
+      "backup/pre-ui-folder-integration-20261011",
+      "cursor/restore-customer-home-pre-pr3-e352",
+      "cursor/restore-customer-home-pre-pr4-e352",
+      "cursor/restore-customer-home-pre-pr5-e352"
+    ],
+    "merged_candidate_after_approval": [
+      "cursor/architecture-followup-e352",
+      "cursor/stage3-order-cancel-e352",
+      "cursor/stage4-loyalty-tier-e352",
+      "fix/admin-dashboard-xss",
+      "integration/ui-safe-only-20261012"
+    ],
+    "old_no_unique_candidate_after_approval": [
+      "feature/profile-and-auth",
+      "say_hello"
+    ],
+    "unmerged_unique": [
+      "agents/greeting-in-persian-b5e6f654",
+      "feature/customers",
+      "integration/ui-folder-reconcile-20261011"
+    ]
+  },
+  "pr8_squash_proof": {
+    "head": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+    "official_base": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+    "head_reachable_from_base": false,
+    "equal_tree": true,
+    "tree": "c24dc576576aa06c34a68f5388ab444094cb95e9",
+    "merge_parent": "c88d58da9be609b89327b747641bb83a9cb88419",
+    "reason": "GitHub marked PR #8 MERGED; base and PR head have identical final trees despite squash ancestry."
+  },
+  "pr7_unmerged_proof": {
+    "head": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619",
+    "state": "CLOSED",
+    "merge_commit": null,
+    "git_cherry_vs_pr9": [
+      {
+        "indicator": "+",
+        "sha": "9927927d06e69c3f8e84b67f45def36a94988787"
+      },
+      {
+        "indicator": "+",
+        "sha": "8ed2f7a840a9815ee867e7a76670f52255b0c295"
+      },
+      {
+        "indicator": "+",
+        "sha": "e99eb403eaf4a36c6f0f71cf7ad2bbe043c81c85"
+      },
+      {
+        "indicator": "+",
+        "sha": "b0436a8a6cda6feba07b4d959f4b56a2d4bd5ed2"
+      },
+      {
+        "indicator": "+",
+        "sha": "bf61c1a33007a89d5592f35dd036b7c768b13ce2"
+      },
+      {
+        "indicator": "+",
+        "sha": "3ef155c1f41fab3fa784e6d693ffd4295728ff8f"
+      },
+      {
+        "indicator": "+",
+        "sha": "ded334a3b647ed3a53e732e10a40381653461714"
+      },
+      {
+        "indicator": "+",
+        "sha": "86010e4348018654da9cfb6c9893cc888697ae31"
+      },
+      {
+        "indicator": "+",
+        "sha": "5fabf1fe14fd5b4983697a9e7b6bb0bc8c5954ef"
+      },
+      {
+        "indicator": "+",
+        "sha": "9783944eeb25c0e4306e8b1358d1539573ad80d2"
+      },
+      {
+        "indicator": "+",
+        "sha": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619"
+      }
+    ],
+    "net_changes_vs_base": [
+      [
+        "R075",
+        ".github/workflows/verify-safe-ui.yml",
+        ".github/workflows/check-ui-integration.yml"
+      ],
+      [
+        "A",
+        "docs/WORKER_LIFECYCLE_AND_FINANCIAL_POLICY_20261011.fa.md"
+      ],
+      [
+        "M",
+        "server/dataStore.js"
+      ],
+      [
+        "M",
+        "server/index.js"
+      ],
+      [
+        "A",
+        "server/orderStart.js"
+      ],
+      [
+        "A",
+        "server/startIntegration.test.js"
+      ],
+      [
+        "M",
+        "src/api/types.ts"
+      ],
+      [
+        "M",
+        "src/components/native/NativeWorkerPortal.tsx"
+      ],
+      [
+        "M",
+        "src/components/native/workerOrderStatus.test.ts"
+      ],
+      [
+        "M",
+        "src/components/native/workerOrderStatus.ts"
+      ],
+      [
+        "M",
+        "src/features/orders/components/OrderDetailModal.tsx"
+      ],
+      [
+        "M",
+        "src/features/orders/components/OrdersScreen.tsx"
+      ],
+      [
+        "M",
+        "src/features/orders/context/OrdersContext.tsx"
+      ],
+      [
+        "M",
+        "src/features/orders/services/orderService.ts"
+      ],
+      [
+        "M",
+        "src/features/orders/types/order.ts"
+      ]
+    ],
+    "net_changes_vs_pr9": [
+      [
+        "A",
+        ".github/workflows/check-ui-integration.yml"
+      ],
+      [
+        "D",
+        ".github/workflows/verify-safe-ui.yml"
+      ],
+      [
+        "M",
+        "docs/ARCHITECTURE_DECISIONS.md"
+      ],
+      [
+        "D",
+        "docs/PR9_TECHNICAL_REVIEW.fa.md"
+      ],
+      [
+        "M",
+        "docs/WORKER_LIFECYCLE_AND_FINANCIAL_POLICY_20261011.fa.md"
+      ],
+      [
+        "M",
+        "server/accountFeatures.test.js"
+      ],
+      [
+        "M",
+        "server/batch4.test.js"
+      ],
+      [
+        "M",
+        "server/dataStore.js"
+      ],
+      [
+        "M",
+        "server/index.js"
+      ],
+      [
+        "D",
+        "server/isolatedOtp.test.js"
+      ],
+      [
+        "M",
+        "server/kavenegarSms.js"
+      ],
+      [
+        "M",
+        "server/kavenegarSms.test.js"
+      ],
+      [
+        "M",
+        "server/orderEvents.test.js"
+      ],
+      [
+        "M",
+        "server/orderStart.js"
+      ],
+      [
+        "D",
+        "server/orderStart.test.js"
+      ],
+      [
+        "M",
+        "server/pointsService.test.js"
+      ],
+      [
+        "M",
+        "server/sqliteFlow.test.js"
+      ],
+      [
+        "M",
+        "server/startIntegration.test.js"
+      ],
+      [
+        "D",
+        "server/testAuthHarness.js"
+      ],
+      [
+        "D",
+        "server/workerCompletionIntegration.test.js"
+      ],
+      [
+        "M",
+        "server/workerDocumentStorage.test.js"
+      ],
+      [
+        "M",
+        "server/workerOrderPrivacy.test.js"
+      ],
+      [
+        "M",
+        "src/api/types.ts"
+      ],
+      [
+        "M",
+        "src/components/native/NativeWorkerPortal.tsx"
+      ],
+      [
+        "M",
+        "src/components/native/workerOrderStatus.test.ts"
+      ],
+      [
+        "M",
+        "src/components/native/workerOrderStatus.ts"
+      ],
+      [
+        "M",
+        "src/features/cleaners/components/CleanerDetailModal.tsx"
+      ],
+      [
+        "D",
+        "src/features/cleaners/components/cleanerPayoutPresentation.test.ts"
+      ],
+      [
+        "M",
+        "src/features/orders/components/OrderDetailModal.tsx"
+      ],
+      [
+        "M",
+        "src/features/orders/context/OrdersContext.tsx"
+      ],
+      [
+        "M",
+        "src/features/orders/services/orderService.ts"
+      ],
+      [
+        "D",
+        "src/features/orders/services/startResponseContract.test.ts"
+      ],
+      [
+        "M",
+        "src/features/orders/types/order.ts"
+      ]
+    ],
+    "exact_tree_equal_pr9": false,
+    "must_not_treat_as_fully_covered": true
+  },
+  "closed_pr_with_missing_remote_branch": [
+    {
+      "baseRefName": "main",
+      "headRefName": "cursor/ui-redesign-f51e",
+      "headRefOid": "07a708d983711cbdb86963cd117ad6fd5147b7a7",
+      "isDraft": true,
+      "mergeCommit": null,
+      "mergedAt": null,
+      "number": 2,
+      "state": "CLOSED",
+      "title": "feat(ui): Paksho design system and Customer Home (phase 1)",
+      "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/2"
+    }
+  ],
+  "branches": [
+    {
+      "sha": "09e14f87ca47f2a5fce4a8832e198ae1dc0e5875",
+      "name": "agents/greeting-in-persian-b5e6f654",
+      "audit_ref": "refs/remotes/stabilization-20261012/agents/greeting-in-persian-b5e6f654",
+      "category": "unmerged_unique",
+      "category_fa": "ادغام‌نشده با تغییر منحصربه‌فرد",
+      "reason_fa": "نام شاخه گمراه‌کننده است: یک کامیت واقعی اصلاحات فرم/قیمت/خدمات و وابستگی‌ها دارد؛ ادغام‌نشده و محفوظ تا بررسی محتوا.",
+      "ahead_of_official_base_commits": 1,
+      "behind_official_base_commits": 84,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 1,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "09e14f87ca47f2a5fce4a8832e198ae1dc0e5875",
+          "subject": "fix: pre-build audit — fix Japanese character bug, service-agnostic labels in wizard, add new services to PricingTable, fix step4 dynamic duration label"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "09e14f87ca47f2a5fce4a8832e198ae1dc0e5875"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 1,
+      "final_tree_sha": "c0dbb2cbea7ab12e28435acd5b845f98dec6b3d1",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/agents/greeting-in-persian-b5e6f654",
+        "bundle_verified": true,
+        "sha": "09e14f87ca47f2a5fce4a8832e198ae1dc0e5875"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false,
+      "changes_from_merge_base_with_official_base": [
+        [
+          "M",
+          ".expo/dev/logs/start.log"
+        ],
+        [
+          "D",
+          "cleaning-mobile"
+        ],
+        [
+          "M",
+          "package-lock.json"
+        ],
+        [
+          "M",
+          "src/components/booking/BookingWizardContainer.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/PricingTable.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/ServiceSelector.tsx"
+        ],
+        [
+          "M",
+          "src/services/location.ts"
+        ]
+      ],
+      "net_tree_changes_vs_official_base": [
+        [
+          "M",
+          ".env.example"
+        ],
+        [
+          "A",
+          ".expo/dev/logs/start.log"
+        ],
+        [
+          "D",
+          ".github/workflows/verify-safe-ui.yml"
+        ],
+        [
+          "M",
+          ".gitignore"
+        ],
+        [
+          "A",
+          ".gitmodules"
+        ],
+        [
+          "D",
+          "Agent 1- copilot.code-workspace"
+        ],
+        [
+          "D",
+          "App.customer.tsx"
+        ],
+        [
+          "M",
+          "App.tsx"
+        ],
+        [
+          "D",
+          "App.worker.tsx"
+        ],
+        [
+          "D",
+          "PROJECT_STATE.md"
+        ],
+        [
+          "M",
+          "TODO.md"
+        ],
+        [
+          "M",
+          "android/app/build.gradle"
+        ],
+        [
+          "M",
+          "android/app/src/main/AndroidManifest.xml"
+        ],
+        [
+          "M",
+          "android/app/src/main/java/com/anonymous/cleaningmobile/MainActivity.kt"
+        ],
+        [
+          "M",
+          "android/app/src/main/res/values/strings.xml"
+        ],
+        [
+          "D",
+          "app.customer.json"
+        ],
+        [
+          "M",
+          "app.json"
+        ],
+        [
+          "D",
+          "app.worker.json"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Bold.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Medium.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Regular.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-SemiBold.ttf"
+        ],
+        [
+          "D",
+          "build-error.txt"
+        ],
+        [
+          "D",
+          "docs/ARCHITECTURE_DECISIONS.md"
+        ],
+        [
+          "D",
+          "index.customer.ts"
+        ],
+        [
+          "M",
+          "index.ts"
+        ],
+        [
+          "D",
+          "index.worker.ts"
+        ],
+        [
+          "M",
+          "package-lock.json"
+        ],
+        [
+          "M",
+          "package.json"
+        ],
+        [
+          "D",
+          "scripts/cleaners-rules-smoke.ts"
+        ],
+        [
+          "D",
+          "server/accountFeatures.test.js"
+        ],
+        [
+          "D",
+          "server/adminDashboard.xss.test.js"
+        ],
+        [
+          "D",
+          "server/batch4.test.js"
+        ],
+        [
+          "D",
+          "server/cancelRequest.test.js"
+        ],
+        [
+          "D",
+          "server/dataStore.js"
+        ],
+        [
+          "D",
+          "server/fieldCrypto.js"
+        ],
+        [
+          "D",
+          "server/index.js"
+        ],
+        [
+          "D",
+          "server/kavenegarSms.js"
+        ],
+        [
+          "D",
+          "server/kavenegarSms.test.js"
+        ],
+        [
+          "D",
+          "server/migrate-json-to-sqlite.js"
+        ],
+        [
+          "D",
+          "server/migrate-sensitive-fields.js"
+        ],
+        [
+          "D",
+          "server/orderEvents.test.js"
+        ],
+        [
+          "D",
+          "server/package-lock.json"
+        ],
+        [
+          "D",
+          "server/package.json"
+        ],
+        [
+          "D",
+          "server/pointsService.js"
+        ],
+        [
+          "D",
+          "server/pointsService.test.js"
+        ],
+        [
+          "D",
+          "server/sensitiveData.test.js"
+        ],
+        [
+          "D",
+          "server/smsOtpFlow.test.js"
+        ],
+        [
+          "D",
+          "server/sqliteFlow.test.js"
+        ],
+        [
+          "D",
+          "server/workerDocumentStorage.js"
+        ],
+        [
+          "D",
+          "server/workerDocumentStorage.test.js"
+        ],
+        [
+          "D",
+          "server/workerOrderPrivacy.test.js"
+        ],
+        [
+          "D",
+          "src/api/accountBlocked.test.ts"
+        ],
+        [
+          "D",
+          "src/api/accountBlocked.ts"
+        ],
+        [
+          "D",
+          "src/api/apiClient.ts"
+        ],
+        [
+          "D",
+          "src/api/authToken.test.ts"
+        ],
+        [
+          "D",
+          "src/api/authToken.ts"
+        ],
+        [
+          "M",
+          "src/api/payment.ts"
+        ],
+        [
+          "D",
+          "src/api/sessionExpired.ts"
+        ],
+        [
+          "D",
+          "src/api/types.ts"
+        ],
+        [
+          "M",
+          "src/components/booking/AddressLocationSelector.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/BookingWizardContainer.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/DateTimeSelector.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/NativeBookingWizard.tsx"
+        ],
+        [
+          "A",
+          "src/components/booking/PaymentReceiptScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/PricingTable.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/ServiceSelector.tsx"
+        ],
+        [
+          "D",
+          "src/components/booking/addressFieldTone.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/addressFieldTone.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/keyboardReveal.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/keyboardReveal.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/rtlHorizontalList.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/rtlHorizontalList.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/submitGuard.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/submitGuard.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/webDateTimeSelector.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/wizardBackNavigation.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/wizardBackNavigation.ts"
+        ],
+        [
+          "M",
+          "src/components/dashboard/AdminPanelScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/dashboard/OrdersScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/dashboard/ProfileScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/dashboard/SpecialistPortalScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/BottomSheetModal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerHomeScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerOnboardingModal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerTabBar.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeAppContainer.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeCustomerApp.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeWorkerApp.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeWorkerPortal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/WorkerAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/WorkerOnboardingScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/accountBlockedWiring.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/customerLoginStorage.ts"
+        ],
+        [
+          "D",
+          "src/components/native/icons/CustomerIcons.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/rtlInput.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/rtlInput.ts"
+        ],
+        [
+          "D",
+          "src/components/native/selectSmartHero.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/selectSmartHero.ts"
+        ],
+        [
+          "D",
+          "src/components/native/sheetKeyboard.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/sheetKeyboard.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useAccountBlockedLogout.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useSessionExpiredLogout.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useSheetKeyboard.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerAppProviders.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerLoginStorage.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrderStatus.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrderStatus.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrdersFetch.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrdersFetch.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerServiceCategory.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerServiceCategory.ts"
+        ],
+        [
+          "M",
+          "src/context/BookingContext.tsx"
+        ],
+        [
+          "D",
+          "src/context/WorkerBookingContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/auth/components/MobileAuthModal.module.css"
+        ],
+        [
+          "D",
+          "src/features/auth/components/MobileAuthModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/auth/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerCard.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerDetailModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerFilterTabs.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerSignupModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanersFeature.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanersScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/EmptyCleanersState.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/context/CleanersContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/context/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/hooks/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/hooks/useCleaners.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cancellationRules.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cleanerPricing.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cleanerService.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/types/cleaner.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/types/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/filterCleaners.test.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/filterCleaners.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/specialtyLabels.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/validation/cleanerValidation.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/validation/index.ts"
+        ],
+        [
+          "D",
+          "src/features/notifications/NativeNotificationsScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/notifications/notificationsUnread.test.ts"
+        ],
+        [
+          "D",
+          "src/features/notifications/notificationsUnread.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/EmptyOrdersState.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderCard.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderDetailModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderFilterTabs.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderRatingModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderStatusBadge.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderTrackingTimeline.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrdersScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/orderModalsState.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/ratingDraft.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/context/OrdersContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/context/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/context/ordersContextWiring.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/hooks/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/hooks/useOrders.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderCardCentered.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderDetailSupportCall.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderStatusLabels.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderStatusLabels.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/ordersScreenKeys.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/ordersStatsTiles.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/serviceTitleDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/serviceTitleDisplay.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/batch4Client.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/clientRequestId.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/money.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderPayload.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderPayload.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderScheduleText.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderService.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderSessionCache.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderStatusWatch.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderStatusWatch.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/ordersFetch.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/ordersFetch.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/unknownStatus.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/types/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/types/order.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/components/AddressManagerModal.module.css"
+        ],
+        [
+          "D",
+          "src/features/profile/components/AddressManagerModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/NativeAddressManagerModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/NativeProfileScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/ProfileScreen.module.css"
+        ],
+        [
+          "D",
+          "src/features/profile/components/ProfileScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/context/ProfileContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/index.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/mainAddress.test.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/mainAddress.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/profileAddressPlacement.test.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/types/profile.ts"
+        ],
+        [
+          "D",
+          "src/features/support/components/NativeSupportScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/support/index.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportConfig.test.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportConfig.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportGreeting.test.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportGreeting.ts"
+        ],
+        [
+          "M",
+          "src/services/location.ts"
+        ],
+        [
+          "D",
+          "src/theme/customerHome.ts"
+        ],
+        [
+          "D",
+          "src/theme/index.ts"
+        ],
+        [
+          "D",
+          "src/theme/primitives.tsx"
+        ],
+        [
+          "D",
+          "src/theme/styleAudit.ts"
+        ],
+        [
+          "D",
+          "src/types/assets.d.ts"
+        ],
+        [
+          "D",
+          "src/types/css-modules.d.ts"
+        ],
+        [
+          "D",
+          "src/types/user.ts"
+        ],
+        [
+          "D",
+          "src/utils/bookingValidation.test.ts"
+        ],
+        [
+          "M",
+          "src/utils/bookingValidation.ts"
+        ],
+        [
+          "D",
+          "src/utils/expectedStartAt.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/expectedStartAt.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDateOptions.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDateOptions.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDisplay.ts"
+        ],
+        [
+          "D",
+          "src/utils/onSiteWording.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/persianDigitsDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/pricing.test.ts"
+        ],
+        [
+          "M",
+          "src/utils/pricing.ts"
+        ],
+        [
+          "D",
+          "src/utils/storage.ts"
+        ],
+        [
+          "M",
+          "tsconfig.json"
+        ],
+        [
+          "D",
+          "vitest.config.ts"
+        ]
+      ]
+    },
+    {
+      "sha": "c88d58da9be609b89327b747641bb83a9cb88419",
+      "name": "backup/pre-ui-folder-integration-20261011",
+      "audit_ref": "refs/remotes/stabilization-20261012/backup/pre-ui-folder-integration-20261011",
+      "category": "backup_recovery",
+      "category_fa": "پشتیبان / بازگشت",
+      "reason_fa": "نقطه بازگشت قبل از ادغام رابط PR #8؛ حتی با پوشش ancestry حفظ شود.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 1,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "18d215743854961ebd0be4f2ee6916e39b922b01",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/backup/pre-ui-folder-integration-20261011",
+        "bundle_verified": true,
+        "sha": "c88d58da9be609b89327b747641bb83a9cb88419"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69",
+      "name": "cursor/architecture-followup-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/architecture-followup-e352",
+      "category": "merged_candidate_after_approval",
+      "category_fa": "ادغام‌شده؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "PR #3 ادغام‌شده و head در ancestry مرجع؛ فقط نامزد بررسی حذف پس از تصویب مستقل.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 9,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "13eb4249686955970c2b7f0d1431059d2063e817",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "cursor/architecture-followup-e352",
+          "headRefOid": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69",
+          "isDraft": true,
+          "mergeCommit": {
+            "oid": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69"
+          },
+          "mergedAt": "2026-10-11T11:25:30Z",
+          "number": 3,
+          "state": "MERGED",
+          "title": "هسته امتیاز و رفع مغایرت‌های تأییدشده با سند معماری",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/3"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/architecture-followup-e352",
+        "bundle_verified": true,
+        "sha": "a8b0ae5f7abdb7a93908f796b234eba9b6aa5a69"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "e4701772b338aaf426324b669bee4366085a3fce",
+      "name": "cursor/restore-customer-home-pre-pr3-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr3-e352",
+      "category": "backup_recovery",
+      "category_fa": "پشتیبان / بازگشت",
+      "reason_fa": "نقطه بازگشت پیش از PR #3؛ حذف ممنوع در این مأموریت.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 11,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/architecture-followup-e352",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "5d2dd482b193465d4af557de4f973adee4a94d98",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr3-e352",
+        "bundle_verified": true,
+        "sha": "e4701772b338aaf426324b669bee4366085a3fce"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "f546620d3e3d496b9f8bde080028e6b0c00120a3",
+      "name": "cursor/restore-customer-home-pre-pr4-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr4-e352",
+      "category": "backup_recovery",
+      "category_fa": "پشتیبان / بازگشت",
+      "reason_fa": "نقطه بازگشت پیش از PR #4؛ حذف ممنوع در این مأموریت.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 8,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "5f8ef2f9bdef1e3d317ae46682d4cbf3d5078424",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr4-e352",
+        "bundle_verified": true,
+        "sha": "f546620d3e3d496b9f8bde080028e6b0c00120a3"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "bf456381b2b367ca9ee9600a990f3465a1ab3bec",
+      "name": "cursor/restore-customer-home-pre-pr5-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr5-e352",
+      "category": "backup_recovery",
+      "category_fa": "پشتیبان / بازگشت",
+      "reason_fa": "نقطه بازگشت پیش از PR #5؛ حذف ممنوع در این مأموریت.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 6,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "41c508529da782c19d25258726275169b41b059b",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/restore-customer-home-pre-pr5-e352",
+        "bundle_verified": true,
+        "sha": "bf456381b2b367ca9ee9600a990f3465a1ab3bec"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "bf456381b2b367ca9ee9600a990f3465a1ab3bec",
+      "name": "cursor/stage3-order-cancel-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/stage3-order-cancel-e352",
+      "category": "merged_candidate_after_approval",
+      "category_fa": "ادغام‌شده؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "PR #4 ادغام‌شده و head در ancestry مرجع؛ همان SHA نقطه بازگشت pre-pr5 است، آن نقطه حفظ شود.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 6,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "41c508529da782c19d25258726275169b41b059b",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "cursor/stage3-order-cancel-e352",
+          "headRefOid": "bf456381b2b367ca9ee9600a990f3465a1ab3bec",
+          "isDraft": true,
+          "mergeCommit": {
+            "oid": "bf456381b2b367ca9ee9600a990f3465a1ab3bec"
+          },
+          "mergedAt": "2026-10-11T12:14:40Z",
+          "number": 4,
+          "state": "MERGED",
+          "title": "مرحله ۳: پیش‌نمایش و مهلت بررسی لغو سفارش",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/4"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/stage3-order-cancel-e352",
+        "bundle_verified": true,
+        "sha": "bf456381b2b367ca9ee9600a990f3465a1ab3bec"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60",
+      "name": "cursor/stage4-loyalty-tier-e352",
+      "audit_ref": "refs/remotes/stabilization-20261012/cursor/stage4-loyalty-tier-e352",
+      "category": "merged_candidate_after_approval",
+      "category_fa": "ادغام‌شده؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "PR #5 ادغام‌شده و head در ancestry مرجع؛ فقط نامزد بررسی حذف پس از تصویب مستقل.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 5,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "694187ffab85cc16eb15f776ae23c25b43f91ea9",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "cursor/stage4-loyalty-tier-e352",
+          "headRefOid": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60",
+          "isDraft": false,
+          "mergeCommit": {
+            "oid": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60"
+          },
+          "mergedAt": "2026-10-11T12:51:06Z",
+          "number": 5,
+          "state": "MERGED",
+          "title": "مرحله ۴: سطح وفاداری از user_points",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/5"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/cursor/stage4-loyalty-tier-e352",
+        "bundle_verified": true,
+        "sha": "280dc6b1616f5dd774701a4b56faf1ebe0f53d60"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "da01a6667172876e0b3bb93c6905675a652d2fa5",
+      "name": "feature/customers",
+      "audit_ref": "refs/remotes/stabilization-20261012/feature/customers",
+      "category": "unmerged_unique",
+      "category_fa": "ادغام‌نشده با تغییر منحصربه‌فرد",
+      "reason_fa": "سه کامیت ادغام‌نشده شامل پرداخت، واحد پول و قیمت‌گذاری؛ بدون تصویب سیاست مالی قابل ادغام خودکار نیست و حذف پیشنهاد نمی‌شود.",
+      "ahead_of_official_base_commits": 3,
+      "behind_official_base_commits": 91,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 3,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "da01a6667172876e0b3bb93c6905675a652d2fa5",
+          "subject": "fix: align legacy payment currency"
+        },
+        {
+          "sha": "391ee04e6924326e752a16c9afb0cb6409d47d5f",
+          "subject": "fix: validate payment responses safely"
+        },
+        {
+          "sha": "5ff2f590ba38ffa37d2d177c2fb20fd24ec71231",
+          "subject": "Agent Host changes for feature/customers"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "5ff2f590ba38ffa37d2d177c2fb20fd24ec71231"
+        },
+        {
+          "indicator": "+",
+          "sha": "391ee04e6924326e752a16c9afb0cb6409d47d5f"
+        },
+        {
+          "indicator": "+",
+          "sha": "da01a6667172876e0b3bb93c6905675a652d2fa5"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 3,
+      "final_tree_sha": "6ef1d6a09a5ce3641ba862ed185b97829042310a",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/feature/customers",
+        "bundle_verified": true,
+        "sha": "da01a6667172876e0b3bb93c6905675a652d2fa5"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false,
+      "changes_from_merge_base_with_official_base": [
+        [
+          "M",
+          ".expo/dev/logs/start.log"
+        ],
+        [
+          "M",
+          "src/api/payment.ts"
+        ],
+        [
+          "M",
+          "src/components/booking/BookingWizardContainer.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/NativeBookingWizard.tsx"
+        ],
+        [
+          "M",
+          "src/utils/pricing.ts"
+        ]
+      ],
+      "net_tree_changes_vs_official_base": [
+        [
+          "M",
+          ".env.example"
+        ],
+        [
+          "A",
+          ".expo/dev/logs/start.log"
+        ],
+        [
+          "D",
+          ".github/workflows/verify-safe-ui.yml"
+        ],
+        [
+          "M",
+          ".gitignore"
+        ],
+        [
+          "A",
+          ".gitmodules"
+        ],
+        [
+          "D",
+          "Agent 1- copilot.code-workspace"
+        ],
+        [
+          "D",
+          "App.customer.tsx"
+        ],
+        [
+          "M",
+          "App.tsx"
+        ],
+        [
+          "D",
+          "App.worker.tsx"
+        ],
+        [
+          "D",
+          "PROJECT_STATE.md"
+        ],
+        [
+          "D",
+          "SUPERVISORY_AUDIT_REPORT.md"
+        ],
+        [
+          "M",
+          "TODO.md"
+        ],
+        [
+          "M",
+          "android/app/build.gradle"
+        ],
+        [
+          "M",
+          "android/app/src/main/AndroidManifest.xml"
+        ],
+        [
+          "M",
+          "android/app/src/main/java/com/anonymous/cleaningmobile/MainActivity.kt"
+        ],
+        [
+          "M",
+          "android/app/src/main/res/values/strings.xml"
+        ],
+        [
+          "D",
+          "app.customer.json"
+        ],
+        [
+          "M",
+          "app.json"
+        ],
+        [
+          "D",
+          "app.worker.json"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Bold.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Medium.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-Regular.ttf"
+        ],
+        [
+          "D",
+          "assets/fonts/Vazirmatn-UI-FD-SemiBold.ttf"
+        ],
+        [
+          "D",
+          "build-error.txt"
+        ],
+        [
+          "A",
+          "cleaning-mobile"
+        ],
+        [
+          "D",
+          "docs/ARCHITECTURE_DECISIONS.md"
+        ],
+        [
+          "D",
+          "index.customer.ts"
+        ],
+        [
+          "M",
+          "index.ts"
+        ],
+        [
+          "D",
+          "index.worker.ts"
+        ],
+        [
+          "M",
+          "package-lock.json"
+        ],
+        [
+          "M",
+          "package.json"
+        ],
+        [
+          "D",
+          "scripts/cleaners-rules-smoke.ts"
+        ],
+        [
+          "D",
+          "server/accountFeatures.test.js"
+        ],
+        [
+          "D",
+          "server/adminDashboard.xss.test.js"
+        ],
+        [
+          "D",
+          "server/batch4.test.js"
+        ],
+        [
+          "D",
+          "server/cancelRequest.test.js"
+        ],
+        [
+          "D",
+          "server/dataStore.js"
+        ],
+        [
+          "D",
+          "server/fieldCrypto.js"
+        ],
+        [
+          "D",
+          "server/index.js"
+        ],
+        [
+          "D",
+          "server/kavenegarSms.js"
+        ],
+        [
+          "D",
+          "server/kavenegarSms.test.js"
+        ],
+        [
+          "D",
+          "server/migrate-json-to-sqlite.js"
+        ],
+        [
+          "D",
+          "server/migrate-sensitive-fields.js"
+        ],
+        [
+          "D",
+          "server/orderEvents.test.js"
+        ],
+        [
+          "D",
+          "server/package-lock.json"
+        ],
+        [
+          "D",
+          "server/package.json"
+        ],
+        [
+          "D",
+          "server/pointsService.js"
+        ],
+        [
+          "D",
+          "server/pointsService.test.js"
+        ],
+        [
+          "D",
+          "server/sensitiveData.test.js"
+        ],
+        [
+          "D",
+          "server/smsOtpFlow.test.js"
+        ],
+        [
+          "D",
+          "server/sqliteFlow.test.js"
+        ],
+        [
+          "D",
+          "server/workerDocumentStorage.js"
+        ],
+        [
+          "D",
+          "server/workerDocumentStorage.test.js"
+        ],
+        [
+          "D",
+          "server/workerOrderPrivacy.test.js"
+        ],
+        [
+          "D",
+          "src/api/accountBlocked.test.ts"
+        ],
+        [
+          "D",
+          "src/api/accountBlocked.ts"
+        ],
+        [
+          "D",
+          "src/api/apiClient.ts"
+        ],
+        [
+          "D",
+          "src/api/authToken.test.ts"
+        ],
+        [
+          "D",
+          "src/api/authToken.ts"
+        ],
+        [
+          "M",
+          "src/api/payment.ts"
+        ],
+        [
+          "D",
+          "src/api/sessionExpired.ts"
+        ],
+        [
+          "D",
+          "src/api/types.ts"
+        ],
+        [
+          "M",
+          "src/components/booking/AddressLocationSelector.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/BookingWizardContainer.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/DateTimeSelector.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/NativeBookingWizard.tsx"
+        ],
+        [
+          "A",
+          "src/components/booking/PaymentReceiptScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/PricingTable.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/ServiceSelector.tsx"
+        ],
+        [
+          "D",
+          "src/components/booking/addressFieldTone.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/addressFieldTone.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/keyboardReveal.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/keyboardReveal.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/rtlHorizontalList.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/rtlHorizontalList.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/submitGuard.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/submitGuard.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/webDateTimeSelector.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/wizardBackNavigation.test.ts"
+        ],
+        [
+          "D",
+          "src/components/booking/wizardBackNavigation.ts"
+        ],
+        [
+          "D",
+          "src/components/dashboard/AdminPanelScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/dashboard/HomeScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/dashboard/OrdersScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/dashboard/ProfileScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/dashboard/SpecialistPortalScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/BottomSheetModal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerHomeScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerOnboardingModal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/CustomerTabBar.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeAppContainer.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeCustomerApp.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeWorkerApp.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/NativeWorkerPortal.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/WorkerAuthScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/WorkerOnboardingScreen.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/accountBlockedWiring.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/customerLoginStorage.ts"
+        ],
+        [
+          "D",
+          "src/components/native/icons/CustomerIcons.tsx"
+        ],
+        [
+          "D",
+          "src/components/native/rtlInput.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/rtlInput.ts"
+        ],
+        [
+          "D",
+          "src/components/native/selectSmartHero.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/selectSmartHero.ts"
+        ],
+        [
+          "D",
+          "src/components/native/sheetKeyboard.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/sheetKeyboard.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useAccountBlockedLogout.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useSessionExpiredLogout.ts"
+        ],
+        [
+          "D",
+          "src/components/native/useSheetKeyboard.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerAppProviders.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerLoginStorage.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrderStatus.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrderStatus.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrdersFetch.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerOrdersFetch.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerServiceCategory.test.ts"
+        ],
+        [
+          "D",
+          "src/components/native/workerServiceCategory.ts"
+        ],
+        [
+          "M",
+          "src/config/servicesData.ts"
+        ],
+        [
+          "M",
+          "src/context/BookingContext.tsx"
+        ],
+        [
+          "D",
+          "src/context/WorkerBookingContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/auth/components/MobileAuthModal.module.css"
+        ],
+        [
+          "D",
+          "src/features/auth/components/MobileAuthModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/auth/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerCard.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerDetailModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerFilterTabs.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanerSignupModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanersFeature.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/CleanersScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/EmptyCleanersState.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/components/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/context/CleanersContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/cleaners/context/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/hooks/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/hooks/useCleaners.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cancellationRules.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cleanerPricing.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/cleanerService.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/services/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/types/cleaner.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/types/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/filterCleaners.test.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/filterCleaners.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/index.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/utils/specialtyLabels.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/validation/cleanerValidation.ts"
+        ],
+        [
+          "D",
+          "src/features/cleaners/validation/index.ts"
+        ],
+        [
+          "D",
+          "src/features/notifications/NativeNotificationsScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/notifications/notificationsUnread.test.ts"
+        ],
+        [
+          "D",
+          "src/features/notifications/notificationsUnread.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/EmptyOrdersState.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderCard.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderDetailModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderFilterTabs.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderRatingModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderStatusBadge.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrderTrackingTimeline.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/OrdersScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/components/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/orderModalsState.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/components/ratingDraft.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/context/OrdersContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/orders/context/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/context/ordersContextWiring.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/hooks/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/hooks/useOrders.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderCardCentered.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderDetailSupportCall.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderStatusLabels.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/orderStatusLabels.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/ordersScreenKeys.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/ordersStatsTiles.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/serviceTitleDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/serviceTitleDisplay.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/batch4Client.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/clientRequestId.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/money.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderPayload.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderPayload.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderScheduleText.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderService.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderSessionCache.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderStatusWatch.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/orderStatusWatch.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/ordersFetch.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/ordersFetch.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/services/unknownStatus.test.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/types/index.ts"
+        ],
+        [
+          "D",
+          "src/features/orders/types/order.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/components/AddressManagerModal.module.css"
+        ],
+        [
+          "D",
+          "src/features/profile/components/AddressManagerModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/NativeAddressManagerModal.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/NativeProfileScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/components/ProfileScreen.module.css"
+        ],
+        [
+          "D",
+          "src/features/profile/components/ProfileScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/context/ProfileContext.tsx"
+        ],
+        [
+          "D",
+          "src/features/profile/index.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/mainAddress.test.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/mainAddress.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/profileAddressPlacement.test.ts"
+        ],
+        [
+          "D",
+          "src/features/profile/types/profile.ts"
+        ],
+        [
+          "D",
+          "src/features/support/components/NativeSupportScreen.tsx"
+        ],
+        [
+          "D",
+          "src/features/support/index.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportConfig.test.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportConfig.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportGreeting.test.ts"
+        ],
+        [
+          "D",
+          "src/features/support/supportGreeting.ts"
+        ],
+        [
+          "D",
+          "src/theme/customerHome.ts"
+        ],
+        [
+          "D",
+          "src/theme/index.ts"
+        ],
+        [
+          "D",
+          "src/theme/primitives.tsx"
+        ],
+        [
+          "D",
+          "src/theme/styleAudit.ts"
+        ],
+        [
+          "D",
+          "src/types/assets.d.ts"
+        ],
+        [
+          "D",
+          "src/types/css-modules.d.ts"
+        ],
+        [
+          "D",
+          "src/types/user.ts"
+        ],
+        [
+          "D",
+          "src/utils/bookingValidation.test.ts"
+        ],
+        [
+          "M",
+          "src/utils/bookingValidation.ts"
+        ],
+        [
+          "D",
+          "src/utils/expectedStartAt.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/expectedStartAt.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDateOptions.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDateOptions.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/jalaliDisplay.ts"
+        ],
+        [
+          "D",
+          "src/utils/onSiteWording.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/persianDigitsDisplay.test.ts"
+        ],
+        [
+          "D",
+          "src/utils/pricing.test.ts"
+        ],
+        [
+          "M",
+          "src/utils/pricing.ts"
+        ],
+        [
+          "D",
+          "src/utils/storage.ts"
+        ],
+        [
+          "M",
+          "tsconfig.json"
+        ],
+        [
+          "D",
+          "vitest.config.ts"
+        ]
+      ]
+    },
+    {
+      "sha": "67abba4b162917ffddbfca9ee741b230d8ac399c",
+      "name": "feature/orders",
+      "audit_ref": "refs/remotes/stabilization-20261012/feature/orders",
+      "category": "active_necessary",
+      "category_fa": "فعال / ضروری",
+      "reason_fa": "شاخه پیش‌فرض فعلی GitHub و مرجع تاریخی؛ تا تصویب تغییر پیش‌فرض محفوظ.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 76,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/architecture-followup-e352",
+        "cursor/restore-customer-home-pre-pr3-e352",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "main",
+        "say_hello",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "a1142c2ec9ba28d5290145fc75d0d2734fb36b15",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/feature/orders",
+        "bundle_verified": true,
+        "sha": "67abba4b162917ffddbfca9ee741b230d8ac399c"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "fac145d19fd7d7d6fef49876d60e644275287e82",
+      "name": "feature/profile-and-auth",
+      "audit_ref": "refs/remotes/stabilization-20261012/feature/profile-and-auth",
+      "category": "old_no_unique_candidate_after_approval",
+      "category_fa": "قدیمی بدون تغییر منحصربه‌فرد؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "قدیمی و تمام کامیت‌های قابل دسترس در ancestry مرجع؛ بدون PR مرتبط در snapshot. فقط نامزد بررسی حذف پس از تصویب.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 77,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/architecture-followup-e352",
+        "cursor/restore-customer-home-pre-pr3-e352",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "feature/orders",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "main",
+        "say_hello",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "a1142c2ec9ba28d5290145fc75d0d2734fb36b15",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/feature/profile-and-auth",
+        "bundle_verified": true,
+        "sha": "fac145d19fd7d7d6fef49876d60e644275287e82"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "9c112e06c83e66ace70f5fb4bd1585c98bb77912",
+      "name": "fix/admin-dashboard-xss",
+      "audit_ref": "refs/remotes/stabilization-20261012/fix/admin-dashboard-xss",
+      "category": "merged_candidate_after_approval",
+      "category_fa": "ادغام‌شده؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "PR #6 ادغام‌شده و head در ancestry مرجع؛ سابقه امنیتی و شرایط حفظ قبلی باید پیش از هر حذف بازبینی شوند.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 2,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "18d215743854961ebd0be4f2ee6916e39b922b01",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "fix/admin-dashboard-xss",
+          "headRefOid": "9c112e06c83e66ace70f5fb4bd1585c98bb77912",
+          "isDraft": false,
+          "mergeCommit": {
+            "oid": "c88d58da9be609b89327b747641bb83a9cb88419"
+          },
+          "mergedAt": "2026-10-11T16:36:26Z",
+          "number": 6,
+          "state": "MERGED",
+          "title": "رفع XSS پنل HTML مدیر در فهرست متخصصان و سفارش‌ها",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/6"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/fix/admin-dashboard-xss",
+        "bundle_verified": true,
+        "sha": "9c112e06c83e66ace70f5fb4bd1585c98bb77912"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619",
+      "name": "integration/ui-folder-reconcile-20261011",
+      "audit_ref": "refs/remotes/stabilization-20261012/integration/ui-folder-reconcile-20261011",
+      "category": "unmerged_unique",
+      "category_fa": "ادغام‌نشده با تغییر منحصربه‌فرد",
+      "reason_fa": "PR #7 بسته ولی ادغام‌نشده؛ چهار کامیت منحصربه‌فرد و تفاوت واقعی با PR #9 دارد. جایگزین‌شدن به معنای پوشش کامل محتوا نیست.",
+      "ahead_of_official_base_commits": 11,
+      "behind_official_base_commits": 1,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 4,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619",
+          "subject": "ci: automate Paksho UI and server regression checks without SMS"
+        },
+        {
+          "sha": "9783944eeb25c0e4306e8b1358d1539573ad80d2",
+          "subject": "feat(ui): connect worker start reporting and customer confirmation to API"
+        },
+        {
+          "sha": "5fabf1fe14fd5b4983697a9e7b6bb0bc8c5954ef",
+          "subject": "feat(worker): restore auditable start-report and customer confirmation workflow (backend)"
+        },
+        {
+          "sha": "86010e4348018654da9cfb6c9893cc888697ae31",
+          "subject": "docs(product): record worker start, completion and future commission decisions"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "9927927d06e69c3f8e84b67f45def36a94988787"
+        },
+        {
+          "indicator": "+",
+          "sha": "8ed2f7a840a9815ee867e7a76670f52255b0c295"
+        },
+        {
+          "indicator": "+",
+          "sha": "e99eb403eaf4a36c6f0f71cf7ad2bbe043c81c85"
+        },
+        {
+          "indicator": "+",
+          "sha": "b0436a8a6cda6feba07b4d959f4b56a2d4bd5ed2"
+        },
+        {
+          "indicator": "+",
+          "sha": "bf61c1a33007a89d5592f35dd036b7c768b13ce2"
+        },
+        {
+          "indicator": "+",
+          "sha": "3ef155c1f41fab3fa784e6d693ffd4295728ff8f"
+        },
+        {
+          "indicator": "+",
+          "sha": "ded334a3b647ed3a53e732e10a40381653461714"
+        },
+        {
+          "indicator": "+",
+          "sha": "86010e4348018654da9cfb6c9893cc888697ae31"
+        },
+        {
+          "indicator": "+",
+          "sha": "5fabf1fe14fd5b4983697a9e7b6bb0bc8c5954ef"
+        },
+        {
+          "indicator": "+",
+          "sha": "9783944eeb25c0e4306e8b1358d1539573ad80d2"
+        },
+        {
+          "indicator": "+",
+          "sha": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 11,
+      "final_tree_sha": "4c00b9d11836844848f0bac8fda4fd42769f1b1e",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "integration/ui-folder-reconcile-20261011",
+          "headRefOid": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619",
+          "isDraft": true,
+          "mergeCommit": null,
+          "mergedAt": null,
+          "number": 7,
+          "state": "CLOSED",
+          "title": "Draft: reconcile prior UI and restore worker start / customer verification",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/7"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/integration/ui-folder-reconcile-20261011",
+        "bundle_verified": true,
+        "sha": "5c8b5269a102f4ba16d0b35ffd2b2d3d8510a619"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false,
+      "changes_from_merge_base_with_official_base": [
+        [
+          "A",
+          ".github/workflows/check-ui-integration.yml"
+        ],
+        [
+          "A",
+          "docs/WORKER_LIFECYCLE_AND_FINANCIAL_POLICY_20261011.fa.md"
+        ],
+        [
+          "M",
+          "server/dataStore.js"
+        ],
+        [
+          "M",
+          "server/index.js"
+        ],
+        [
+          "A",
+          "server/orderStart.js"
+        ],
+        [
+          "A",
+          "server/startIntegration.test.js"
+        ],
+        [
+          "M",
+          "src/api/types.ts"
+        ],
+        [
+          "M",
+          "src/components/booking/NativeBookingWizard.tsx"
+        ],
+        [
+          "M",
+          "src/components/booking/PricingTable.tsx"
+        ],
+        [
+          "M",
+          "src/components/native/NativeWorkerPortal.tsx"
+        ],
+        [
+          "M",
+          "src/components/native/WorkerAuthScreen.tsx"
+        ],
+        [
+          "M",
+          "src/components/native/workerOrderStatus.test.ts"
+        ],
+        [
+          "M",
+          "src/components/native/workerOrderStatus.ts"
+        ],
+        [
+          "M",
+          "src/features/orders/components/EmptyOrdersState.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderCard.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderDetailModal.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderFilterTabs.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderRatingModal.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderStatusBadge.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderTrackingTimeline.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrdersScreen.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/context/OrdersContext.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/services/orderService.ts"
+        ],
+        [
+          "M",
+          "src/features/orders/types/order.ts"
+        ],
+        [
+          "A",
+          "src/theme/index.ts"
+        ],
+        [
+          "A",
+          "src/theme/primitives.tsx"
+        ],
+        [
+          "A",
+          "src/theme/styleAudit.ts"
+        ]
+      ],
+      "net_tree_changes_vs_official_base": [
+        [
+          "R075",
+          ".github/workflows/verify-safe-ui.yml",
+          ".github/workflows/check-ui-integration.yml"
+        ],
+        [
+          "A",
+          "docs/WORKER_LIFECYCLE_AND_FINANCIAL_POLICY_20261011.fa.md"
+        ],
+        [
+          "M",
+          "server/dataStore.js"
+        ],
+        [
+          "M",
+          "server/index.js"
+        ],
+        [
+          "A",
+          "server/orderStart.js"
+        ],
+        [
+          "A",
+          "server/startIntegration.test.js"
+        ],
+        [
+          "M",
+          "src/api/types.ts"
+        ],
+        [
+          "M",
+          "src/components/native/NativeWorkerPortal.tsx"
+        ],
+        [
+          "M",
+          "src/components/native/workerOrderStatus.test.ts"
+        ],
+        [
+          "M",
+          "src/components/native/workerOrderStatus.ts"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrderDetailModal.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/components/OrdersScreen.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/context/OrdersContext.tsx"
+        ],
+        [
+          "M",
+          "src/features/orders/services/orderService.ts"
+        ],
+        [
+          "M",
+          "src/features/orders/types/order.ts"
+        ]
+      ]
+    },
+    {
+      "sha": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+      "name": "integration/ui-safe-only-20261012",
+      "audit_ref": "refs/remotes/stabilization-20261012/integration/ui-safe-only-20261012",
+      "category": "merged_candidate_after_approval",
+      "category_fa": "ادغام‌شده؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "PR #8 با squash ادغام‌شده؛ tree نهایی دقیقاً برابر مرجع است، نه پوشش ancestry. تاریخچه ۸ کامیت هنوز حفظ شود.",
+      "ahead_of_official_base_commits": 8,
+      "behind_official_base_commits": 1,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 1,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+          "subject": "ci: verify isolated UI integration with regression checks"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "9927927d06e69c3f8e84b67f45def36a94988787"
+        },
+        {
+          "indicator": "+",
+          "sha": "8ed2f7a840a9815ee867e7a76670f52255b0c295"
+        },
+        {
+          "indicator": "+",
+          "sha": "e99eb403eaf4a36c6f0f71cf7ad2bbe043c81c85"
+        },
+        {
+          "indicator": "+",
+          "sha": "b0436a8a6cda6feba07b4d959f4b56a2d4bd5ed2"
+        },
+        {
+          "indicator": "+",
+          "sha": "bf61c1a33007a89d5592f35dd036b7c768b13ce2"
+        },
+        {
+          "indicator": "+",
+          "sha": "3ef155c1f41fab3fa784e6d693ffd4295728ff8f"
+        },
+        {
+          "indicator": "+",
+          "sha": "ded334a3b647ed3a53e732e10a40381653461714"
+        },
+        {
+          "indicator": "+",
+          "sha": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 8,
+      "final_tree_sha": "c24dc576576aa06c34a68f5388ab444094cb95e9",
+      "final_tree_matches_official_base": true,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "integration/ui-safe-only-20261012",
+          "headRefOid": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a",
+          "isDraft": false,
+          "mergeCommit": {
+            "oid": "febe14ee679c4d71b177e3b65844be6b14ce9625"
+          },
+          "mergedAt": "2026-10-11T21:08:17Z",
+          "number": 8,
+          "state": "MERGED",
+          "title": "Merge tested visual UI improvements only (no worker lifecycle changes)",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/8"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/integration/ui-safe-only-20261012",
+        "bundle_verified": true,
+        "sha": "2cfe60cd64b3df1bbd5c5bb5eed955d4b2a1504a"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+      "name": "integration/worker-start-followup-20261012",
+      "audit_ref": "refs/remotes/stabilization-20261012/integration/worker-start-followup-20261012",
+      "category": "active_necessary",
+      "category_fa": "فعال / ضروری",
+      "reason_fa": "PR #9 باز و پیش‌نویس؛ تغییرات تأییدشده، در انتظار تصمیم ادغام.",
+      "ahead_of_official_base_commits": 10,
+      "behind_official_base_commits": 0,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": true,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 10,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+          "subject": "test(orders): preserve closed legacy history during proven start adjudication"
+        },
+        {
+          "sha": "14ec67249ac165634361f13c114583e1e6d8816d",
+          "subject": "fix(orders): resolve proven start disputes on legacy active assignments"
+        },
+        {
+          "sha": "1d8adff3807bf897672144b7aff0f275dfeea5a0",
+          "subject": "ci(android): reuse installed SDK and retain setup failure diagnostics"
+        },
+        {
+          "sha": "88c952fd1c66d95852ae7e4c07be15a67bfa2bac",
+          "subject": "ci: verify all regressions and both Android apps with review artifacts"
+        },
+        {
+          "sha": "9283a779f5499ef53f3ec56e581cddf05fad1c00",
+          "subject": "fix(auth): prevent stored session hashes from acting as bearer tokens"
+        },
+        {
+          "sha": "5a4964a492729099b4172a062503aa2b186aea71",
+          "subject": "fix(orders): persist start evidence and bind commands to acceptance revisions"
+        },
+        {
+          "sha": "84e396d12303bf67d78e2f68e63ceef2fce06df4",
+          "subject": "fix(ui): avoid unapproved payout and pending-confirmation claims"
+        },
+        {
+          "sha": "2f211d7fd65cd7033130c3dfa734b75f37437f96",
+          "subject": "test(auth): migrate existing start flow to captured plaintext OTP"
+        },
+        {
+          "sha": "9c910c41d2677429ca10aac9d397ac3c07e414a8",
+          "subject": "fix(auth): reject stored OTP hashes and test real four-digit login without SMS"
+        },
+        {
+          "sha": "4e6ddea058740d5914d2a23b14722de4ea35c5ba",
+          "subject": "feat(worker): isolate start-report and customer confirmation after safe UI merge"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "4e6ddea058740d5914d2a23b14722de4ea35c5ba"
+        },
+        {
+          "indicator": "+",
+          "sha": "9c910c41d2677429ca10aac9d397ac3c07e414a8"
+        },
+        {
+          "indicator": "+",
+          "sha": "2f211d7fd65cd7033130c3dfa734b75f37437f96"
+        },
+        {
+          "indicator": "+",
+          "sha": "84e396d12303bf67d78e2f68e63ceef2fce06df4"
+        },
+        {
+          "indicator": "+",
+          "sha": "5a4964a492729099b4172a062503aa2b186aea71"
+        },
+        {
+          "indicator": "+",
+          "sha": "9283a779f5499ef53f3ec56e581cddf05fad1c00"
+        },
+        {
+          "indicator": "+",
+          "sha": "88c952fd1c66d95852ae7e4c07be15a67bfa2bac"
+        },
+        {
+          "indicator": "+",
+          "sha": "1d8adff3807bf897672144b7aff0f275dfeea5a0"
+        },
+        {
+          "indicator": "+",
+          "sha": "14ec67249ac165634361f13c114583e1e6d8816d"
+        },
+        {
+          "indicator": "+",
+          "sha": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 10,
+      "final_tree_sha": "5279a7b8a714520a3aa4301ab942aa9e2f497c18",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "integration/worker-start-followup-20261012",
+          "headRefOid": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+          "isDraft": true,
+          "mergeCommit": null,
+          "mergedAt": null,
+          "number": 9,
+          "state": "OPEN",
+          "title": "Harden worker start confirmation and lifecycle compatibility",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/9"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/integration/worker-start-followup-20261012",
+        "bundle_verified": true,
+        "sha": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "165ad0b24a2088599f0b3bf0d04806dda37d0f28",
+      "name": "main",
+      "audit_ref": "refs/remotes/stabilization-20261012/main",
+      "category": "active_necessary",
+      "category_fa": "فعال / ضروری",
+      "reason_fa": "شاخه اصلی قدیمی و تاریخچه محفوظ؛ در این مأموریت تغییر یا حذف نشود.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 38,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/architecture-followup-e352",
+        "cursor/restore-customer-home-pre-pr3-e352",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "99cf54d2f889973e2d36eecc0bd74d8dab652fdc",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/main",
+        "bundle_verified": true,
+        "sha": "165ad0b24a2088599f0b3bf0d04806dda37d0f28"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "3af65b63a07dc83442d4b7d4511882747f4e9846",
+      "name": "say_hello",
+      "audit_ref": "refs/remotes/stabilization-20261012/say_hello",
+      "category": "old_no_unique_candidate_after_approval",
+      "category_fa": "قدیمی بدون تغییر منحصربه‌فرد؛ نامزد بررسی حذف پس از تصویب",
+      "reason_fa": "قدیمی و تمام کامیت‌های قابل دسترس در ancestry مرجع؛ بدون تغییر منحصربه‌فرد نسبت به سایر شاخه‌ها. فقط نامزد بررسی حذف پس از تصویب.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 42,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": false,
+      "head_reachable_from_other_remote_heads": [
+        "backup/pre-ui-folder-integration-20261011",
+        "cursor/architecture-followup-e352",
+        "cursor/restore-customer-home-pre-pr3-e352",
+        "cursor/restore-customer-home-pre-pr4-e352",
+        "cursor/restore-customer-home-pre-pr5-e352",
+        "cursor/stage3-order-cancel-e352",
+        "cursor/stage4-loyalty-tier-e352",
+        "fix/admin-dashboard-xss",
+        "integration/ui-folder-reconcile-20261011",
+        "integration/ui-safe-only-20261012",
+        "integration/worker-start-followup-20261012",
+        "main",
+        "ui/customer-home-redesign",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "a8cd3ebef28a4d376e205a3ea983f6aa19a8096f",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/say_hello",
+        "bundle_verified": true,
+        "sha": "3af65b63a07dc83442d4b7d4511882747f4e9846"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "febe14ee679c4d71b177e3b65844be6b14ce9625",
+      "name": "ui/customer-home-redesign",
+      "audit_ref": "refs/remotes/stabilization-20261012/ui/customer-home-redesign",
+      "category": "active_necessary",
+      "category_fa": "فعال / ضروری",
+      "reason_fa": "مرجع رسمی پیشنهادی برای توسعه و مقصد PRهای ۹ و ۱۰؛ بدون تغییر در این ممیزی.",
+      "ahead_of_official_base_commits": 0,
+      "behind_official_base_commits": 0,
+      "head_reachable_from_official_base": true,
+      "official_base_reachable_from_head": true,
+      "head_reachable_from_other_remote_heads": [
+        "integration/worker-start-followup-20261012",
+        "ui/ux-ui-development"
+      ],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 0,
+      "exclusive_commits_vs_all_other_18_retained_heads": [],
+      "git_cherry_vs_base": [],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 0,
+      "final_tree_sha": "c24dc576576aa06c34a68f5388ab444094cb95e9",
+      "final_tree_matches_official_base": true,
+      "pull_requests": [],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/ui/customer-home-redesign",
+        "bundle_verified": true,
+        "sha": "febe14ee679c4d71b177e3b65844be6b14ce9625"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    },
+    {
+      "sha": "22832987836ca6448c82752d3c4816d91ea5cc57",
+      "name": "ui/ux-ui-development",
+      "audit_ref": "refs/remotes/stabilization-20261012/ui/ux-ui-development",
+      "category": "active_necessary",
+      "category_fa": "فعال / ضروری",
+      "reason_fa": "PR #10 باز و پیش‌نویس؛ مرز خروج پیش‌نمایش نیازمند اصلاح و بازبینی مستقل.",
+      "ahead_of_official_base_commits": 23,
+      "behind_official_base_commits": 0,
+      "head_reachable_from_official_base": false,
+      "official_base_reachable_from_head": true,
+      "head_reachable_from_other_remote_heads": [],
+      "exclusive_commits_vs_all_other_18_retained_heads_count": 23,
+      "exclusive_commits_vs_all_other_18_retained_heads": [
+        {
+          "sha": "22832987836ca6448c82752d3c4816d91ea5cc57",
+          "subject": "docs(preview): record device network audit, exit evidence, and attribution limits"
+        },
+        {
+          "sha": "a447ac5f27cd8a7cea2958d6bd645c64a87c42ab",
+          "subject": "test(preview): model prototype-level XMLHttpRequest.open correctly"
+        },
+        {
+          "sha": "0afefcb185907996e4ded0f2b4fcb52d064daa65",
+          "subject": "test(preview): verify outbound fetch and XHR are blocked and Metro is allowlisted"
+        },
+        {
+          "sha": "923a9cd6ac648b7f4053e43e36d8510369568b48",
+          "subject": "fix(preview): type XHR audit receiver explicitly"
+        },
+        {
+          "sha": "95c5eba376543fdc3d0add5a8ee4327c42c16bf4",
+          "subject": "fix(preview): prevent worker avatar external native-image traffic"
+        },
+        {
+          "sha": "4558bd5f2cb1686c15f349453c527eecf6e75233",
+          "subject": "feat(preview): audit each mock request and guard unmediated JS network"
+        },
+        {
+          "sha": "1a98b76d1a4efaa94721566f7846449d2d3d4c03",
+          "subject": "test(preview): add runtime JS network audit and fail-closed outbound guard"
+        },
+        {
+          "sha": "7f8e14de743f94a880b9ba16c06b1e425a427021",
+          "subject": "fix(preview): route worker internal logout to selection without changing real logout"
+        },
+        {
+          "sha": "8f5f3a0773b8164928d2b2369e33c0cd8c337306",
+          "subject": "fix(preview): connect worker internal logout to preview exit callback"
+        },
+        {
+          "sha": "e92fa8932883066cb86e75d3ba7921fe8377804a",
+          "subject": "fix(preview): supply synthetic customer identity to existing orders provider"
+        },
+        {
+          "sha": "d9d946657ed3e3661d841085e9f36121f178e44a",
+          "subject": "fix(preview): clear in-memory preview state before dev reload"
+        },
+        {
+          "sha": "cc715c6cdd4d4d09330ef431ac4b5dce5bd163d8",
+          "subject": "fix(preview): clear in-memory preview state before dev reload"
+        },
+        {
+          "sha": "f9fc71acaa52799ceafd0a265b2f52b56c59e23f",
+          "subject": "test(preview): negative tests for wallet, addresses, notifications and all mock mutations"
+        },
+        {
+          "sha": "c976f5103db30c24f9d5d8d87caef81da01a841c",
+          "subject": "fix(preview): reject all non-GET operations before mock response routes"
+        },
+        {
+          "sha": "771fd244141f3c34a5623fab12e8241117b20c04",
+          "subject": "fix(preview): reload dev runtime on exit to avoid stale sandbox tasks"
+        },
+        {
+          "sha": "b2ad2e5fbc36e426eb8ecaef2f04caea2767381a",
+          "subject": "fix(preview): reload dev runtime on exit to avoid stale sandbox tasks"
+        },
+        {
+          "sha": "d4362b5aace2fae930e75127594604ff0c6550f5",
+          "subject": "feat(preview): render real app screens with isolated dev-only data and storage"
+        },
+        {
+          "sha": "580dcadda30935381420dc32b6dc15ec0dc7fe45",
+          "subject": "fix(ui-preview): remove unused React import in src/components/native/IsolatedUiPreview.tsx"
+        },
+        {
+          "sha": "f50758b223d98e8b3a86f8c023fc229a515bcd28",
+          "subject": "fix(ui-preview): remove unused React import in App.worker.tsx"
+        },
+        {
+          "sha": "33c86195a77efdcd5ffd250a4210f1f81d0db2f7",
+          "subject": "fix(ui-preview): remove unused React import in App.customer.tsx"
+        },
+        {
+          "sha": "1371f5bfe9a70790ffbe764a6749ff92267f5709",
+          "subject": "feat(ui): wire isolated worker preview into development entry"
+        },
+        {
+          "sha": "c07bc9c9f888c13a0eed80bee3fed6b06a478f02",
+          "subject": "feat(ui): wire isolated customer preview into development entry"
+        },
+        {
+          "sha": "1f8ae2245c46999ee89dd9e4c5c89a9bcc06d562",
+          "subject": "feat(ui): add isolated in-memory customer and worker preview sandbox"
+        }
+      ],
+      "git_cherry_vs_base": [
+        {
+          "indicator": "+",
+          "sha": "1f8ae2245c46999ee89dd9e4c5c89a9bcc06d562"
+        },
+        {
+          "indicator": "+",
+          "sha": "c07bc9c9f888c13a0eed80bee3fed6b06a478f02"
+        },
+        {
+          "indicator": "+",
+          "sha": "1371f5bfe9a70790ffbe764a6749ff92267f5709"
+        },
+        {
+          "indicator": "+",
+          "sha": "33c86195a77efdcd5ffd250a4210f1f81d0db2f7"
+        },
+        {
+          "indicator": "+",
+          "sha": "f50758b223d98e8b3a86f8c023fc229a515bcd28"
+        },
+        {
+          "indicator": "+",
+          "sha": "580dcadda30935381420dc32b6dc15ec0dc7fe45"
+        },
+        {
+          "indicator": "+",
+          "sha": "d4362b5aace2fae930e75127594604ff0c6550f5"
+        },
+        {
+          "indicator": "+",
+          "sha": "b2ad2e5fbc36e426eb8ecaef2f04caea2767381a"
+        },
+        {
+          "indicator": "+",
+          "sha": "771fd244141f3c34a5623fab12e8241117b20c04"
+        },
+        {
+          "indicator": "+",
+          "sha": "c976f5103db30c24f9d5d8d87caef81da01a841c"
+        },
+        {
+          "indicator": "+",
+          "sha": "f9fc71acaa52799ceafd0a265b2f52b56c59e23f"
+        },
+        {
+          "indicator": "+",
+          "sha": "cc715c6cdd4d4d09330ef431ac4b5dce5bd163d8"
+        },
+        {
+          "indicator": "+",
+          "sha": "d9d946657ed3e3661d841085e9f36121f178e44a"
+        },
+        {
+          "indicator": "+",
+          "sha": "e92fa8932883066cb86e75d3ba7921fe8377804a"
+        },
+        {
+          "indicator": "+",
+          "sha": "8f5f3a0773b8164928d2b2369e33c0cd8c337306"
+        },
+        {
+          "indicator": "+",
+          "sha": "7f8e14de743f94a880b9ba16c06b1e425a427021"
+        },
+        {
+          "indicator": "+",
+          "sha": "1a98b76d1a4efaa94721566f7846449d2d3d4c03"
+        },
+        {
+          "indicator": "+",
+          "sha": "4558bd5f2cb1686c15f349453c527eecf6e75233"
+        },
+        {
+          "indicator": "+",
+          "sha": "95c5eba376543fdc3d0add5a8ee4327c42c16bf4"
+        },
+        {
+          "indicator": "+",
+          "sha": "923a9cd6ac648b7f4053e43e36d8510369568b48"
+        },
+        {
+          "indicator": "+",
+          "sha": "0afefcb185907996e4ded0f2b4fcb52d064daa65"
+        },
+        {
+          "indicator": "+",
+          "sha": "a447ac5f27cd8a7cea2958d6bd645c64a87c42ab"
+        },
+        {
+          "indicator": "+",
+          "sha": "22832987836ca6448c82752d3c4816d91ea5cc57"
+        }
+      ],
+      "patch_equivalent_nonmerge_commits_vs_base_count": 0,
+      "patch_not_equivalent_nonmerge_commits_vs_base_count": 23,
+      "final_tree_sha": "50ee4ad4842ca9f57617a47db2bafda0aef8f884",
+      "final_tree_matches_official_base": false,
+      "pull_requests": [
+        {
+          "baseRefName": "ui/customer-home-redesign",
+          "headRefName": "ui/ux-ui-development",
+          "headRefOid": "22832987836ca6448c82752d3c4816d91ea5cc57",
+          "isDraft": true,
+          "mergeCommit": null,
+          "mergedAt": null,
+          "number": 10,
+          "state": "OPEN",
+          "title": "Draft: real customer and worker UI preview with isolated mock transport",
+          "url": "https://github.com/antigravity1344-code/my-mobile-app/pull/10"
+        }
+      ],
+      "recovery": {
+        "bundle_path": "/workspace/reports/project-stabilization-20261012/all-remote-heads.bundle",
+        "bundle_ref": "refs/remotes/stabilization-20261012/ui/ux-ui-development",
+        "bundle_verified": true,
+        "sha": "22832987836ca6448c82752d3c4816d91ea5cc57"
+      },
+      "remote_deletion_performed": false,
+      "remote_deletion_authorized_now": false
+    }
+  ],
+  "default_branch_proposal": {
+    "proposed": "ui/customer-home-redesign",
+    "performed": false,
+    "owner_approval_required": true,
+    "checks_before_change": [
+      "branch protection/rulesets and required checks",
+      "new PR default base and automation",
+      "clone/setup/CI/deployment consumers of default or main",
+      "README/build docs and external links",
+      "permissions and recovery snapshot"
+    ]
+  }
+}
