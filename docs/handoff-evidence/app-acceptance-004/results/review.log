@@ -1,0 +1,167 @@
+
+ RUN  v3.2.7 /workspace/scratch/0593980fef2a/app-acceptance-004-evidence/docs/handoff-evidence/app-acceptance-004
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 2
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes
+APP004_SECURITY_REACHED {"network":0,"read":0,"write":0,"remove":0,"tokenEmpty":true,"authorizationSent":false}
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload
+APP004_SECURITY_REACHED {"network":0,"read":0,"write":0,"remove":0,"tokenEmpty":true,"authorizationSent":false}
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload
+APP004_SECURITY_REACHED {"network":0,"read":0,"write":0,"remove":0,"tokenEmpty":true,"authorizationSent":false}
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload
+APP004_SECURITY_REACHED {"network":0,"read":0,"write":0,"remove":0,"tokenEmpty":true,"authorizationSent":false}
+
+stdout | review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start PUT before outbound fetch 120ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response PUT before outbound fetch 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision PUT before outbound fetch 7ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start POST before outbound fetch 7ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /orders/PREVIEW-ORDER-1/start-response POST before outbound fetch 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview denies /admin/orders/PREVIEW-ORDER-1/start-decision POST before outbound fetch 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > ACTIVE preview unknown and admin read routes fail closed with no fallback 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > actual customer start-response service is blocked while ACTIVE 7ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > current preview fixture omits references necessary to show new start controls 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > entrypoints quarantine boundary before requesting reload 5ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending actual customer start response stays offline until reload completes 7ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: scheduled preview worker refresh stays offline during deferred reload 8ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: pending profile address timer cannot mutate real account during deferred reload 6ms
+ ✓ review/integrationPreviewQuarantine004.test.ts > actual combined-source preview boundary > EXIT acceptance: mounted preview callback cannot write real persisted storage before reload 6ms
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer endPreview quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer endPreview quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer beginPreviewShutdown quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer beginPreviewShutdown quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker endPreview quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker endPreview quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker beginPreviewShutdown quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker beginPreviewShutdown quarantines deferred callbacks in its own runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer endPreview quarantines deferred callbacks in its own runtime 9ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > customer beginPreviewShutdown quarantines deferred callbacks in its own runtime 3ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker endPreview quarantines deferred callbacks in its own runtime 3ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > worker beginPreviewShutdown quarantines deferred callbacks in its own runtime 3ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > initial real selection uses a fresh runtime that has never entered preview 3ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > release __DEV__=false ignores customer preview flag in fresh runtime 3ms
+ ✓ review/previewDirectExitFresh004.test.ts > fresh runtime exit and initial-selection contract > release __DEV__=false ignores worker preview flag in fresh runtime 3ms
+
+ Test Files  2 passed (2)
+      Tests  21 passed (21)
+   Start at  01:09:37
+   Duration  594ms (transform 135ms, setup 0ms, collect 51ms, tests 234ms, environment 0ms, prepare 100ms)
+
+JSON report written to /tmp/app004-review-results.json

@@ -1,0 +1,61 @@
+[
+  {
+    "name": "typecheck",
+    "command": [
+      "npm",
+      "run",
+      "typecheck"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 3.853
+  },
+  {
+    "name": "server",
+    "command": [
+      "node",
+      "--test",
+      "--test-concurrency=1",
+      "server/accountFeatures.test.js",
+      "server/adminDashboard.xss.test.js",
+      "server/batch4.test.js",
+      "server/cancelRequest.test.js",
+      "server/isolatedOtp.test.js",
+      "server/kavenegarSms.test.js",
+      "server/orderEvents.test.js",
+      "server/orderStart.test.js",
+      "server/pointsService.test.js",
+      "server/sensitiveData.test.js",
+      "server/smsOtpFlow.test.js",
+      "server/sqliteFlow.test.js",
+      "server/startIntegration.test.js",
+      "server/workerCompletionIntegration.test.js",
+      "server/workerDocumentStorage.test.js",
+      "server/workerOrderPrivacy.test.js"
+    ],
+    "exit_code": 1,
+    "duration_seconds": 4.221
+  },
+  {
+    "name": "app",
+    "command": [
+      "npm",
+      "test",
+      "--",
+      "--reporter=dot",
+      "--maxWorkers=2",
+      "--minWorkers=1"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 5.57
+  },
+  {
+    "name": "lint",
+    "command": [
+      "npm",
+      "run",
+      "lint"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 3.069
+  }
+]

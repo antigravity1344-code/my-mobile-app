@@ -1,0 +1,50 @@
+{
+  "original_03": {
+    "passed": 1,
+    "diagnostic_failures": 3,
+    "security_not_reached": 3,
+    "rerun_in_004": false
+  },
+  "corrected_004": [
+    {
+      "scenario": "pending customer start response",
+      "security_assertions": "REACHED_AND_PASSED",
+      "network": 0,
+      "read": 0,
+      "write": 0,
+      "remove": 0,
+      "tokenEmpty": true,
+      "authorizationSent": false
+    },
+    {
+      "scenario": "worker 10000ms polling",
+      "security_assertions": "REACHED_AND_PASSED",
+      "network": 0,
+      "read": 0,
+      "write": 0,
+      "remove": 0,
+      "tokenEmpty": true,
+      "authorizationSent": false
+    },
+    {
+      "scenario": "customer 250ms address callback",
+      "security_assertions": "REACHED_AND_PASSED",
+      "network": 0,
+      "read": 0,
+      "write": 0,
+      "remove": 0,
+      "tokenEmpty": true,
+      "authorizationSent": false
+    },
+    {
+      "scenario": "deferred persistent storage callback",
+      "security_assertions": "REACHED_AND_PASSED",
+      "network": 0,
+      "read": 0,
+      "write": 0,
+      "remove": 0,
+      "tokenEmpty": true,
+      "authorizationSent": false
+    }
+  ]
+}

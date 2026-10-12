@@ -1,0 +1,127 @@
+{
+  "base": "8ac99c5bd8228f7fd0ecdd8b74b41abc36df7f40",
+  "combined_local_commit": "7b21657d10f4721697631e5ec41c95af5397089b",
+  "combined_tree": "f0d96bff341ed3597866c46b1735c69807951578",
+  "files_excluding_manifest": [
+    {
+      "path": "PRICING_GAP.fa.md",
+      "sha256": "769c6f409fd10d1a2eff88b4d396d3a689dbdb399dd10fc78437596b3bfaee53",
+      "bytes": 6371
+    },
+    {
+      "path": "README.fa.md",
+      "sha256": "5e88847500949845c9dff19763675b2ed943dce6235713dd45c5de0f2fbedd06",
+      "bytes": 11922
+    },
+    {
+      "path": "original/expoMock.ts.txt",
+      "sha256": "8eea93e6f7d863a8142867d0adbfa11f998cfd05316804a52e2376793cdd3e65",
+      "bytes": 48
+    },
+    {
+      "path": "original/integrationPreviewProbe.test.ts.txt",
+      "sha256": "eead1391e0f585cc6b210b5160394b9c0779fa5f55e08920d0fa92516d97fcc1",
+      "bytes": 7796
+    },
+    {
+      "path": "original/storageMock.ts.txt",
+      "sha256": "c1d42998c8bc7596ca43ca460a0fd9fd48efb20b72c50598cf3d5531a74d7bea",
+      "bytes": 378
+    },
+    {
+      "path": "original/vitest.config.mjs.txt",
+      "sha256": "ea478194999792ebb67dca49fa9a8dda262bc3bea1767bfe008c72f954605382",
+      "bytes": 674
+    },
+    {
+      "path": "previewDirectExit.proposed.patch",
+      "sha256": "bb206bc0b7258d61b2e23bb021247edf646bfba9bd5baad0a65d55fd969db633",
+      "bytes": 7383
+    },
+    {
+      "path": "prior-03-github-evidence.md",
+      "sha256": "cf0769c5234c4f02a946111fb6533542ade7e940d32868242a8832f042c2eff8",
+      "bytes": 58082
+    },
+    {
+      "path": "prior-03-report.md",
+      "sha256": "38ba74706a66f5ce29cfbe1e2c48862bbf86e7df1edcd7e2aa0ab835451d8aff",
+      "bytes": 13873
+    },
+    {
+      "path": "results/app.log",
+      "sha256": "6dbf9c1f9b5874f01b5eecb12e21b4fa7fd15f8ea313b1b85194fe23869f84c9",
+      "bytes": 20222
+    },
+    {
+      "path": "results/commands.json",
+      "sha256": "e0f6c0baf2a15768f183958925b12cdba8df5bb737aae61510b18c5e2f676a43",
+      "bytes": 1295
+    },
+    {
+      "path": "results/lint.log",
+      "sha256": "d0442dd2d69a15bca24c57023ca26c42268d20afdc76c798b33d75e1206d8f70",
+      "bytes": 2458
+    },
+    {
+      "path": "results/review-results.json",
+      "sha256": "495d2dc78d1e44a7dbbe7dd9e4bc5ba43f867be5af3bd6aa450f23fbaa290f81",
+      "bytes": 8769
+    },
+    {
+      "path": "results/review.log",
+      "sha256": "a08e2db888d96ddce2d767b974555f74691d651bb5453073d6fdd3b2651e1aa6",
+      "bytes": 14670
+    },
+    {
+      "path": "results/server.log",
+      "sha256": "3148253731eea9714ef1a8e19fca008e3c313a0ba603410329cd96e6f97854a6",
+      "bytes": 19418
+    },
+    {
+      "path": "results/setup-attempt-1.log",
+      "sha256": "ae4bb3a57a88d5e73731938d76264f8f9d3b99727b104cfdbdbdaa1170e505f4",
+      "bytes": 5380
+    },
+    {
+      "path": "results/setup-attempt-2.log",
+      "sha256": "7b7cf4a62d4d92eba59bddb1886090cba57275def16a564e129fcf7c81560f2e",
+      "bytes": 5380
+    },
+    {
+      "path": "results/typecheck.log",
+      "sha256": "2f7edfec2854e5cf7a9fa9c636795392a23367d108d11a7b4bdec46c2b4c6d57",
+      "bytes": 148
+    },
+    {
+      "path": "review/expoMock.ts",
+      "sha256": "8eea93e6f7d863a8142867d0adbfa11f998cfd05316804a52e2376793cdd3e65",
+      "bytes": 48
+    },
+    {
+      "path": "review/integrationPreviewQuarantine004.test.ts",
+      "sha256": "6c78fd35789e8b41b78f8dba55809a1fc563b87c5671afff40bdc38260fda548",
+      "bytes": 8984
+    },
+    {
+      "path": "review/previewDirectExitFresh004.test.ts",
+      "sha256": "629c4cd4c8e82a2a00494aa8953be5cec5bb26b78465a6513895f9cb6cac4e60",
+      "bytes": 4560
+    },
+    {
+      "path": "review/storageMock.ts",
+      "sha256": "c1d42998c8bc7596ca43ca460a0fd9fd48efb20b72c50598cf3d5531a74d7bea",
+      "bytes": 378
+    },
+    {
+      "path": "security-matrix.json",
+      "sha256": "dbf0324e981e0d38bc6583963aff12192dbbd9c1ec80317d04398a1c8c93d617",
+      "bytes": 1152
+    },
+    {
+      "path": "vitest.review.config.mjs",
+      "sha256": "8c6c94ccdd4d9c80e06068b04f0ff8e2a5ee8cc0512062f2ec5d8fcafe2a6454",
+      "bytes": 731
+    }
+  ]
+}

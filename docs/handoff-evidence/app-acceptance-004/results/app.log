@@ -1,0 +1,294 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> my-mobile-app@1.0.0 test
+> vitest run --reporter=dot --maxWorkers=2 --minWorkers=1
+
+
+ RUN  v3.2.7 /workspace/scratch/0593980fef2a/app-acceptance-004-combined
+
+···············································································stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > never accesses network or persistent storage while preview is active
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > never accesses network or persistent storage while preview is active
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > never accesses network or persistent storage while preview is active
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 2
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > never accesses network or persistent storage while preview is active
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 3
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > never accesses network or persistent storage while preview is active
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > does not overwrite a previously attached real token
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > does not overwrite a previously attached real token
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > does not overwrite a previously attached real token
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 1. pending network callback after exit cannot access real transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stderr | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 1. pending network callback after exit cannot access real transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_fetch blocked_count 1
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > isolates preview cache from real persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > isolates preview cache from real persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewBoundary.test.ts > preview transport and storage isolation > isolates preview cache from real persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+···stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 2. delayed writes and deletes never touch persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 2. delayed writes and deletes never touch persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 3. late token/session callbacks cannot read or overwrite a real token
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > 4. old response continuation during reload cannot mutate persisted state
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewShutdownRace.test.ts > preview shutdown race: pending operations remain quarantined > repeated exits remain guarded and cannot restart a retired runtime
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+·····stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > customer pending start-response callback remains offline
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > customer pending start-response callback remains offline
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > worker polling after exit cannot read stored tokens or call real transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > worker polling after exit cannot read stored tokens or call real transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > address timer callback after exit cannot write to server
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > address timer callback after exit cannot write to server
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > deferred storage write and remove after exit never touch persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > deferred storage write and remove after exit never touch persistent storage
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > initial selection outside any preview remains harmless
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewDirectExit.test.ts > direct endPreview quarantines active runtime > initial selection outside any preview remains harmless
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+·····························stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks external direct fetch without handing it to native transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stderr | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks external direct fetch without handing it to native transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_fetch blocked_count 1
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks external direct fetch without handing it to native transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stderr | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks external direct fetch without handing it to native transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_fetch blocked_count 2
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks external direct fetch without handing it to native transport
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > permits only local development Metro port, and rejects other localhost ports
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stderr | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > permits only local development Metro port, and rejects other localhost ports
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_fetch blocked_count 1
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > permits only local development Metro port, and rejects other localhost ports
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks direct XHR from calling original open
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stderr | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks direct XHR from calling original open
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_xhr blocked_count 1
+[PAKSHO_PREVIEW_NETWORK_AUDIT] blocked_xhr blocked_count 2
+
+stdout | src/components/native/previewNetworkAudit.test.ts > preview outbound network barrier > blocks direct XHR from calling original open
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+·················stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > keeps preview data in its own memory and clears it at exit
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > keeps preview data in its own memory and clears it at exit
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > returns only synthetic results without calling network fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > returns only synthetic results without calling network fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 2
+
+stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > returns only synthetic results without calling network fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 3
+
+stdout | src/components/native/previewRuntime.test.ts > isolated preview policy > returns only synthetic results without calling network fetch
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+··········································stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet/charge POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet/charge POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /wallet/charge POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses/addr-1 DELETE without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses/addr-1 DELETE without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request DELETE mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/addresses/addr-1 DELETE without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications/PREVIEW-N-1/read POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications/PREVIEW-N-1/read POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /notifications/PREVIEW-N-1/read POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders/PREVIEW-ORDER-1/accept POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders/PREVIEW-ORDER-1/accept POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /orders/PREVIEW-ORDER-1/accept POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /auth/logout POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /auth/logout POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /auth/logout POST without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /loyalty PATCH without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /loyalty PATCH without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PATCH mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /loyalty PATCH without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/me PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/me PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request PUT mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > denies /users/me PUT without false positive success
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 1
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 2
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request GET mocked_count 3
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] mocked_request POST mocked_count 4
+
+stdout | src/components/native/previewMutations.test.ts > negative preview mutations > keeps reads working without allowing writes
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+········································································stdout | src/components/native/previewDirectNetwork.test.ts > direct endpoint preview guard > blocks legacy booking and both payment endpoints before network
+[PAKSHO_PREVIEW_NETWORK_AUDIT] guard_enabled
+
+stdout | src/components/native/previewDirectNetwork.test.ts > direct endpoint preview guard > blocks legacy booking and both payment endpoints before network
+[PAKSHO_PREVIEW_NETWORK_AUDIT] preview_quarantined
+
+···············
+
+ Test Files  53 passed (53)
+      Tests  262 passed (262)
+   Start at  01:09:57
+   Duration  5.13s (transform 609ms, setup 0ms, collect 1.04s, tests 1.10s, environment 7ms, prepare 2.45s)
+

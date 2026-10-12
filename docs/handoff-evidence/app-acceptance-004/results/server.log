@@ -1,0 +1,261 @@
+✔ support, notifications, wallet and loyalty stay on sqlite (53.790644ms)
+✖ worker text fields are literal text, not executable HTML (37.964042ms)
+✖ order text and nonnumeric amount cannot inject HTML (0.506844ms)
+✖ avatar attributes and unsafe image URL schemes are rejected (0.132865ms)
+✖ supported HTTP, relative and raster data avatars stay usable (0.040119ms)
+✖ unknown status values cannot create classes, attributes or executable content (0.102511ms)
+✖ untrusted worker and order IDs are inert and use encoded API paths when clicked (0.053309ms)
+✖ real API data with injected worker and order text renders inertly (0.056853ms)
+✖ ordinary content, dashboard classes, empty states and existing button operations are preserved (0.089591ms)
+✔ batch4 #1: no customer-facing order response carries the specialist phone (51.507224ms)
+✔ batch4 #2: admin cancel records cancelledAt/cancelledBy=admin; CANCELLED -> COMPLETED is blocked (16.246784ms)
+✔ batch4 #5: a repeated create with the same client key returns the same order (12.128926ms)
+✔ batch4 #6: admin return to PENDING is an event; admin acceptance records the specialist (15.616293ms)
+✔ a pending cancel stays immediate and does not spend a free cancel or points (9.661235ms)
+✔ after acceptance the preview does not write, and a changed rule must be confirmed again (5.965983ms)
+✔ final cancel transfers only the locked deductible once, even if confirmed twice (6.976746ms)
+✔ auto confirmation waits ten minutes and uses the same final function (5.849312ms)
+✔ without an active penalty rule the cancel is free, and a free allowance is consumed only at the end (6.125397ms)
+✔ admin fault none skips the penalty, and relaxing fault after the end reverses it (6.872633ms)
+✔ two concurrent final confirms charge the penalty once (70.734475ms)
+✔ reading orders is what finalizes a due request; no one-minute timer is hardcoded (0.642082ms)
+✔ OTP send -> verify uses captured four digits without exposing OTP or stored hash (32.000282ms)
+✔ OTP rejects stored hash as code and accepts actual English four digits (12.865847ms)
+✔ OTP accepts Persian four digits for each app role (8.893509ms)
+✔ OTP wrong, malformed and expired codes never issue a session (7.825497ms)
+✔ sessions reject missing, wrong, expired and revoked tokens (8.373155ms)
+✔ a stored session hash cannot be used as a bearer credential (3.879432ms)
+✔ a stored session hash cannot revoke the original opaque session (4.874302ms)
+✔ iran mobile numbers normalize to 09 format (1.119613ms)
+✔ missing Kavenegar settings do not call VerifyLookup (0.301903ms)
+✔ VerifyLookup sends receptor, token and template without a sender (0.267743ms)
+✔ a thrown VerifyLookup does not count as a sent OTP (0.164652ms)
+✔ test mode is the fake sender and does not imply production (0.123041ms)
+✔ production cannot enable the fake sender through configuration (0.243046ms)
+✔ a fresh database has the order_events table, index, append-only triggers and new order columns (5.15245ms)
+✔ a new order starts with not_recorded and empty time fields (3.848646ms)
+✔ appendOrderEvent stores server recordedAt and the claimed time separately (4.516717ms)
+✔ claimedAt may be empty and system or admin events need no actor id (3.724285ms)
+✔ the same idempotency key is stored once; different content under that key is a conflict (3.718105ms)
+✔ invalid events are rejected without inserting anything (3.914754ms)
+✔ a correction is a new record that references an earlier event of the same order (3.981772ms)
+✔ order_events rejects UPDATE and DELETE at the database level (5.361597ms)
+✔ two concurrent appends with one idempotency key leave exactly one event (63.742195ms)
+✔ recordAcceptance keeps the last acceptance on the order, the history in events, and needs a worker (4.586589ms)
+✔ two acceptances in the same millisecond get distinct keys and never overwrite earlier events (3.649635ms)
+✔ clearAcceptanceForReturnToPending is the only clearing path and needs a PENDING order (3.790001ms)
+✔ normalizeIsoTimestamp accepts only explicit-zone ISO timestamps (0.134107ms)
+✔ POST /api/orders stores a valid expectedStartAt as UTC, allows it missing and rejects invalid values in Persian (33.978174ms)
+✔ a reset to PENDING clears acceptedAt and the worker; re-acceptance records a new acceptedAt and keeps both events (27.658702ms)
+✔ complete and rate do not emit order events; a pending cancel records the final cancel (12.814182ms)
+✔ admin activation into each active status is an acceptance that needs a worker (22.308021ms)
+✔ admin moves between active statuses are not new acceptances; worker assignment and reassignment are (23.503115ms)
+✔ admin activation re-checks the order's current worker inside the transaction (48.156749ms)
+✔ saving an order as PENDING always removes the worker, so no later change re-activates it silently (25.056826ms)
+✔ admin cannot swap the worker in the same request that completes or cancels the order (34.010774ms)
+✖ admin reassigning an active order notifies both previous and new workers (15.39532ms)
+✔ admin status notifications use Persian status labels, never raw status values (12.455806ms)
+✔ order_events cannot be overwritten through REPLACE, INSERT OR IGNORE or UPSERT (6.803754ms)
+✔ an older database gains the new columns and tables once, keeping its data (5.49326ms)
+✔ worker completes an active order, missing schedule is rejected, and orders are not deleted (11.5584ms)
+✔ prompt yes/no survives database reopen and retry/conflicting answer has no additional effects (12.973416ms)
+✔ worker report and explicit confirmation keep independent status/pricing and duplicate effects bounded (5.296241ms)
+✔ customer denial records both claims, dispute metadata and exactly one denial notification (4.656753ms)
+✔ later worker report remains answerable after automated customer yes (4.992606ms)
+✔ later worker report remains answerable after automated customer no (5.594859ms)
+✔ new acceptance resets only current start projection and rejects response about prior worker (5.313366ms)
+✔ return Pending resets current start projection, and repeat acceptance has a fresh start cycle (5.649579ms)
+✔ missing/wrong event references cannot confirm current report and have no side effects (4.034019ms)
+✔ stale automated answer cannot silently confirm a newer worker report (4.556226ms)
+✔ admin duplicate decisions are bounded, correction retains original value and survives reopen (7.312049ms)
+✔ worker report cannot reopen a start decision already resolved by admin (3.988812ms)
+✔ legacy admin metadata fails safely without claiming started: undefined (5.68381ms)
+✔ legacy admin metadata fails safely without claiming started: {invalid (5.686063ms)
+✔ legacy admin metadata fails safely without claiming started: null (5.361226ms)
+✔ legacy admin metadata fails safely without claiming started: [] (5.449246ms)
+✔ legacy admin metadata fails safely without claiming started: {"subject":"start"} (5.898255ms)
+✔ legacy admin metadata fails safely without claiming started: {"subject":"other","started":true} (5.571234ms)
+✔ legacy customer_reported with missing structured proof does not assume started (3.936636ms)
+✔ legacy customer_confirmed with missing structured proof does not assume started (3.772856ms)
+✔ oversized legacy JSON is unknown consistently in event DTO and started projection (4.399716ms)
+✔ event metadata is a bounded plain JSON object and participates in duplicate comparison (4.760875ms)
+✔ no rule, inactive/malformed/negative/out-of-range delay produce no question and no default (4.260712ms)
+✔ configured delay uses exact due boundary and emits one prompt across retry/reopen (5.479531ms)
+✔ explicit zero delay is valid and absent expectedStartAt remains unguessed (8.905908ms)
+✔ start report/answer cannot change status or financial data for PENDING (4.566791ms)
+✔ start report/answer cannot change status or financial data for CANCEL_REQUESTED (4.245639ms)
+✔ start report/answer cannot change status or financial data for CANCELLED (3.845062ms)
+✔ start report/answer cannot change status or financial data for COMPLETED (3.878611ms)
+✔ start report/answer cannot change status or financial data for UNKNOWN (4.058365ms)
+✔ admin exact command replay after correction cannot flip the latest decision (5.898365ms)
+✔ admin correction remains latest when server audit clock moves backwards (6.411487ms)
+✔ admin command content conflict and stale decision context have no effects (4.31406ms)
+✔ admin intent from a replaced acceptance cannot resolve the new worker start (4.088549ms)
+✔ admin commands require explicit bounded IDs and revision without guessing old intent (3.926221ms)
+✔ same worker delayed report after ABA reassignment cannot start a fresh acceptance (4.568433ms)
+✔ worker start requires explicit acceptance reference and exposes it only for active orders (3.988122ms)
+✔ legacy active assignment can report start without inventing an acceptance timestamp (4.274752ms)
+✔ admin can resolve actual start dispute on legacy ACCEPTED without inventing acceptance time (5.676719ms)
+✔ admin can resolve actual start dispute on legacy CONFIRMED without inventing acceptance time (5.423247ms)
+✔ admin can resolve actual start dispute on legacy ASSIGNED without inventing acceptance time (5.532037ms)
+✔ admin can resolve actual start dispute on legacy IN_PROGRESS without inventing acceptance time (5.734524ms)
+✔ admin can resolve actual start dispute on legacy CANCELLED without inventing acceptance time (6.356677ms)
+✔ admin can resolve actual start dispute on legacy COMPLETED without inventing acceptance time (5.36306ms)
+✔ legacy assignment without a current worker report cannot gain an invented start decision (3.485114ms)
+✔ a new database has no point rules and no seeded amounts (5.040376ms)
+✔ rules are appended as new versions and cannot be edited (4.916994ms)
+✔ postEntry is idempotent, rejects a conflicting key, and never goes below zero (5.294029ms)
+✔ initial free cancels are granted once from the published rule and capped by it (3.901565ms)
+✔ quoteCancelPenalty does not write, is free before acceptance, and reads the penalty rule after it (6.162923ms)
+✔ postTransfer moves only the points actually deducted and can be reversed once (4.421968ms)
+✔ tier changes only by a published rule, upgrades immediately, and does not fall (5.763787ms)
+✔ completion awards points and free-cancel refills only from active rules; cancel and rating do not (7.958237ms)
+✔ two concurrent posts with one key award once, and two keys add up (114.91449ms)
+✔ points_ledger rejects update, delete and replace (4.452964ms)
+✔ admin can append a point rule, customers cannot, and admin completion awards from that rule (41.848154ms)
+✔ loyalty tier follows user_points and ignores stars the customer gave (7.388161ms)
+✔ national id and sheba round-trip and are not stored as plaintext (8.613799ms)
+✔ otp hash and session hash keep login behavior (87.579927ms)
+✔ sensitive migration converts once and rolls back on failure (7.023706ms)
+✔ api responses and logs do not reveal secrets (56.771863ms)
+✔ otp is not issued when Kavenegar settings are empty (22.638749ms)
+✔ sqlite keeps the current API behavior (56.491155ms)
+✔ data survives closing and reopening sqlite (5.555041ms)
+✔ two concurrent accepts leave one accepted order (60.572418ms)
+✔ an older orders table gains a null serviceId and still stores new values (4.690562ms)
+✔ API lifecycle create -> accept -> start -> customer yes -> complete preserves status and privacy (59.222067ms)
+✔ customer no opens one dispute; admin authenticated resolution is replay-safe and correction preserves history (33.090605ms)
+✔ start and response reject forged actors, bad references, invalid sessions and blocked accounts without effects (24.109155ms)
+✔ lost committed create, start and customer response can be retried without duplicate orders or events (16.476316ms)
+✔ reassign and return to pending reset start summaries; delayed old-cycle response cannot confirm new worker (23.211208ms)
+✔ cancel before start, during dispute and closed orders reject start and response with no extra effects (21.373411ms)
+✔ configured prompt delay respects exact time boundary and customer prompt yes/no without fabricating agreed time (18.086459ms)
+✔ missing order and pending order cannot record a start or customer confirmation (10.892983ms)
+▶ completion stays available from all four active statuses without requiring a start report
+  ✔ ACCEPTED (8.724311ms)
+  ✔ CONFIRMED (5.842122ms)
+  ✔ ASSIGNED (4.287621ms)
+  ✔ IN_PROGRESS (4.561964ms)
+✔ completion stays available from all four active statuses without requiring a start report (59.738014ms)
+✔ historical active orders without acceptedAt or expectedStartAt can still be completed (16.059193ms)
+✔ completion rejects wrong role, worker forgery, blocked/unapproved worker and invalid/expired/revoked sessions without effects (23.046827ms)
+✔ completion retry after a lost response or concurrent request never repeats points, notifications or completedAt (14.736422ms)
+✔ pending, cancel requested and cancelled orders cannot complete and do not earn completion points (14.990486ms)
+✔ reassigned order completes only for the current worker, preserving previous acceptance history (11.974911ms)
+✔ missing order returns404 and customer view never discloses the assigned worker phone (12.236895ms)
+▶ worker identity documents stay private
+  ✔ missing document returns a controlled response (2.313164ms)
+  ✔ invalid file is rejected (2.592684ms)
+  ✔ oversized file is rejected (12.263255ms)
+  ✔ valid upload stores only an opaque id (4.174996ms)
+  ✔ public and static routes do not return the file (7.631648ms)
+  ✔ worker token cannot read the document (1.35656ms)
+  ✔ admin can read the document (1.614168ms)
+  ✔ replacement keeps the new document and removes the old file (3.573032ms)
+  ✔ a failed database write does not replace the saved document (5.864801ms)
+  ✔ admin delete removes the document (3.907534ms)
+  ✔ a failed record save restores the previous document (0.870307ms)
+✔ worker identity documents stay private (66.62139ms)
+✔ worker order views hide customer contact data until an active accept (69.893735ms)
+✔ accepting an order the customer already cancelled gets a distinct message (15.327961ms)
+✔ a malformed accept request gets a friendly JSON error without internal details (8.746444ms)
+✔ customer free-text notes never reach the worker but stay for the customer and admin (23.920739ms)
+✔ the customer rating comment and tags never reach the worker (D-32) but stay for the customer and admin (16.572767ms)
+✔ status notifications call ACCEPTED «پذیرفته‌شده», not «در حال انجام» (E6) (10.295377ms)
+✔ admin user-status message names the status in Persian, never the raw enum (D-06) (6.473027ms)
+✔ a blocked user gets 403 with code ACCOUNT_BLOCKED and the unchanged Persian message on every request (4.151732ms)
+ℹ tests 164
+ℹ suites 0
+ℹ pass 155
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4164.740385
+
+✖ failing tests:
+
+test at server/adminDashboard.xss.test.js:108:1
+✖ worker text fields are literal text, not executable HTML (37.964042ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:119:1
+✖ order text and nonnumeric amount cannot inject HTML (0.506844ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:130:1
+✖ avatar attributes and unsafe image URL schemes are rejected (0.132865ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:154:1
+✖ supported HTTP, relative and raster data avatars stay usable (0.040119ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:169:1
+✖ unknown status values cannot create classes, attributes or executable content (0.102511ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:182:1
+✖ untrusted worker and order IDs are inert and use encoded API paths when clicked (0.053309ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:209:1
+✖ real API data with injected worker and order text renders inertly (0.056853ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/adminDashboard.xss.test.js:221:1
+✖ ordinary content, dashboard classes, empty states and existing button operations are preserved (0.089591ms)
+  browserType.launch: Failed to launch chromium because executable doesn't exist at /usr/bin/chromium
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/adminDashboard.xss.test.js:54:28) {
+    name: 'Error',
+    log: []
+  }
+
+test at server/orderEvents.test.js:949:3
+✖ admin reassigning an active order notifies both previous and new workers (15.39532ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ORDER_ASSIGNED'
+  - 'ORDER_STATUS'
+           ^
+  
+      at TestContext.<anonymous> (/workspace/scratch/0593980fef2a/app-acceptance-004-combined/server/orderEvents.test.js:1036:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ORDER_ASSIGNED',
+    expected: 'ORDER_STATUS',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
