@@ -35,10 +35,8 @@ describe('preview outbound network barrier', () => {
     expect(native).toHaveBeenCalledTimes(1);
   });
   it('blocks direct XHR from calling original open', () => {
-    const open = vi.fn();
-    class FakeXHR { open = open; }
-    // Prototype method mirrors the React Native XHR interface.
-    FakeXHR.prototype.open = open;
+    class FakeXHR { open(_method: string, _url: string) { return undefined; } }
+    const open = vi.spyOn(FakeXHR.prototype, 'open');
     vi.stubGlobal('XMLHttpRequest', FakeXHR);
     beginPreview('customer');
     const xhr = new XMLHttpRequest();
