@@ -33,7 +33,7 @@ export function startPreviewNetworkAudit(): void {
     return Promise.reject(new Error('درخواست خارجی در حالت پیش‌نمایش مسدود شد.'));
   }) as typeof fetch;
   if (originalOpen && typeof XMLHttpRequest !== 'undefined') {
-    XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
+    XMLHttpRequest.prototype.open = function (this: XMLHttpRequest, method: string, url: string | URL, ...rest: any[]) {
       if (!isMetroRequest(String(url))) {
         blocked++;
         console.warn('[PAKSHO_PREVIEW_NETWORK_AUDIT]', 'blocked_xhr', 'blocked_count', blocked);
