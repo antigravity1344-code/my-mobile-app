@@ -957,6 +957,25 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
 
     const orderNotes = (userId, orderId) =>
       store.listNotifications(userId).filter((item) => item.orderId === orderId).reverse();
+    // دو اعلان پشت‌سرهم می‌توانند createdAt یکسان (دقت میلی‌ثانیه) بگیرند؛ کوئری فقط با
+    // createdAt DESC و بدون کلید دوم مرتب می‌شود، پس ترتیب بین دو ردیف هم‌زمان تعریف‌نشده
+    // است. به‌جای شمارش/slice که به این ترتیب مبهم تکیه دارد، اعلان‌های تازه با اختلاف id
+    // نسبت به یک snapshot قبلی مشخص می‌شوند؛ تعداد، نوع، مالک و متن همچنان بررسی می‌شوند.
+    // تقویت (مأموریت ۰۰۷): snapshot اکنون کل ردیف را نگه می‌دارد و freshSince بررسی می‌کند
+    // که اعلان‌های قبلی همچنان بدون تغییر باقی مانده‌اند. روش شمارش/slice قبلی حذف
+    // ناخواسته اعلان‌های قدیمی را تشخیص می‌داد، اما بازنویسی عنوان آن‌ها را نمی‌گرفت.
+    // روش جدید هر دو (حذف و بازنویسی) را بررسی می‌کند.
+    const snapshotIds = function (userId, orderId) {
+      return new Map(orderNotes(userId, orderId).map(function (item) { return [item.id, { ...item }]; }));
+    };
+    const freshSince = function (userId, orderId, idsBefore) {
+      const current = orderNotes(userId, orderId);
+      const currentById = new Map(current.map(function (item) { return [item.id, item]; }));
+      for (const [id, earlier] of idsBefore) {
+        assert.deepEqual(currentById.get(id), earlier, 'earlier notification ' + id + ' must remain present and unchanged');
+      }
+      return current.filter(function (item) { return !idsBefore.has(item.id); });
+    };
 
     // ۱. PENDING → B: فقط B اعلان می‌گیرد؛ هیچ اعلان Reassign صادر نمی‌شود
     const pendingOrder = (await postOrder(server, customer.token)).json.order;
@@ -972,74 +991,72 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       (await request(server, { method: 'PUT', pathname: '/api/orders/' + activeOrder.id + '/accept', token: workerA.token, body: {} })).status,
       200
     );
-    const initialCustomerNotes = orderNotes(customer.user.id, activeOrder.id).length;
-    const initialWorkerANotes = orderNotes(workerA.user.id, activeOrder.id).length;
-    const initialWorkerBNotes = orderNotes(workerB.user.id, activeOrder.id).length;
+    const initialCustomerIds = snapshotIds(customer.user.id, activeOrder.id);
+    const initialWorkerAIds = snapshotIds(workerA.user.id, activeOrder.id);
+    const initialWorkerBIds = snapshotIds(workerB.user.id, activeOrder.id);
 
     // ۲. A → B با status ثابت: A اعلان ORDER_REASSIGNED و B اعلان ORDER_ASSIGNED می‌گیرد؛ مشتری اعلان جدیدی نمی‌گیرد
     const swapFixedStatus = await adminPut(activeOrder.id, { cleanerId: workerB.user.id });
     assert.equal(swapFixedStatus.status, 200);
     assert.equal(swapFixedStatus.json.order.cleanerId, workerB.user.id);
 
-    const aNotesAfterSwap1 = orderNotes(workerA.user.id, activeOrder.id);
-    const freshA1 = aNotesAfterSwap1.slice(initialWorkerANotes);
+    const freshA1 = freshSince(workerA.user.id, activeOrder.id, initialWorkerAIds);
     assert.equal(freshA1.length, 1);
     assert.equal(freshA1[0].kind, 'ORDER_REASSIGNED');
     assert.equal(freshA1[0].title, 'تغییر متخصص سفارش');
     assert.equal(freshA1[0].body.includes('به متخصص دیگری واگذار شد'), true);
 
-    const bNotesAfterSwap1 = orderNotes(workerB.user.id, activeOrder.id);
-    const freshB1 = bNotesAfterSwap1.slice(initialWorkerBNotes);
+    const freshB1 = freshSince(workerB.user.id, activeOrder.id, initialWorkerBIds);
     assert.equal(freshB1.length, 1);
     assert.equal(freshB1[0].kind, 'ORDER_ASSIGNED');
     assert.equal(freshB1[0].title, 'واگذاری سفارش جدید');
     assert.equal(freshB1[0].body.includes('به شما واگذار شد'), true);
 
     // برای مشتری هیچ اعلان جدیدی اضافه نمی‌شود
-    assert.equal(orderNotes(customer.user.id, activeOrder.id).length, initialCustomerNotes);
+    assert.equal(freshSince(customer.user.id, activeOrder.id, initialCustomerIds).length, 0);
 
     // ۳. تغییر متخصص به همان متخصص قبلی (B → B): هیچ اعلان واگذاری یا سلب جدیدی تولید نمی‌شود
-    const bCountBefore = orderNotes(workerB.user.id, activeOrder.id).length;
+    const idsBeforeSameWorker = snapshotIds(workerB.user.id, activeOrder.id);
     const sameWorker = await adminPut(activeOrder.id, { cleanerId: workerB.user.id });
     assert.equal(sameWorker.status, 200);
-    assert.equal(orderNotes(workerB.user.id, activeOrder.id).length, bCountBefore);
+    assert.equal(freshSince(workerB.user.id, activeOrder.id, idsBeforeSameWorker).length, 0);
 
     // ۴. B → A همراه با تغییر وضعیت (مثلاً به IN_PROGRESS):
     // B اعلان ORDER_REASSIGNED می‌گیرد؛ A فقط یک اعلان ORDER_ASSIGNED می‌گیرد (بدون اعلان تکراری ORDER_STATUS)؛ مشتری اعلان تغییر وضعیت می‌گیرد
-    const custCountBeforeStatusChange = orderNotes(customer.user.id, activeOrder.id).length;
-    const bCountBeforeSwap2 = orderNotes(workerB.user.id, activeOrder.id).length;
-    const aCountBeforeSwap2 = orderNotes(workerA.user.id, activeOrder.id).length;
+    const custIdsBeforeStatusChange = snapshotIds(customer.user.id, activeOrder.id);
+    const bIdsBeforeSwap2 = snapshotIds(workerB.user.id, activeOrder.id);
+    const aIdsBeforeSwap2 = snapshotIds(workerA.user.id, activeOrder.id);
 
     const swapWithStatus = await adminPut(activeOrder.id, { cleanerId: workerA.user.id, status: 'IN_PROGRESS' });
     assert.equal(swapWithStatus.status, 200);
     assert.equal(swapWithStatus.json.order.cleanerId, workerA.user.id);
     assert.equal(swapWithStatus.json.order.status, 'IN_PROGRESS');
 
-    const freshB2 = orderNotes(workerB.user.id, activeOrder.id).slice(bCountBeforeSwap2);
+    const freshB2 = freshSince(workerB.user.id, activeOrder.id, bIdsBeforeSwap2);
     assert.equal(freshB2.length, 1);
     assert.equal(freshB2[0].kind, 'ORDER_REASSIGNED');
 
-    const freshA2 = orderNotes(workerA.user.id, activeOrder.id).slice(aCountBeforeSwap2);
+    const freshA2 = freshSince(workerA.user.id, activeOrder.id, aIdsBeforeSwap2);
     assert.equal(freshA2.length, 1, 'worker A receives only ORDER_ASSIGNED, without duplicate ORDER_STATUS');
     assert.equal(freshA2[0].kind, 'ORDER_ASSIGNED');
 
-    const freshCust = orderNotes(customer.user.id, activeOrder.id).slice(custCountBeforeStatusChange);
+    const freshCust = freshSince(customer.user.id, activeOrder.id, custIdsBeforeStatusChange);
     assert.equal(freshCust.length, 1);
     assert.equal(freshCust[0].kind, 'ORDER_STATUS');
 
     // ۵. بدون تغییر متخصص ولی با تغییر وضعیت: فقط اعلان عادی تغییر وضعیت ارسال می‌شود
-    const aCountBeforeStatusOnly = orderNotes(workerA.user.id, activeOrder.id).length;
+    const aIdsBeforeStatusOnly = snapshotIds(workerA.user.id, activeOrder.id);
     const statusOnly = await adminPut(activeOrder.id, { status: 'CONFIRMED' });
     assert.equal(statusOnly.status, 200);
-    const freshAStatusOnly = orderNotes(workerA.user.id, activeOrder.id).slice(aCountBeforeStatusOnly);
+    const freshAStatusOnly = freshSince(workerA.user.id, activeOrder.id, aIdsBeforeStatusOnly);
     assert.equal(freshAStatusOnly.length, 1);
     assert.equal(freshAStatusOnly[0].kind, 'ORDER_STATUS');
 
     // ۶. ارسال متخصص نامعتبر/تأییدنشده: ارور ۴۰۰ برمی‌گردد و هیچ اعلانی ثبت نمی‌شود (Rollback)
-    const aCountBeforeBad = orderNotes(workerA.user.id, activeOrder.id).length;
+    const aIdsBeforeBad = snapshotIds(workerA.user.id, activeOrder.id);
     const badWorker = await adminPut(activeOrder.id, { cleanerId: 'non-existent-user' });
     assert.equal(badWorker.status, 400);
-    assert.equal(orderNotes(workerA.user.id, activeOrder.id).length, aCountBeforeBad);
+    assert.equal(freshSince(workerA.user.id, activeOrder.id, aIdsBeforeBad).length, 0);
   });
 
   test('admin status notifications use Persian status labels, never raw status values', async (t) => {
