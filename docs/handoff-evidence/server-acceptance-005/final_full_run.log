@@ -1,0 +1,1243 @@
+TAP version 13
+# (node:3400) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: support, notifications, wallet and loyalty stay on sqlite
+ok 1 - support, notifications, wallet and loyalty stay on sqlite
+  ---
+  duration_ms: 114.365182
+  type: 'test'
+  ...
+# (node:3407) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: worker text fields are literal text, not executable HTML
+    # Subtest: name
+    ok 1 - name
+      ---
+      duration_ms: 455.534761
+      type: 'test'
+      ...
+    # Subtest: phone
+    ok 2 - phone
+      ---
+      duration_ms: 342.942798
+      type: 'test'
+      ...
+    # Subtest: nationalId
+    ok 3 - nationalId
+      ---
+      duration_ms: 386.156687
+      type: 'test'
+      ...
+    # Subtest: bankSheba
+    ok 4 - bankSheba
+      ---
+      duration_ms: 444.461281
+      type: 'test'
+      ...
+    # Subtest: address
+    ok 5 - address
+      ---
+      duration_ms: 399.867578
+      type: 'test'
+      ...
+    1..5
+ok 2 - worker text fields are literal text, not executable HTML
+  ---
+  duration_ms: 2258.512285
+  type: 'test'
+  ...
+# Subtest: order text and nonnumeric amount cannot inject HTML
+    # Subtest: id
+    ok 1 - id
+      ---
+      duration_ms: 361.470397
+      type: 'test'
+      ...
+    # Subtest: serviceTitle
+    ok 2 - serviceTitle
+      ---
+      duration_ms: 389.771489
+      type: 'test'
+      ...
+    # Subtest: customerName
+    ok 3 - customerName
+      ---
+      duration_ms: 362.316183
+      type: 'test'
+      ...
+    # Subtest: customerPhone
+    ok 4 - customerPhone
+      ---
+      duration_ms: 361.148409
+      type: 'test'
+      ...
+    # Subtest: address
+    ok 5 - address
+      ---
+      duration_ms: 402.37572
+      type: 'test'
+      ...
+    # Subtest: date
+    ok 6 - date
+      ---
+      duration_ms: 447.587271
+      type: 'test'
+      ...
+    # Subtest: time
+    ok 7 - time
+      ---
+      duration_ms: 486.132447
+      type: 'test'
+      ...
+    # Subtest: cleanerName
+    ok 8 - cleanerName
+      ---
+      duration_ms: 416.129481
+      type: 'test'
+      ...
+    # Subtest: price
+    ok 9 - price
+      ---
+      duration_ms: 404.864462
+      type: 'test'
+      ...
+    1..9
+ok 3 - order text and nonnumeric amount cannot inject HTML
+  ---
+  duration_ms: 3635.668458
+  type: 'test'
+  ...
+# Subtest: avatar attributes and unsafe image URL schemes are rejected
+    # Subtest: double-quote attribute breakout
+    ok 1 - double-quote attribute breakout
+      ---
+      duration_ms: 361.866618
+      type: 'test'
+      ...
+    # Subtest: single-quote and markup breakout
+    ok 2 - single-quote and markup breakout
+      ---
+      duration_ms: 390.043166
+      type: 'test'
+      ...
+    # Subtest: javascript scheme
+    ok 3 - javascript scheme
+      ---
+      duration_ms: 325.419326
+      type: 'test'
+      ...
+    # Subtest: case-insensitive javascript scheme
+    ok 4 - case-insensitive javascript scheme
+      ---
+      duration_ms: 368.288712
+      type: 'test'
+      ...
+    # Subtest: vbscript scheme
+    ok 5 - vbscript scheme
+      ---
+      duration_ms: 330.728935
+      type: 'test'
+      ...
+    # Subtest: HTML data URI
+    ok 6 - HTML data URI
+      ---
+      duration_ms: 321.794121
+      type: 'test'
+      ...
+    # Subtest: SVG data URI
+    ok 7 - SVG data URI
+      ---
+      duration_ms: 333.512753
+      type: 'test'
+      ...
+    # Subtest: base64 SVG data URI
+    ok 8 - base64 SVG data URI
+      ---
+      duration_ms: 355.784176
+      type: 'test'
+      ...
+    # Subtest: URL control character
+    ok 9 - URL control character
+      ---
+      duration_ms: 304.188944
+      type: 'test'
+      ...
+    1..9
+ok 4 - avatar attributes and unsafe image URL schemes are rejected
+  ---
+  duration_ms: 3097.740009
+  type: 'test'
+  ...
+# Subtest: supported HTTP, relative and raster data avatars stay usable
+    # Subtest: https://example.invalid/avatar.png
+    ok 1 - https://example.invalid/avatar.png
+      ---
+      duration_ms: 282.651569
+      type: 'test'
+      ...
+    # Subtest: http://example.invalid/avatar.png
+    ok 2 - http://example.invalid/avatar.png
+      ---
+      duration_ms: 327.523162
+      type: 'test'
+      ...
+    # Subtest: /test-avatar.png
+    ok 3 - /test-avatar.png
+      ---
+      duration_ms: 304.214403
+      type: 'test'
+      ...
+    # Subtest: data:image/png;base64
+    ok 4 - data:image/png;base64
+      ---
+      duration_ms: 298.587759
+      type: 'test'
+      ...
+    # Subtest: data:image/jpeg;base64
+    ok 5 - data:image/jpeg;base64
+      ---
+      duration_ms: 299.809204
+      type: 'test'
+      ...
+    # Subtest: data:image/jpg;base64
+    ok 6 - data:image/jpg;base64
+      ---
+      duration_ms: 290.073603
+      type: 'test'
+      ...
+    # Subtest: data:image/webp;base64
+    ok 7 - data:image/webp;base64
+      ---
+      duration_ms: 313.414104
+      type: 'test'
+      ...
+    1..7
+ok 5 - supported HTTP, relative and raster data avatars stay usable
+  ---
+  duration_ms: 2117.478022
+  type: 'test'
+  ...
+# Subtest: unknown status values cannot create classes, attributes or executable content
+ok 6 - unknown status values cannot create classes, attributes or executable content
+  ---
+  duration_ms: 387.233546
+  type: 'test'
+  ...
+# Subtest: untrusted worker and order IDs are inert and use encoded API paths when clicked
+    # Subtest: worker
+    ok 1 - worker
+      ---
+      duration_ms: 358.188985
+      type: 'test'
+      ...
+    # Subtest: order
+    ok 2 - order
+      ---
+      duration_ms: 412.906233
+      type: 'test'
+      ...
+    1..2
+ok 7 - untrusted worker and order IDs are inert and use encoded API paths when clicked
+  ---
+  duration_ms: 772.006763
+  type: 'test'
+  ...
+# Subtest: real API data with injected worker and order text renders inertly
+ok 8 - real API data with injected worker and order text renders inertly
+  ---
+  duration_ms: 468.52027
+  type: 'test'
+  ...
+# Subtest: ordinary content, dashboard classes, empty states and existing button operations are preserved
+ok 9 - ordinary content, dashboard classes, empty states and existing button operations are preserved
+  ---
+  duration_ms: 507.295743
+  type: 'test'
+  ...
+# (node:4155) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: batch4 \#1: no customer-facing order response carries the specialist phone
+ok 10 - batch4 \#1: no customer-facing order response carries the specialist phone
+  ---
+  duration_ms: 98.593095
+  type: 'test'
+  ...
+# Subtest: batch4 \#2: admin cancel records cancelledAt/cancelledBy=admin; CANCELLED -> COMPLETED is blocked
+ok 11 - batch4 \#2: admin cancel records cancelledAt/cancelledBy=admin; CANCELLED -> COMPLETED is blocked
+  ---
+  duration_ms: 42.478713
+  type: 'test'
+  ...
+# Subtest: batch4 \#5: a repeated create with the same client key returns the same order
+ok 12 - batch4 \#5: a repeated create with the same client key returns the same order
+  ---
+  duration_ms: 35.022898
+  type: 'test'
+  ...
+# Subtest: batch4 \#6: admin return to PENDING is an event; admin acceptance records the specialist
+ok 13 - batch4 \#6: admin return to PENDING is an event; admin acceptance records the specialist
+  ---
+  duration_ms: 51.064248
+  type: 'test'
+  ...
+# (node:4162) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a pending cancel stays immediate and does not spend a free cancel or points
+ok 14 - a pending cancel stays immediate and does not spend a free cancel or points
+  ---
+  duration_ms: 57.654231
+  type: 'test'
+  ...
+# Subtest: after acceptance the preview does not write, and a changed rule must be confirmed again
+ok 15 - after acceptance the preview does not write, and a changed rule must be confirmed again
+  ---
+  duration_ms: 40.920195
+  type: 'test'
+  ...
+# Subtest: final cancel transfers only the locked deductible once, even if confirmed twice
+ok 16 - final cancel transfers only the locked deductible once, even if confirmed twice
+  ---
+  duration_ms: 50.602804
+  type: 'test'
+  ...
+# Subtest: auto confirmation waits ten minutes and uses the same final function
+ok 17 - auto confirmation waits ten minutes and uses the same final function
+  ---
+  duration_ms: 42.741857
+  type: 'test'
+  ...
+# Subtest: without an active penalty rule the cancel is free, and a free allowance is consumed only at the end
+ok 18 - without an active penalty rule the cancel is free, and a free allowance is consumed only at the end
+  ---
+  duration_ms: 60.04453
+  type: 'test'
+  ...
+# Subtest: admin fault none skips the penalty, and relaxing fault after the end reverses it
+ok 19 - admin fault none skips the penalty, and relaxing fault after the end reverses it
+  ---
+  duration_ms: 80.01243
+  type: 'test'
+  ...
+# (node:4162) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:4162) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: two concurrent final confirms charge the penalty once
+ok 20 - two concurrent final confirms charge the penalty once
+  ---
+  duration_ms: 139.826149
+  type: 'test'
+  ...
+# Subtest: reading orders is what finalizes a due request; no one-minute timer is hardcoded
+ok 21 - reading orders is what finalizes a due request; no one-minute timer is hardcoded
+  ---
+  duration_ms: 1.299499
+  type: 'test'
+  ...
+# (node:4171) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: OTP send -> verify uses captured four digits without exposing OTP or stored hash
+ok 22 - OTP send -> verify uses captured four digits without exposing OTP or stored hash
+  ---
+  duration_ms: 47.050083
+  type: 'test'
+  ...
+# Subtest: OTP rejects stored hash as code and accepts actual English four digits
+ok 23 - OTP rejects stored hash as code and accepts actual English four digits
+  ---
+  duration_ms: 15.981475
+  type: 'test'
+  ...
+# Subtest: OTP accepts Persian four digits for each app role
+ok 24 - OTP accepts Persian four digits for each app role
+  ---
+  duration_ms: 19.411786
+  type: 'test'
+  ...
+# Subtest: OTP wrong, malformed and expired codes never issue a session
+ok 25 - OTP wrong, malformed and expired codes never issue a session
+  ---
+  duration_ms: 14.774391
+  type: 'test'
+  ...
+# Subtest: sessions reject missing, wrong, expired and revoked tokens
+ok 26 - sessions reject missing, wrong, expired and revoked tokens
+  ---
+  duration_ms: 26.468335
+  type: 'test'
+  ...
+# Subtest: a stored session hash cannot be used as a bearer credential
+ok 27 - a stored session hash cannot be used as a bearer credential
+  ---
+  duration_ms: 12.53972
+  type: 'test'
+  ...
+# Subtest: a stored session hash cannot revoke the original opaque session
+ok 28 - a stored session hash cannot revoke the original opaque session
+  ---
+  duration_ms: 18.553679
+  type: 'test'
+  ...
+# Subtest: iran mobile numbers normalize to 09 format
+ok 29 - iran mobile numbers normalize to 09 format
+  ---
+  duration_ms: 1.323238
+  type: 'test'
+  ...
+# Subtest: missing Kavenegar settings do not call VerifyLookup
+ok 30 - missing Kavenegar settings do not call VerifyLookup
+  ---
+  duration_ms: 0.303737
+  type: 'test'
+  ...
+# Subtest: VerifyLookup sends receptor, token and template without a sender
+ok 31 - VerifyLookup sends receptor, token and template without a sender
+  ---
+  duration_ms: 0.351745
+  type: 'test'
+  ...
+# Subtest: a thrown VerifyLookup does not count as a sent OTP
+ok 32 - a thrown VerifyLookup does not count as a sent OTP
+  ---
+  duration_ms: 0.19029
+  type: 'test'
+  ...
+# Subtest: test mode is the fake sender and does not imply production
+ok 33 - test mode is the fake sender and does not imply production
+  ---
+  duration_ms: 0.139043
+  type: 'test'
+  ...
+# Subtest: production cannot enable the fake sender through configuration
+ok 34 - production cannot enable the fake sender through configuration
+  ---
+  duration_ms: 0.099504
+  type: 'test'
+  ...
+# (node:4185) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a fresh database has the order_events table, index, append-only triggers and new order columns
+ok 35 - a fresh database has the order_events table, index, append-only triggers and new order columns
+  ---
+  duration_ms: 30.774374
+  type: 'test'
+  ...
+# Subtest: a new order starts with not_recorded and empty time fields
+ok 36 - a new order starts with not_recorded and empty time fields
+  ---
+  duration_ms: 27.756874
+  type: 'test'
+  ...
+# Subtest: appendOrderEvent stores server recordedAt and the claimed time separately
+ok 37 - appendOrderEvent stores server recordedAt and the claimed time separately
+  ---
+  duration_ms: 30.699278
+  type: 'test'
+  ...
+# Subtest: claimedAt may be empty and system or admin events need no actor id
+ok 38 - claimedAt may be empty and system or admin events need no actor id
+  ---
+  duration_ms: 32.378746
+  type: 'test'
+  ...
+# Subtest: the same idempotency key is stored once; different content under that key is a conflict
+ok 39 - the same idempotency key is stored once; different content under that key is a conflict
+  ---
+  duration_ms: 35.941471
+  type: 'test'
+  ...
+# Subtest: invalid events are rejected without inserting anything
+ok 40 - invalid events are rejected without inserting anything
+  ---
+  duration_ms: 26.588513
+  type: 'test'
+  ...
+# Subtest: a correction is a new record that references an earlier event of the same order
+ok 41 - a correction is a new record that references an earlier event of the same order
+  ---
+  duration_ms: 25.745886
+  type: 'test'
+  ...
+# Subtest: order_events rejects UPDATE and DELETE at the database level
+ok 42 - order_events rejects UPDATE and DELETE at the database level
+  ---
+  duration_ms: 25.250401
+  type: 'test'
+  ...
+# (node:4185) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:4185) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: two concurrent appends with one idempotency key leave exactly one event
+ok 43 - two concurrent appends with one idempotency key leave exactly one event
+  ---
+  duration_ms: 118.433885
+  type: 'test'
+  ...
+# Subtest: recordAcceptance keeps the last acceptance on the order, the history in events, and needs a worker
+ok 44 - recordAcceptance keeps the last acceptance on the order, the history in events, and needs a worker
+  ---
+  duration_ms: 30.216468
+  type: 'test'
+  ...
+# Subtest: two acceptances in the same millisecond get distinct keys and never overwrite earlier events
+ok 45 - two acceptances in the same millisecond get distinct keys and never overwrite earlier events
+  ---
+  duration_ms: 27.889664
+  type: 'test'
+  ...
+# Subtest: clearAcceptanceForReturnToPending is the only clearing path and needs a PENDING order
+ok 46 - clearAcceptanceForReturnToPending is the only clearing path and needs a PENDING order
+  ---
+  duration_ms: 24.344526
+  type: 'test'
+  ...
+# Subtest: normalizeIsoTimestamp accepts only explicit-zone ISO timestamps
+ok 47 - normalizeIsoTimestamp accepts only explicit-zone ISO timestamps
+  ---
+  duration_ms: 0.320992
+  type: 'test'
+  ...
+# Subtest: POST /api/orders stores a valid expectedStartAt as UTC, allows it missing and rejects invalid values in Persian
+ok 48 - POST /api/orders stores a valid expectedStartAt as UTC, allows it missing and rejects invalid values in Persian
+  ---
+  duration_ms: 59.549305
+  type: 'test'
+  ...
+# Subtest: a reset to PENDING clears acceptedAt and the worker; re-acceptance records a new acceptedAt and keeps both events
+ok 49 - a reset to PENDING clears acceptedAt and the worker; re-acceptance records a new acceptedAt and keeps both events
+  ---
+  duration_ms: 56.731516
+  type: 'test'
+  ...
+# Subtest: complete and rate do not emit order events; a pending cancel records the final cancel
+ok 50 - complete and rate do not emit order events; a pending cancel records the final cancel
+  ---
+  duration_ms: 38.706352
+  type: 'test'
+  ...
+# Subtest: admin activation into each active status is an acceptance that needs a worker
+ok 51 - admin activation into each active status is an acceptance that needs a worker
+  ---
+  duration_ms: 53.580594
+  type: 'test'
+  ...
+# Subtest: admin moves between active statuses are not new acceptances; worker assignment and reassignment are
+ok 52 - admin moves between active statuses are not new acceptances; worker assignment and reassignment are
+  ---
+  duration_ms: 68.145631
+  type: 'test'
+  ...
+# Subtest: admin activation re-checks the order's current worker inside the transaction
+ok 53 - admin activation re-checks the order's current worker inside the transaction
+  ---
+  duration_ms: 125.111726
+  type: 'test'
+  ...
+# Subtest: saving an order as PENDING always removes the worker, so no later change re-activates it silently
+ok 54 - saving an order as PENDING always removes the worker, so no later change re-activates it silently
+  ---
+  duration_ms: 83.201991
+  type: 'test'
+  ...
+# Subtest: admin cannot swap the worker in the same request that completes or cancels the order
+ok 55 - admin cannot swap the worker in the same request that completes or cancels the order
+  ---
+  duration_ms: 89.68717
+  type: 'test'
+  ...
+# Subtest: admin reassigning an active order notifies both previous and new workers
+ok 56 - admin reassigning an active order notifies both previous and new workers
+  ---
+  duration_ms: 54.558661
+  type: 'test'
+  ...
+# Subtest: admin status notifications use Persian status labels, never raw status values
+ok 57 - admin status notifications use Persian status labels, never raw status values
+  ---
+  duration_ms: 42.934093
+  type: 'test'
+  ...
+# Subtest: order_events cannot be overwritten through REPLACE, INSERT OR IGNORE or UPSERT
+ok 58 - order_events cannot be overwritten through REPLACE, INSERT OR IGNORE or UPSERT
+  ---
+  duration_ms: 36.486638
+  type: 'test'
+  ...
+# Subtest: an older database gains the new columns and tables once, keeping its data
+ok 59 - an older database gains the new columns and tables once, keeping its data
+  ---
+  duration_ms: 44.720652
+  type: 'test'
+  ...
+# Subtest: worker completes an active order, missing schedule is rejected, and orders are not deleted
+ok 60 - worker completes an active order, missing schedule is rejected, and orders are not deleted
+  ---
+  duration_ms: 46.423651
+  type: 'test'
+  ...
+# (node:4194) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: prompt yes/no survives database reopen and retry/conflicting answer has no additional effects
+ok 61 - prompt yes/no survives database reopen and retry/conflicting answer has no additional effects
+  ---
+  duration_ms: 43.211035
+  type: 'test'
+  ...
+# Subtest: worker report and explicit confirmation keep independent status/pricing and duplicate effects bounded
+ok 62 - worker report and explicit confirmation keep independent status/pricing and duplicate effects bounded
+  ---
+  duration_ms: 30.159135
+  type: 'test'
+  ...
+# Subtest: customer denial records both claims, dispute metadata and exactly one denial notification
+ok 63 - customer denial records both claims, dispute metadata and exactly one denial notification
+  ---
+  duration_ms: 29.271642
+  type: 'test'
+  ...
+# Subtest: later worker report remains answerable after automated customer yes
+ok 64 - later worker report remains answerable after automated customer yes
+  ---
+  duration_ms: 29.234478
+  type: 'test'
+  ...
+# Subtest: later worker report remains answerable after automated customer no
+ok 65 - later worker report remains answerable after automated customer no
+  ---
+  duration_ms: 36.002855
+  type: 'test'
+  ...
+# Subtest: new acceptance resets only current start projection and rejects response about prior worker
+ok 66 - new acceptance resets only current start projection and rejects response about prior worker
+  ---
+  duration_ms: 33.511597
+  type: 'test'
+  ...
+# Subtest: return Pending resets current start projection, and repeat acceptance has a fresh start cycle
+ok 67 - return Pending resets current start projection, and repeat acceptance has a fresh start cycle
+  ---
+  duration_ms: 36.664538
+  type: 'test'
+  ...
+# Subtest: missing/wrong event references cannot confirm current report and have no side effects
+ok 68 - missing/wrong event references cannot confirm current report and have no side effects
+  ---
+  duration_ms: 29.177521
+  type: 'test'
+  ...
+# Subtest: stale automated answer cannot silently confirm a newer worker report
+ok 69 - stale automated answer cannot silently confirm a newer worker report
+  ---
+  duration_ms: 28.475914
+  type: 'test'
+  ...
+# Subtest: admin duplicate decisions are bounded, correction retains original value and survives reopen
+ok 70 - admin duplicate decisions are bounded, correction retains original value and survives reopen
+  ---
+  duration_ms: 37.372111
+  type: 'test'
+  ...
+# Subtest: worker report cannot reopen a start decision already resolved by admin
+ok 71 - worker report cannot reopen a start decision already resolved by admin
+  ---
+  duration_ms: 27.103701
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: undefined
+ok 72 - legacy admin metadata fails safely without claiming started: undefined
+  ---
+  duration_ms: 30.536481
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: {invalid
+ok 73 - legacy admin metadata fails safely without claiming started: {invalid
+  ---
+  duration_ms: 30.743961
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: null
+ok 74 - legacy admin metadata fails safely without claiming started: null
+  ---
+  duration_ms: 35.01479
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: []
+ok 75 - legacy admin metadata fails safely without claiming started: []
+  ---
+  duration_ms: 30.913928
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: {"subject":"start"}
+ok 76 - legacy admin metadata fails safely without claiming started: {"subject":"start"}
+  ---
+  duration_ms: 28.418956
+  type: 'test'
+  ...
+# Subtest: legacy admin metadata fails safely without claiming started: {"subject":"other","started":true}
+ok 77 - legacy admin metadata fails safely without claiming started: {"subject":"other","started":true}
+  ---
+  duration_ms: 35.417714
+  type: 'test'
+  ...
+# Subtest: legacy customer_reported with missing structured proof does not assume started
+ok 78 - legacy customer_reported with missing structured proof does not assume started
+  ---
+  duration_ms: 25.513262
+  type: 'test'
+  ...
+# Subtest: legacy customer_confirmed with missing structured proof does not assume started
+ok 79 - legacy customer_confirmed with missing structured proof does not assume started
+  ---
+  duration_ms: 22.542184
+  type: 'test'
+  ...
+# Subtest: oversized legacy JSON is unknown consistently in event DTO and started projection
+ok 80 - oversized legacy JSON is unknown consistently in event DTO and started projection
+  ---
+  duration_ms: 25.969067
+  type: 'test'
+  ...
+# Subtest: event metadata is a bounded plain JSON object and participates in duplicate comparison
+ok 81 - event metadata is a bounded plain JSON object and participates in duplicate comparison
+  ---
+  duration_ms: 24.505346
+  type: 'test'
+  ...
+# Subtest: no rule, inactive/malformed/negative/out-of-range delay produce no question and no default
+ok 82 - no rule, inactive/malformed/negative/out-of-range delay produce no question and no default
+  ---
+  duration_ms: 28.786235
+  type: 'test'
+  ...
+# Subtest: configured delay uses exact due boundary and emits one prompt across retry/reopen
+ok 83 - configured delay uses exact due boundary and emits one prompt across retry/reopen
+  ---
+  duration_ms: 28.896641
+  type: 'test'
+  ...
+# Subtest: explicit zero delay is valid and absent expectedStartAt remains unguessed
+ok 84 - explicit zero delay is valid and absent expectedStartAt remains unguessed
+  ---
+  duration_ms: 42.774014
+  type: 'test'
+  ...
+# Subtest: start report/answer cannot change status or financial data for PENDING
+ok 85 - start report/answer cannot change status or financial data for PENDING
+  ---
+  duration_ms: 21.55342
+  type: 'test'
+  ...
+# Subtest: start report/answer cannot change status or financial data for CANCEL_REQUESTED
+ok 86 - start report/answer cannot change status or financial data for CANCEL_REQUESTED
+  ---
+  duration_ms: 22.503602
+  type: 'test'
+  ...
+# Subtest: start report/answer cannot change status or financial data for CANCELLED
+ok 87 - start report/answer cannot change status or financial data for CANCELLED
+  ---
+  duration_ms: 23.940864
+  type: 'test'
+  ...
+# Subtest: start report/answer cannot change status or financial data for COMPLETED
+ok 88 - start report/answer cannot change status or financial data for COMPLETED
+  ---
+  duration_ms: 28.359633
+  type: 'test'
+  ...
+# Subtest: start report/answer cannot change status or financial data for UNKNOWN
+ok 89 - start report/answer cannot change status or financial data for UNKNOWN
+  ---
+  duration_ms: 32.349165
+  type: 'test'
+  ...
+# Subtest: admin exact command replay after correction cannot flip the latest decision
+ok 90 - admin exact command replay after correction cannot flip the latest decision
+  ---
+  duration_ms: 22.708153
+  type: 'test'
+  ...
+# Subtest: admin correction remains latest when server audit clock moves backwards
+ok 91 - admin correction remains latest when server audit clock moves backwards
+  ---
+  duration_ms: 26.733641
+  type: 'test'
+  ...
+# Subtest: admin command content conflict and stale decision context have no effects
+ok 92 - admin command content conflict and stale decision context have no effects
+  ---
+  duration_ms: 17.59211
+  type: 'test'
+  ...
+# Subtest: admin intent from a replaced acceptance cannot resolve the new worker start
+ok 93 - admin intent from a replaced acceptance cannot resolve the new worker start
+  ---
+  duration_ms: 18.663274
+  type: 'test'
+  ...
+# Subtest: admin commands require explicit bounded IDs and revision without guessing old intent
+ok 94 - admin commands require explicit bounded IDs and revision without guessing old intent
+  ---
+  duration_ms: 18.18504
+  type: 'test'
+  ...
+# Subtest: same worker delayed report after ABA reassignment cannot start a fresh acceptance
+ok 95 - same worker delayed report after ABA reassignment cannot start a fresh acceptance
+  ---
+  duration_ms: 19.573707
+  type: 'test'
+  ...
+# Subtest: worker start requires explicit acceptance reference and exposes it only for active orders
+ok 96 - worker start requires explicit acceptance reference and exposes it only for active orders
+  ---
+  duration_ms: 17.306254
+  type: 'test'
+  ...
+# Subtest: legacy active assignment can report start without inventing an acceptance timestamp
+ok 97 - legacy active assignment can report start without inventing an acceptance timestamp
+  ---
+  duration_ms: 21.348688
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy ACCEPTED without inventing acceptance time
+ok 98 - admin can resolve actual start dispute on legacy ACCEPTED without inventing acceptance time
+  ---
+  duration_ms: 24.312269
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy CONFIRMED without inventing acceptance time
+ok 99 - admin can resolve actual start dispute on legacy CONFIRMED without inventing acceptance time
+  ---
+  duration_ms: 23.861556
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy ASSIGNED without inventing acceptance time
+ok 100 - admin can resolve actual start dispute on legacy ASSIGNED without inventing acceptance time
+  ---
+  duration_ms: 21.689225
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy IN_PROGRESS without inventing acceptance time
+ok 101 - admin can resolve actual start dispute on legacy IN_PROGRESS without inventing acceptance time
+  ---
+  duration_ms: 25.589726
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy CANCELLED without inventing acceptance time
+ok 102 - admin can resolve actual start dispute on legacy CANCELLED without inventing acceptance time
+  ---
+  duration_ms: 26.988442
+  type: 'test'
+  ...
+# Subtest: admin can resolve actual start dispute on legacy COMPLETED without inventing acceptance time
+ok 103 - admin can resolve actual start dispute on legacy COMPLETED without inventing acceptance time
+  ---
+  duration_ms: 26.668255
+  type: 'test'
+  ...
+# Subtest: legacy assignment without a current worker report cannot gain an invented start decision
+ok 104 - legacy assignment without a current worker report cannot gain an invented start decision
+  ---
+  duration_ms: 19.544303
+  type: 'test'
+  ...
+# (node:4201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a new database has no point rules and no seeded amounts
+ok 105 - a new database has no point rules and no seeded amounts
+  ---
+  duration_ms: 22.38955
+  type: 'test'
+  ...
+# Subtest: rules are appended as new versions and cannot be edited
+ok 106 - rules are appended as new versions and cannot be edited
+  ---
+  duration_ms: 23.504608
+  type: 'test'
+  ...
+# Subtest: postEntry is idempotent, rejects a conflicting key, and never goes below zero
+ok 107 - postEntry is idempotent, rejects a conflicting key, and never goes below zero
+  ---
+  duration_ms: 22.516002
+  type: 'test'
+  ...
+# Subtest: initial free cancels are granted once from the published rule and capped by it
+ok 108 - initial free cancels are granted once from the published rule and capped by it
+  ---
+  duration_ms: 21.526523
+  type: 'test'
+  ...
+# Subtest: quoteCancelPenalty does not write, is free before acceptance, and reads the penalty rule after it
+ok 109 - quoteCancelPenalty does not write, is free before acceptance, and reads the penalty rule after it
+  ---
+  duration_ms: 34.195412
+  type: 'test'
+  ...
+# Subtest: postTransfer moves only the points actually deducted and can be reversed once
+ok 110 - postTransfer moves only the points actually deducted and can be reversed once
+  ---
+  duration_ms: 21.850256
+  type: 'test'
+  ...
+# Subtest: tier changes only by a published rule, upgrades immediately, and does not fall
+ok 111 - tier changes only by a published rule, upgrades immediately, and does not fall
+  ---
+  duration_ms: 29.416805
+  type: 'test'
+  ...
+# Subtest: completion awards points and free-cancel refills only from active rules; cancel and rating do not
+ok 112 - completion awards points and free-cancel refills only from active rules; cancel and rating do not
+  ---
+  duration_ms: 53.238093
+  type: 'test'
+  ...
+# (node:4201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:4201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:4201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: two concurrent posts with one key award once, and two keys add up
+ok 113 - two concurrent posts with one key award once, and two keys add up
+  ---
+  duration_ms: 167.299214
+  type: 'test'
+  ...
+# Subtest: points_ledger rejects update, delete and replace
+ok 114 - points_ledger rejects update, delete and replace
+  ---
+  duration_ms: 21.749505
+  type: 'test'
+  ...
+# (node:4201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: admin can append a point rule, customers cannot, and admin completion awards from that rule
+ok 115 - admin can append a point rule, customers cannot, and admin completion awards from that rule
+  ---
+  duration_ms: 75.378104
+  type: 'test'
+  ...
+# Subtest: loyalty tier follows user_points and ignores stars the customer gave
+ok 116 - loyalty tier follows user_points and ignores stars the customer gave
+  ---
+  duration_ms: 39.376769
+  type: 'test'
+  ...
+# (node:4212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: national id and sheba round-trip and are not stored as plaintext
+ok 117 - national id and sheba round-trip and are not stored as plaintext
+  ---
+  duration_ms: 25.194515
+  type: 'test'
+  ...
+# Subtest: otp hash and session hash keep login behavior
+ok 118 - otp hash and session hash keep login behavior
+  ---
+  duration_ms: 154.009343
+  type: 'test'
+  ...
+# Subtest: sensitive migration converts once and rolls back on failure
+ok 119 - sensitive migration converts once and rolls back on failure
+  ---
+  duration_ms: 20.225366
+  type: 'test'
+  ...
+# Subtest: api responses and logs do not reveal secrets
+ok 120 - api responses and logs do not reveal secrets
+  ---
+  duration_ms: 44.007818
+  type: 'test'
+  ...
+# (node:4226) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: otp is not issued when Kavenegar settings are empty
+ok 121 - otp is not issued when Kavenegar settings are empty
+  ---
+  duration_ms: 41.805975
+  type: 'test'
+  ...
+# (node:4233) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: sqlite keeps the current API behavior
+ok 122 - sqlite keeps the current API behavior
+  ---
+  duration_ms: 107.227645
+  type: 'test'
+  ...
+# Subtest: data survives closing and reopening sqlite
+ok 123 - data survives closing and reopening sqlite
+  ---
+  duration_ms: 22.737218
+  type: 'test'
+  ...
+# (node:4233) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: two concurrent accepts leave one accepted order
+ok 124 - two concurrent accepts leave one accepted order
+  ---
+  duration_ms: 116.51861
+  type: 'test'
+  ...
+# Subtest: an older orders table gains a null serviceId and still stores new values
+ok 125 - an older orders table gains a null serviceId and still stores new values
+  ---
+  duration_ms: 31.935582
+  type: 'test'
+  ...
+# (node:4233) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:4242) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: API lifecycle create -> accept -> start -> customer yes -> complete preserves status and privacy
+ok 126 - API lifecycle create -> accept -> start -> customer yes -> complete preserves status and privacy
+  ---
+  duration_ms: 131.381689
+  type: 'test'
+  ...
+# Subtest: customer no opens one dispute; admin authenticated resolution is replay-safe and correction preserves history
+ok 127 - customer no opens one dispute; admin authenticated resolution is replay-safe and correction preserves history
+  ---
+  duration_ms: 87.247973
+  type: 'test'
+  ...
+# Subtest: start and response reject forged actors, bad references, invalid sessions and blocked accounts without effects
+ok 128 - start and response reject forged actors, bad references, invalid sessions and blocked accounts without effects
+  ---
+  duration_ms: 76.051205
+  type: 'test'
+  ...
+# Subtest: lost committed create, start and customer response can be retried without duplicate orders or events
+ok 129 - lost committed create, start and customer response can be retried without duplicate orders or events
+  ---
+  duration_ms: 59.21142
+  type: 'test'
+  ...
+# Subtest: reassign and return to pending reset start summaries; delayed old-cycle response cannot confirm new worker
+ok 130 - reassign and return to pending reset start summaries; delayed old-cycle response cannot confirm new worker
+  ---
+  duration_ms: 84.901494
+  type: 'test'
+  ...
+# Subtest: cancel before start, during dispute and closed orders reject start and response with no extra effects
+ok 131 - cancel before start, during dispute and closed orders reject start and response with no extra effects
+  ---
+  duration_ms: 68.093556
+  type: 'test'
+  ...
+# Subtest: configured prompt delay respects exact time boundary and customer prompt yes/no without fabricating agreed time
+ok 132 - configured prompt delay respects exact time boundary and customer prompt yes/no without fabricating agreed time
+  ---
+  duration_ms: 64.242712
+  type: 'test'
+  ...
+# Subtest: missing order and pending order cannot record a start or customer confirmation
+ok 133 - missing order and pending order cannot record a start or customer confirmation
+  ---
+  duration_ms: 37.808462
+  type: 'test'
+  ...
+# (node:4249) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: completion stays available from all four active statuses without requiring a start report
+    # Subtest: ACCEPTED
+    ok 1 - ACCEPTED
+      ---
+      duration_ms: 24.86724
+      type: 'test'
+      ...
+    # Subtest: CONFIRMED
+    ok 2 - CONFIRMED
+      ---
+      duration_ms: 16.169749
+      type: 'test'
+      ...
+    # Subtest: ASSIGNED
+    ok 3 - ASSIGNED
+      ---
+      duration_ms: 12.450509
+      type: 'test'
+      ...
+    # Subtest: IN_PROGRESS
+    ok 4 - IN_PROGRESS
+      ---
+      duration_ms: 15.311845
+      type: 'test'
+      ...
+    1..4
+ok 134 - completion stays available from all four active statuses without requiring a start report
+  ---
+  duration_ms: 145.797362
+  type: 'test'
+  ...
+# Subtest: historical active orders without acceptedAt or expectedStartAt can still be completed
+ok 135 - historical active orders without acceptedAt or expectedStartAt can still be completed
+  ---
+  duration_ms: 57.556009
+  type: 'test'
+  ...
+# Subtest: completion rejects wrong role, worker forgery, blocked/unapproved worker and invalid/expired/revoked sessions without effects
+ok 136 - completion rejects wrong role, worker forgery, blocked/unapproved worker and invalid/expired/revoked sessions without effects
+  ---
+  duration_ms: 66.554273
+  type: 'test'
+  ...
+# Subtest: completion retry after a lost response or concurrent request never repeats points, notifications or completedAt
+ok 137 - completion retry after a lost response or concurrent request never repeats points, notifications or completedAt
+  ---
+  duration_ms: 35.165694
+  type: 'test'
+  ...
+# Subtest: pending, cancel requested and cancelled orders cannot complete and do not earn completion points
+ok 138 - pending, cancel requested and cancelled orders cannot complete and do not earn completion points
+  ---
+  duration_ms: 44.193955
+  type: 'test'
+  ...
+# Subtest: reassigned order completes only for the current worker, preserving previous acceptance history
+ok 139 - reassigned order completes only for the current worker, preserving previous acceptance history
+  ---
+  duration_ms: 45.398469
+  type: 'test'
+  ...
+# Subtest: missing order returns404 and customer view never discloses the assigned worker phone
+ok 140 - missing order returns404 and customer view never discloses the assigned worker phone
+  ---
+  duration_ms: 35.392773
+  type: 'test'
+  ...
+# (node:4256) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: worker identity documents stay private
+    # Subtest: missing document returns a controlled response
+    ok 1 - missing document returns a controlled response
+      ---
+      duration_ms: 4.851038
+      type: 'test'
+      ...
+    # Subtest: invalid file is rejected
+    ok 2 - invalid file is rejected
+      ---
+      duration_ms: 6.903348
+      type: 'test'
+      ...
+    # Subtest: oversized file is rejected
+    ok 3 - oversized file is rejected
+      ---
+      duration_ms: 23.942702
+      type: 'test'
+      ...
+    # Subtest: valid upload stores only an opaque id
+    ok 4 - valid upload stores only an opaque id
+      ---
+      duration_ms: 8.229197
+      type: 'test'
+      ...
+    # Subtest: public and static routes do not return the file
+    ok 5 - public and static routes do not return the file
+      ---
+      duration_ms: 16.617639
+      type: 'test'
+      ...
+    # Subtest: worker token cannot read the document
+    ok 6 - worker token cannot read the document
+      ---
+      duration_ms: 2.874943
+      type: 'test'
+      ...
+    # Subtest: admin can read the document
+    ok 7 - admin can read the document
+      ---
+      duration_ms: 2.947332
+      type: 'test'
+      ...
+    # Subtest: replacement keeps the new document and removes the old file
+    ok 8 - replacement keeps the new document and removes the old file
+      ---
+      duration_ms: 8.467187
+      type: 'test'
+      ...
+    # Subtest: a failed database write does not replace the saved document
+    ok 9 - a failed database write does not replace the saved document
+      ---
+      duration_ms: 11.190204
+      type: 'test'
+      ...
+    # Subtest: admin delete removes the document
+    ok 10 - admin delete removes the document
+      ---
+      duration_ms: 6.733342
+      type: 'test'
+      ...
+    # Subtest: a failed record save restores the previous document
+    ok 11 - a failed record save restores the previous document
+      ---
+      duration_ms: 1.262829
+      type: 'test'
+      ...
+    1..11
+ok 141 - worker identity documents stay private
+  ---
+  duration_ms: 131.794626
+  type: 'test'
+  ...
+# (node:4263) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: worker order views hide customer contact data until an active accept
+ok 142 - worker order views hide customer contact data until an active accept
+  ---
+  duration_ms: 176.174833
+  type: 'test'
+  ...
+# Subtest: accepting an order the customer already cancelled gets a distinct message
+ok 143 - accepting an order the customer already cancelled gets a distinct message
+  ---
+  duration_ms: 34.21483
+  type: 'test'
+  ...
+# Subtest: a malformed accept request gets a friendly JSON error without internal details
+ok 144 - a malformed accept request gets a friendly JSON error without internal details
+  ---
+  duration_ms: 35.975009
+  type: 'test'
+  ...
+# Subtest: customer free-text notes never reach the worker but stay for the customer and admin
+ok 145 - customer free-text notes never reach the worker but stay for the customer and admin
+  ---
+  duration_ms: 104.07864
+  type: 'test'
+  ...
+# Subtest: the customer rating comment and tags never reach the worker (D-32) but stay for the customer and admin
+ok 146 - the customer rating comment and tags never reach the worker (D-32) but stay for the customer and admin
+  ---
+  duration_ms: 69.387046
+  type: 'test'
+  ...
+# Subtest: status notifications call ACCEPTED «پذیرفته‌شده», not «در حال انجام» (E6)
+ok 147 - status notifications call ACCEPTED «پذیرفته‌شده», not «در حال انجام» (E6)
+  ---
+  duration_ms: 53.876773
+  type: 'test'
+  ...
+# Subtest: admin user-status message names the status in Persian, never the raw enum (D-06)
+ok 148 - admin user-status message names the status in Persian, never the raw enum (D-06)
+  ---
+  duration_ms: 33.974972
+  type: 'test'
+  ...
+# Subtest: a blocked user gets 403 with code ACCOUNT_BLOCKED and the unchanged Persian message on every request
+ok 149 - a blocked user gets 403 with code ACCOUNT_BLOCKED and the unchanged Persian message on every request
+  ---
+  duration_ms: 18.712825
+  type: 'test'
+  ...
+1..149
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 23167.846576
