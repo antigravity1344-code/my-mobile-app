@@ -1,3 +1,18 @@
+# راهنمای ایجنت‌های پروژه پاکشو
+
+**شاخه پیش‌فرض و مرجع توسعه:** `ui/customer-home-redesign`.
+
+قبل از هر کار، این منابع همین شاخه را بخوان:
+- [سند اصلی تحویل فارسی](docs/PROJECT_HANDOFF.fa.md)
+- [ممیزی شاخه‌ها](docs/PROJECT_BRANCH_AUDIT.fa.md) و [مکمل](docs/PROJECT_BRANCH_AUDIT_SUPPLEMENT.fa.md)
+- [تصمیم‌های معماری](docs/ARCHITECTURE_DECISIONS.md) و [Issue #11](https://github.com/antigravity1344-code/my-mobile-app/issues/11)
+
+ابتدا `git status --short --branch`، `git rev-parse HEAD`، `git remote -v` و وضعیت واقعی PRهای #9/#10/#12 و CI را بررسی کن. قبل از هر ویرایش، گزارش فقط‌خواندنی از وضعیت پروژه و اقدام پیشنهادی بده. شواهد قدیمی را به head جدید تعمیم نده.
+
+**بدون اجازه صریح مالک:** ساخت شاخه، commit/push، merge/rebase، حذف، force-push، deploy، تغییر CI یا تنظیمات و تصمیم مالی D-60 ممنوع است. شاخه‌های بازگشت و کارهای ادغام‌نشده محفوظ‌اند. پس از کار مجاز، سند تحویل را به‌روزرسانی کن.
+
+---
+
 # Claude Code — project context
 
 
