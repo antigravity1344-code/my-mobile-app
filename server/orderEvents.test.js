@@ -961,9 +961,21 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     // createdAt DESC و بدون کلید دوم مرتب می‌شود، پس ترتیب بین دو ردیف هم‌زمان تعریف‌نشده
     // است. به‌جای شمارش/slice که به این ترتیب مبهم تکیه دارد، اعلان‌های تازه با اختلاف id
     // نسبت به یک snapshot قبلی مشخص می‌شوند؛ تعداد، نوع، مالک و متن همچنان بررسی می‌شوند.
-    const snapshotIds = (userId, orderId) => new Set(orderNotes(userId, orderId).map((item) => item.id));
-    const freshSince = (userId, orderId, idsBefore) =>
-      orderNotes(userId, orderId).filter((item) => !idsBefore.has(item.id));
+    // تقویت (مأموریت ۰۰۷): snapshot اکنون کل ردیف را نگه می‌دارد و freshSince بررسی می‌کند
+    // که اعلان‌های قبلی همچنان بدون تغییر باقی مانده‌اند. روش شمارش/slice قبلی حذف
+    // ناخواسته اعلان‌های قدیمی را تشخیص می‌داد، اما بازنویسی عنوان آن‌ها را نمی‌گرفت.
+    // روش جدید هر دو (حذف و بازنویسی) را بررسی می‌کند.
+    const snapshotIds = function (userId, orderId) {
+      return new Map(orderNotes(userId, orderId).map(function (item) { return [item.id, { ...item }]; }));
+    };
+    const freshSince = function (userId, orderId, idsBefore) {
+      const current = orderNotes(userId, orderId);
+      const currentById = new Map(current.map(function (item) { return [item.id, item]; }));
+      for (const [id, earlier] of idsBefore) {
+        assert.deepEqual(currentById.get(id), earlier, 'earlier notification ' + id + ' must remain present and unchanged');
+      }
+      return current.filter(function (item) { return !idsBefore.has(item.id); });
+    };
 
     // ۱. PENDING → B: فقط B اعلان می‌گیرد؛ هیچ اعلان Reassign صادر نمی‌شود
     const pendingOrder = (await postOrder(server, customer.token)).json.order;
