@@ -100,6 +100,7 @@ after(async () => {
 
 test('D-62 authenticated HTTP rejects without writing or changing onboarding state', async t => {
   const cases = [
+    ['G2: 8-byte PNG magic is not a decodable image', onboarding(Buffer.from('89504e470d0a1a0a','hex').toString('base64'), 'image/png'), 400, /ناقص|خراب|پردازش/],
     ['forged MIME versus binary signature', onboarding(png.toString('base64'), 'image/jpeg'), 400, /نوع تصویر اعلام|محتوای/],
     ['stored image MIME denied by deployment policy', onboarding(jpeg.toString('base64'), 'image/jpeg'), 400, /فرمت واقعی/],
     ['file exceeds deployment maxBytes', onboarding(Buffer.concat([png, Buffer.alloc(55)]).toString('base64'), 'image/png'), 400, /حجم/],
