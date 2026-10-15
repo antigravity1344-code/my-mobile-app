@@ -73,6 +73,8 @@ const workerDocuments = createWorkerDocumentStorage(
 );
 
 app.use(cors());
+// Non-secret UI policy is always derived from this server instance, never a client tenant ID.
+app.get('/api/document-policy', (_req, res) => res.json({ success: true, policy: deploymentDocumentPolicy }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', (req, res) => {
   res.status(404).json({ success: false, message: 'یافت نشد.' });
