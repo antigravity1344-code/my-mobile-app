@@ -24,6 +24,55 @@ function createWorkerDocumentStorage(directory) {
     return null;
   }
 
+  // A durable intent is written *before* the file, so failed database updates
+  // and failed unlink operations cannot leave an untracked document behind.
+  // Reconciliation must consult the database before removing a pending document.
+  function pendingPath(documentId) {
+    if (!DOCUMENT_ID.test(documentId)) throw new Error('INVALID_DOCUMENT_ID');
+    return path.join(root, documentId + '.pending');
+  }
+
+  function trackPendingDocument(documentId) {
+    fs.mkdirSync(root, { recursive: true });
+    const fd = fs.openSync(pendingPath(documentId), 'wx', 0o600);
+    try {
+      fs.writeSync(fd, JSON.stringify({ version: 1, documentId, pendingCleanup: true }));
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  function finishPendingDocument(documentId) {
+    try {
+      fs.unlinkSync(pendingPath(documentId));
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+
+  function reconcilePendingDocuments(isReferenced) {
+    if (typeof isReferenced !== 'function') throw new Error('REFERENCE_CHECK_REQUIRED');
+    if (!fs.existsSync(root)) return { recovered: 0, referenced: 0 };
+    let recovered = 0, referenced = 0;
+    for (const filename of fs.readdirSync(root)) {
+      const match = /^(wd_[0-9a-f]{32})\.pending$/.exec(filename);
+      if (!match) continue;
+      const documentId = match[1];
+      if (isReferenced(documentId)) {
+        // The DB transaction committed; only the stale intent remains.
+        finishPendingDocument(documentId);
+        referenced++;
+        continue;
+      }
+      // If unlink fails this throws and the durable pending record remains.
+      deleteWorkerDocument(documentId);
+      finishPendingDocument(documentId);
+      recovered++;
+    }
+    return { recovered, referenced };
+  }
+
   function uploadWorkerDocument({ buffer, ext }) {
     if (!Buffer.isBuffer(buffer) || buffer.length === 0 || !EXTENSIONS.includes(ext)) {
       throw new Error('INVALID_DOCUMENT');
@@ -33,6 +82,7 @@ function createWorkerDocumentStorage(directory) {
     const filename = documentId + '.' + ext;
     const finalPath = path.join(root, filename);
     const tempPath = path.join(root, documentId + '.tmp');
+    trackPendingDocument(documentId);
     try {
       fs.writeFileSync(tempPath, buffer, { flag: 'wx' });
       fs.renameSync(tempPath, finalPath);
@@ -81,6 +131,9 @@ function createWorkerDocumentStorage(directory) {
 
   return {
     uploadWorkerDocument,
+    trackPendingDocument,
+    finishPendingDocument,
+    reconcilePendingDocuments,
     getWorkerDocument,
     deleteWorkerDocument,
     discardLegacyPath,
