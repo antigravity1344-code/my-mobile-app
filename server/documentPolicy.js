@@ -1,6 +1,11 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
+// Upper bounds for untrusted decoded images; deployment-specific maxBytes can be lower.
+const MAX_DOCUMENT_PIXELS = 16_000_000;
+const MAX_DOCUMENT_EDGE = 8192;
+const MAX_DOCUMENT_BYTES = 16 * 1024 * 1024;
 
 const MIME_KINDS = Object.freeze({ 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' });
 const PAKSHO_COMPAT_POLICY = Object.freeze({
@@ -24,7 +29,7 @@ function validatePolicy(policy) {
   if (!Array.isArray(policy.allowedStoredMimes) || policy.allowedStoredMimes.length === 0 ||
       !policy.allowedStoredMimes.every(mime => Object.hasOwn(MIME_KINDS, mime)))
     throw Error('D62_POLICY_MIMES');
-  if (!Number.isSafeInteger(policy.maxBytes) || policy.maxBytes <= 0)
+  if (!Number.isSafeInteger(policy.maxBytes) || (policy.maxBytes <= 0 || policy.maxBytes > MAX_DOCUMENT_BYTES))
     throw Error('D62_POLICY_MAX_BYTES');
   if (policy.oversizeAction !== 'reject') throw Error('D62_POLICY_OVERSIZE');
   if (!policy.compression || typeof policy.compression.enabled !== 'boolean' ||
@@ -79,4 +84,37 @@ function inspectDocument(payload, policy) {
     return { error: 'محتوای فایل با نوع تصویر اعلام‌شده یکی نیست.' };
   return { buffer, ext: kind === 'jpeg' ? 'jpg' : kind };
 }
-module.exports = { PAKSHO_COMPAT_POLICY, validatePolicy, loadDeploymentPolicy, detectKind, inspectDocument };
+/** Decode every pixel before accepting client-controlled bytes.
+ * A magic header or metadata alone is not enough (D-62 G2).
+ * Processing is capped by input size, dimensions, pixel count and channels.
+ */
+async function validateDecodedDocument(buffer, ext) {
+  const requiredFormat = ext === 'jpg' ? 'jpeg' : ext;
+  try {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0 || buffer.length > MAX_DOCUMENT_BYTES)
+      throw new Error('BAD_SIZE');
+    const image = sharp(buffer, {
+      failOn: 'warning', limitInputPixels: MAX_DOCUMENT_PIXELS,
+      limitInputChannels: 4, sequentialRead: true, animated: false, pages: 1
+    });
+    const metadata = await image.metadata();
+    if (metadata.format !== requiredFormat || !Number.isSafeInteger(metadata.width) ||
+        !Number.isSafeInteger(metadata.height) || metadata.width < 1 || metadata.height < 1 ||
+        metadata.width > MAX_DOCUMENT_EDGE || metadata.height > MAX_DOCUMENT_EDGE ||
+        metadata.width * metadata.height > MAX_DOCUMENT_PIXELS ||
+        (metadata.pages && metadata.pages !== 1))
+      throw new Error('BAD_DIMENSIONS_OR_FORMAT');
+    const decoded = await image.raw().toBuffer({ resolveWithObject: true });
+    if (decoded.info.width !== metadata.width || decoded.info.height !== metadata.height ||
+        decoded.info.channels < 1 || decoded.info.channels > 4 ||
+        decoded.data.length !== metadata.width * metadata.height * decoded.info.channels)
+      throw new Error('INCOMPLETE_DECODE');
+    return { ok: true };
+  } catch {
+    return { error: 'تصویر مدرک ناقص، خراب یا غیرقابل پردازش است.' };
+  }
+}
+module.exports = {
+  PAKSHO_COMPAT_POLICY, validatePolicy, loadDeploymentPolicy, detectKind, inspectDocument,
+  validateDecodedDocument, MAX_DOCUMENT_PIXELS, MAX_DOCUMENT_EDGE, MAX_DOCUMENT_BYTES
+};
