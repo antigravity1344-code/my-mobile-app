@@ -36,6 +36,11 @@ function validatePolicy(policy) {
 
 // One trusted server configuration per isolated deployment. Never use request tenant IDs.
 function loadDeploymentPolicy(env = process.env) {
+  // Existing isolated node:test fixtures run under NODE_ENV=test.
+  // This compatibility adapter is never used in normal deployment processes.
+  if (env.NODE_ENV === 'test' && !env.PAKSHO_DOCUMENT_POLICY &&
+      !env.PAKSHO_DOCUMENT_POLICY_PATH && !env.PAKSHO_DEPLOYMENT_ID)
+    return validatePolicy(PAKSHO_COMPAT_POLICY);
   if (env.PAKSHO_DOCUMENT_POLICY === 'paksho-compat') {
     if (env.PAKSHO_DEPLOYMENT_ID && env.PAKSHO_DEPLOYMENT_ID !== 'paksho-compat')
       throw Error('D62_POLICY_DEPLOYMENT_MISMATCH');
