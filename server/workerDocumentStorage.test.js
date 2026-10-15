@@ -22,8 +22,8 @@ const { app, store } = require('./index.js');
 
 const PHONE = '09120000099';
 const NATIONAL_ID = '0012345678';
-const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
-const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDg6KKK2PoT/9k=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGOs0AhgYGBgYmBgYGBgAAALkgD0DmG2vQAAAABJRU5ErkJggg==', 'base64');
 
 function request(server, { method = 'GET', pathname, token, body }) {
   const payload = body === undefined ? null : JSON.stringify(body);
@@ -257,6 +257,49 @@ test('worker identity documents stay private', async (t) => {
     assert.deepEqual(readable.buf, png);
     assert.equal(workerRecord().idDoc, previousId);
     assert.deepEqual(fs.readdirSync(process.env.PAKSHO_WORKER_DOC_DIR), [previousId + '.png']);
+  });
+
+  await t.test('D-62 F1: DB abort plus unlink fault keeps durable recovery record', async () => {
+    const originalId = workerRecord().idDoc;
+    const { DatabaseSync } = require('node:sqlite');
+    const side = new DatabaseSync(process.env.PAKSHO_SQLITE_PATH);
+    side.exec("CREATE TRIGGER d62_abort_user_update BEFORE UPDATE ON users BEGIN SELECT RAISE(ABORT, 'synthetic db failure'); END");
+    const realUnlink = fs.unlinkSync;
+    let injected = false;
+    fs.unlinkSync = function (filename, ...args) {
+      if (!injected && typeof filename === 'string' &&
+          /^wd_[0-9a-f]{32}\.jpg$/.test(path.basename(filename))) {
+        injected = true;
+        const err = new Error('synthetic EACCES');
+        err.code = 'EACCES';
+        throw err;
+      }
+      return realUnlink.call(this, filename, ...args);
+    };
+    let response;
+    try {
+      response = await request(server, {
+        method: 'PUT', pathname: '/api/users/worker-onboarding', token: workerToken,
+        body: onboardingBody(jpeg.toString('base64'), 'image/jpeg')
+      });
+    } finally {
+      fs.unlinkSync = realUnlink;
+      side.exec('DROP TRIGGER d62_abort_user_update');
+      side.close();
+    }
+    assert.equal(response.status, 500);
+    assert.equal(injected, true, 'the final document unlink fault was injected');
+    assert.equal(workerRecord().idDoc, originalId, 'DB failed without changing referenced doc');
+    const names = fs.readdirSync(process.env.PAKSHO_WORKER_DOC_DIR);
+    const orphan = names.find(name => /^wd_[0-9a-f]{32}\.jpg$/.test(name));
+    assert.ok(orphan, 'synthetic final file remains after injected unlink failure');
+    assert.ok(names.includes(orphan.replace(/\.jpg$/, '.pending')), 'durable pending intent must survive both faults');
+    const storage = createWorkerDocumentStorage(process.env.PAKSHO_WORKER_DOC_DIR);
+    const result = storage.reconcilePendingDocuments(id =>
+      store.listUsers('WORKER').some(user => user.idDoc === id)
+    );
+    assert.equal(result.recovered, 1);
+    assert.deepEqual(fs.readdirSync(process.env.PAKSHO_WORKER_DOC_DIR), [originalId + '.png']);
   });
 
   await t.test('admin delete removes the document', async () => {
