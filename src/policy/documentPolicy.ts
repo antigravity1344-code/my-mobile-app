@@ -6,7 +6,6 @@ export type DocumentMime = 'image/png' | 'image/jpeg' | 'image/webp';
 export type OversizeAction = 'reject';
 export type DocumentPolicy = {
   deploymentId: string;
-  allowedInputMimes: DocumentMime[];
   allowedStoredMimes: DocumentMime[];
   maxBytes: number;
   compression: { enabled: false } | { enabled: true; quality: number };
@@ -22,11 +21,9 @@ export function validateDocumentPolicy(value: unknown): DocumentPolicy {
   const p = value as Partial<DocumentPolicy>;
   if (!p.deploymentId?.trim() || !p.approvedBy?.trim() || !p.minimumLegibility?.trim())
     throw new Error('شناسه استقرار، معیار خوانایی و تأییدکننده سیاست الزامی است.');
-  if (!Array.isArray(p.allowedInputMimes) || !p.allowedInputMimes.length ||
-      !p.allowedInputMimes.every(m => MIMES.includes(m)) ||
-      !Array.isArray(p.allowedStoredMimes) || !p.allowedStoredMimes.length ||
+  if (!Array.isArray(p.allowedStoredMimes) || !p.allowedStoredMimes.length ||
       !p.allowedStoredMimes.every(m => MIMES.includes(m)))
-    throw new Error('فرمت‌های ورودی و ذخیره باید صریحاً تعیین شوند.');
+    throw new Error('فرمت‌های ذخیره باید صریحاً تعیین شوند.');
   if (!Number.isSafeInteger(p.maxBytes) || (p.maxBytes ?? 0) <= 0)
     throw new Error('سقف حجم مدارک باید به بایت تعیین شود.');
   if (p.oversizeAction !== 'reject')
@@ -87,7 +84,6 @@ export function validateSelectedDocument(profileValue: unknown, base64: string) 
  */
 export const PAKSHO_COMPAT_DOCUMENT_POLICY: DocumentPolicy = {
   deploymentId: 'paksho-compat',
-  allowedInputMimes: ['image/png', 'image/jpeg', 'image/webp'],
   allowedStoredMimes: ['image/png', 'image/jpeg', 'image/webp'],
   maxBytes: 614400,
   compression: { enabled: true, quality: 0.5 },
