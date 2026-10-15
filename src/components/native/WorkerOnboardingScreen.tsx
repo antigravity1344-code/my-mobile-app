@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
-import { PAKSHO_COMPAT_DOCUMENT_POLICY, pickerQualityForPolicy, validateSelectedDocument } from '../../policy/documentPolicy';
+import { pickerQualityForPolicy, validateDocumentPolicy, validateSelectedDocument } from '../../policy/documentPolicy';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
@@ -148,6 +148,17 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
 
   const handlePickIdDoc = async () => {
     setErrorMsg(null);
+    // The deployment policy comes only from this server; never from a client-supplied tenant ID.
+    const policyResponse = await apiFetch('/document-policy');
+    let documentPolicy;
+    try {
+      if (!policyResponse.success) throw Error('سیاست مدارک استقرار در دسترس نیست.');
+      documentPolicy = validateDocumentPolicy(policyResponse.policy);
+    } catch {
+      setIdDocFile(null);
+      setErrorMsg('سیاست مدارک این استقرار تعریف نشده یا معتبر نیست.');
+      return;
+    }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setErrorMsg(
@@ -161,7 +172,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     try {
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: pickerQualityForPolicy(PAKSHO_COMPAT_DOCUMENT_POLICY),
+        quality: pickerQualityForPolicy(documentPolicy),
         base64: true,
       });
     } catch {
@@ -181,7 +192,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       return;
     }
     try {
-      const inspected = validateSelectedDocument(PAKSHO_COMPAT_DOCUMENT_POLICY, asset.base64);
+      const inspected = validateSelectedDocument(documentPolicy, asset.base64);
       setIdDocFile({
         mimeType: inspected.mimeType,
         data: asset.base64,
