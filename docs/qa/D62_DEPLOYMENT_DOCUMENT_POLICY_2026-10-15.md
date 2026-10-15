@@ -47,3 +47,23 @@ Earlier intermediate CI failures are superseded by this successful run on the im
 - PR #15 remains **draft/unmerged/unreleased**. No phone testing, APK build/install, production app modification or QA database changes occurred during Issue #16.
 
 This document supersedes the initial implementation handoff's outdated assertions that the server policy resolver/enforcement were absent or that the full repository suites had not run.
+
+
+## Issue #16 follow-up — authenticated HTTP negative-path/no-write gate (15 Oct 2026)
+
+Test implementation commit: `7d6a6947b523415a3b9e26ccb687c7023a9721cc`.
+Added `server/documentPolicy.http.test.js`, included in the full server suite by the existing `server/*.test.js` CI glob.
+
+The fixture creates a synthetic isolated deployment with a trusted server-local JSON policy (`deploymentId=synthetic-deployment`, `allowedStoredMimes=['image/png']`, `maxBytes=64` **test-only value**), temporary SQLite path and temporary documents directory. It creates a fictional WORKER account through the fake OTP harness and authenticates using a real bearer token. No actual SMS, identity documents, phone or QA account is used.
+
+Four genuine HTTP `PUT /api/users/worker-onboarding` cases are submitted:
+1. PNG bytes with a forged JPEG MIME claim → HTTP 400, declared MIME does not match bytes.
+2. JPEG bytes declared as JPEG but disallowed by deployment policy → HTTP 400, output MIME not permitted.
+3. Valid PNG magic with bytes above this test policy's cap → HTTP 400, over-limit.
+4. JSON request larger than the configured body parser allowance → HTTP 413.
+
+For **each denial**, the test compares a snapshot of the complete worker record (serialized) and the names and contents of the temporary document directory, before and after the HTTP response. All must remain byte-for-byte unchanged, with the initial worker status `REGISTERED`; no rejected document file is written. The test checks the actual HTTP status and, for controlled 400 responses, the user-visible error category.
+
+Verification: [Actions run 38758550964](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38758550964) on the test-implementation SHA completed **SUCCESS**, including app tests, full server suite, TypeScript and lint.
+
+**Remaining gates:** independent security review by a separate reviewer; operational proof of isolation across provisioned customer deployments, controlled configuration permissions, positive-path policy/version auditability, image decoding and real identity-document legibility review as required by policy. This authenticated negative-path test does not establish any of those. PR #15 remains draft and unmerged; no deploy or APK/device/QA change occurred.
