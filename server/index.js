@@ -11,7 +11,7 @@ const {
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
-const { loadDeploymentPolicy, inspectDocument } = require('./documentPolicy');
+const { loadDeploymentPolicy, inspectDocument, validateDecodedDocument } = require('./documentPolicy');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -93,6 +93,11 @@ const store = createDataStore(
   process.env.PAKSHO_SQLITE_PATH
     ? path.resolve(process.env.PAKSHO_SQLITE_PATH)
     : path.join(__dirname, 'data', 'paksho.sqlite')
+);
+// Recover abandoned uploads on startup, but never erase a document still referenced
+// by a committed worker record. Failure to reconcile is a fail-closed startup error.
+workerDocuments.reconcilePendingDocuments(documentId =>
+  store.listUsers('WORKER').some(user => user.idDoc === documentId)
 );
 const otpSendWindow = new Map();
 const adminLoginAttempts = new Map();
@@ -506,7 +511,7 @@ app.put('/api/users/addresses', (req, res) => {
   res.json({ success: true, addresses: savedAddresses });
 });
 
-app.put('/api/users/worker-onboarding', (req, res) => {
+app.put('/api/users/worker-onboarding', async (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   if (authUser.role !== 'WORKER') {
@@ -537,6 +542,12 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   }
   if (uploadedIdDoc.error) {
     return res.status(400).json({ success: false, message: uploadedIdDoc.error });
+  }
+  if (!uploadedIdDoc.error) {
+    const decoded = await validateDecodedDocument(uploadedIdDoc.buffer, uploadedIdDoc.ext);
+    if (decoded.error) {
+      return res.status(400).json({ success: false, message: decoded.error });
+    }
   }
   if (nextAvatar && nextAvatar.startsWith('data:') && !/^data:image\/(png|jpeg|jpg|webp);/i.test(nextAvatar)) {
     return res.status(400).json({ success: false, message: 'فرمت تصویر پروفایل مجاز نیست.' });
@@ -573,16 +584,27 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   } catch (error) {
     try {
       workerDocuments.deleteWorkerDocument(storedDocument.documentId);
+      workerDocuments.finishPendingDocument(storedDocument.documentId);
     } catch (cleanupError) {
-      // فایل جدید بدون رکورد معتبر باقی نمی‌ماند.
+      // The fsynced pre-write intent survives for reference-aware recovery.
+      console.error('D62_DOCUMENT_CLEANUP_DEFERRED', cleanupError.code || 'UNKNOWN');
     }
     return res.status(500).json({ success: false, message: 'ذخیره مدرک هویتی ممکن نشد.' });
   }
+  try {
+    // A committed DB reference must not be removed by later reconciliation.
+    workerDocuments.finishPendingDocument(storedDocument.documentId);
+  } catch (error) {
+    console.error('D62_DOCUMENT_COMMITTED_INTENT_RETAINED', error.code || 'UNKNOWN');
+  }
   if (previousDocument.idDoc && previousDocument.idDoc !== storedDocument.documentId) {
     try {
+      workerDocuments.trackPendingDocument(previousDocument.idDoc);
       workerDocuments.deleteWorkerDocument(previousDocument.idDoc);
+      workerDocuments.finishPendingDocument(previousDocument.idDoc);
     } catch (error) {
-      // شناسه جدید ذخیره شده است و مدرک قبلی دیگر مرجع نیست.
+      // The intent is retained for retry; startup checks DB references first.
+      console.error('D62_PREVIOUS_DOCUMENT_CLEANUP_DEFERRED', error.code || 'UNKNOWN');
     }
   }
   if (previousDocument.hadPath) {
