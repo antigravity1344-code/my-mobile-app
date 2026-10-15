@@ -1,53 +1,49 @@
-# D-62 — Deployment document-policy implementation handoff
+# D-62 — Per-deployment document-policy implementation and verification
 
-Date: 2026-10-15
-Base: `ui/customer-home-redesign` @ `55a2a4add6bd0824b28660c5e2b5cb1ad57365ba`
-Branch: `feat/d62-deployment-document-policy-20261015`
+Date: 2026-10-15  
+Base branch: `ui/customer-home-redesign` @ `55a2a4add6bd0824b28660c5e2b5cb1ad57365ba`  
+Work branch: `feat/d62-deployment-document-policy-20261015`  
+Implementation SHA verified: `8d85d37030fddbece88310d30db41f78f196d66b`  
+CI: [GitHub Actions run 38756089386](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38756089386) — **success**, all recorded steps passed.
 
-## Implemented
-- Added `src/policy/documentPolicy.ts` with explicit deployment ID, permitted input/stored MIME sets, max byte size, lossless-versus-explicitly-approved lossy picker quality, oversize rejection, legibility description and approver fields.
-- Missing configuration is an error, never silently populated with invented per-customer numeric values.
-- `PAKSHO_COMPAT_DOCUMENT_POLICY` retains *historical* `quality=0.5` and `maxBytes=614400`, without establishing a product approval or a default for other tenants.
-- Image-selection boundary on existing Paksho worker screen uses the named compatibility profile. Binary signature rather than Expo asset MIME/filename determines stored MIME. Displayed extension is normalized to match bytes. The client rejects oversized files before building the upload payload.
-- Added Vitest tests for incomplete profiles, explicit lossless mode, Paksho regression, signature handling, format allowlist and oversize rejection.
-- No APK, device, QA database or production app touched.
+## Implemented architecture — option A approved in Issue #16
 
-## Tenant/deployment resolution boundary — deliberately not fabricated
-The current worker flow does not provide an authenticated, trustworthy per-deployment policy resolver. The named Paksho compatibility profile is supplied explicitly to this flow. Other deployments **must not** use that constant: the app/bootstrap and trusted server configuration need a deployment-policy resolution contract (with version, provenance and approval), and the server upload validator must enforce the *same* resolved policy before any second deployment is enabled. Server currently still has a fixed 600 KiB cap, so multi-tenant enforcement is **NOT shipped** and this branch must not be deployed as a general multi-tenant solution. Until this contract exists, any non-Paksho deployment must fail closed rather than reuse legacy values.
+Each customer uses an **isolated server deployment** with its own policy, SQLite database and document directory; this is **not** a shared multi-tenant server. The server alone selects its policy from trusted deployment configuration, never from an untrusted tenant identifier supplied by a client or inferred from an API URL.
 
-## Verification
-- Standalone Node 22 TypeScript-strip test of policy routines: **PASS** (5 assertions covering compatibility, MIME, extension, absent policy, oversize).
-- TypeScript 6 strict single-module compile: **PASS** (NodeNext).
-- Added `src/policy/documentPolicy.test.ts` for repository Vitest execution; **full repository Vitest, ESLint, end-to-end / API integration and full app typecheck NOT RUN** in this isolated handoff. Those are release gates, not claimed passes.
-- Reusing the complete D-62 picker/device test was explicitly prohibited and was not done.
+- `server/documentPolicy.js`: validates a named/versioned policy, loads it from trusted server configuration and inspects the bytes, MIME claim, allowlisted stored format and configured maximum size before storage.
+- `server/index.js`: refuses startup for missing or invalid policy, uses that policy on worker onboarding, exposes its non-secret configuration via `GET /api/document-policy` and sizes the JSON body limit from the configured cap.
+- `src/policy/documentPolicy.ts` and `src/components/native/WorkerOnboardingScreen.tsx`: validate the server-selected profile before opening the picker; inspect returned image bytes and fail closed if policy or selected file is invalid.
+- `server/documentPolicy.test.js`, `src/policy/documentPolicy.test.ts`: regression checks for missing policy, unapproved MIME, declared/binary MIME mismatch, oversize rejection and historic Paksho compatibility.
+- `.github/workflows/verify-safe-ui.yml`: app tests, full server regression suite, typecheck and lint. Chromium sandbox override applies only to this isolated CI.
+- `docs/ARCHITECTURE_DECISIONS.md`: records architecture A and MIME semantics.
 
-## Next gates before merging/deployment
-1. Define server-authoritative deployment identification and policy delivery; do not infer tenant from user metadata or permissive defaults.
-2. Align server-side MIME and maxBytes authorization with the resolved policy. Keep current Paksho behavior during rollout.
-3. Run full repository app/server tests and typecheck on clean checkout of this branch, plus end-to-end upload-denial tests for configured deployments.
-4. Product owner to approve numeric policies and legibility acceptance criteria per deployment.
+## Trusted configuration and compatibility
 
+The legacy Paksho server must explicitly set `PAKSHO_DOCUMENT_POLICY=paksho-compat`; the named compatibility policy retains picker `quality:0.5`, the 614400-byte cap and the historic oversize message. Those are **not defaults for other customers**.
 
-## Follow-up to Issue #16 — architecture A approved (15 October 2026)
+A new isolated deployment must configure `PAKSHO_DEPLOYMENT_ID` and `PAKSHO_DOCUMENT_POLICY_PATH` for its approved server-local JSON profile, with an exact deployment ID match. It must also explicitly configure `PAKSHO_SQLITE_PATH` and `PAKSHO_WORKER_DOC_DIR`. The policy requires explicit version, allowed stored MIME types, maximum bytes, compression settings, oversize handling, approver and legibility criteria. No numerical policy for an unidentified customer has been invented. Missing/invalid policy results in startup failure; `NODE_ENV=test` has an isolated legacy test-fixture-only compatibility path, not a production default.
 
-Decision: **one isolated server process, SQLite database and document directory per customer deployment**. This is not a shared multi-tenant server. The trusted server environment binds one deployment to one approved document policy. Client tenant identifiers and API URLs are not used as proof of tenant identity.
+## Meaning of MIME and compression
 
-### Server configuration contract
+`allowedInputMimes` was removed because the image picker can re-encode the source before exposing its Base64 output. Neither `asset.mimeType` nor its filename proves the original bytes. The enforceable contract is `allowedStoredMimes` for the actual output bytes. The server independently checks binary signatures, declared MIME and maximum bytes; the client does equivalent pre-upload checks. Lossy picker quality is enabled only when the explicit server-selected profile allows it, with Paksho compatibility set to 0.5. The server cannot prove the original source MIME or that a client obeyed the requested compression quality.
 
-- Legacy Paksho deployment: explicitly set `PAKSHO_DOCUMENT_POLICY=paksho-compat`; the named compatibility policy has `version=paksho-compat-v1`, quality `0.5`, and `maxBytes=614400`. Normal server startup without an explicit policy fails closed.
-- Other customer deployments: set `PAKSHO_DEPLOYMENT_ID` and `PAKSHO_DOCUMENT_POLICY_PATH` to a trusted, server-local JSON policy file. The file must pass structural validation and its `deploymentId` must match the server environment. Do not put this file under a public or client-writable path.
-- New deployments must explicitly set their own `PAKSHO_SQLITE_PATH` and `PAKSHO_WORKER_DOC_DIR`; provision independent storage for each server process, set least-privilege filesystem permissions, and never mount another customer's database or upload root. The code verifies presence, but distinctness across independent server instances remains a deployment orchestration responsibility.
-- `NODE_ENV=test` without deployment configuration uses the named Paksho compatibility profile solely to preserve legacy isolated node:test fixtures. This is NOT a deployment option.
-- Required policy fields: `version`, `deploymentId`, `allowedStoredMimes`, `maxBytes`, `compression`, `oversizeAction=reject`, `approvedBy`, `minimumLegibility`. Values must be explicitly approved. No numeric default is invented for other customers.
+## Verified tests (for SHA 8d85d37030fddbece88310d30db41f78f196d66b)
 
-### MIME semantics and security
+GitHub Actions run [38756089386](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38756089386) finished with **success**:
+- App and server lockfile dependency installation — PASS
+- `npm run typecheck` — PASS
+- `npm test -- --reporter=dot` — PASS
+- `npm run lint` — PASS
+- `node --test --test-concurrency=2 server/*.test.js` — PASS (fake SMS; isolated Chromium setting)
 
-`allowedInputMimes` has been **removed** from the implementation. The Expo picker may re-encode an input before returning Base64; after conversion, its metadata cannot provide reliable binary proof of the original MIME. In this implementation the verifiable constraint is `allowedStoredMimes`: the bytes actually returned for storage. The server uses independent signature detection, rejects a mismatch with the MIME header, checks the per-deployment size cap and refuses disallowed stored formats. The client also checks the output bytes before attempting a PUT. The server does not allow a tenant ID supplied by the client to select policy.
+Earlier intermediate CI failures are superseded by this successful run on the implementation SHA; they are not evidence that tests remained unexecuted.
 
-The client fetches `GET /api/document-policy` for a non-secret server-selected policy before showing the native picker. A failed or incomplete response fails closed. **Caveat:** a malicious or outdated client can ignore UI quality settings; only the server's checks are authoritative for stored MIME and byte cap, not for how compression was performed. Policy version is returned to the client, but no version is currently persisted alongside each submitted document; this is a follow-up auditability improvement.
+## Still-open acceptance gates
 
-`quality:1` is used when lossy compression is not explicitly enabled. The approved compat policy continues to use 0.5. Server JSON body size is derived from configured `maxBytes` with Base64 overhead. No image upload occurs before server-side validation.
+- Review **actual operational isolation** across independently provisioned servers, databases, document directories, access controls and configuration permissions; a passing unit suite does not prove cross-customer filesystem separation.
+- Independent security review and full authenticated HTTP upload-denial scenarios for new deployment profiles, including proving that denial creates no stored document.
+- Persist/version-audit the policy associated with individual documents if required for long-term traceability; current validation does not establish that audit trail.
+- Product owner to approve customer-specific numeric limits and real-document legibility criteria before each deployment; synthetic QA files do not prove legibility of a real ID.
+- PR #15 remains **draft/unmerged/unreleased**. No phone testing, APK build/install, production app modification or QA database changes occurred during Issue #16.
 
-### Verification limitations and release gates
-
-The PR must remain draft until complete Actions checks (app tests, all server tests, typecheck and lint) are confirmed for the final SHA. Test coverage includes isolated policy resolver and binary signature checks; additionally, full authenticated HTTP upload-denial tests, source-MIME pretransformation proof and cross-deployment storage audits are not established by the current unit tests. Verify document payloads with all relevant policy MIME branches and confirm no files are written on denial before production deployment. No phone/QA/APK work is part of Issue #16.
+This document supersedes the initial implementation handoff's outdated assertions that the server policy resolver/enforcement were absent or that the full repository suites had not run.
