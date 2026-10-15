@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
+import { PAKSHO_COMPAT_DOCUMENT_POLICY, pickerQualityForPolicy, validateSelectedDocument } from '../../policy/documentPolicy';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
@@ -184,7 +185,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     try {
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.5,
+        quality: pickerQualityForPolicy(PAKSHO_COMPAT_DOCUMENT_POLICY),
         base64: true,
       });
     } catch {
@@ -198,27 +199,23 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
       return;
     }
-    const mimeType = resolveIdDocMime(asset);
-    if (!mimeType) {
-      setIdDocFile(null);
-      setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
-      return;
-    }
     if (!asset.base64) {
       setIdDocFile(null);
       setErrorMsg('خواندن تصویر مدرک ممکن نشد.');
       return;
     }
-    if (base64Size(asset.base64) > MAX_ID_DOC_BYTES) {
+    try {
+      const inspected = validateSelectedDocument(PAKSHO_COMPAT_DOCUMENT_POLICY, asset.base64);
+      setIdDocFile({
+        mimeType: inspected.mimeType,
+        data: asset.base64,
+        // Picker may re-encode PNG to JPEG. Never retain a misleading extension.
+        label: 'تصویر مدرک' + inspected.extension,
+      });
+    } catch (error) {
       setIdDocFile(null);
-      setErrorMsg('حجم تصویر باید حداکثر ۶۰۰ کیلوبایت باشد.');
-      return;
+      setErrorMsg(error instanceof Error ? error.message : 'تصویر مدرک معتبر نیست.');
     }
-    setIdDocFile({
-      mimeType,
-      data: asset.base64,
-      label: asset.fileName || 'تصویر مدرک',
-    });
   };
 
   return (
