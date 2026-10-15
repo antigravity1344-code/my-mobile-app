@@ -45,7 +45,20 @@ export function detectDocumentMime(base64: string): DocumentMime | null {
     return null;
   if (base64.startsWith('iVBORw0KGgo')) return 'image/png';
   if (base64.startsWith('/9j/')) return 'image/jpeg';
-  if (base64.startsWith('UklGR') && base64.slice(16, 20) === 'V0VC') return 'image/webp';
+  if (base64.startsWith('UklGR')) {
+    const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const bytes: number[] = [];
+    let bits = 0, n = 0;
+    for (const ch of base64.slice(0, 24)) {
+      if (ch === '=') break;
+      const v = abc.indexOf(ch);
+      if (v < 0) return null;
+      bits = (bits << 6) | v; n += 6;
+      if (n >= 8) { n -= 8; bytes.push((bits >>> n) & 255); }
+    }
+    if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP')
+      return 'image/webp';
+  }
   return null;
 }
 
