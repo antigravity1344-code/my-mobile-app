@@ -573,7 +573,7 @@ if (!isMainThread) {
         address: 'تهران',
         city: 'تهران',
         bankSheba: 'IR120000000000000000000000',
-        idDocFile: { mimeType: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64') },
+        idDocFile: { mimeType: 'image/jpeg', data: require('./testImageFixtures').jpeg.toString('base64') },
       },
     });
     assert.equal(onboard.status, 200);
