@@ -8,7 +8,8 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "kavenegar": "^1.1.4"
+    "kavenegar": "^1.1.4",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "playwright-core": "1.64.0"
