@@ -11,6 +11,7 @@ const {
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
+const { loadDeploymentPolicy, inspectDocument } = require('./documentPolicy');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -35,6 +36,8 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(__dirname, '.env'));
 loadEnvFile(path.join(__dirname, '..', '.env'));
 assertKeyConfigured();
+// Fail closed at startup for absent or invalid per-deployment document policy.
+const deploymentDocumentPolicy = loadDeploymentPolicy();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,7 +66,6 @@ const USER_STATUS_LABELS = {
 const MIN_ORDER_PRICE = 50000;
 const MAX_ORDER_PRICE = 20000000;
 const MAX_DOC_CHARS = 400000;
-const MAX_ID_DOC_BYTES = 600 * 1024;
 const workerDocuments = createWorkerDocumentStorage(
   process.env.PAKSHO_WORKER_DOC_DIR
     ? path.resolve(process.env.PAKSHO_WORKER_DOC_DIR)
@@ -143,55 +145,8 @@ function requireUser(req, res) {
   return user;
 }
 
-function detectImageKind(buffer) {
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpeg';
-  if (
-    buffer.length >= 8 &&
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a
-  ) {
-    return 'png';
-  }
-  if (
-    buffer.length >= 12 &&
-    buffer.toString('ascii', 0, 4) === 'RIFF' &&
-    buffer.toString('ascii', 8, 12) === 'WEBP'
-  ) {
-    return 'webp';
-  }
-  return null;
-}
-
 function parseIdDocFile(payload) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return { error: 'مدرک هویتی الزامی است.' };
-  }
-  const mime = typeof payload.mimeType === 'string' ? payload.mimeType.trim().toLowerCase() : '';
-  const allowed = { 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' };
-  if (!allowed[mime]) {
-    return { error: 'فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.' };
-  }
-  const raw = typeof payload.data === 'string' ? payload.data.trim() : '';
-  if (!raw) return { error: 'مدرک هویتی الزامی است.' };
-  const cleaned = raw.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
-  if (!cleaned || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned) || cleaned.length % 4 !== 0) {
-    return { error: 'فایل مدرک معتبر نیست.' };
-  }
-  const buffer = Buffer.from(cleaned, 'base64');
-  if (!buffer.length || buffer.length > MAX_ID_DOC_BYTES) {
-    return { error: 'حجم مدرک باید حداکثر ۶۰۰ کیلوبایت باشد.' };
-  }
-  const kind = detectImageKind(buffer);
-  if (!kind || kind !== allowed[mime]) {
-    return { error: 'محتوای فایل با نوع تصویر اعلام‌شده یکی نیست.' };
-  }
-  return { buffer, ext: kind === 'jpeg' ? 'jpg' : kind };
+  return inspectDocument(payload, deploymentDocumentPolicy);
 }
 
 function publicUser(user) {
