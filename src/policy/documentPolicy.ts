@@ -5,6 +5,7 @@
 export type DocumentMime = 'image/png' | 'image/jpeg' | 'image/webp';
 export type OversizeAction = 'reject';
 export type DocumentPolicy = {
+  version: string;
   deploymentId: string;
   allowedStoredMimes: DocumentMime[];
   maxBytes: number;
@@ -19,7 +20,7 @@ const MIMES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 export function validateDocumentPolicy(value: unknown): DocumentPolicy {
   if (!value || typeof value !== 'object') throw new Error('پروفایل مدارک تعریف نشده است.');
   const p = value as Partial<DocumentPolicy>;
-  if (!p.deploymentId?.trim() || !p.approvedBy?.trim() || !p.minimumLegibility?.trim())
+  if (!p.version?.trim() || !p.deploymentId?.trim() || !p.approvedBy?.trim() || !p.minimumLegibility?.trim())
     throw new Error('شناسه استقرار، معیار خوانایی و تأییدکننده سیاست الزامی است.');
   if (!Array.isArray(p.allowedStoredMimes) || !p.allowedStoredMimes.length ||
       !p.allowedStoredMimes.every(m => MIMES.includes(m)))
@@ -83,6 +84,7 @@ export function validateSelectedDocument(profileValue: unknown, base64: string) 
  * Final production approval remains a product decision under D-62.
  */
 export const PAKSHO_COMPAT_DOCUMENT_POLICY: DocumentPolicy = {
+  version: 'paksho-compat-v1',
   deploymentId: 'paksho-compat',
   allowedStoredMimes: ['image/png', 'image/jpeg', 'image/webp'],
   maxBytes: 614400,
