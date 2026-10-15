@@ -68,7 +68,7 @@ function inspectDocument(payload, policy) {
   if (!cleaned || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned) || cleaned.length % 4 !== 0)
     return { error: 'فایل مدرک معتبر نیست.' };
   const approximateSize = cleaned.length * 3 / 4 - (cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0);
-  if (approximateSize > policy.maxBytes) return { error: 'حجم مدرک از سقف مجاز این استقرار بیشتر است.' };
+  if (approximateSize > policy.maxBytes) return { error: policy.deploymentId === 'paksho-compat' ? 'حجم مدرک باید حداکثر ۶۰۰ کیلوبایت باشد.' : 'حجم مدرک از سقف مجاز این استقرار بیشتر است.' };
   const buffer = Buffer.from(cleaned, 'base64');
   const kind = detectKind(buffer);
   const mime = Object.entries(MIME_KINDS).find(([, v]) => v === kind)?.[0];
