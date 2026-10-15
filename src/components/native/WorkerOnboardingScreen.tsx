@@ -21,35 +21,11 @@ interface WorkerOnboardingScreenProps {
   onUpdateUser: (updatedUser: UserData) => void;
 }
 
-const MAX_ID_DOC_BYTES = 600 * 1024;
-
 type SelectedIdDoc = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   data: string;
   label: string;
 };
-
-function resolveIdDocMime(asset: {
-  mimeType?: string | null;
-  uri?: string;
-  fileName?: string | null;
-}): SelectedIdDoc['mimeType'] | null {
-  const raw = String(asset.mimeType || '').toLowerCase();
-  if (raw === 'image/jpg' || raw === 'image/jpeg') return 'image/jpeg';
-  if (raw === 'image/png') return 'image/png';
-  if (raw === 'image/webp') return 'image/webp';
-  const name = `${asset.fileName || ''} ${asset.uri || ''}`.toLowerCase();
-  if (name.includes('.png')) return 'image/png';
-  if (name.includes('.webp')) return 'image/webp';
-  if (name.includes('.jpg') || name.includes('.jpeg')) return 'image/jpeg';
-  return null;
-}
-
-function base64Size(value: string) {
-  const cleaned = value.replace(/\s/g, '');
-  const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
-  return Math.floor((cleaned.length * 3) / 4) - padding;
-}
 
 export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   user,
