@@ -17,6 +17,7 @@ jobs:
     env:
       NODE_ENV: test
       PAKSHO_SMS_MODE: fake
+      PAKSHO_TEST_CHROMIUM_SANDBOX: '0'
       PAKSHO_DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     steps:
       - name: Check out proposed changes
