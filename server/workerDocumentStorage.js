@@ -41,6 +41,16 @@ function createWorkerDocumentStorage(directory) {
     } finally {
       fs.closeSync(fd);
     }
+    // POSIX needs the directory entry persisted too, not only the file bytes.
+    // Directory fsync is not supported uniformly by Windows.
+    if (process.platform !== 'win32') {
+      const directoryFd = fs.openSync(root, 'r');
+      try {
+        fs.fsyncSync(directoryFd);
+      } finally {
+        fs.closeSync(directoryFd);
+      }
+    }
   }
 
   function finishPendingDocument(documentId) {
