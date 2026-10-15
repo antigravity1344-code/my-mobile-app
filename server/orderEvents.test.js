@@ -41,7 +41,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
   });
 
   const INVALID_START_MESSAGE = 'زمان انتخاب‌شده برای شروع کار معتبر نیست. لطفاً تاریخ و ساعت را دوباره انتخاب کنید.';
-  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  const { jpeg } = require('./testImageFixtures');
   let fileCounter = 0;
 
   function freshStore() {
