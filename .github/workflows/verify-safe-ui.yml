@@ -34,10 +34,7 @@ jobs:
         run: npm run typecheck
       - name: App unit tests
         run: npm test -- --reporter=dot
-      - name: Server regression tests (fake SMS, no real SMS)
-        run: >
-          node --test --test-concurrency=2
-          server/accountFeatures.test.js
-          server/cancelRequest.test.js
-          server/orderEvents.test.js
-          server/workerOrderPrivacy.test.js
+      - name: Lint app sources
+        run: npm run lint
+      - name: All server regression tests (fake SMS, no real SMS)
+        run: node --test --test-concurrency=2 server/*.test.js
