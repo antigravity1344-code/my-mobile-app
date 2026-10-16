@@ -1,4 +1,6 @@
 export const MAX_ID_DOC_BYTES = 8 * 1024 * 1024;
+export const ID_DOC_SIZE_HINT = 'حجم فایل حداکثر ۸ مگابایت. فرمت JPEG، PNG یا WebP.';
+export const ID_DOC_TOO_LARGE_MESSAGE = 'حجم این تصویر بیشتر از ۸ مگابایت است. لطفاً فایل کوچک‌تری انتخاب کنید.';
 
 export type PreparedIdDoc = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -70,10 +72,7 @@ export function prepareIdDocumentFromBase64(
     return { ok: false, message: 'فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.' };
   }
   if (base64ByteLength(data) > MAX_ID_DOC_BYTES) {
-    return {
-      ok: false,
-      message: 'حجم تصویر باید حداکثر ۸ مگابایت باشد.',
-    };
+    return { ok: false, message: ID_DOC_TOO_LARGE_MESSAGE };
   }
   return { ok: true, doc: { mimeType, data } };
 }

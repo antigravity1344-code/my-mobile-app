@@ -14,7 +14,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
-import { prepareIdDocumentFromBase64, type PreparedIdDoc } from '../../features/worker/prepareIdDocument';
+import {
+  ID_DOC_SIZE_HINT,
+  prepareIdDocumentFromBase64,
+  type PreparedIdDoc,
+} from '../../features/worker/prepareIdDocument';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
@@ -272,7 +276,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           </View>
 
           <Text style={styles.label}>تصویر مدرک هویتی:</Text>
-          <Pressable onPress={handlePickIdDoc} style={styles.input} disabled={picking || loading}>
+          <Pressable onPress={handlePickIdDoc} style={[styles.input, styles.docInput]} disabled={picking || loading}>
             {picking ? (
               <View style={styles.docRow}>
                 <ActivityIndicator size="small" color="#0f766e" />
@@ -284,6 +288,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
               </Text>
             )}
           </Pressable>
+          <Text style={styles.docHint}>{ID_DOC_SIZE_HINT}</Text>
 
           {/* شهر و محدوده فعالیت */}
           <Text style={styles.label}>شهر و محدوده فعالیت:</Text>
@@ -432,6 +437,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 14,
     justifyContent: 'center',
+  },
+  docInput: {
+    marginBottom: 6,
+  },
+  docHint: {
+    color: '#64748b',
+    fontSize: 11,
+    textAlign: 'right',
+    marginBottom: 14,
+    lineHeight: 18,
   },
   docRow: {
     flexDirection: 'row-reverse',

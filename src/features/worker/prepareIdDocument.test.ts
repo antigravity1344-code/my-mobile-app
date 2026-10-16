@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ID_DOC_SIZE_HINT,
+  ID_DOC_TOO_LARGE_MESSAGE,
   MAX_ID_DOC_BYTES,
   detectImageKindFromBase64,
   prepareIdDocumentFromBase64,
@@ -53,7 +55,12 @@ describe('prepareIdDocumentFromBase64', () => {
     const result = prepareIdDocumentFromBase64(huge);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.message).toContain('۸ مگابایت');
+      expect(result.message).toBe(ID_DOC_TOO_LARGE_MESSAGE);
     }
+  });
+
+  it('tells the user the size limit before they pick a file', () => {
+    expect(ID_DOC_SIZE_HINT).toContain('۸ مگابایت');
+    expect(ID_DOC_TOO_LARGE_MESSAGE).toContain('۸ مگابایت');
   });
 });

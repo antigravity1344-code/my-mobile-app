@@ -145,6 +145,7 @@ test('worker identity documents stay private', async (t) => {
     });
     assert.equal(oversized.status, 400);
     assert.match(oversized.json.message, /۸ مگابایت/);
+    assert.match(oversized.json.message, /کوچک‌تری/);
     assert.equal(workerRecord().idDoc, '');
   });
 

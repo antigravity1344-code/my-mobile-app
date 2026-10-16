@@ -185,7 +185,7 @@ function parseIdDocFile(payload) {
   }
   const buffer = Buffer.from(cleaned, 'base64');
   if (!buffer.length || buffer.length > MAX_ID_DOC_BYTES) {
-    return { error: 'حجم مدرک باید حداکثر ۸ مگابایت باشد.' };
+    return { error: 'حجم این تصویر بیشتر از ۸ مگابایت است. لطفاً فایل کوچک‌تری انتخاب کنید.' };
   }
   const kind = detectImageKind(buffer);
   if (!kind || kind !== allowed[mime]) {
