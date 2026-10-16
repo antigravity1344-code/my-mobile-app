@@ -1,3 +1,4 @@
+import { WEB_PREVIEW_GATE } from '../../config/webPreviewGate';
 import { previewAuditMock, startPreviewNetworkAudit, stopPreviewNetworkAudit } from './previewNetworkAudit';
 /** DEV-ONLY. No production auth or network data is used in preview. */
 type Role = 'customer' | 'worker';
@@ -20,8 +21,13 @@ export function beginPreviewShutdown(): void {
 let scenario: Scenario = 'PENDING';
 const store = new Map<string, string>();
 
-export const previewAvailable = (): boolean =>
-  typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW === '1';
+export const previewAvailable = (): boolean => {
+  const flagged = process.env.EXPO_PUBLIC_PAKSHO_UI_PREVIEW === '1';
+  const dev = typeof __DEV__ !== 'undefined' && __DEV__;
+  if (dev && flagged) return true;
+  // Browser QA only (document exists). Native store builds stay closed.
+  return typeof document !== 'undefined' && WEB_PREVIEW_GATE;
+};
 
 export function beginPreview(nextRole: Role): void {
   if (!previewAvailable()) return;

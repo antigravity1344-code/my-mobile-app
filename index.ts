@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import App from './App';
 import CustomerApp from './App.customer';
 import WorkerApp from './App.worker';
+import { WEB_PREVIEW_GATE } from './src/config/webPreviewGate';
 
 type NativeRootProps = {
   appFlavor?: string;
@@ -40,7 +41,7 @@ if (Platform.OS === 'web') {
 }
 
 // داشبورد وب پیش‌فرض می‌ماند. فقط با EXPO_PUBLIC_WEB_NATIVE=1 اپ واقعی مشتری/متخصص روی وب برای QA باز می‌شود.
-if (Platform.OS === 'web' && process.env.EXPO_PUBLIC_WEB_NATIVE !== '1') {
+if (Platform.OS === 'web' && !WEB_PREVIEW_GATE && process.env.EXPO_PUBLIC_WEB_NATIVE !== '1') {
   registerRootComponent(App);
 } else {
   registerRootComponent(NativeRoot);
