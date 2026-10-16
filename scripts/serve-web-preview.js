@@ -36,6 +36,10 @@ const server = http.createServer((req, res) => {
     send(res, 403, 'Forbidden', 'text/plain');
     return;
   }
+  if (urlPath === '/status' || urlPath === '/json') {
+    send(res, 404, 'Not found', 'text/plain');
+    return;
+  }
   fs.readFile(file, (err, data) => {
     if (err) {
       fs.readFile(path.join(root, 'index.html'), (fallbackErr, html) => {
