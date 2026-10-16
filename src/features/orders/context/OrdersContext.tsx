@@ -10,10 +10,12 @@ import { applyOrdersFetch, shouldStartOrdersRefresh } from '../services/ordersFe
 import { createLatestRequestGuard } from '../services/orderStatusWatch';
 import { selectCustomerOrders } from '../services/orderPayload';
 import { appStorage } from '../../../utils/storage';
+import { previewActive } from '../../../components/native/previewRuntime';
 
 const CUSTOMER_USER_STORAGE_KEY = 'PAKSHO_USER_CUSTOMER';
 
 async function resolveCustomerUserId(): Promise<string> {
+  if (previewActive()) return 'PREVIEW-CUSTOMER';
   const savedUserStr = await appStorage.getItem<string>(CUSTOMER_USER_STORAGE_KEY, '');
   if (!savedUserStr) {
     return '';

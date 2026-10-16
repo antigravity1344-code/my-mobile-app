@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { previewActive } from './previewRuntime';
 import {
   View,
   Text,
@@ -28,7 +29,7 @@ import { useAccountBlockedLogout } from './useAccountBlockedLogout';
 
 type UserData = WorkerSessionUser;
 
-export const NativeWorkerApp: React.FC = () => {
+export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPreviewExit }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -64,6 +65,13 @@ export const NativeWorkerApp: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const restoreState = async () => {
+      if (previewActive()) {
+        const demo: UserData = { id: 'PREVIEW-WORKER', name: 'متخصص نمونه', phone: '09000000000', avatar: '', role: 'WORKER', status: 'ACTIVE' };
+        setUserData(demo);
+        setIsLoggedIn(true);
+        setIsLoading(false);
+        return;
+      }
       const user = await loadWorkerSession(appStorage);
 
       if (!isMounted) return;
@@ -106,6 +114,7 @@ export const NativeWorkerApp: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    if (previewActive()) { onPreviewExit?.(); return; }
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
     await apiFetch('/auth/logout', { method: 'POST' });
     setIsLoggedIn(false);
@@ -139,7 +148,7 @@ export const NativeWorkerApp: React.FC = () => {
       <View style={styles.roleBanner}>
         <View style={styles.userInfoRow}>
           <Image
-            source={{ uri: userData.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150' }}
+            source={previewActive() ? undefined : { uri: userData.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150' }}
             style={styles.avatarImage}
           />
           <View style={styles.userDetails}>

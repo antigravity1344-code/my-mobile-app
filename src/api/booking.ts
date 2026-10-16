@@ -1,3 +1,4 @@
+import { previewActive } from '../components/native/previewRuntime';
 import type { CleaningService } from '../types/service';
 import { SERVICES_CATALOG } from '../config/servicesData';
 import type { BookingScheduleData } from '../types/booking';
@@ -19,6 +20,7 @@ export const getServiceById = (id: string): CleaningService | undefined =>
 export { calculatePrice };
 
 export const submitBooking = async (payload: BookingScheduleData): Promise<BookingResponse> => {
+  if (previewActive()) return { success: false, error: 'ثبت سفارش در پیش‌نمایش غیرفعال است.' };
   if (!API_URL) {
     await wait(700);
     return { success: true, orderId: `MOCK-${Date.now()}` };

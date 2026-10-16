@@ -1,3 +1,4 @@
+import { previewActive } from '../components/native/previewRuntime';
 export interface PaymentRequest {
   orderId: string;
   amount: number; // IRR
@@ -62,6 +63,7 @@ const parsePaymentVerification = (value: unknown): { success: boolean; refId?: s
 
 /** درخواست پرداخت فقط وقتی endpoint واقعی سرور موجود باشد. هیچ پرداخت ساختگی موفقی برنمی‌گردد. */
 export const requestPayment = async (payload: PaymentRequest): Promise<PaymentResult> => {
+  if (previewActive()) return { success: false, error: 'پرداخت در پیش‌نمایش غیرفعال است.' };
   if (!API_URL) {
     return {
       success: false,
@@ -92,6 +94,7 @@ export const verifyPayment = async (
   authority: string,
   amount: number,
 ): Promise<{ success: boolean; refId?: string; error?: string }> => {
+  if (previewActive()) return { success: false, error: 'تأیید پرداخت در پیش‌نمایش غیرفعال است.' };
   if (!API_URL) {
     return { success: false, error: 'درگاه پرداخت پیکربندی نشده است.' };
   }
