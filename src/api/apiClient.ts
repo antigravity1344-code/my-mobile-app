@@ -1,8 +1,9 @@
-﻿import Constants from 'expo-constants';
+import Constants from 'expo-constants';
 import { previewActive, previewApi } from '../components/native/previewRuntime';
 import { getApiAuthToken } from './authToken';
 import { accountBlockedMessage, emitAccountBlocked, isAccountBlockedResponse } from './accountBlocked';
 import { emitSessionExpired, isSessionExpiredResponse } from './sessionExpired';
+import { FETCH_TIMEOUT_MS, withTimeoutSignal } from './fetchTimeout';
 
 function resolveApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -47,11 +48,26 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       });
     }
 
-    // headers را بعد از rest می‌گذاریم تا Authorization با options.headers پاک نشود.
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...rest,
-      headers,
-    });
+    const timeout = withTimeoutSignal(
+      rest.signal ?? null,
+      FETCH_TIMEOUT_MS,
+      () => Date.now(),
+      (fn, ms) => {
+        const id = setTimeout(fn, ms);
+        return { clear: () => clearTimeout(id) };
+      },
+    );
+    let response: Response;
+    try {
+      // headers را بعد از rest می‌گذاریم تا Authorization با options.headers پاک نشود.
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...rest,
+        signal: timeout.signal,
+        headers,
+      });
+    } finally {
+      timeout.clear();
+    }
 
     const text = await response.text();
     if (!text) {

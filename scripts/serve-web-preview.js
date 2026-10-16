@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(process.argv[2] || path.join(__dirname, '..', 'dist-customer'));
+const chooser = path.join(__dirname, '..', 'web-qa', 'chooser.html');
 const port = Number(process.env.PORT || 4173);
 
 const types = {
@@ -30,14 +31,21 @@ function send(res, code, body, type) {
 
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-  const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+  if (urlPath === '/status' || urlPath === '/json') {
+    send(res, 404, 'Not found', 'text/plain');
+    return;
+  }
+  if (urlPath === '/' || urlPath === '/chooser.html') {
+    fs.readFile(chooser, (err, data) => {
+      if (err) send(res, 404, 'Not found', 'text/plain');
+      else send(res, 200, data, types['.html']);
+    });
+    return;
+  }
+  const rel = urlPath === '/app.html' ? 'index.html' : urlPath.replace(/^\/+/, '');
   const file = path.normalize(path.join(root, rel));
   if (!file.startsWith(root)) {
     send(res, 403, 'Forbidden', 'text/plain');
-    return;
-  }
-  if (urlPath === '/status' || urlPath === '/json') {
-    send(res, 404, 'Not found', 'text/plain');
     return;
   }
   fs.readFile(file, (err, data) => {

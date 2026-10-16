@@ -1964,6 +1964,8 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
+  const { startCancelDueScheduler } = require('./cancelDueScheduler');
+  startCancelDueScheduler(store);
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Paksho Secure Backend & Admin Dashboard running on http://0.0.0.0:${PORT}`);
   });

@@ -5,6 +5,7 @@ import App from './App';
 import CustomerApp from './App.customer';
 import WorkerApp from './App.worker';
 import { WEB_PREVIEW_GATE } from './src/config/webPreviewGate';
+import { webAppRoleFromSearch } from './src/config/webAppRole';
 
 type NativeRootProps = {
   appFlavor?: string;
@@ -14,6 +15,11 @@ function resolveNativeFlavor(appFlavor?: string): 'worker' | 'customer' {
   const fromProps = String(appFlavor || '').toLowerCase();
   if (fromProps === 'worker') return 'worker';
   if (fromProps === 'customer') return 'customer';
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const fromQuery = webAppRoleFromSearch(window.location.search);
+    if (fromQuery) return fromQuery;
+  }
 
   const fromEnv = String(process.env.EXPO_PUBLIC_APP_FLAVOR || '').toLowerCase();
   if (fromEnv === 'worker') return 'worker';

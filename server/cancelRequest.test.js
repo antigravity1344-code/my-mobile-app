@@ -293,10 +293,12 @@ if (!isMainThread) {
     after.close();
   });
 
-  test('reading orders is what finalizes a due request; no one-minute timer is hardcoded', () => {
+  test('the ten-minute review window is fixed and the running server starts a due-cancel check', () => {
     const source = fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8');
+    const scheduler = fs.readFileSync(path.join(__dirname, 'cancelDueScheduler.js'), 'utf8');
     assert.equal(source.includes('finalizeDueCancelRequests()'), true);
-    assert.equal(/setInterval\(/.test(source), false);
+    assert.equal(source.includes('startCancelDueScheduler'), true);
+    assert.equal(scheduler.includes('finalizeDueCancelRequests'), true);
     assert.equal(CANCEL_REVIEW_MS, 10 * 60 * 1000);
   });
 }
