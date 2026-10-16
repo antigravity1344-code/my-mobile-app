@@ -84,6 +84,50 @@ function inspectDocument(payload, policy) {
     return { error: 'محتوای فایل با نوع تصویر اعلام‌شده یکی نیست.' };
   return { buffer, ext: kind === 'jpeg' ? 'jpg' : kind };
 }
+/** Multi-frame image formats are prohibited for identity documents.
+ * libvips/Sharp can expose only frame zero when constructed with pages: 1.
+ * Inspect the raw container too so an invalid APNG tail is not silently ignored.
+ */
+function isAnimatedContainer(buffer, ext) {
+  if (ext === 'png') {
+    let offset = 8;
+    let sawEnd = false;
+    while (offset < buffer.length) {
+      if (offset + 12 > buffer.length) throw Error('PNG_TRUNCATED_CHUNK');
+      const length = buffer.readUInt32BE(offset);
+      const end = offset + 12 + length;
+      if (end > buffer.length) throw Error('PNG_TRUNCATED_CHUNK');
+      const kind = buffer.toString('ascii', offset + 4, offset + 8);
+      if (kind === 'acTL' || kind === 'fcTL' || kind === 'fdAT') return true;
+      offset = end;
+      if (kind === 'IEND') {
+        sawEnd = true;
+        break;
+      }
+    }
+    if (!sawEnd || offset !== buffer.length) throw Error('PNG_INVALID_CONTAINER');
+    return false;
+  }
+  if (ext === 'webp') {
+    if (buffer.length < 12 || buffer.toString('ascii', 0, 4) !== 'RIFF' ||
+        buffer.toString('ascii', 8, 12) !== 'WEBP') throw Error('WEBP_INVALID_HEADER');
+    if (buffer.readUInt32LE(4) + 8 !== buffer.length) throw Error('WEBP_INVALID_SIZE');
+    let offset = 12;
+    while (offset < buffer.length) {
+      if (offset + 8 > buffer.length) throw Error('WEBP_TRUNCATED_CHUNK');
+      const kind = buffer.toString('ascii', offset, offset + 4);
+      const size = buffer.readUInt32LE(offset + 4);
+      const end = offset + 8 + size + (size % 2);
+      if (end > buffer.length) throw Error('WEBP_TRUNCATED_CHUNK');
+      if (kind === 'ANIM' || kind === 'ANMF' ||
+          (kind === 'VP8X' && size >= 1 && (buffer[offset + 8] & 0x02) !== 0)) return true;
+      offset = end;
+    }
+    if (offset !== buffer.length) throw Error('WEBP_INVALID_CONTAINER');
+  }
+  return false;
+}
+
 /** Decode every pixel before accepting client-controlled bytes.
  * A magic header or metadata alone is not enough (D-62 G2).
  * Processing is capped by input size, dimensions, pixel count and channels.
@@ -93,12 +137,14 @@ async function validateDecodedDocument(buffer, ext) {
   try {
     if (!Buffer.isBuffer(buffer) || buffer.length === 0 || buffer.length > MAX_DOCUMENT_BYTES)
       throw new Error('BAD_SIZE');
+    if (isAnimatedContainer(buffer, ext)) throw new Error('ANIMATED_DOCUMENT_NOT_ALLOWED');
     const image = sharp(buffer, {
       failOn: 'warning', limitInputPixels: MAX_DOCUMENT_PIXELS,
       limitInputChannels: 4, sequentialRead: true, animated: false, pages: 1
     });
     const metadata = await image.metadata();
-    if (metadata.format !== requiredFormat || !Number.isSafeInteger(metadata.width) ||
+    if (metadata.format !== requiredFormat || (metadata.pages && metadata.pages !== 1) ||
+        !Number.isSafeInteger(metadata.width) ||
         !Number.isSafeInteger(metadata.height) || metadata.width < 1 || metadata.height < 1 ||
         metadata.width > MAX_DOCUMENT_EDGE || metadata.height > MAX_DOCUMENT_EDGE ||
         metadata.width * metadata.height > MAX_DOCUMENT_PIXELS ||
@@ -116,5 +162,5 @@ async function validateDecodedDocument(buffer, ext) {
 }
 module.exports = {
   PAKSHO_COMPAT_POLICY, validatePolicy, loadDeploymentPolicy, detectKind, inspectDocument,
-  validateDecodedDocument, MAX_DOCUMENT_PIXELS, MAX_DOCUMENT_EDGE, MAX_DOCUMENT_BYTES
+  validateDecodedDocument, isAnimatedContainer, MAX_DOCUMENT_PIXELS, MAX_DOCUMENT_EDGE, MAX_DOCUMENT_BYTES
 };
