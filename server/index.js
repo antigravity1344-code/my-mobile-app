@@ -96,8 +96,12 @@ const store = createDataStore(
 );
 // Recover abandoned uploads on startup, but never erase a document still referenced
 // by a committed worker record. Failure to reconcile is a fail-closed startup error.
-workerDocuments.reconcilePendingDocuments(documentId =>
-  store.listUsers('WORKER').some(user => user.idDoc === documentId)
+workerDocuments.reconcilePendingDocuments(
+  documentId => store.listUsers().some(user => user.idDoc === documentId),
+  filename => store.listUsers().some(user =>
+    user.idDocPath === 'uploads/worker-docs/' + filename ||
+    user.idDoc === 'uploads/worker-docs/' + filename
+  )
 );
 const otpSendWindow = new Map();
 const adminLoginAttempts = new Map();
