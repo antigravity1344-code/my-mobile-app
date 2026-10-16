@@ -127,6 +127,23 @@ function corruptedSecondFrameApng() {
   ]);
 }
 
+// Animated WebP is disallowed even if its first frame would be decodable.
+// The VP8X flag and ANIM chunk make the multi-frame intent unambiguous.
+function brokenAnimatedWebp() {
+  const vp8x = Buffer.alloc(18);
+  vp8x.write('VP8X', 0);
+  vp8x.writeUInt32LE(10, 4);
+  vp8x[8] = 0x02; // animation flag
+  const anim = Buffer.alloc(14);
+  anim.write('ANIM', 0);
+  anim.writeUInt32LE(6, 4);
+  const body = Buffer.concat([Buffer.from('WEBP'), vp8x, anim]);
+  const riff = Buffer.alloc(8);
+  riff.write('RIFF', 0);
+  riff.writeUInt32LE(body.length, 4);
+  return Buffer.concat([riff, body]);
+}
+
 before(async () => {
   server = http.createServer(app);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -152,6 +169,7 @@ after(async () => {
 
 test('D-62 authenticated HTTP rejects without writing or changing onboarding state', async t => {
   const cases = [
+    ['G2: animated WebP rejected regardless of first-frame decode', onboarding(brokenAnimatedWebp().toString('base64'), 'image/webp'), 400, /ناقص|خراب|پردازش/],
     ['G2: corrupt APNG second frame is rejected before any write', onboarding(corruptedSecondFrameApng().toString('base64'), 'image/png'), 400, /ناقص|خراب|پردازش/],
     ['G2: 8-byte PNG magic is not a decodable image', onboarding(Buffer.from('89504e470d0a1a0a','hex').toString('base64'), 'image/png'), 400, /ناقص|خراب|پردازش/],
     ['forged MIME versus binary signature', onboarding(png.toString('base64'), 'image/jpeg'), 400, /نوع تصویر اعلام|محتوای/],
