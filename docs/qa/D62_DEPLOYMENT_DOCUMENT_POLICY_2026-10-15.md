@@ -3,12 +3,32 @@
 Date: 2026-10-15  
 Base branch: `ui/customer-home-redesign` @ `55a2a4add6bd0824b28660c5e2b5cb1ad57365ba`  
 Work branch: `feat/d62-deployment-document-policy-20261015`  
-Implementation SHA verified: `8d85d37030fddbece88310d30db41f78f196d66b`  
-CI: [GitHub Actions run 38756089386](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38756089386) — **success**, all recorded steps passed.
+Initial implementation SHA verified (historical): `8d85d37030fddbece88310d30db41f78f196d66b`  
+Initial implementation CI (historical): [GitHub Actions run 38756089386](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38756089386) — **success**, all recorded steps passed.
+
+## Current status — 16 Oct 2026 (supersedes historical gate statements below)
+
+**Scope and version:** PR #15, `feat/d62-deployment-document-policy-20261015`, implementation HEAD **`e86b9890bff18bc4f162913481cd0ad66dfef9df`**. PR #15 was checked as **OPEN / DRAFT / UNMERGED** before this documentation-only update. This section describes the implementation and evidence *before* the documentation commit; preserve the historic SHAs and CI runs below. CI success is not independent security approval.
+
+| Gate | Current classification | Evidence and qualification |
+| --- | --- | --- |
+| **G2 — multi-frame/malformed images** | **PASS only in tested scenarios; independent acceptance pending** | An authenticated HTTP upload of an APNG with a corrupt second frame and a separate animated-WebP request were rejected with HTTP 400. The HTTP tests check that the worker record and the document directory (including pending intents) are unchanged after each rejection. Single-frame image decoding remains enforced; this is **not** evidence of every malformed or adversarial image case, nor of identity-document legibility. |
+| **F1 — document orphan recovery** | **PASS for independently reconstructed and tested scenarios; one-to-one match with the original review evidence: UNVERIFIED** | Synthetic SQLite/filesystem and real process-restart regression tests cover (1) an unreferenced final `wd_<id>.jpg` without a journal, (2) an abandoned `wd_<id>.tmp` without a journal, and (3) an unreferenced historical `DOC-*.png`. They check preservation of DB-referenced documents and unknown files, a failed unlink causing startup to fail closed with a recoverable intent, recovery on a subsequent restart and malformed-intent fail-closed handling. The original evidence bundle at `/tmp/review-evidence/` was not available to the implementer; **it is not verified that these three reconstructed paths exactly match the reviewer's original three findings**. Multi-process/shared-directory races and all filesystem crash modes are not proven safe. |
+| **G1 — deployment isolation** | **OPEN / BLOCKED FOR PRODUCTION** | Actual per-deployment separation has **not** been demonstrated on provisioned customer infrastructure: SQLite and document paths, realpath/symlinks, mount overlap, ACL/ownership, server process identity and configuration permissions need operational evidence. Different pathname strings alone do not guarantee isolation. |
+| **Product acceptance** | **OPEN** | Readability of real identity documents and numeric size/quality/compression thresholds for each customer still require explicit product-owner approval; historical Paksho `quality:0.5` and `614400` are compatibility values, not global defaults or newly approved customer criteria. |
+
+**Security-review status:** an independent review **was performed** on the earlier implementation and found G2 and F1 failures. The implementer then changed G2/F1 and the regressions passed at `e86b9890bff18bc4f162913481cd0ad66dfef9df`. The original failures cannot be dismissed by ordinary CI success; a **new independent review on the changed code is still required**. The older statements “independent review not yet performed” and “authenticated HTTP negative tests not yet performed” are **historical, not the current status**.
+
+### Test-count reconciliation: independent sandbox vs CI
+
+- **Independent sandbox execution:** **110 observed test cases = 102 passed + 8 failed**, with those **eight failures caused by missing Chromium** in that sandbox. Do not label this run 110/110 passed.
+- **32-case count difference:** the 32 cases separating 110 and 142 are **nested XSS subtests**, executed with Chromium available in the CI environment. These **32 nested subtests were not independently executed in the sandbox**. The difference is explained by coverage/environment, not evidence of 142 independently passing in the sandbox.
+- **GitHub Actions evidence:** [run #38829158836](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38829158836), **Node `v24.21.0`**. The checkout log identifies PR merge commit **`ee676a0964f5632eae9907faae7441e9cd95056a`**, whose second parent is implementation HEAD `e86b9890bff18bc4f162913481cd0ad66dfef9df`; it is **not** a merge of PR #15 into the base branch. CI result: **142/142 server tests passed**, **218/218 app tests passed (45 files)**, typecheck and lint passed (lint: 0 errors, 4 existing warnings). This is a CI result on the PR merge-ref tree, not a substitute for the sandbox's missing independent Chromium subtests.
+- **Reconciliation conclusion:** the test-count discrepancy is documented; **independent execution of those 32 XSS subtests in the Chromium-less sandbox remains UNVERIFIED**. Neither test-count reconciliation nor CI closes G1 or grants merge/deploy approval.
 
 ## Implemented architecture — option A approved in Issue #16
 
-Each customer uses an **isolated server deployment** with its own policy, SQLite database and document directory; this is **not** a shared multi-tenant server. The server alone selects its policy from trusted deployment configuration, never from an untrusted tenant identifier supplied by a client or inferred from an API URL.
+Architecture A **requires** each customer to have an isolated server deployment, SQLite database and document directory; this is **not** intended to be a shared multi-tenant server. **G1 remains OPEN / BLOCKED FOR PRODUCTION:** actual isolation on customer infrastructure (including paths, mount/symlinks, ACL/ownership and process identity) is not yet evidenced. The server alone selects its policy from trusted deployment configuration, never from an untrusted tenant identifier supplied by a client or inferred from an API URL.
 
 - `server/documentPolicy.js`: validates a named/versioned policy, loads it from trusted server configuration and inspects the bytes, MIME claim, allowlisted stored format and configured maximum size before storage.
 - `server/index.js`: refuses startup for missing or invalid policy, uses that policy on worker onboarding, exposes its non-secret configuration via `GET /api/document-policy` and sizes the JSON body limit from the configured cap.
@@ -25,7 +45,7 @@ A new isolated deployment must configure `PAKSHO_DEPLOYMENT_ID` and `PAKSHO_DOCU
 
 ## Meaning of MIME and compression
 
-`allowedInputMimes` was removed because the image picker can re-encode the source before exposing its Base64 output. Neither `asset.mimeType` nor its filename proves the original bytes. The enforceable contract is `allowedStoredMimes` for the actual output bytes. The server independently checks binary signatures, declared MIME and maximum bytes; the client does equivalent pre-upload checks. Lossy picker quality is enabled only when the explicit server-selected profile allows it, with Paksho compatibility set to 0.5. The server cannot prove the original source MIME or that a client obeyed the requested compression quality.
+`allowedInputMimes` was removed because the image picker can re-encode the source before exposing its Base64 output. Neither `asset.mimeType` nor its filename proves the original bytes. The enforceable contract is `allowedStoredMimes` for the actual output bytes. The server independently checks binary signatures, declared MIME and maximum bytes; subsequent D-62 changes also perform bounded full-image decode and explicitly reject APNG and animated WebP in the tested scenarios. The client performs pre-upload checks, but server-side validation is authoritative. These checks do not prove real-document legibility. Lossy picker quality is enabled only when the explicit server-selected profile allows it, with Paksho compatibility set to 0.5. The server cannot prove the original source MIME or that a client obeyed the requested compression quality.
 
 ## Verified tests (for SHA 8d85d37030fddbece88310d30db41f78f196d66b)
 
@@ -41,7 +61,7 @@ Earlier intermediate CI failures are superseded by this successful run on the im
 ## Still-open acceptance gates
 
 - Review **actual operational isolation** across independently provisioned servers, databases, document directories, access controls and configuration permissions; a passing unit suite does not prove cross-customer filesystem separation.
-- Independent security review and full authenticated HTTP upload-denial scenarios for new deployment profiles, including proving that denial creates no stored document.
+- Independent security review **has occurred** and identified G2/F1 failures on the earlier head. Authenticated HTTP negative/no-write tests **have also been implemented and run**, including APNG and animated WebP regressions; the latest implementation passes its tested scenarios. **A further independent security re-review on the latest implementation SHA is still required**; these positive tests/CI do not grant security acceptance.
 - Persist/version-audit the policy associated with individual documents if required for long-term traceability; current validation does not establish that audit trail.
 - Product owner to approve customer-specific numeric limits and real-document legibility criteria before each deployment; synthetic QA files do not prove legibility of a real ID.
 - PR #15 remains **draft/unmerged/unreleased**. No phone testing, APK build/install, production app modification or QA database changes occurred during Issue #16.
@@ -66,4 +86,4 @@ For **each denial**, the test compares a snapshot of the complete worker record 
 
 Verification: [Actions run 38758550964](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38758550964) on the test-implementation SHA completed **SUCCESS**, including app tests, full server suite, TypeScript and lint.
 
-**Remaining gates:** independent security review by a separate reviewer; operational proof of isolation across provisioned customer deployments, controlled configuration permissions, positive-path policy/version auditability, image decoding and real identity-document legibility review as required by policy. This authenticated negative-path test does not establish any of those. PR #15 remains draft and unmerged; no deploy or APK/device/QA change occurred.
+**Gates at the time of this historical follow-up (15 Oct 2026):** separate independent security review, operational proof of isolation across provisioned customer deployments, configuration permissions, positive-path policy/version auditability, image decoding and real identity-document legibility. Subsequent reviews and fixes are recorded in the current-status section above: independent reviews and authenticated HTTP denial tests are no longer 'not done', but acceptance of the latest SHA still requires a fresh independent re-review; G1 and real-document/product approvals remain open. PR #15 remains draft and unmerged; no deploy or APK/device/QA change occurred.
