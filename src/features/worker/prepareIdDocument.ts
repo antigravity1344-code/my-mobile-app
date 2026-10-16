@@ -1,23 +1,9 @@
-export const MAX_ID_DOC_BYTES = 600 * 1024;
+export const MAX_ID_DOC_BYTES = 8 * 1024 * 1024;
 
 export type PreparedIdDoc = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   data: string;
 };
-
-export type ManipulateIdImage = (
-  uri: string,
-  actions: Array<{ resize: { width: number } }>,
-  options: { compress: number; format: 'jpeg'; base64: true },
-) => Promise<{ base64?: string | null }>;
-
-const JPEG_ATTEMPTS: Array<{ maxWidth: number; compress: number }> = [
-  { maxWidth: 1600, compress: 0.8 },
-  { maxWidth: 1600, compress: 0.65 },
-  { maxWidth: 1280, compress: 0.55 },
-  { maxWidth: 1024, compress: 0.5 },
-  { maxWidth: 800, compress: 0.45 },
-];
 
 export function base64ByteLength(value: string): number {
   const cleaned = value.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
@@ -72,47 +58,22 @@ export function detectImageKindFromBase64(value: string): PreparedIdDoc['mimeTyp
   return null;
 }
 
-function acceptIfFits(data: string): PreparedIdDoc | null {
+export function prepareIdDocumentFromBase64(
+  sourceBase64: string,
+): { ok: true; doc: PreparedIdDoc } | { ok: false; message: string } {
+  const data = sourceBase64.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
+  if (!data) {
+    return { ok: false, message: 'خواندن تصویر مدرک ممکن نشد.' };
+  }
   const mimeType = detectImageKindFromBase64(data);
-  if (!mimeType) return null;
-  if (base64ByteLength(data) > MAX_ID_DOC_BYTES) return null;
-  return { mimeType, data: data.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '') };
-}
-
-export async function prepareIdDocument(params: {
-  uri: string;
-  width?: number | null;
-  sourceBase64?: string | null;
-  manipulate: ManipulateIdImage;
-}): Promise<{ ok: true; doc: PreparedIdDoc } | { ok: false; message: string }> {
-  if (params.sourceBase64) {
-    const ready = acceptIfFits(params.sourceBase64);
-    if (ready) return { ok: true, doc: ready };
+  if (!mimeType) {
+    return { ok: false, message: 'فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.' };
   }
-
-  const sourceWidth = Number(params.width) > 0 ? Number(params.width) : 1600;
-
-  try {
-    for (const attempt of JPEG_ATTEMPTS) {
-      const width = Math.min(sourceWidth, attempt.maxWidth);
-      const actions = width > 0 ? [{ resize: { width } }] : [];
-      const result = await params.manipulate(params.uri, actions, {
-        compress: attempt.compress,
-        format: 'jpeg',
-        base64: true,
-      });
-      const data = result.base64 || '';
-      const ready = acceptIfFits(data);
-      if (ready && ready.mimeType === 'image/jpeg') {
-        return { ok: true, doc: ready };
-      }
-    }
-  } catch {
-    return { ok: false, message: 'آماده‌سازی تصویر ممکن نشد. دوباره از گالری انتخاب کنید.' };
+  if (base64ByteLength(data) > MAX_ID_DOC_BYTES) {
+    return {
+      ok: false,
+      message: 'حجم تصویر باید حداکثر ۸ مگابایت باشد.',
+    };
   }
-
-  return {
-    ok: false,
-    message: 'این تصویر برای مدرک خیلی حجیم است. عکس واضح‌تر و نزدیک‌تری بگیرید و دوباره تلاش کنید.',
-  };
+  return { ok: true, doc: { mimeType, data } };
 }

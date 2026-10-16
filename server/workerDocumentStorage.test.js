@@ -133,7 +133,7 @@ test('worker identity documents stay private', async (t) => {
   });
 
   await t.test('oversized file is rejected', async () => {
-    const big = Buffer.alloc(600 * 1024 + 1, 0x11);
+    const big = Buffer.alloc(8 * 1024 * 1024 + 1, 0x11);
     big[0] = 0xff;
     big[1] = 0xd8;
     big[2] = 0xff;
@@ -144,7 +144,7 @@ test('worker identity documents stay private', async (t) => {
       body: onboardingBody(big.toString('base64'), 'image/jpeg'),
     });
     assert.equal(oversized.status, 400);
-    assert.match(oversized.json.message, /۶۰۰/);
+    assert.match(oversized.json.message, /۸ مگابایت/);
     assert.equal(workerRecord().idDoc, '');
   });
 

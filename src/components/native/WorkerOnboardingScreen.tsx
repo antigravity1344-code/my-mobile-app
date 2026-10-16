@@ -11,11 +11,10 @@ import {
   Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
-import { prepareIdDocument, type PreparedIdDoc } from '../../features/worker/prepareIdDocument';
+import { prepareIdDocumentFromBase64, type PreparedIdDoc } from '../../features/worker/prepareIdDocument';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
@@ -160,7 +159,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 1,
-        base64: false,
+        base64: true,
       });
     } catch {
       setErrorMsg('باز کردن گالری ممکن نشد. اگر مشکل ادامه داشت، اپ متخصص را دوباره نصب کنید.');
@@ -168,25 +167,9 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     }
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    if (!asset.uri) {
-      setIdDocFile(null);
-      setErrorMsg('خواندن تصویر مدرک ممکن نشد.');
-      return;
-    }
     setPicking(true);
     try {
-      const prepared = await prepareIdDocument({
-        uri: asset.uri,
-        width: asset.width,
-        manipulate: async (uri, actions, options) => {
-          const resized = await ImageManipulator.manipulateAsync(uri, actions, {
-            compress: options.compress,
-            format: ImageManipulator.SaveFormat.JPEG,
-            base64: true,
-          });
-          return { base64: resized.base64 };
-        },
-      });
+      const prepared = prepareIdDocumentFromBase64(asset.base64 || '');
       if (!prepared.ok) {
         setIdDocFile(null);
         setErrorMsg(prepared.message);
@@ -196,9 +179,6 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
         ...prepared.doc,
         label: asset.fileName || 'تصویر مدرک',
       });
-    } catch {
-      setIdDocFile(null);
-      setErrorMsg('آماده‌سازی تصویر ممکن نشد. دوباره از گالری انتخاب کنید.');
     } finally {
       setPicking(false);
     }

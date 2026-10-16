@@ -63,7 +63,7 @@ const USER_STATUS_LABELS = {
 const MIN_ORDER_PRICE = 50000;
 const MAX_ORDER_PRICE = 20000000;
 const MAX_DOC_CHARS = 400000;
-const MAX_ID_DOC_BYTES = 600 * 1024;
+const MAX_ID_DOC_BYTES = 8 * 1024 * 1024;
 const workerDocuments = createWorkerDocumentStorage(
   process.env.PAKSHO_WORKER_DOC_DIR
     ? path.resolve(process.env.PAKSHO_WORKER_DOC_DIR)
@@ -71,7 +71,7 @@ const workerDocuments = createWorkerDocumentStorage(
 );
 
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '12mb' }));
 app.use('/uploads', (req, res) => {
   res.status(404).json({ success: false, message: 'یافت نشد.' });
 });
@@ -185,7 +185,7 @@ function parseIdDocFile(payload) {
   }
   const buffer = Buffer.from(cleaned, 'base64');
   if (!buffer.length || buffer.length > MAX_ID_DOC_BYTES) {
-    return { error: 'حجم مدرک باید حداکثر ۶۰۰ کیلوبایت باشد.' };
+    return { error: 'حجم مدرک باید حداکثر ۸ مگابایت باشد.' };
   }
   const kind = detectImageKind(buffer);
   if (!kind || kind !== allowed[mime]) {
