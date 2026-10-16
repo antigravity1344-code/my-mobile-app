@@ -1,6 +1,10 @@
 # PROJECT_STATE — پاکشو / cleaning-mobile
 
-**آخرین به‌روزرسانی:** 2026-09-21 حدود ۰۲:۳۵ (Asia/Tehran)  
+> **این فایل از ۲۱ سپتامبر ۲۰۲۶ کهنه است و مرجع اجرایی نیست.**  
+> مرجع تصمیم: `docs/ARCHITECTURE_DECISIONS.md`  
+> ثبت کامل کار ۱۷ اکتبر ۲۰۲۶: `docs/PROJECT_RECORD_2026-10-17.fa.md`
+
+**آخرین به‌روزرسانی همین پرونده (قدیمی):** 2026-09-21 حدود ۰۲:۳۵ (Asia/Tehran)  
 **نقطه تحویل امن:** پس از Completion — آماده توقف / انتقال به چت یا مدل بعدی  
 **Repo:** `antigravity1344-code/my-mobile-app`  
 **Branch:** `say_hello`  
