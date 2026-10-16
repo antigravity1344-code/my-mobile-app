@@ -5,6 +5,7 @@ import {
   canAcceptWorkerOrder,
   canCallWorkerCustomer,
   canCompleteWorkerOrder,
+  canReportWorkerStart,
   isActiveWorkerJob,
   normalizeWorkerOrderStatus,
   partitionWorkerJobs,
@@ -66,6 +67,16 @@ describe('workerOrderStatus', () => {
     expect(canCallWorkerCustomer('ACCEPTED', '')).toBe(false);
   });
 
+  it('offers start reporting only on active jobs explicitly marked unreported', () => {
+    expect(canReportWorkerStart('ACCEPTED', false, 'cycle-1')).toBe(true);
+    expect(canReportWorkerStart('IN_PROGRESS', false, 'cycle-1')).toBe(true);
+    expect(canReportWorkerStart('ACCEPTED', true)).toBe(false);
+    expect(canReportWorkerStart('ACCEPTED', null)).toBe(false);
+    expect(canReportWorkerStart('PENDING', false)).toBe(false);
+    expect(canReportWorkerStart('CANCEL_REQUESTED', false)).toBe(false);
+    expect(canReportWorkerStart('COMPLETED', false)).toBe(false);
+  });
+
   it('puts active jobs first (newest first) and keeps cancelled/completed in history', () => {
     const orders = [
       { id: 'old-active', status: 'ACCEPTED' as WorkerOrderStatus, createdAt: '2026-10-01T08:00:00.000Z' },
@@ -115,5 +126,15 @@ describe('workerOrderStatus', () => {
     expect(view.price).toBe(100000);
     expect(JSON.stringify(view)).not.toMatch(/09120000000|۰۹۱۲|پلاک|زنگ/);
     expect(leaky.customerPhone).toBe('09120000000');
+  });
+});
+
+
+describe('worker start acceptance reference', () => {
+  it('does not enable a start command without the acceptance shown by the server', () => {
+    expect(canReportWorkerStart('ACCEPTED', false)).toBe(false);
+    expect(canReportWorkerStart('ACCEPTED', false, '')).toBe(false);
+    expect(canReportWorkerStart('ACCEPTED', false, '   ')).toBe(false);
+    expect(canReportWorkerStart('CANCEL_REQUESTED', false, 'cycle-1')).toBe(false);
   });
 });

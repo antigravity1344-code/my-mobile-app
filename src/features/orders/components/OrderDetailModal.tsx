@@ -45,6 +45,7 @@ interface OrderDetailModalProps {
     reason?: string,
     confirmQuote?: CancelQuote,
   ) => Promise<{ success: boolean; error?: string; needsConfirmation?: boolean; message?: string; quote?: CancelQuote }>;
+  onRespondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) => Promise<{ success: boolean; error?: string }>;
   /** Opened from the card's «لغو»: start with the cancel prompt open. */
   openCancelPrompt?: boolean;
 }
@@ -68,11 +69,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onClose,
   onOpenRating,
   onCancelOrder,
+  onRespondToStart,
   openCancelPrompt,
 }) => {
   const [showCancelPrompt, setShowCancelPrompt] = useState(Boolean(openCancelPrompt) && isOrderCancellable(order?.status ?? 'UNKNOWN'));
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRespondingToStart, setIsRespondingToStart] = useState(false);
   const [cancelPreview, setCancelPreview] = useState('');
   const [pendingQuote, setPendingQuote] = useState<CancelQuote | null>(null);
   const sheetKb = useSheetKeyboard(visible);
@@ -132,6 +135,19 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 
   const handleCallSupport = () => {
     void Linking.openURL(SUPPORT_TEL_URL);
+  };
+
+  const respondToStart = async (answer: 'yes' | 'no') => {
+    if (isRespondingToStart || !order.startPrompt || !order.startPromptEventId || order.status === 'CANCEL_REQUESTED') return;
+    setIsRespondingToStart(true);
+    try {
+      const result = await onRespondToStart(order.id, answer, order.startPromptEventId);
+      if (!result.success) Alert.alert('ثبت پاسخ انجام نشد', result.error || 'لطفاً دوباره تلاش کنید.');
+    } catch {
+      Alert.alert('خطای ارتباط', 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.');
+    } finally {
+      setIsRespondingToStart(false);
+    }
   };
 
   const handleConfirmCancel = async () => {
@@ -441,6 +457,37 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             )}
           </ScrollView>
 
+          {/* Customer confirmation is independent of cancellation and completion. */}
+          {order.startPrompt && order.startPromptEventId && order.status !== 'CANCEL_REQUESTED' ? (
+            <View style={styles.startPromptBox}>
+              <Text style={styles.startPromptTitle}>تأیید شروع کار</Text>
+              <Text style={styles.startPromptDescription}>
+                {order.startPrompt === 'confirm_report'
+                  ? 'متخصص اعلام کرده کار را شروع کرده است. آیا این موضوع را تأیید می‌کنید؟'
+                  : 'آیا متخصص کار سفارش شما را شروع کرده است؟'}
+              </Text>
+              <View style={styles.startPromptActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="تأیید شروع کار"
+                  disabled={isRespondingToStart}
+                  onPress={() => void respondToStart('yes')}
+                  style={styles.startPromptYes}
+                >
+                  <Text style={styles.startPromptYesText}>{isRespondingToStart ? 'در حال ثبت...' : 'بله، شروع شده'}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="رد شروع کار"
+                  disabled={isRespondingToStart}
+                  onPress={() => void respondToStart('no')}
+                  style={styles.startPromptNo}
+                >
+                  <Text style={styles.startPromptNoText}>خیر، شروع نشده</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
           {/* Footer Actions */}
           <View style={styles.footer}>
             {isCompleted && (
@@ -482,6 +529,14 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  startPromptBox: { backgroundColor: '#ecfdf5', borderColor: '#99f6e4', borderWidth: 1, borderRadius: 14, padding: 14, marginHorizontal: 16, marginTop: 10 },
+  startPromptTitle: { fontSize: 14, fontWeight: '800', color: '#115e59', textAlign: 'right' },
+  startPromptDescription: { marginTop: 6, fontSize: 12, color: '#134e4a', textAlign: 'right', lineHeight: 21 },
+  startPromptActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
+  startPromptYes: { flex: 1, backgroundColor: '#0f766e', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  startPromptYesText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  startPromptNo: { flex: 1, borderWidth: 1, borderColor: '#b91c1c', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  startPromptNoText: { color: '#b91c1c', fontWeight: '700', fontSize: 12 },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',

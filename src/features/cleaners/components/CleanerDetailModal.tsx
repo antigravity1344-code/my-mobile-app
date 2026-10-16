@@ -59,8 +59,7 @@ export const CleanerDetailModal: React.FC<CleanerDetailModalProps> = ({
                 {price.finalPrice.toLocaleString('fa-IR')} تومان
               </Text>
               <Text style={styles.priceHint}>
-                افزایش {Math.round(price.upliftRate * 100).toLocaleString('fa-IR')}٪ • سهم متخصص{' '}
-                {price.cleanerNetAmount.toLocaleString('fa-IR')} تومان
+                افزایش {Math.round(price.upliftRate * 100).toLocaleString('fa-IR')}٪ • تسویه متخصص پس از تعیین سیاست مالی
               </Text>
             </View>
 

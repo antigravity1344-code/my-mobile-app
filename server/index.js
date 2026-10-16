@@ -381,10 +381,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // 2. بررسی OTP
 app.post('/api/auth/verify-otp', (req, res) => {
   const phone = kavenegarSms.normalizeIranMobile(req.body?.phone);
-  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const code = typeof req.body?.code === 'string'
+    ? req.body.code.trim()
+      .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+      .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    : '';
   const role = req.body?.role;
 
-  if (!phone || !code) {
+  // Only a human-entered four-digit OTP is a valid credential; stored HMACs are never input codes.
+  if (!phone || !/^\d{4}$/.test(code)) {
     return res.status(400).json({ success: false, message: 'شماره تلفن و کد تایید الزامی است.' });
   }
 
@@ -785,7 +790,7 @@ app.post('/api/orders', (req, res) => {
 function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  return rest;
+  return { ...rest, startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -844,7 +849,7 @@ function workerAssignedOrderView(order) {
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
-    return { ...workerVisible, area };
+    return { ...workerVisible, area, startReported: store.workerStartReported(order), startAcceptanceKey: store.startAcceptanceKey(order) };
   }
   return {
     ...workerVisible,
@@ -944,6 +949,52 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
     return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
   }
   res.json({ success: true, order: workerAssignedOrderView(accepted.order) });
+});
+
+// ثبت شروع کار: رویدادی مستقل از وضعیت اصلی سفارش و مستقل از سیاست مالی.
+const START_ERROR_RESPONSES = {
+  missing: [404, 'سفارش یافت نشد.'],
+  forbidden: [403, 'این کار فقط برای طرف همین سفارش مجاز است.'],
+  'bad-status': [400, 'این سفارش در وضعیت مجاز شروع کار نیست.'],
+  invalid: [400, 'پاسخ نامعتبر است.'],
+  'already-answered': [409, 'پاسخ قبلاً ثبت شده و تغییر آن نیازمند پشتیبانی است.'],
+  'no-question': [409, 'در حال حاضر سؤالی درباره شروع کار ثبت نشده است.'],
+  'stale-acceptance': [409, 'پذیرش این سفارش تغییر کرده است. اطلاعات تازه را بررسی کنید.'],
+  'stale-decision': [409, 'زمینه تصمیم مدیریتی تغییر کرده است. سوابق تازه را بررسی کنید.'],
+  'key-conflict': [409, 'شناسه درخواست قبلاً با محتوای دیگری استفاده شده است.'],
+  'stale-prompt': [409, 'گزارش شروع کار تغییر کرده است. اطلاعات تازه را بررسی کنید.'],
+  resolved: [409, 'موضوع شروع کار توسط پشتیبانی بررسی شده است.'],
+};
+function sendStartError(res, code) {
+  const [status, message] = START_ERROR_RESPONSES[code] || [400, 'درخواست انجام نشد.'];
+  return res.status(status).json({ success: false, message });
+}
+
+app.put('/api/orders/:orderId/start', (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (user.role !== 'WORKER') return sendStartError(res, 'forbidden');
+  if (user.status !== 'APPROVED' && user.status !== 'ACTIVE') return sendStartError(res, 'forbidden');
+  const result = store.reportStart(req.params.orderId, user, req.body && req.body.acceptanceKey);
+  if (result.code !== 'ok' && result.code !== 'duplicate') return sendStartError(res, result.code);
+  return res.json({ success: true, order: workerAssignedOrderView(result.order) });
+});
+
+app.put('/api/orders/:orderId/start-response', (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (user.role !== 'CUSTOMER') return sendStartError(res, 'forbidden');
+  const result = store.respondStart(req.params.orderId, user.id, req.body && req.body.answer, req.body && req.body.promptEventId);
+  if (result.code === 'stale-prompt') {
+    // Only the authenticated owner reaches this result; never expose another customer's order.
+    const current = store.getOrder(req.params.orderId);
+    return res.status(409).json({
+      success: false, code: result.code, message: START_ERROR_RESPONSES[result.code][1],
+      ...(current && current.customerId === user.id ? { order: customerOrderView(current) } : {}),
+    });
+  }
+  if (result.code !== 'ok' && result.code !== 'duplicate') return sendStartError(res, result.code);
+  return res.json({ success: true, order: customerOrderView(result.order) });
 });
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'];
@@ -1169,6 +1220,30 @@ app.get('/api/loyalty', (req, res) => {
 });
 
 app.use('/api/admin', requireAdmin);
+
+// Read-only audit and command context, restricted to the existing authenticated admin role.
+app.get('/api/admin/orders/:orderId/start-events', (req, res) => {
+  const order = store.getOrder(req.params.orderId);
+  if (!order) return sendStartError(res, 'missing');
+  return res.json({ success: true, orderId: order.id, startDecisionContext: store.startDecisionContext(order),
+    events: store.listOrderEvents(order.id) });
+});
+
+// تصمیم مدیر تنها بعد از میان‌افزار احراز هویت مدیریتی در دسترس است.
+app.put('/api/admin/orders/:orderId/start-decision', (req, res) => {
+  const result = store.adminStartDecision(req.params.orderId, req.body && req.body.started, {
+    requestId: req.body && req.body.requestId,
+    acceptanceKey: req.body && req.body.acceptanceKey,
+    expectedDecisionEventId: req.body && req.body.expectedDecisionEventId,
+  });
+  if (result.code === 'stale-decision') {
+    return res.status(409).json({ success: false, code: result.code, message: START_ERROR_RESPONSES[result.code][1],
+      startDecisionContext: store.startDecisionContext(store.getOrder(req.params.orderId)) });
+  }
+  if (result.code !== 'ok' && result.code !== 'duplicate') return sendStartError(res, result.code);
+  return res.json({ success: true, duplicate: result.code === 'duplicate', order: result.order,
+    startDecisionContext: store.startDecisionContext(result.order) });
+});
 
 app.get('/api/admin/support/messages', (req, res) => {
   res.json({ success: true, messages: store.listAllSupportMessages() });

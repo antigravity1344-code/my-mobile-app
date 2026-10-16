@@ -34,7 +34,10 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
   process.env.NODE_ENV = 'test';
 
   const { createDataStore, ORDER_EVENT_KINDS, normalizeIsoTimestamp } = require('./dataStore');
+  const { installTestSmsCapture } = require('./testAuthHarness');
+  const smsCapture = installTestSmsCapture();
   const { app, store } = require('./index.js');
+  require('node:test').after(() => smsCapture.restore());
   after(() => {
     store.close();
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -120,7 +123,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     const verified = await request(server, {
       method: 'POST',
       pathname: '/api/auth/verify-otp',
-      body: { phone, code: store.getOtp(phone).code, role },
+      body: { phone, code: smsCapture.codeFor(phone), role },
     });
     assert.equal(verified.status, 200);
     return verified.json;
@@ -203,7 +206,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.equal(names.includes('trigger:order_events_no_overwrite'), true);
     const columns = raw.prepare('PRAGMA table_info(order_events)').all().map((column) => column.name);
     assert.deepEqual(columns, [
-      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey', 'workerId',
+      'id', 'orderId', 'actorId', 'actorRole', 'kind', 'claimedAt', 'recordedAt', 'correctsEventId', 'note', 'idempotencyKey', 'workerId', 'dataJson',
     ]);
     const foreignKeys = raw.prepare('PRAGMA foreign_key_list(order_events)').all();
     assert.equal(foreignKeys.some((fk) => fk.table === 'orders'), false, 'orderId must not reference orders');

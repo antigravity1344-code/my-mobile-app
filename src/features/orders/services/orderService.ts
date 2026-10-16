@@ -127,6 +127,11 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     ? (o.customerTier as (typeof tiers)[number])
     : 'NEW';
   const storedPricing = o.pricing && typeof o.pricing === 'object' ? o.pricing : null;
+  // An old response without an event reference cannot safely identify the question being answered.
+  const startPrompt = (o.startPrompt === 'confirm_report' || o.startPrompt === 'ask_started') &&
+    typeof o.startPromptEventId === 'string' && o.startPromptEventId.trim()
+    ? o.startPrompt
+    : null;
 
   return {
     id: o.id,
@@ -135,6 +140,8 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     serviceTitle: o.serviceTitle || 'سرویس نظافت',
     pricingType: 'hourly',
     status: normalizeOrderStatus(o.status),
+    startPrompt,
+    startPromptEventId: startPrompt ? o.startPromptEventId! : null,
     paymentStatus: o.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
     paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
     date: {
@@ -372,6 +379,35 @@ export const orderService = {
     return { success: true, order: updatedOrder, refundAmount: 0 };
   },
 
+  async respondToStart(orderId: string, answer: 'yes' | 'no', promptEventId: string):
+    Promise<{ success: boolean; error?: string; order?: OrderItem; needsRefresh?: boolean }> {
+    if (typeof promptEventId !== 'string' || !promptEventId.trim()) {
+      return { success: false, error: 'پرسش شروع کار تغییر کرده است. لطفاً دوباره بررسی کنید.', needsRefresh: true };
+    }
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/start-response', {
+      method: 'PUT',
+      // Keep the reference the customer actually saw, even if a new report arrived meanwhile.
+      body: JSON.stringify({ answer, promptEventId }),
+    });
+    const updatedOrder = res.order?.id === orderId && (res.success || res.httpStatus === 409)
+      ? mapApiOrderForCustomer(res.order)
+      : undefined;
+    if (updatedOrder) {
+      const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
+      if (index >= 0) ordersMemoryStore[index] = updatedOrder;
+    }
+    if (!res.success || !res.order) {
+      return {
+        success: false,
+        error: res.message || 'ثبت پاسخ شروع کار انجام نشد.',
+        ...(res.httpStatus === 409 ? { order: updatedOrder, needsRefresh: true } : {}),
+      };
+    }
+    if (!updatedOrder) return { success: false, error: 'ثبت پاسخ شروع کار انجام نشد.' };
+    return { success: true, order: updatedOrder };
+  },
+
   async rateOrder(
     orderId: string,
     customerRating: number,
@@ -506,4 +542,3 @@ export const orderService = {
     }
   },
 };
-

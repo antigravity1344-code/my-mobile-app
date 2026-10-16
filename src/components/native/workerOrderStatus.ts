@@ -77,6 +77,12 @@ export function canCompleteWorkerOrder(status: WorkerOrderStatus): boolean {
   return isActiveWorkerJob(status);
 }
 
+/** Only show start reporting when the server explicitly says it has not been reported. */
+export function canReportWorkerStart(status: WorkerOrderStatus, startReported: boolean | null, acceptanceKey?: string | null): boolean {
+  return isActiveWorkerJob(status) && startReported === false &&
+    typeof acceptanceKey === 'string' && acceptanceKey.trim().length > 0;
+}
+
 /** تماس فقط برای کار فعال و وقتی شماره واقعاً موجود است. */
 export function canCallWorkerCustomer(status: WorkerOrderStatus, phone: string | null | undefined): boolean {
   return isActiveWorkerJob(status) && typeof phone === 'string' && phone.trim() !== '';

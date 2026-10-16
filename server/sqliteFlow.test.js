@@ -22,7 +22,10 @@ if (!isMainThread) {
   process.env.PAKSHO_ADMIN_PASSWORD = 'paksho-test-admin';
   process.env.NODE_ENV = 'test';
 
+  const { installTestSmsCapture } = require('./testAuthHarness');
+  const smsCapture = installTestSmsCapture();
   const { app, store } = require('./index.js');
+  require('node:test').after(() => smsCapture.restore());
   const { after } = require('node:test');
   after(() => {
     store.close();
@@ -67,7 +70,7 @@ if (!isMainThread) {
 
   async function login(server, phone, role) {
     await request(server, { method: 'POST', pathname: '/api/auth/send-otp', body: { phone } });
-    const code = store.getOtp(phone).code;
+    const code = smsCapture.codeFor(phone);
     const verified = await request(server, {
       method: 'POST',
       pathname: '/api/auth/verify-otp',
