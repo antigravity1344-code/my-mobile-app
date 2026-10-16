@@ -6,9 +6,36 @@ Work branch: `feat/d62-deployment-document-policy-20261015`
 Initial implementation SHA verified (historical): `8d85d37030fddbece88310d30db41f78f196d66b`  
 Initial implementation CI (historical): [GitHub Actions run 38756089386](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38756089386) — **success**, all recorded steps passed.
 
-## Current status — 16 Oct 2026 (supersedes historical gate statements below)
+## Final review and Sharp upgrade status — 16 Oct 2026 (latest)
 
-**Scope and version:** PR #15, `feat/d62-deployment-document-policy-20261015`. The reviewed **code implementation SHA is `e86b9890bff18bc4f162913481cd0ad66dfef9df`**. Commit **`df4c2668b2bece8706271d608467d9c606817b9b` changed documentation only**, not code or dependencies; this subsequent documentation-only clarification also makes no code changes. The PR was checked as **OPEN / DRAFT / UNMERGED**. Preserve all historical implementation SHAs and CI runs below. CI success alone is not security acceptance.
+**Scope:** PR #15, branch `feat/d62-deployment-document-policy-20261015`. This section supersedes older statements about reviews and prerequisites where they conflict; the historical commits and CI records below remain preserved.
+
+### Reviews completed and boundaries
+
+- **Independent D-62 implementation review completed** on `e86b9890bff18bc4f162913481cd0ad66dfef9df`. The outcome is constrained to the independently tested scenarios. This review is **not** an operational deployment approval.
+- **Limited independent Sharp-upgrade review: PASS** on `95dad4d43baeda062400e3d4a3882ec22f8525cd`, covering the server-only transition `sharp@0.34.5` → `sharp@0.35.5`. The limited verdict does not replace broader deployment isolation or real-document/product approval.
+- `npm ci` with the updated server lockfile **PASS**. `npm audit` for server dependencies **PASS: 0 known vulnerabilities reported** at the time checked. This is **not** a guarantee that no undiscovered or future vulnerabilities exist.
+- Sharp `0.35.5` declares **Node.js >=20.9.0** in the server lockfile. GitHub CI succeeded on **Node.js 24.21.0**, but **the actual production runtime version has NOT been verified**. Confirm runtime compatibility before any deployment.
+
+| Gate | Latest exact status | Qualification |
+| --- | --- | --- |
+| **G2 — image validation** | **PASS only in tested scenarios** | Authenticated HTTP rejected malformed APNG (corrupt second frame), animated WebP and incomplete inputs; valid single-frame PNG/JPEG/WebP passed relevant tests. No claim of exhaustive malformed-image coverage. |
+| **F1 — orphan recovery** | **PASS for reconstructed/tested scenarios; correspondence to original evidence UNVERIFIED** | File-recovery and restart tests pass for independently reconstructed cases. One-to-one matching of those cases to the initial reviewer's original evidence bundle is still unverified. |
+| **G1 — isolation in production** | **OPEN / BLOCKED FOR PRODUCTION** | Per-customer real storage/database paths, mount/symlinks, ACL/ownership, process separation, and infrastructure configuration have not been proven on actual provisioned deployments. |
+| **Product acceptance** | **OPEN** | Real identity-document legibility and each customer's numerical size/compression/quality criteria remain for product approval. |
+
+### Separate test environments and exact counts
+
+- **Limited independent Sharp review:** **29 / 29 related tests PASS**. This is narrower than the entire server suite.
+- **Independent full-server sandbox:** **110 observed tests = 102 PASS + 8 FAIL**. All eight failures were attributed to the **absence of Chromium** in that sandbox; this is not a clean full-suite PASS. The remaining **32 nested XSS subtests** included in the 142-case CI count **were not independently executed in the sandbox**.
+- **GitHub Actions on Sharp-upgrade SHA `95dad4d43baeda062400e3d4a3882ec22f8525cd`:** [run #38842008114](https://github.com/antigravity1344-code/my-mobile-app/actions/runs/38842008114), **completed/success**. The CI checkout was the PR test merge-ref `c0064d8374ff073f000048862d289a55b026604b`, joining that head with base `55a2a4add6bd0824b28660c5e2b5cb1ad57365ba` (not a merged PR). Node `24.21.0`; **142/142 server tests PASS**, **218/218 app tests PASS** (45 files), TypeScript PASS, lint PASS with 0 errors and 4 existing warnings.
+- **Review/CI distinction:** the independent 29-case verdict, independent sandbox 110-case result, and CI 142-case result are three **different executions and coverage levels**. None proves G1 or real-world product criteria.
+
+**PR control:** PR #15 remains **OPEN / DRAFT / UNMERGED**. No merge, deploy, APK, phone or real identity-data testing is authorised by these results.
+
+## D-62 implementation baseline — 16 Oct 2026 (historical, before Sharp upgrade)
+
+**Scope and version of this historical D-62 implementation baseline:** PR #15, `feat/d62-deployment-document-policy-20261015`. The independently reviewed **implementation SHA was `e86b9890bff18bc4f162913481cd0ad66dfef9df`**; Sharp was subsequently upgraded and independently reviewed as described in the **latest section above**. Commit **`df4c2668b2bece8706271d608467d9c606817b9b` changed documentation only**, not code or dependencies; this subsequent documentation-only clarification also makes no code changes. The PR was checked as **OPEN / DRAFT / UNMERGED**. Preserve all historical implementation SHAs and CI runs below. CI success alone is not security acceptance.
 
 | Gate | Current classification | Evidence and qualification |
 | --- | --- | --- |
