@@ -18,7 +18,7 @@ after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+const { jpeg } = require('./testImageFixtures');
 const CUSTOMER_PHONE = '09121234567';
 const FULL_ADDRESS = 'سعادت‌آباد، خیابان سرو غربی، کوچه ۵، پلاک ۱۲، واحد ۳';
 const ADDRESS_NOTE = 'کد درب ۴۴۵۵';

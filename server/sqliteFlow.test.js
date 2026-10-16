@@ -28,7 +28,7 @@ if (!isMainThread) {
     store.close();
     fs.rmSync(tmp, { recursive: true, force: true });
   });
-  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  const { jpeg } = require('./testImageFixtures');
 
   function request(server, { method = 'GET', pathname, token, body }) {
     const payload = body === undefined ? null : JSON.stringify(body);

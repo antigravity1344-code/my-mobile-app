@@ -14,41 +14,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
+import { pickerQualityForPolicy, validateDocumentPolicy, validateSelectedDocument } from '../../policy/documentPolicy';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
   onUpdateUser: (updatedUser: UserData) => void;
 }
 
-const MAX_ID_DOC_BYTES = 600 * 1024;
-
 type SelectedIdDoc = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   data: string;
   label: string;
 };
-
-function resolveIdDocMime(asset: {
-  mimeType?: string | null;
-  uri?: string;
-  fileName?: string | null;
-}): SelectedIdDoc['mimeType'] | null {
-  const raw = String(asset.mimeType || '').toLowerCase();
-  if (raw === 'image/jpg' || raw === 'image/jpeg') return 'image/jpeg';
-  if (raw === 'image/png') return 'image/png';
-  if (raw === 'image/webp') return 'image/webp';
-  const name = `${asset.fileName || ''} ${asset.uri || ''}`.toLowerCase();
-  if (name.includes('.png')) return 'image/png';
-  if (name.includes('.webp')) return 'image/webp';
-  if (name.includes('.jpg') || name.includes('.jpeg')) return 'image/jpeg';
-  return null;
-}
-
-function base64Size(value: string) {
-  const cleaned = value.replace(/\s/g, '');
-  const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
-  return Math.floor((cleaned.length * 3) / 4) - padding;
-}
 
 export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   user,
@@ -171,6 +148,17 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
 
   const handlePickIdDoc = async () => {
     setErrorMsg(null);
+    // The deployment policy comes only from this server; never from a client-supplied tenant ID.
+    const policyResponse = await apiFetch('/document-policy');
+    let documentPolicy;
+    try {
+      if (!policyResponse.success) throw Error('سیاست مدارک استقرار در دسترس نیست.');
+      documentPolicy = validateDocumentPolicy(policyResponse.policy);
+    } catch {
+      setIdDocFile(null);
+      setErrorMsg('سیاست مدارک این استقرار تعریف نشده یا معتبر نیست.');
+      return;
+    }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setErrorMsg(
@@ -184,7 +172,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     try {
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.5,
+        quality: pickerQualityForPolicy(documentPolicy),
         base64: true,
       });
     } catch {
@@ -198,27 +186,23 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
       return;
     }
-    const mimeType = resolveIdDocMime(asset);
-    if (!mimeType) {
-      setIdDocFile(null);
-      setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
-      return;
-    }
     if (!asset.base64) {
       setIdDocFile(null);
       setErrorMsg('خواندن تصویر مدرک ممکن نشد.');
       return;
     }
-    if (base64Size(asset.base64) > MAX_ID_DOC_BYTES) {
+    try {
+      const inspected = validateSelectedDocument(documentPolicy, asset.base64);
+      setIdDocFile({
+        mimeType: inspected.mimeType,
+        data: asset.base64,
+        // Picker may re-encode PNG to JPEG. Never retain a misleading extension.
+        label: 'تصویر مدرک' + inspected.extension,
+      });
+    } catch (error) {
       setIdDocFile(null);
-      setErrorMsg('حجم تصویر باید حداکثر ۶۰۰ کیلوبایت باشد.');
-      return;
+      setErrorMsg(error instanceof Error ? error.message : 'تصویر مدرک معتبر نیست.');
     }
-    setIdDocFile({
-      mimeType,
-      data: asset.base64,
-      label: asset.fileName || 'تصویر مدرک',
-    });
   };
 
   return (

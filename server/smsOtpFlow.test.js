@@ -11,6 +11,7 @@ process.env.PAKSHO_SQLITE_PATH = path.join(tmp, 'paksho.sqlite');
 process.env.PAKSHO_WORKER_DOC_DIR = path.join(tmp, 'docs');
 process.env.PAKSHO_ADMIN_PASSWORD = 'paksho-test-admin';
 process.env.NODE_ENV = 'development';
+process.env.PAKSHO_DOCUMENT_POLICY = 'paksho-compat'; // explicit legacy deployment for this isolated test
 process.env.PAKSHO_SMS_MODE = '';
 process.env.KAVENEGAR_API_KEY = '';
 process.env.KAVENEGAR_OTP_TEMPLATE = '';

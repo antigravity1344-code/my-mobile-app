@@ -11,6 +11,7 @@ const {
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
+const { loadDeploymentPolicy, inspectDocument, validateDecodedDocument } = require('./documentPolicy');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -35,6 +36,14 @@ function loadEnvFile(filePath) {
 loadEnvFile(path.join(__dirname, '.env'));
 loadEnvFile(path.join(__dirname, '..', '.env'));
 assertKeyConfigured();
+// Fail closed at startup for absent or invalid per-deployment document policy.
+const deploymentDocumentPolicy = loadDeploymentPolicy();
+if (deploymentDocumentPolicy.deploymentId !== 'paksho-compat') {
+  if (!process.env.PAKSHO_SQLITE_PATH || !process.env.PAKSHO_WORKER_DOC_DIR)
+    throw new Error('D62_ISOLATED_STORAGE_PATHS_REQUIRED');
+  if (path.resolve(process.env.PAKSHO_SQLITE_PATH) === path.resolve(process.env.PAKSHO_WORKER_DOC_DIR))
+    throw new Error('D62_STORAGE_PATHS_COLLIDE');
+}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,7 +72,6 @@ const USER_STATUS_LABELS = {
 const MIN_ORDER_PRICE = 50000;
 const MAX_ORDER_PRICE = 20000000;
 const MAX_DOC_CHARS = 400000;
-const MAX_ID_DOC_BYTES = 600 * 1024;
 const workerDocuments = createWorkerDocumentStorage(
   process.env.PAKSHO_WORKER_DOC_DIR
     ? path.resolve(process.env.PAKSHO_WORKER_DOC_DIR)
@@ -71,7 +79,9 @@ const workerDocuments = createWorkerDocumentStorage(
 );
 
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// Non-secret UI policy is always derived from this server instance, never a client tenant ID.
+app.get('/api/document-policy', (_req, res) => res.json({ success: true, policy: deploymentDocumentPolicy }));
+app.use(express.json({ limit: Math.ceil(deploymentDocumentPolicy.maxBytes * 4 / 3) + 65536 }));
 app.use('/uploads', (req, res) => {
   res.status(404).json({ success: false, message: 'یافت نشد.' });
 });
@@ -83,6 +93,16 @@ const store = createDataStore(
   process.env.PAKSHO_SQLITE_PATH
     ? path.resolve(process.env.PAKSHO_SQLITE_PATH)
     : path.join(__dirname, 'data', 'paksho.sqlite')
+);
+// Recover abandoned uploads on startup, but never erase a document still referenced
+// by a committed worker record. Failure to reconcile is a fail-closed startup error.
+workerDocuments.reconcilePendingDocuments(
+  documentId => store.listUsers().some(user => user.idDoc === documentId),
+  filename => store.listUsers().some(user =>
+    user.idDocPath === 'uploads/worker-docs/' + filename ||
+    user.idDoc === 'uploads/worker-docs/' + filename ||
+    user.idDoc === filename
+  )
 );
 const otpSendWindow = new Map();
 const adminLoginAttempts = new Map();
@@ -143,55 +163,8 @@ function requireUser(req, res) {
   return user;
 }
 
-function detectImageKind(buffer) {
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpeg';
-  if (
-    buffer.length >= 8 &&
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a
-  ) {
-    return 'png';
-  }
-  if (
-    buffer.length >= 12 &&
-    buffer.toString('ascii', 0, 4) === 'RIFF' &&
-    buffer.toString('ascii', 8, 12) === 'WEBP'
-  ) {
-    return 'webp';
-  }
-  return null;
-}
-
 function parseIdDocFile(payload) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return { error: 'مدرک هویتی الزامی است.' };
-  }
-  const mime = typeof payload.mimeType === 'string' ? payload.mimeType.trim().toLowerCase() : '';
-  const allowed = { 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' };
-  if (!allowed[mime]) {
-    return { error: 'فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.' };
-  }
-  const raw = typeof payload.data === 'string' ? payload.data.trim() : '';
-  if (!raw) return { error: 'مدرک هویتی الزامی است.' };
-  const cleaned = raw.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
-  if (!cleaned || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned) || cleaned.length % 4 !== 0) {
-    return { error: 'فایل مدرک معتبر نیست.' };
-  }
-  const buffer = Buffer.from(cleaned, 'base64');
-  if (!buffer.length || buffer.length > MAX_ID_DOC_BYTES) {
-    return { error: 'حجم مدرک باید حداکثر ۶۰۰ کیلوبایت باشد.' };
-  }
-  const kind = detectImageKind(buffer);
-  if (!kind || kind !== allowed[mime]) {
-    return { error: 'محتوای فایل با نوع تصویر اعلام‌شده یکی نیست.' };
-  }
-  return { buffer, ext: kind === 'jpeg' ? 'jpg' : kind };
+  return inspectDocument(payload, deploymentDocumentPolicy);
 }
 
 function publicUser(user) {
@@ -543,7 +516,7 @@ app.put('/api/users/addresses', (req, res) => {
   res.json({ success: true, addresses: savedAddresses });
 });
 
-app.put('/api/users/worker-onboarding', (req, res) => {
+app.put('/api/users/worker-onboarding', async (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   if (authUser.role !== 'WORKER') {
@@ -574,6 +547,12 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   }
   if (uploadedIdDoc.error) {
     return res.status(400).json({ success: false, message: uploadedIdDoc.error });
+  }
+  if (!uploadedIdDoc.error) {
+    const decoded = await validateDecodedDocument(uploadedIdDoc.buffer, uploadedIdDoc.ext);
+    if (decoded.error) {
+      return res.status(400).json({ success: false, message: decoded.error });
+    }
   }
   if (nextAvatar && nextAvatar.startsWith('data:') && !/^data:image\/(png|jpeg|jpg|webp);/i.test(nextAvatar)) {
     return res.status(400).json({ success: false, message: 'فرمت تصویر پروفایل مجاز نیست.' });
@@ -610,16 +589,27 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   } catch (error) {
     try {
       workerDocuments.deleteWorkerDocument(storedDocument.documentId);
+      workerDocuments.finishPendingDocument(storedDocument.documentId);
     } catch (cleanupError) {
-      // فایل جدید بدون رکورد معتبر باقی نمی‌ماند.
+      // The fsynced pre-write intent survives for reference-aware recovery.
+      console.error('D62_DOCUMENT_CLEANUP_DEFERRED', cleanupError.code || 'UNKNOWN');
     }
     return res.status(500).json({ success: false, message: 'ذخیره مدرک هویتی ممکن نشد.' });
   }
+  try {
+    // A committed DB reference must not be removed by later reconciliation.
+    workerDocuments.finishPendingDocument(storedDocument.documentId);
+  } catch (error) {
+    console.error('D62_DOCUMENT_COMMITTED_INTENT_RETAINED', error.code || 'UNKNOWN');
+  }
   if (previousDocument.idDoc && previousDocument.idDoc !== storedDocument.documentId) {
     try {
+      workerDocuments.trackPendingDocument(previousDocument.idDoc);
       workerDocuments.deleteWorkerDocument(previousDocument.idDoc);
+      workerDocuments.finishPendingDocument(previousDocument.idDoc);
     } catch (error) {
-      // شناسه جدید ذخیره شده است و مدرک قبلی دیگر مرجع نیست.
+      // The intent is retained for retry; startup checks DB references first.
+      console.error('D62_PREVIOUS_DOCUMENT_CLEANUP_DEFERRED', error.code || 'UNKNOWN');
     }
   }
   if (previousDocument.hadPath) {
