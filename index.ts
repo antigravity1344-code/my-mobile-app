@@ -37,7 +37,10 @@ if (Platform.OS === 'web') {
       document.head.appendChild(script);
     }
   }
-  // داشبورد وب
+}
+
+// داشبورد وب پیش‌فرض می‌ماند. فقط با EXPO_PUBLIC_WEB_NATIVE=1 اپ واقعی مشتری/متخصص روی وب برای QA باز می‌شود.
+if (Platform.OS === 'web' && process.env.EXPO_PUBLIC_WEB_NATIVE !== '1') {
   registerRootComponent(App);
 } else {
   registerRootComponent(NativeRoot);

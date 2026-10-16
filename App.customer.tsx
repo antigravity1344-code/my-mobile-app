@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, DevSettings } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { reloadApp } from './src/components/native/reloadApp';
 import { beginPreview, endPreview, beginPreviewShutdown, previewAvailable } from './src/components/native/previewRuntime';
 import { RealUiPreview } from './src/components/native/RealUiPreview';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ function ProductionApp() {
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
   if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="customer" onExit={() => { beginPreviewShutdown(); DevSettings.reload(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
+  if (mode === 'preview') return <RealUiPreview role="customer" onExit={() => { beginPreviewShutdown(); reloadApp(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
   if (mode === 'real') return <ProductionApp />;
   return (
     <View style={previewStyle.container}>

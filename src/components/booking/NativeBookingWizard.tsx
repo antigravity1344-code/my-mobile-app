@@ -30,6 +30,7 @@ import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
 import { createSubmitGuard } from './submitGuard';
 import { computeRevealDelta } from './keyboardReveal';
 import { addressFieldTone, firstAddressHint } from './addressFieldTone';
+import { messageForGpsResult } from './gpsFeedback';
 import { RTL_SINGLE_LINE_INPUT } from '../native/rtlInput';
 import { createClientRequestId } from '../../features/orders/services/clientRequestId';
 import { colors, fontFamily, radius, ui, TOUCH_MIN } from '../../theme';
@@ -70,6 +71,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
@@ -278,9 +280,13 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
 
   const useGps = async () => {
     setGpsLoading(true);
+    setGpsError(null);
     try {
       const coordinates = await getCurrentPosition();
       if (coordinates) booking.updateAddressField('coordinates', coordinates);
+      setGpsError(messageForGpsResult(Boolean(coordinates)));
+    } catch {
+      setGpsError(messageForGpsResult(false));
     } finally {
       setGpsLoading(false);
     }
@@ -532,6 +538,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             </Text>
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color={colors.teal} /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color={colors.teal} />}</Pressable>
+          {gpsError ? <Text style={styles.errorMessage}>{gpsError}</Text> : null}
           <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView ref={districtStripRef} horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} onContentSizeChange={districtStripScroll.onContentSizeChange} contentContainerStyle={[{ paddingHorizontal: 16 }, styles.rtlStrip]}>{rtlOrder(filteredDistricts).map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>

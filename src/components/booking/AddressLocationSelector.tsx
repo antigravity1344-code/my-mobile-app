@@ -64,7 +64,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
         onUpdateField('coordinates', coords);
         setGpsStatus('success');
       } else {
-        setGpsError('نمی‌توان 現在 مکان شما را دریافت کرد. لطفاً مجوز موقعیت جغرافیایی را بررسی کنید.');
+        setGpsError('نمی‌توان مکان شما را دریافت کرد. لطفاً مجوز موقعیت جغرافیایی را بررسی کنید.');
         setGpsStatus('error');
       }
     } catch {
