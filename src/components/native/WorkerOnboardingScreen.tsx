@@ -11,44 +11,18 @@ import {
   Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
+import { prepareIdDocument, type PreparedIdDoc } from '../../features/worker/prepareIdDocument';
 
 interface WorkerOnboardingScreenProps {
   user: UserData;
   onUpdateUser: (updatedUser: UserData) => void;
 }
 
-const MAX_ID_DOC_BYTES = 600 * 1024;
-
-type SelectedIdDoc = {
-  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
-  data: string;
-  label: string;
-};
-
-function resolveIdDocMime(asset: {
-  mimeType?: string | null;
-  uri?: string;
-  fileName?: string | null;
-}): SelectedIdDoc['mimeType'] | null {
-  const raw = String(asset.mimeType || '').toLowerCase();
-  if (raw === 'image/jpg' || raw === 'image/jpeg') return 'image/jpeg';
-  if (raw === 'image/png') return 'image/png';
-  if (raw === 'image/webp') return 'image/webp';
-  const name = `${asset.fileName || ''} ${asset.uri || ''}`.toLowerCase();
-  if (name.includes('.png')) return 'image/png';
-  if (name.includes('.webp')) return 'image/webp';
-  if (name.includes('.jpg') || name.includes('.jpeg')) return 'image/jpeg';
-  return null;
-}
-
-function base64Size(value: string) {
-  const cleaned = value.replace(/\s/g, '');
-  const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
-  return Math.floor((cleaned.length * 3) / 4) - padding;
-}
+type SelectedIdDoc = PreparedIdDoc & { label: string };
 
 export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   user,
@@ -62,6 +36,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   const [bankSheba, setBankSheba] = useState('');
   const [idDocFile, setIdDocFile] = useState<SelectedIdDoc | null>(null);
   const [loading, setLoading] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const fieldY = useRef<Record<string, number>>({});
@@ -184,8 +159,8 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     try {
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.5,
-        base64: true,
+        quality: 1,
+        base64: false,
       });
     } catch {
       setErrorMsg('باز کردن گالری ممکن نشد. اگر مشکل ادامه داشت، اپ متخصص را دوباره نصب کنید.');
@@ -193,32 +168,40 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
     }
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    if (asset.mimeType && !asset.mimeType.toLowerCase().startsWith('image/')) {
-      setIdDocFile(null);
-      setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
-      return;
-    }
-    const mimeType = resolveIdDocMime(asset);
-    if (!mimeType) {
-      setIdDocFile(null);
-      setErrorMsg('فقط تصویر JPEG، PNG یا WebP پذیرفته می‌شود.');
-      return;
-    }
-    if (!asset.base64) {
+    if (!asset.uri) {
       setIdDocFile(null);
       setErrorMsg('خواندن تصویر مدرک ممکن نشد.');
       return;
     }
-    if (base64Size(asset.base64) > MAX_ID_DOC_BYTES) {
+    setPicking(true);
+    try {
+      const prepared = await prepareIdDocument({
+        uri: asset.uri,
+        width: asset.width,
+        manipulate: async (uri, actions, options) => {
+          const resized = await ImageManipulator.manipulateAsync(uri, actions, {
+            compress: options.compress,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true,
+          });
+          return { base64: resized.base64 };
+        },
+      });
+      if (!prepared.ok) {
+        setIdDocFile(null);
+        setErrorMsg(prepared.message);
+        return;
+      }
+      setIdDocFile({
+        ...prepared.doc,
+        label: asset.fileName || 'تصویر مدرک',
+      });
+    } catch {
       setIdDocFile(null);
-      setErrorMsg('حجم تصویر باید حداکثر ۶۰۰ کیلوبایت باشد.');
-      return;
+      setErrorMsg('آماده‌سازی تصویر ممکن نشد. دوباره از گالری انتخاب کنید.');
+    } finally {
+      setPicking(false);
     }
-    setIdDocFile({
-      mimeType,
-      data: asset.base64,
-      label: asset.fileName || 'تصویر مدرک',
-    });
   };
 
   return (
@@ -309,10 +292,17 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           </View>
 
           <Text style={styles.label}>تصویر مدرک هویتی:</Text>
-          <Pressable onPress={handlePickIdDoc} style={styles.input}>
-            <Text style={idDocFile ? styles.docPickedText : styles.docPlaceholder}>
-              {idDocFile ? `انتخاب شد: ${idDocFile.label}` : 'انتخاب تصویر از گالری'}
-            </Text>
+          <Pressable onPress={handlePickIdDoc} style={styles.input} disabled={picking || loading}>
+            {picking ? (
+              <View style={styles.docRow}>
+                <ActivityIndicator size="small" color="#0f766e" />
+                <Text style={styles.docPlaceholder}>در حال آماده‌سازی تصویر...</Text>
+              </View>
+            ) : (
+              <Text style={idDocFile ? styles.docPickedText : styles.docPlaceholder}>
+                {idDocFile ? `انتخاب شد: ${idDocFile.label}` : 'انتخاب تصویر از گالری'}
+              </Text>
+            )}
           </Pressable>
 
           {/* شهر و محدوده فعالیت */}
@@ -462,6 +452,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 14,
     justifyContent: 'center',
+  },
+  docRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
   },
   docPlaceholder: {
     color: '#94a3b8',
