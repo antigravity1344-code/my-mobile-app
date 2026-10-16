@@ -100,7 +100,8 @@ workerDocuments.reconcilePendingDocuments(
   documentId => store.listUsers().some(user => user.idDoc === documentId),
   filename => store.listUsers().some(user =>
     user.idDocPath === 'uploads/worker-docs/' + filename ||
-    user.idDoc === 'uploads/worker-docs/' + filename
+    user.idDoc === 'uploads/worker-docs/' + filename ||
+    user.idDoc === filename
   )
 );
 const otpSendWindow = new Map();
