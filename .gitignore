@@ -21,3 +21,4 @@ server/server.stderr.log
 customer-build.log
 AGENT-REPORT.txt
 android/apk-inspect/
+.local-qa/
