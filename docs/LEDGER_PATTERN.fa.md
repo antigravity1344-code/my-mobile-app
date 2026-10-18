@@ -1,7 +1,7 @@
 # الگوی Ledger برای رویدادهای سفارش پاکشو
 
-**نسخه:** 1.0  
-**آخرین به‌روزرسانی:** 13 اکتبر 2026  
+**نسخه:** 1.0
+**آخرین به‌روزرسانی:** 13 اکتبر 2026
 **وضعیت:** قطعی (D-52 در ARCHITECTURE_DECISIONS.md)
 
 ---
@@ -119,8 +119,8 @@ const event = {
 // appendOrderEvent() — تنها تابع قانونی
 function appendOrderEvent(event) {
   const result = db.exec(
-    `INSERT INTO order_events 
-     (orderId, actorId, actorRole, kind, claimedAt, recordedAt, 
+    `INSERT INTO order_events
+     (orderId, actorId, actorRole, kind, claimedAt, recordedAt,
       correctsEventId, note, idempotencyKey, workerId)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -136,13 +136,13 @@ function appendOrderEvent(event) {
       event.workerId || null,
     ]
   );
-  
+
   if (result.changes === 0) {
     // کلید یکتا تکراری است = رویداد هم‌زمان
     const existing = db.prepare(`SELECT * FROM order_events WHERE idempotencyKey = ?`).get(event.idempotencyKey);
     return { code: 'IDEMPOTENT_DUPLICATE', event: existing };
   }
-  
+
   return { code: 'APPENDED', event: /* inserted row */ };
 }
 ```
@@ -181,7 +181,7 @@ function recordAcceptance(orderId, workerId, now = new Date().toISOString()) {
     // 1. شماره ترتیب پذیرش برای idempotency
     const sequence = getAcceptanceSequenceForOrder(orderId);
     const idempotencyKey = `accept:${orderId}:seq${sequence}`;
-    
+
     // 2. ثبت رویداد
     const event = appendOrderEvent({
       orderId,
@@ -193,18 +193,18 @@ function recordAcceptance(orderId, workerId, now = new Date().toISOString()) {
       idempotencyKey,
       claimedAt: now,
     });
-    
+
     if (event.code === 'IDEMPOTENT_DUPLICATE') {
       return { success: false, reason: 'already_accepted' };
     }
-    
+
     // 3. به‌روزرسانی acceptedAt و cleanerId روی orders
     db.prepare(`
-      UPDATE orders 
+      UPDATE orders
       SET acceptedAt = ?, cleanerId = ?
       WHERE id = ?
     `).run(now, workerId, orderId);
-    
+
     return { success: true, event: event.event, acceptedAt: now };
   })();
 }
@@ -237,21 +237,21 @@ function clearAcceptanceForReturnToPending(orderId, workerId, now) {
       idempotencyKey: `return:${orderId}:${now}`,
       note: null,
     });
-    
+
     if (event.code !== 'APPENDED') {
       return { success: false };
     }
-    
+
     // 2. پاک کردن acceptedAt و متخصص
     db.prepare(`
       UPDATE orders
       SET acceptedAt = null, cleanerId = null, cleanerName = null, cleanerPhone = null
       WHERE id = ?
     `).run(orderId);
-    
+
     // 3. اعلان متخصص کنارگذاشته
     notifyWorker(workerId, orderId, 'وضعیت سفارش تغییر کرد: در انتظار متخصص');
-    
+
     return { success: true };
   })();
 }
@@ -285,7 +285,7 @@ function getOrderTimeline(orderId) {
     WHERE orderId = ?
     ORDER BY recordedAt ASC
   `).all(orderId);
-  
+
   return events.map(event => ({
     ...event,
     corrected: event.correctsEventId ? true : false,
@@ -303,7 +303,7 @@ function getOrderTimeline(orderId) {
 test('two concurrent appends with one idempotency key leave exactly one event', async (t) => {
   const { db } = freshStore();
   db.createOrder(sampleOrder('ORD-RACE-001'));
-  
+
   // دو worker تقریباً هم‌زمان درخواست می‌فرستند
   const results = await Promise.all([
     new Promise(resolve => {
@@ -319,7 +319,7 @@ test('two concurrent appends with one idempotency key leave exactly one event', 
       worker.on('message', resolve);
     }),
   ]);
-  
+
   // نتیجه: دقیقاً یک رویداد ثبت شد
   const events = db.listOrderEvents('ORD-RACE-001');
   assert.equal(events.length, 1);
@@ -333,7 +333,7 @@ test('admin activation re-checks the order\'s current worker inside the transact
   // مدیر سفارش را فعال می‌کند
   // اما یک race condition: متخصص مسدود شد!
   // تضمین: transaction در سرور هم‌زمان می‌بیند
-  
+
   const order = await adminPut({ status: 'ACCEPTED', cleanerId: blockedWorker.id });
   assert.equal(order.status, 400);
   assert.ok(order.message.includes('تأییدشده'));
@@ -384,13 +384,13 @@ appendOrderEvent({
 db.transaction(() => {
   // رویداد
   appendOrderEvent({ ... });
-  
+
   // به‌روزرسانی جدول orders
   db.prepare('UPDATE orders SET ... WHERE id = ?').run(...);
-  
+
   // اعلان
   notifyUsers(...);
-  
+
   // اگر exception: همه rollback
 })();
 ```
@@ -405,7 +405,7 @@ PENDING
 ACCEPTED → CONFIRMED → ASSIGNED → IN_PROGRESS → COMPLETED
   ↓ (دوباره سفارش انجام‌نشده)
 PENDING
-  
+
 درهر لحظه:
   → CANCELLED (لغو)
 ```
