@@ -14,6 +14,8 @@ const {
 
 // Technical quote lifetime, not a tariff and not a price.
 const QUOTE_TTL_MS = 15 * 60 * 1000;
+// The JSON body limit is 12mb. A quote token is a short signed selection, so reject oversized tokens before HMAC.
+const MAX_QUOTE_TOKEN_CHARS = 32768;
 const NO_TARIFF_MESSAGE = 'تعرفه این خدمت هنوز تعیین نشده است.';
 
 class QuoteError extends Error {
@@ -47,7 +49,7 @@ function signQuote(payload, secret) {
 }
 
 function readSignedQuote(token, secret) {
-  if (typeof token !== 'string' || !token.includes('.')) {
+  if (typeof token !== 'string' || token.length === 0 || token.length > MAX_QUOTE_TOKEN_CHARS || !token.includes('.')) {
     throw new QuoteError('QUOTE_INVALID', 'نقل‌قول قیمت معتبر نیست.');
   }
   const splitAt = token.lastIndexOf('.');
@@ -136,7 +138,11 @@ function issueOrderQuote(body, now = new Date()) {
     issuedAt,
     expiresAt,
   };
-  return publicQuote(priced, signQuote(payload, secret), expiresAt);
+  const token = signQuote(payload, secret);
+  if (token.length > MAX_QUOTE_TOKEN_CHARS) {
+    throw new QuoteError('QUOTE_INVALID', 'نقل‌قول قیمت معتبر نیست.');
+  }
+  return publicQuote(priced, token, expiresAt);
 }
 
 function sameSelection(signed, selection) {
@@ -152,6 +158,39 @@ function acknowledgementMatches(body, total) {
     return false;
   }
   return true;
+}
+
+function readQuoteReplay(body) {
+  const selection = selectionFromBody(body);
+  const secret = quoteSecret();
+  if (!secret) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
+  const signed = readSignedQuote(body.quoteToken, secret);
+  if (!signed || !sameSelection(signed, selection) || !acknowledgementMatches(body, signed.total)) {
+    throw new QuoteError('REPLAY_MISMATCH', 'این درخواست با سفارش ثبت‌شده یکسان نیست.');
+  }
+  return {
+    price: signed.total,
+    pricing: {
+      serviceId: signed.serviceId,
+      quantity: signed.quantity,
+      options: stable(signed.options || {}),
+      tariffVersionId: signed.tariffVersionId,
+      total: signed.total,
+    },
+  };
+}
+
+function matchExistingServerOrder(body, existing) {
+  if (!storedServerFingerprint(existing)) return { duplicate: true };
+  let replay;
+  try {
+    replay = readQuoteReplay(body);
+  } catch (error) {
+    if (error instanceof QuoteError && error.code === 'REPLAY_MISMATCH') return { conflict: true };
+    throw error;
+  }
+  if (serverRequestConflicts(existing, replay)) return { conflict: true };
+  return { duplicate: true };
 }
 
 function confirmOrderQuote(body, now = new Date()) {
@@ -246,8 +285,10 @@ module.exports = {
   QUOTE_TTL_MS,
   NO_TARIFF_MESSAGE,
   QuoteError,
+  MAX_QUOTE_TOKEN_CHARS,
   issueOrderQuote,
   confirmOrderQuote,
+  matchExistingServerOrder,
   mapPricingError,
   serverRequestConflicts,
 };

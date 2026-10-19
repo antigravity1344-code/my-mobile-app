@@ -15,6 +15,7 @@ const { resolvePricingMode } = require('./pricing/pricingMode');
 const {
   issueOrderQuote,
   confirmOrderQuote,
+  matchExistingServerOrder,
   mapPricingError,
   serverRequestConflicts,
 } = require('./pricing/orderQuote');
@@ -714,6 +715,26 @@ app.post('/api/orders', (req, res) => {
   }
   const serverMode = resolvePricingMode() === 'server';
   let serverPriced = null;
+  // بازیابی سفارش موجود به تعرفه جاری یا مهلت نقل‌قول وابسته نیست. سفارش جدید پایین‌تر اعتبارسنجی می‌شود.
+  if (serverMode && storedClientRequestId) {
+    const existing = store.findOrderByClientRequest(user.id, storedClientRequestId);
+    if (existing) {
+      try {
+        const match = matchExistingServerOrder(req.body || {}, existing);
+        if (match.conflict) {
+          return res.status(409).json({
+            success: false,
+            code: 'ORDER_REQUEST_CONFLICT',
+            message: 'این درخواست قبلاً با مبلغ دیگری ثبت شده است و مبلغ آن تغییر نمی‌کند.',
+          });
+        }
+      } catch (error) {
+        const mapped = mapPricingError(error);
+        return res.status(mapped.status).json(mapped.body);
+      }
+      return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
+    }
+  }
   if (serverMode) {
     try {
       serverPriced = confirmOrderQuote(req.body || {}, new Date());

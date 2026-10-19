@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { confirmOrderQuote } = require('./orderQuote');
+const { confirmOrderQuote, issueOrderQuote } = require('./orderQuote');
 
 process.env.NODE_ENV = 'test';
 process.env.PAKSHO_PRICING_MODE = 'server';
@@ -313,5 +313,104 @@ test('server quote and confirmed order use the deployment tariff', async (t) => 
   process.env.NODE_ENV = nodeEnv;
   process.env.PAKSHO_PRICING_MODE = mode;
   process.env.PAKSHO_TARIFF_FILE = file;
+  baseTariff();
+
+  const replayQuote = await quote({ serviceId: 'hourly', quantity: 2 });
+  const replayed = await place(orderBody(replayQuote.json.quote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(replayed.status, 200);
+  const replayId = replayed.json.order.id;
+  const replayCount = (await orders()).length;
+  const replayNotes = (await notifications()).length;
+  const staleQuote = issueOrderQuote(
+    { serviceId: 'hourly', quantity: 2 },
+    new Date(Date.now() - 16 * 60 * 1000),
+  );
+  const afterExpiry = await place(orderBody(staleQuote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(afterExpiry.status, 200);
+  assert.equal(afterExpiry.json.duplicate, true);
+  assert.equal(afterExpiry.json.order.id, replayId);
+  assert.equal(afterExpiry.json.order.price, 2000);
+
+  writeTariff([published('v-changed', { hourly: { model: 'hourly', rate: 5 } })]);
+  const afterTariffChange = await place(orderBody(staleQuote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(afterTariffChange.status, 200);
+  assert.equal(afterTariffChange.json.order.id, replayId);
+  assert.equal(afterTariffChange.json.order.price, 2000);
+
+  fs.rmSync(tariffPath, { force: true });
+  const afterTariffDeletion = await place(orderBody(staleQuote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(afterTariffDeletion.status, 200);
+  assert.equal(afterTariffDeletion.json.order.id, replayId);
+  assert.equal(afterTariffDeletion.json.order.price, 2000);
+  assert.equal((await orders()).length, replayCount);
+  assert.equal((await notifications()).length, replayNotes);
+
+  baseTariff();
+  const differentQuote = await quote({ serviceId: 'fixed' });
+  const differentRequest = await place(orderBody(differentQuote.json.quote.quoteToken, 2500, {
+    serviceId: 'fixed', clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(differentRequest.status, 409);
+  assert.equal(differentRequest.json.code, 'ORDER_REQUEST_CONFLICT');
+  assert.equal((await orders()).find((order) => order.id === replayId).price, 2000);
+  assert.equal((await orders()).length, replayCount);
+
+  const expiredNew = await place(orderBody(staleQuote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2expired',
+  }));
+  assert.equal(expiredNew.status, 409);
+  assert.equal(expiredNew.json.code, 'QUOTE_EXPIRED');
+  const expiredWithoutKey = await place(orderBody(staleQuote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2,
+  }));
+  assert.equal(expiredWithoutKey.status, 409);
+  assert.equal(expiredWithoutKey.json.code, 'QUOTE_EXPIRED');
+  const bypass = await place({
+    serviceId: 'hourly', quantity: 2, price: 150000, confirmedTotal: 2000,
+    quoteToken: staleQuote.quoteToken, address: 'آدرس ساختگی', date: '1405-01-01', time: '10:00',
+    clientRequestId: 'stage2bypass',
+  });
+  assert.equal(bypass.status, 409);
+  assert.equal(bypass.json.code, 'QUOTE_EXPIRED');
+  assert.equal((await orders()).some((order) => order.price === 150000 && order.id !== historical.json.order.id), false);
+  assert.equal((await orders()).length, replayCount);
+  assert.equal((await notifications()).length, replayNotes);
+
+  const oversized = await place(orderBody('x'.repeat(40000), 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+  }));
+  assert.equal(oversized.status, 400);
+  assert.equal(oversized.json.code, 'QUOTE_INVALID');
+  assert.equal((await orders()).find((order) => order.id === replayId).price, 2000);
+
+  const otherCustomer = await harness.login(server, '09120000113');
+  const otherReplay = await request(server, {
+    method: 'POST', pathname: '/api/orders', token: otherCustomer.token,
+    body: orderBody(staleQuote.quoteToken, 2000, {
+      serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',
+    }),
+  });
+  assert.equal(otherReplay.status, 409);
+  assert.equal(otherReplay.json.code, 'QUOTE_EXPIRED');
+  const otherOrders = await request(server, { method: 'GET', pathname: '/api/orders', token: otherCustomer.token });
+  assert.equal(otherOrders.json.orders.some((order) => order.id === replayId), false);
+
+  process.env.PAKSHO_PRICING_MODE = 'legacy';
+  const legacyAgain = await place({
+    serviceTitle: 'سفارش قدیمی آزمایشی', address: 'آدرس ساختگی', date: '1405-01-01', time: '11:00',
+    price: 180000, clientRequestId: 'legacykey1',
+  });
+  assert.equal(legacyAgain.status, 200);
+  assert.equal(legacyAgain.json.duplicate, true);
+  assert.equal(legacyAgain.json.order.price, 150000);
+  process.env.PAKSHO_PRICING_MODE = 'server';
   baseTariff();
 });
