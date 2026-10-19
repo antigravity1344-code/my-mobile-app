@@ -68,7 +68,7 @@ interface OrdersContextValue {
     comment?: string,
     tags?: string[],
   ) => Promise<{ success: boolean; error?: string }>;
-  addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string; order?: OrderItem }>;
+  addNewOrder: (order: OrderItem) => Promise<{ success: boolean; error?: string; code?: string; order?: OrderItem }>;
   /** خروج یا تغییر کاربر: همه سفارش‌ها و انتخاب‌های کاربر قبلی پاک می‌شود. */
   resetOrders: () => Promise<void>;
 }

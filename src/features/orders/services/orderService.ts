@@ -18,7 +18,6 @@ import {
   selectCustomerOrders,
   submittedDateText,
   submittedDurationHours,
-  submittedOrderPrice,
   submittedTimeText,
 } from './orderPayload';
 import { expectedStartAtFromSelection } from '../../../utils/expectedStartAt';
@@ -469,7 +468,7 @@ export const orderService = {
     };
   },
 
-  async addOrder(newOrder: OrderItem, userId: string): Promise<{ success: boolean; error?: string; order?: OrderItem }> {
+  async addOrder(newOrder: OrderItem, userId: string): Promise<{ success: boolean; error?: string; code?: string; order?: OrderItem }> {
     try {
       const trimmedUserId = typeof userId === 'string' ? userId.trim() : '';
       if (!trimmedUserId) {
@@ -479,9 +478,10 @@ export const orderService = {
         };
       }
 
-      const price = submittedOrderPrice(newOrder.pricing?.total);
-      if (price == null) {
-        return { success: false, error: 'مبلغ سفارش معتبر نیست.' };
+      const quoteToken = newOrder.quoteToken;
+      const confirmedTotal = newOrder.confirmedTotal;
+      if (typeof quoteToken !== 'string' || quoteToken.length === 0 || !Number.isInteger(confirmedTotal)) {
+        return { success: false, error: 'قیمت سرور هنوز تأیید نشده است.' };
       }
       const address = formatSubmittedAddress(newOrder.address);
       const expectedStartAt = expectedStartAtFromSelection(newOrder.date?.dateString, newOrder.timeSlot?.startTime);
@@ -498,14 +498,16 @@ export const orderService = {
         durationHours: submittedDurationHours(newOrder),
         genderPreference: newOrder.genderPreference,
         serviceOptions: newOrder.serviceOptions || {},
+        ...(Number.isInteger(newOrder.quoteQuantity) ? { quantity: newOrder.quoteQuantity } : {}),
         addressNotes: typeof newOrder.address?.addressNotes === 'string' ? newOrder.address.addressNotes : '',
         recurringFrequency: newOrder.recurringFrequency,
         customerTier: newOrder.customerTier,
-        pricing: newOrder.pricing,
         address,
         date: submittedDateText(newOrder.date),
         time: submittedTimeText(newOrder.timeSlot),
-        price,
+        quoteToken,
+        confirmedTotal,
+        price: confirmedTotal,
         notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
         // شروع بازه انتخاب‌شده به وقت تهران، به‌صورت UTC؛ اگر قابل ساختن نباشد فرستاده نمی‌شود.
         ...(expectedStartAt ? { expectedStartAt } : {}),
@@ -522,6 +524,7 @@ export const orderService = {
       if (!res.success) {
         return {
           success: false,
+          code: typeof res.code === 'string' ? res.code : undefined,
           error: res.message || 'ثبت سفارش انجام نشد. لطفاً دوباره تلاش کنید.'
         };
       }

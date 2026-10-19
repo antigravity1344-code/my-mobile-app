@@ -17,7 +17,6 @@ import { Check, Clock, MapPin, Sparkles, X } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { calculateFinalPrice, customerTierLabel, type FinalPrice } from '../../utils/pricing';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
@@ -33,6 +32,12 @@ import { addressFieldTone, firstAddressHint } from './addressFieldTone';
 import { messageForGpsResult } from './gpsFeedback';
 import { RTL_SINGLE_LINE_INPUT } from '../native/rtlInput';
 import { createClientRequestId } from '../../features/orders/services/clientRequestId';
+import {
+  formatServerAmount,
+  isQuoteRefreshCode,
+  serverQuoteAsFinalPrice,
+} from '../../features/orders/services/serverQuote';
+import { useCustomerPriceQuote } from '../../features/orders/services/useCustomerPriceQuote';
 import { colors, fontFamily, radius, ui, TOUCH_MIN } from '../../theme';
 
 const TIME_SLOTS: TimeSlot[] = [
@@ -78,6 +83,15 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const submitGuard = useRef(createSubmitGuard());
   // یک کلید برای همین رزرو؛ بعد از خطا (مثلاً قطع شبکه) ارسال دوباره همان کلید را می‌فرستد تا سفارش تکراری ساخته نشود.
   const clientRequestKey = useRef<string | null>(null);
+  const quoteSelection = booking.selectedService
+    ? {
+      serviceId: booking.selectedService.id,
+      pricingType: booking.selectedService.pricingType,
+      durationHours: booking.durationHours,
+      serviceOptions: booking.serviceOptions,
+    }
+    : null;
+  const { view: quoteView, refreshQuote } = useCustomerPriceQuote(quoteSelection);
   const [districtSearch, setDistrictSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const dateStripRef = useRef<ScrollView>(null);
@@ -243,33 +257,6 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   }, [submissionState]);
   const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
   const filteredDistricts = districts.filter((district) => district.includes(districtSearch.trim()));
-  const pricing: FinalPrice = booking.selectedService && booking.selectedDate
-    ? calculateFinalPrice(
-      booking.selectedService,
-      booking.durationHours,
-      booking.serviceOptions,
-      booking.selectedDate.dateString,
-      booking.selectedTimeSlot?.extraFee ?? 0,
-      {
-        recurringFrequency: booking.recurringFrequency,
-        isFirstRecurringInvoice: true,
-        customerTier: booking.customerTier,
-      },
-    )
-    : {
-      subtotal: 0,
-      earlyBirdDiscountRate: 0,
-      earlyBirdDiscountAmount: 0,
-      tierDiscountRate: 0,
-      tierDiscountAmount: 0,
-      recurringDiscountRate: 0,
-      recurringDiscountAmount: 0,
-      discountRate: 0,
-      discountAmount: 0,
-      recurringDiscountDeferred: false,
-      total: 0,
-    };
-  const total = pricing.total;
 
   const selectService = (service: CleaningService, options: Record<string, string | number | boolean> = {}) => {
     booking.setSelectedService(service);
@@ -301,10 +288,13 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const addressHint = firstAddressHint(addressErrors);
   const submitCurrentBooking = async () => {
     if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot) return;
+    if (quoteView.status !== 'ready') return;
     // دو لمس سریع قبل از رندر بعدی هر دو از disabled رد می‌شوند؛ این قفل همزمان فقط یکی را می‌فرستد.
     if (!submitGuard.current.tryBegin()) return;
     setSubmissionState('submitting');
     setSubmissionMessage(null);
+    const confirmedQuote = quoteView.quote;
+    const confirmedRequest = quoteView.request;
 
     const now = new Date().toISOString();
     const addressDetails = {
@@ -318,7 +308,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
-      serviceId: booking.selectedService.id,
+      serviceId: confirmedRequest.serviceId,
       serviceTitle: booking.selectedService.title,
       serviceSubtitle: booking.selectedService.subtitle,
       pricingType: booking.selectedService.pricingType,
@@ -329,11 +319,15 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       timeSlot: booking.selectedTimeSlot,
       durationHours: booking.durationHours,
       genderPreference: booking.genderPreference,
-      serviceOptions: booking.serviceOptions,
+      serviceOptions: confirmedRequest.options,
       recurringFrequency: booking.recurringFrequency,
       customerTier: booking.customerTier,
       address: addressDetails,
-      pricing,
+      pricing: serverQuoteAsFinalPrice(confirmedQuote),
+      quoteToken: confirmedQuote.quoteToken,
+      confirmedTotal: confirmedQuote.total,
+      quoteCurrencyUnit: confirmedQuote.currencyUnit,
+      quoteQuantity: confirmedRequest.quantity,
       timeline: [
         {
           step: 'SUBMITTED',
@@ -350,7 +344,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       updatedAt: now,
     };
 
-    let result: { success: boolean; error?: string; order?: OrderItem };
+    let result: { success: boolean; error?: string; code?: string; order?: OrderItem };
     try {
       result = await addNewOrder(newOrder);
     } catch {
@@ -363,6 +357,10 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       setCreatedOrderId(orderId);
       setSubmissionState('success');
       setSubmissionMessage(`درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
+    } else if (isQuoteRefreshCode(result.code)) {
+      refreshQuote();
+      setSubmissionState('error');
+      setSubmissionMessage('قیمت تغییر کرده است. مبلغ جدید را ببینید و دوباره تأیید کنید.');
     } else {
       setSubmissionState('error');
       setSubmissionMessage(result.error || 'ثبت سفارش انجام نشد.');
@@ -443,7 +441,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <Pressable key={service.id} onPress={() => selectService(service)} style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}>
               <View style={styles.cardIcon}><Sparkles size={20} color={colors.teal} /></View>
               <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text></View>
-              <Text style={styles.price}>{service.pricingType === 'hourly' ? `کف ۴ ساعت: ${(service.basePrice * 4).toLocaleString('fa-IR')} تومان` : service.basePrice ? `شروع از ${service.basePrice.toLocaleString('fa-IR')} تومان` : 'استعلام قیمت'}</Text>
+              <Text style={styles.price}>قیمت را سرور اعلام می‌کند</Text>
             </Pressable>
           ))}
           <PricingTable visible={pricingVisible} onClose={() => setPricingVisible(false)} onSelect={selectService} />
@@ -451,14 +449,14 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
 
         {booking.step === 2 && <View style={styles.section}>
           <Text style={styles.heading}>تاریخ و ساعت</Text>
-          <Text style={styles.earlyBirdHint}>با رزرو برای ۷ روز آینده یا بیشتر، تا ۱۰٪ تخفیف برنامه‌ریزی زودهنگام بگیرید.</Text>
+          <Text style={styles.earlyBirdHint}>مبلغ نهایی را سرور از تعرفه شرکت محاسبه می‌کند و قبل از ثبت نشان می‌دهد.</Text>
           <Text style={styles.label}>تاریخ اعزام</Text>
           <ScrollView ref={dateStripRef} horizontal showsHorizontalScrollIndicator={false} onContentSizeChange={dateStripScroll.onContentSizeChange} contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}>
             {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{toPersianDigits(date.dayOfMonth)}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
           <Text style={styles.label}>بازه زمانی</Text>
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color={colors.teal} /><Text style={[styles.flex, styles.slotText]}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color={colors.teal} />}</Pressable>)}
-          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان (حداقل ۴ ساعت)</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
           <Text style={styles.label}>تکرار سفارش</Text>
           <View style={styles.choiceRow}>
             {[
@@ -478,7 +476,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           </View>
           {booking.recurringFrequency !== 'ONE_TIME' && (
             <Text style={styles.recurringHint}>
-              فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
+              تکرار سفارش همراه درخواست فرستاده می‌شود. مبلغ همین سفارش را فقط سرور محاسبه می‌کند.
             </Text>
           )}
           <Text style={styles.label}>یادداشت سفارش (اختیاری)</Text>
@@ -492,7 +490,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           />
           {booking.selectedService?.configuration.inputs?.map((input) => (
             <View key={input.id} style={styles.optionBlock}>
-              <Text style={styles.label}>{input.label}{input.price ? ` (+${input.price.toLocaleString('fa-IR')} تومان)` : ''}</Text>
+              <Text style={styles.label}>{input.label}</Text>
               {input.type === 'number' && <TextInput keyboardType="numeric" placeholder={input.id === 'floors' ? 'مثال: ۴' : 'مثال: ۰'} placeholderTextColor="#94a3b8" value={String(booking.serviceOptions[input.id] ?? '')} onChangeText={(value) => booking.setServiceOption(input.id, Number(value.replace(/[^0-9]/g, '')) || 0)} style={styles.input} />}
               {input.type === 'select' && <View style={styles.choiceRow}>{input.options?.map((option) => <Pressable key={option} onPress={() => booking.setServiceOption(input.id, option)} style={[styles.choice, booking.serviceOptions[input.id] === option && styles.choiceSelected]}><Text style={booking.serviceOptions[input.id] === option ? styles.choiceTextSelected : styles.choiceText}>{option}</Text></Pressable>)}</View>}
               {input.type === 'boolean' && <Pressable onPress={() => booking.setServiceOption(input.id, !booking.serviceOptions[input.id])} style={[styles.toggle, booking.serviceOptions[input.id] === true && styles.toggleSelected]}><Text style={booking.serviceOptions[input.id] === true ? styles.choiceTextSelected : styles.choiceText}>{booking.serviceOptions[input.id] === true ? 'بله' : 'خیر'}</Text></Pressable>}
@@ -579,13 +577,16 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedTimeSlot?.label}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
-            <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه سرویس</Text><Text style={styles.summaryLine}>{(total - (booking.selectedTimeSlot?.extraFee ?? 0)).toLocaleString('fa-IR')} تومان</Text></View>
-            {(booking.selectedTimeSlot?.extraFee ?? 0) > 0 && <View style={styles.invoiceLine}><Text style={styles.summaryLine}>هزینه بازه زمانی</Text><Text style={styles.summaryLine}>{booking.selectedTimeSlot?.extraFee?.toLocaleString('fa-IR')} تومان</Text></View>}
-            {pricing.earlyBirdDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف برنامه‌ریزی زودهنگام ({toPersianDigits(Math.round(pricing.earlyBirdDiscountRate * 100))}٪)</Text><Text style={styles.discountAmount}>-{pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
-            {pricing.tierDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف باشگاه مشتریان (سطح {customerTierLabel(booking.customerTier) || '—'})</Text><Text style={styles.discountAmount}>-{pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
-            {pricing.recurringDiscountDeferred && <Text style={styles.recurringHint}>فاکتور جلسه اول عادی محاسبه شد؛ تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.</Text>}
-            {pricing.recurringDiscountAmount > 0 && <View style={styles.discountLine}><Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text><Text style={styles.discountAmount}>-{pricing.recurringDiscountAmount.toLocaleString('fa-IR')} تومان</Text></View>}
-            <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ برآوردی</Text><Text style={styles.total}>{total.toLocaleString('fa-IR')} تومان</Text></View>
+            {quoteView.status === 'loading' || quoteView.status === 'idle' ? <Text style={styles.summaryLine}>در حال دریافت قیمت از سرور...</Text> : null}
+            {quoteView.status === 'ready' ? (
+              <>
+                <View style={styles.invoiceLine}><Text style={styles.summaryLine}>مبلغ جزء</Text><Text style={styles.summaryLine}>{formatServerAmount(quoteView.quote.subtotal, quoteView.quote.currencyUnit)}</Text></View>
+                {quoteView.quote.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{line.id}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, quoteView.quote.currencyUnit)}</Text></View>)}
+                {quoteView.quote.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{line.id}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, quoteView.quote.currencyUnit)}`}</Text></View>)}
+                <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل تأیید</Text><Text style={styles.total}>{formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit)}</Text></View>
+              </>
+            ) : null}
+            {quoteView.status === 'unavailable' || quoteView.status === 'network' ? <Text style={styles.errorMessage}>{quoteView.message}</Text> : null}
           </View>
           <Text style={styles.mockHint}>پرداخت بعد از انجام کار انجام می‌شود. الان فقط درخواست ثبت می‌شود.</Text>
           {submissionState === 'success' ? (
@@ -612,12 +613,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <>
               {submissionMessage ? <Text style={styles.errorMessage}>{submissionMessage}</Text> : null}
               <Pressable
-                disabled={submissionState === 'submitting'}
+                disabled={submissionState === 'submitting' || quoteView.status !== 'ready'}
                 onPress={submitCurrentBooking}
-                style={[styles.primary, submissionState === 'submitting' && styles.disabled]}
+                style={[styles.primary, (submissionState === 'submitting' || quoteView.status !== 'ready') && styles.disabled]}
               >
                 {submissionState === 'submitting' && <ActivityIndicator color={colors.white} />}
-                <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'ثبت سفارش'}</Text>
+                <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'تأیید و ثبت سفارش'}</Text>
               </Pressable>
             </>
           )}

@@ -4,10 +4,16 @@ import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
-import { calculateFinalPrice, calculatePrice, type RecurringFrequency } from '../../utils/pricing';
 import { useOrders, type OrderItem } from '../../features/orders';
 import { createClientRequestId } from '../../features/orders/services/clientRequestId';
+import {
+  formatServerAmount,
+  isQuoteRefreshCode,
+  serverQuoteAsFinalPrice,
+} from '../../features/orders/services/serverQuote';
+import { useCustomerPriceQuote } from '../../features/orders/services/useCustomerPriceQuote';
 import { normalizePersianDigits } from '../../utils/bookingValidation';
+import type { RecurringFrequency } from '../../utils/pricing';
 import { Sparkles, Calendar, MapPin, Check, Clock, ShieldCheck, Loader2, CheckCircle, AlertCircle, ClipboardList } from 'lucide-react';
 
 const STEPS = [
@@ -49,33 +55,32 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     prevStep,
   } = useBooking();
 
-  const hourlyEstimate = selectedService?.pricingType === 'hourly'
-    ? calculatePrice(selectedService, durationHours, serviceOptions)
-    : null;
-  const pricing = selectedService && selectedDate
-    ? calculateFinalPrice(
-      selectedService,
+  const quoteSelection = selectedService
+    ? {
+      serviceId: selectedService.id,
+      pricingType: selectedService.pricingType,
       durationHours,
       serviceOptions,
-      selectedDate.dateString,
-      selectedTimeSlot?.extraFee ?? 0,
-      { recurringFrequency, isFirstRecurringInvoice: true, customerTier },
-    )
+    }
     : null;
-  const totalPrice = pricing?.total ?? 0;
+  const { view: quoteView, refreshQuote } = useCustomerPriceQuote(quoteSelection);
   const { addNewOrder } = useOrders();
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const clientRequestKey = useRef<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
-  const canSubmit =
-    Boolean(selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque);
+  const canSubmit = Boolean(
+    selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque
+    && quoteView.status === 'ready',
+  );
 
   const submitPendingOrder = async () => {
-    if (!selectedService || !selectedDate || !selectedTimeSlot || !pricing) return;
+    if (!selectedService || !selectedDate || !selectedTimeSlot || quoteView.status !== 'ready') return;
     setSubmissionState('submitting');
     setSubmissionMessage(null);
+    const confirmedQuote = quoteView.quote;
+    const confirmedRequest = quoteView.request;
 
     if (!clientRequestKey.current) clientRequestKey.current = createClientRequestId();
     const now = new Date().toISOString();
@@ -89,7 +94,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
-      serviceId: selectedService.id,
+      serviceId: confirmedRequest.serviceId,
       serviceTitle: selectedService.title,
       serviceSubtitle: selectedService.subtitle,
       pricingType: selectedService.pricingType,
@@ -100,11 +105,15 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       timeSlot: selectedTimeSlot,
       durationHours,
       genderPreference,
-      serviceOptions,
+      serviceOptions: confirmedRequest.options,
       recurringFrequency,
       customerTier,
       address: normalizedAddress,
-      pricing,
+      pricing: serverQuoteAsFinalPrice(confirmedQuote),
+      quoteToken: confirmedQuote.quoteToken,
+      confirmedTotal: confirmedQuote.total,
+      quoteCurrencyUnit: confirmedQuote.currencyUnit,
+      quoteQuantity: confirmedRequest.quantity,
       timeline: [
         {
           step: 'SUBMITTED',
@@ -128,6 +137,10 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       setCreatedOrderId(orderId);
       setSubmissionState('success');
       setSubmissionMessage('سفارش ثبت شد. پرداخت بعد از انجام کار انجام می‌شود.');
+    } else if (isQuoteRefreshCode(result.code)) {
+      refreshQuote();
+      setSubmissionState('error');
+      setSubmissionMessage('قیمت تغییر کرده است. مبلغ جدید را ببینید و دوباره تأیید کنید.');
     } else {
       setSubmissionState('error');
       setSubmissionMessage(result.error || 'ثبت سفارش ناموفق بود.');
@@ -215,7 +228,6 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               onChangeNotes={setNotes}
               onNext={nextStep}
               onPrev={prevStep}
-              hourlyEstimate={hourlyEstimate}
             />
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
               <div className="mb-3 text-sm font-bold text-slate-700">تکرار سفارش</div>
@@ -242,7 +254,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               </div>
               {recurringFrequency !== 'ONE_TIME' && (
                 <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-800">
-                  فاکتور جلسه اول عادی محاسبه شد، تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
+                  تکرار سفارش همراه درخواست فرستاده می‌شود. مبلغ همین سفارش را فقط سرور محاسبه می‌کند.
                 </div>
               )}
             </div>
@@ -322,23 +334,40 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-sm font-extrabold text-slate-900">مبلغ برآوردی:</span>
-                <span className="text-base sm:text-lg font-black text-emerald-600">
-                  {totalPrice.toLocaleString('fa-IR')} تومان
-                </span>
+              <div className="space-y-2 border-t border-slate-200/80 pt-3">
+                {quoteView.status === 'loading' || quoteView.status === 'idle' ? (
+                  <span className="text-xs text-slate-500">در حال دریافت قیمت از سرور...</span>
+                ) : null}
+                {quoteView.status === 'ready' ? (
+                  <>
+                    <div className="flex justify-between text-xs text-slate-700">
+                      <span>مبلغ جزء</span>
+                      <span>{formatServerAmount(quoteView.quote.subtotal, quoteView.quote.currencyUnit)}</span>
+                    </div>
+                    {quoteView.quote.surcharges.map((line) => (
+                      <div key={line.id} className="flex justify-between text-xs text-slate-700">
+                        <span>{line.id}</span>
+                        <span>{formatServerAmount(line.amount, quoteView.quote.currencyUnit)}</span>
+                      </div>
+                    ))}
+                    {quoteView.quote.discounts.map((line) => (
+                      <div key={line.id} className="flex justify-between text-xs text-emerald-700">
+                        <span>{line.id}</span>
+                        <span>{`-${formatServerAmount(line.amount, quoteView.quote.currencyUnit)}`}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-sm font-extrabold text-slate-900">مبلغ قابل تأیید</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-600">
+                        {formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit)}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                {quoteView.status === 'unavailable' || quoteView.status === 'network' ? (
+                  <div className="text-xs text-red-700">{quoteView.message}</div>
+                ) : null}
               </div>
-              {pricing && pricing.discountAmount > 0 && (
-                <div className="flex flex-col gap-1 border-t border-slate-100 pt-3 text-xs text-emerald-700">
-                  {pricing.earlyBirdDiscountAmount > 0 && <span>تخفیف زودهنگام: {pricing.earlyBirdDiscountAmount.toLocaleString('fa-IR')} تومان</span>}
-                  {pricing.tierDiscountAmount > 0 && <span>تخفیف باشگاه مشتریان: {pricing.tierDiscountAmount.toLocaleString('fa-IR')} تومان</span>}
-                </div>
-              )}
-              {pricing?.recurringDiscountDeferred && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-800">
-                  فاکتور جلسه اول عادی محاسبه شد، تخفیف دوره‌ای روی فاکتور جلسات بعدی اعمال می‌شود.
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-3 bg-emerald-50/70 border border-emerald-200/70 p-3.5 rounded-2xl text-emerald-800 text-xs leading-relaxed">
@@ -420,7 +449,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   ) : (
                     <>
                       <ClipboardList className="h-4 w-4" />
-                      <span>ثبت سفارش</span>
+                      <span>تأیید و ثبت سفارش</span>
                     </>
                   )}
                 </button>

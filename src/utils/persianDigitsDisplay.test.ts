@@ -9,7 +9,7 @@ const read = (rel: string) => readFileSync(join(__dirname, '..', rel), 'utf8');
 const cases: [string, string[], string[]][] = [
   ['components/booking/NativeBookingWizard.tsx',
     ['{toPersianDigits(hours)} ساعت', '{toPersianDigits(date.dayOfMonth)}', '{toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)}',
-     "{toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')}", '({toPersianDigits(Math.round(pricing.earlyBirdDiscountRate * 100))}٪)'],
+     "{toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')}", 'formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit)'],
     ['>{hours} ساعت<', '>{date.dayOfMonth}<']],
   ['features/orders/components/OrderDetailModal.tsx',
     ['${toPersianDigits(order.durationHours)} ساعت', "{toPersianDigits(order.ratings?.customerRating ?? '')} از ۵"],

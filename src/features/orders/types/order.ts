@@ -82,6 +82,11 @@ export interface OrderItem {
   notes?: string;
   /** فقط برای ارسال سفارش جدید: کلید تکرارنشدنی رزرو (D-07). */
   clientRequestId?: string;
+  /** نقل‌قول امضاشده سرور؛ مبلغ سفارش از این تأیید می‌آید. */
+  quoteToken?: string;
+  confirmedTotal?: number;
+  quoteCurrencyUnit?: string;
+  quoteQuantity?: number;
   createdAt: string;
   updatedAt: string;
 }
