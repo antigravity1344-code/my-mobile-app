@@ -26,6 +26,7 @@ import { useOrders, type OrderItem } from '../../features/orders';
 import { useProfile, type SavedAddress } from '../../features/profile';
 import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from './wizardBackNavigation';
 import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
+import { bookingReview, bookingSubmitEnabled, quoteForSubmittedAttempt } from './bookingRecoveryReview';
 import { createSubmitGuard } from './submitGuard';
 import { computeRevealDelta } from './keyboardReveal';
 import { addressFieldTone, firstAddressHint } from './addressFieldTone';
@@ -294,18 +295,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     return tone === 'error' ? styles.inputError : tone === 'ok' ? styles.inputSuccess : null;
   };
   const addressHint = firstAddressHint(addressErrors);
-  const submitCurrentBooking = async () => {
-    // دو لمس سریع قبل از رندر بعدی هر دو از disabled رد می‌شوند؛ این قفل همزمان فقط یکی را می‌فرستد.
-    if (!submitGuard.current.tryBegin()) return;
-    if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot || !quoteSelection) {
-      submitGuard.current.finish(false);
-      return;
-    }
-    const builtSelection = buildQuoteRequest(quoteSelection);
-    const selectionFingerprint = bookingSelectionFingerprint({
+  const builtSelection = quoteSelection ? buildQuoteRequest(quoteSelection) : null;
+  const selectionFingerprint = quoteSelection && booking.selectedDate && booking.selectedTimeSlot
+    ? bookingSelectionFingerprint({
       serviceId: quoteSelection.serviceId,
-      options: builtSelection.ok ? builtSelection.body.options : {},
-      quantity: builtSelection.ok ? builtSelection.body.quantity : undefined,
+      options: builtSelection?.ok ? builtSelection.body.options : {},
+      quantity: builtSelection?.ok ? builtSelection.body.quantity : undefined,
       durationHours: booking.durationHours,
       date: booking.selectedDate.dateString,
       time: booking.selectedTimeSlot.id,
@@ -322,8 +317,27 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       genderPreference: booking.genderPreference,
       recurringFrequency: booking.recurringFrequency,
       notes: booking.notes,
-    });
-    const recovering = clientRequestKey.current?.selectionFingerprint === selectionFingerprint;
+    })
+    : '';
+  const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
+  const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
+  const review = bookingReview({ recovering, held: clientRequestKey.current, confirmable, fresh: freshQuote });
+  const confirmEnabled = bookingSubmitEnabled({
+    recovering,
+    confirmable,
+    submitting: submissionState === 'submitting',
+  });
+  const submitCurrentBooking = async () => {
+    // دو لمس سریع قبل از رندر بعدی هر دو از disabled رد می‌شوند؛ این قفل همزمان فقط یکی را می‌فرستد.
+    if (!submitGuard.current.tryBegin()) return;
+    if (!booking.selectedService || !booking.selectedDate || !booking.selectedTimeSlot || !quoteSelection) {
+      submitGuard.current.finish(false);
+      return;
+    }
+    if (!selectionFingerprint) {
+      submitGuard.current.finish(false);
+      return;
+    }
     if (!recovering && !confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
       submitGuard.current.finish(false);
       refreshQuote();
@@ -333,7 +347,6 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     }
     setSubmissionState('submitting');
     setSubmissionMessage(null);
-    const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
     const freshRequest = quoteView.status === 'ready' ? quoteView.request : null;
     const sent = resolveBookingSubmission(clientRequestKey.current, selectionFingerprint, {
       quoteToken: freshQuote?.quoteToken ?? '',
@@ -341,7 +354,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       currencyUnit: freshQuote?.currencyUnit ?? '',
       quantity: freshRequest?.quantity,
       serviceId: freshRequest?.serviceId ?? quoteSelection.serviceId,
-      options: freshRequest?.options ?? (builtSelection.ok ? builtSelection.body.options : {}),
+      options: freshRequest?.options ?? (builtSelection?.ok ? builtSelection.body.options : {}),
     });
     clientRequestKey.current = sent;
 
@@ -352,16 +365,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       unit: normalizePersianDigits(booking.addressDetails.unit),
       contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
     };
-    const heldQuote = {
-      quoteToken: sent.quoteToken,
-      subtotal: sent.confirmedTotal,
-      surcharges: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.surcharges : [],
-      discounts: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.discounts : [],
-      total: sent.confirmedTotal,
-      currencyUnit: sent.currencyUnit,
-      tariffVersionId: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.tariffVersionId : 'held',
-      expiresAt: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.expiresAt : '',
-    };
+    const heldQuote = quoteForSubmittedAttempt(sent, freshQuote, recovering);
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
@@ -634,16 +638,19 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedTimeSlot?.label}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
-            {quoteView.status === 'loading' || quoteView.status === 'idle' ? <Text style={styles.summaryLine}>در حال دریافت قیمت از سرور...</Text> : null}
-            {confirmable && quoteView.status === 'ready' ? (
+            {review.kind === 'none' && (quoteView.status === 'loading' || quoteView.status === 'idle') ? <Text style={styles.summaryLine}>در حال دریافت قیمت از سرور...</Text> : null}
+            {review.kind === 'recovery' ? (
+              <View style={styles.totalLine}><Text style={styles.totalLabel}>{review.title}</Text><Text style={styles.total}>{formatServerAmount(review.amount, review.currencyUnit)}</Text></View>
+            ) : null}
+            {review.kind === 'fresh' ? (
               <>
-                <View style={styles.invoiceLine}><Text style={styles.summaryLine}>مبلغ جزء</Text><Text style={styles.summaryLine}>{formatServerAmount(quoteView.quote.subtotal, quoteView.quote.currencyUnit)}</Text></View>
-                {quoteView.quote.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{line.id}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, quoteView.quote.currencyUnit)}</Text></View>)}
-                {quoteView.quote.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{line.id}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, quoteView.quote.currencyUnit)}`}</Text></View>)}
-                <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل تأیید</Text><Text style={styles.total}>{formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit)}</Text></View>
+                <View style={styles.invoiceLine}><Text style={styles.summaryLine}>مبلغ جزء</Text><Text style={styles.summaryLine}>{formatServerAmount(review.subtotal, review.currencyUnit)}</Text></View>
+                {review.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{line.id}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, review.currencyUnit)}</Text></View>)}
+                {review.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{line.id}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, review.currencyUnit)}`}</Text></View>)}
+                <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل تأیید</Text><Text style={styles.total}>{formatServerAmount(review.total, review.currencyUnit)}</Text></View>
               </>
             ) : null}
-            {quoteView.status === 'unavailable' || quoteView.status === 'network' ? <Text style={styles.errorMessage}>{quoteView.message}</Text> : null}
+            {review.kind !== 'recovery' && (quoteView.status === 'unavailable' || quoteView.status === 'network') ? <Text style={styles.errorMessage}>{quoteView.message}</Text> : null}
           </View>
           <Text style={styles.mockHint}>پرداخت بعد از انجام کار انجام می‌شود. الان فقط درخواست ثبت می‌شود.</Text>
           {submissionState === 'success' ? (
@@ -670,9 +677,9 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             <>
               {submissionMessage ? <Text style={styles.errorMessage}>{submissionMessage}</Text> : null}
               <Pressable
-                disabled={submissionState === 'submitting' || !confirmable}
+                disabled={!confirmEnabled}
                 onPress={submitCurrentBooking}
-                style={[styles.primary, (submissionState === 'submitting' || !confirmable) && styles.disabled]}
+                style={[styles.primary, !confirmEnabled && styles.disabled]}
               >
                 {submissionState === 'submitting' && <ActivityIndicator color={colors.white} />}
                 <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'تأیید و ثبت سفارش'}</Text>

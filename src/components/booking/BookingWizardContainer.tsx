@@ -20,6 +20,7 @@ import {
   serverQuoteAsFinalPrice,
 } from '../../features/orders/services/serverQuote';
 import { useCustomerPriceQuote } from '../../features/orders/services/useCustomerPriceQuote';
+import { bookingReview, bookingSubmitEnabled, quoteForSubmittedAttempt } from './bookingRecoveryReview';
 import { normalizePersianDigits } from '../../utils/bookingValidation';
 import type { RecurringFrequency } from '../../utils/pricing';
 import { Sparkles, Calendar, MapPin, Check, Clock, ShieldCheck, Loader2, CheckCircle, AlertCircle, ClipboardList } from 'lucide-react';
@@ -102,10 +103,17 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     })
     : '';
   const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
+  const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
+  const review = bookingReview({ recovering, held: clientRequestKey.current, confirmable, fresh: freshQuote });
+  const confirmEnabled = bookingSubmitEnabled({
+    recovering,
+    confirmable,
+    submitting: submissionState === 'submitting',
+  });
 
   const canSubmit = Boolean(
     selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque
-    && (confirmable || recovering),
+    && confirmEnabled,
   );
 
   const submitPendingOrder = async () => {
@@ -118,7 +126,6 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     }
     setSubmissionState('submitting');
     setSubmissionMessage(null);
-    const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
     const freshRequest = quoteView.status === 'ready' ? quoteView.request : null;
     const sent = resolveBookingSubmission(clientRequestKey.current, selectionFingerprint, {
       quoteToken: freshQuote?.quoteToken ?? '',
@@ -136,16 +143,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       unit: normalizePersianDigits(addressDetails.unit),
       contactPhone: normalizePersianDigits(addressDetails.contactPhone),
     };
-    const heldQuote = {
-      quoteToken: sent.quoteToken,
-      subtotal: sent.confirmedTotal,
-      surcharges: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.surcharges : [],
-      discounts: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.discounts : [],
-      total: sent.confirmedTotal,
-      currencyUnit: sent.currencyUnit,
-      tariffVersionId: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.tariffVersionId : 'held',
-      expiresAt: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.expiresAt : '',
-    };
+    const heldQuote = quoteForSubmittedAttempt(sent, freshQuote, recovering);
 
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
@@ -391,36 +389,44 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               </div>
 
               <div className="space-y-2 border-t border-slate-200/80 pt-3">
-                {quoteView.status === 'loading' || quoteView.status === 'idle' ? (
+                {review.kind === 'none' && (quoteView.status === 'loading' || quoteView.status === 'idle') ? (
                   <span className="text-xs text-slate-500">در حال دریافت قیمت از سرور...</span>
                 ) : null}
-                {confirmable && quoteView.status === 'ready' ? (
+                {review.kind === 'recovery' ? (
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-sm font-extrabold text-slate-900">{review.title}</span>
+                    <span className="text-base sm:text-lg font-black text-emerald-600">
+                      {formatServerAmount(review.amount, review.currencyUnit)}
+                    </span>
+                  </div>
+                ) : null}
+                {review.kind === 'fresh' ? (
                   <>
                     <div className="flex justify-between text-xs text-slate-700">
                       <span>مبلغ جزء</span>
-                      <span>{formatServerAmount(quoteView.quote.subtotal, quoteView.quote.currencyUnit)}</span>
+                      <span>{formatServerAmount(review.subtotal, review.currencyUnit)}</span>
                     </div>
-                    {quoteView.quote.surcharges.map((line) => (
+                    {review.surcharges.map((line) => (
                       <div key={line.id} className="flex justify-between text-xs text-slate-700">
                         <span>{line.id}</span>
-                        <span>{formatServerAmount(line.amount, quoteView.quote.currencyUnit)}</span>
+                        <span>{formatServerAmount(line.amount, review.currencyUnit)}</span>
                       </div>
                     ))}
-                    {quoteView.quote.discounts.map((line) => (
+                    {review.discounts.map((line) => (
                       <div key={line.id} className="flex justify-between text-xs text-emerald-700">
                         <span>{line.id}</span>
-                        <span>{`-${formatServerAmount(line.amount, quoteView.quote.currencyUnit)}`}</span>
+                        <span>{`-${formatServerAmount(line.amount, review.currencyUnit)}`}</span>
                       </div>
                     ))}
                     <div className="flex justify-between items-center pt-2">
                       <span className="text-sm font-extrabold text-slate-900">مبلغ قابل تأیید</span>
                       <span className="text-base sm:text-lg font-black text-emerald-600">
-                        {formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit)}
+                        {formatServerAmount(review.total, review.currencyUnit)}
                       </span>
                     </div>
                   </>
                 ) : null}
-                {quoteView.status === 'unavailable' || quoteView.status === 'network' ? (
+                {review.kind !== 'recovery' && (quoteView.status === 'unavailable' || quoteView.status === 'network') ? (
                   <div className="text-xs text-red-700">{quoteView.message}</div>
                 ) : null}
               </div>
