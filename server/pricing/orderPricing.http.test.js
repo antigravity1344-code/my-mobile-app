@@ -403,6 +403,31 @@ test('server quote and confirmed order use the deployment tariff', async (t) => 
   const otherOrders = await request(server, { method: 'GET', pathname: '/api/orders', token: otherCustomer.token });
   assert.equal(otherOrders.json.orders.some((order) => order.id === replayId), false);
 
+  const legacyBefore = (await orders()).find((order) => order.id === historical.json.order.id);
+  assert.equal(legacyBefore.price, 150000);
+  const legacyStatus = legacyBefore.status;
+  const legacyCount = (await orders()).length;
+  const legacyNotes = (await notifications()).length;
+  const emptyLegacyReplay = await place({ clientRequestId: 'legacykey1' });
+  assert.equal(emptyLegacyReplay.status, 409);
+  assert.equal(emptyLegacyReplay.json.code, 'ORDER_REQUEST_CONFLICT');
+  assert.equal(emptyLegacyReplay.json.duplicate, undefined);
+  const differentLegacyAmount = await place({
+    clientRequestId: 'legacykey1', price: 180000, address: 'آدرس ساختگی', date: '1405-01-01', time: '11:00',
+  });
+  assert.equal(differentLegacyAmount.status, 409);
+  assert.equal(differentLegacyAmount.json.code, 'ORDER_REQUEST_CONFLICT');
+  const differentLegacyService = await place(orderBody((await quote({ serviceId: 'fixed' })).json.quote.quoteToken, 2500, {
+    serviceId: 'fixed', clientRequestId: 'legacykey1',
+  }));
+  assert.equal(differentLegacyService.status, 409);
+  assert.equal(differentLegacyService.json.code, 'ORDER_REQUEST_CONFLICT');
+  const legacyAfter = (await orders()).find((order) => order.id === historical.json.order.id);
+  assert.equal(legacyAfter.price, 150000);
+  assert.equal(legacyAfter.status, legacyStatus);
+  assert.equal((await orders()).length, legacyCount);
+  assert.equal((await notifications()).length, legacyNotes);
+
   process.env.PAKSHO_PRICING_MODE = 'legacy';
   const legacyAgain = await place({
     serviceTitle: 'سفارش قدیمی آزمایشی', address: 'آدرس ساختگی', date: '1405-01-01', time: '11:00',

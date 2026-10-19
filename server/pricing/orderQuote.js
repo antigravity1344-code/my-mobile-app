@@ -181,7 +181,7 @@ function readQuoteReplay(body) {
 }
 
 function matchExistingServerOrder(body, existing) {
-  if (!storedServerFingerprint(existing)) return { duplicate: true };
+  if (!storedServerFingerprint(existing)) return { conflict: true };
   let replay;
   try {
     replay = readQuoteReplay(body);
@@ -277,7 +277,7 @@ function requestFingerprint(priced) {
 
 function serverRequestConflicts(existing, priced) {
   const stored = storedServerFingerprint(existing);
-  if (!stored) return false;
+  if (!stored) return true;
   return stored !== requestFingerprint(priced);
 }
 
