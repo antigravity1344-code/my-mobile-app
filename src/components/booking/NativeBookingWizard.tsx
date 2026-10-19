@@ -31,9 +31,15 @@ import { computeRevealDelta } from './keyboardReveal';
 import { addressFieldTone, firstAddressHint } from './addressFieldTone';
 import { messageForGpsResult } from './gpsFeedback';
 import { RTL_SINGLE_LINE_INPUT } from '../native/rtlInput';
-import { bookingRequestFingerprint, clientRequestIdForAttempt, type HeldClientRequest } from '../../features/orders/services/clientRequestId';
+import {
+  attemptAfterSubmit,
+  bookingSelectionFingerprint,
+  resolveBookingSubmission,
+  type StoredBookingAttempt,
+} from '../../features/orders/services/clientRequestId';
 import {
   QUOTE_STALE_MESSAGE,
+  buildQuoteRequest,
   confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
@@ -84,7 +90,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const submitGuard = useRef(createSubmitGuard());
   // کلید فقط تا وقتی محتوای سفارش و قیمت عوض نشده بماند تا خطای نامشخص شبکه سفارش دوم نسازد.
-  const clientRequestKey = useRef<HeldClientRequest | null>(null);
+  const clientRequestKey = useRef<StoredBookingAttempt | null>(null);
   const quoteSelection = booking.selectedService
     ? {
       serviceId: booking.selectedService.id,
@@ -295,7 +301,30 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       submitGuard.current.finish(false);
       return;
     }
-    if (!confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
+    const builtSelection = buildQuoteRequest(quoteSelection);
+    const selectionFingerprint = bookingSelectionFingerprint({
+      serviceId: quoteSelection.serviceId,
+      options: builtSelection.ok ? builtSelection.body.options : {},
+      quantity: builtSelection.ok ? builtSelection.body.quantity : undefined,
+      durationHours: booking.durationHours,
+      date: booking.selectedDate.dateString,
+      time: booking.selectedTimeSlot.id,
+      address: {
+        district: booking.addressDetails.district,
+        fullAddress: booking.addressDetails.fullAddress,
+        plaque: normalizePersianDigits(booking.addressDetails.plaque),
+        unit: normalizePersianDigits(booking.addressDetails.unit),
+        floor: booking.addressDetails.floor ?? '',
+        recipientName: booking.addressDetails.recipientName,
+        contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
+        addressNotes: booking.addressDetails.addressNotes ?? '',
+      },
+      genderPreference: booking.genderPreference,
+      recurringFrequency: booking.recurringFrequency,
+      notes: booking.notes,
+    });
+    const recovering = clientRequestKey.current?.selectionFingerprint === selectionFingerprint;
+    if (!recovering && !confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
       submitGuard.current.finish(false);
       refreshQuote();
       setSubmissionState('error');
@@ -304,8 +333,17 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     }
     setSubmissionState('submitting');
     setSubmissionMessage(null);
-    const confirmedQuote = quoteView.quote;
-    const confirmedRequest = quoteView.request;
+    const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
+    const freshRequest = quoteView.status === 'ready' ? quoteView.request : null;
+    const sent = resolveBookingSubmission(clientRequestKey.current, selectionFingerprint, {
+      quoteToken: freshQuote?.quoteToken ?? '',
+      confirmedTotal: freshQuote?.total ?? 0,
+      currencyUnit: freshQuote?.currencyUnit ?? '',
+      quantity: freshRequest?.quantity,
+      serviceId: freshRequest?.serviceId ?? quoteSelection.serviceId,
+      options: freshRequest?.options ?? (builtSelection.ok ? builtSelection.body.options : {}),
+    });
+    clientRequestKey.current = sent;
 
     const now = new Date().toISOString();
     const addressDetails = {
@@ -314,36 +352,20 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       unit: normalizePersianDigits(booking.addressDetails.unit),
       contactPhone: normalizePersianDigits(booking.addressDetails.contactPhone),
     };
-
-    const fingerprint = bookingRequestFingerprint({
-      serviceId: confirmedRequest.serviceId,
-      options: confirmedRequest.options,
-      quantity: confirmedRequest.quantity,
-      durationHours: booking.durationHours,
-      confirmedTotal: confirmedQuote.total,
-      currencyUnit: confirmedQuote.currencyUnit,
-      date: booking.selectedDate.dateString,
-      time: booking.selectedTimeSlot.id,
-      address: {
-        district: addressDetails.district,
-        fullAddress: addressDetails.fullAddress,
-        plaque: addressDetails.plaque,
-        unit: addressDetails.unit,
-        floor: addressDetails.floor ?? '',
-        recipientName: addressDetails.recipientName,
-        contactPhone: addressDetails.contactPhone,
-        addressNotes: addressDetails.addressNotes ?? '',
-      },
-      genderPreference: booking.genderPreference,
-      recurringFrequency: booking.recurringFrequency,
-      notes: booking.notes,
-    });
-    const held = clientRequestIdForAttempt(clientRequestKey.current, fingerprint);
-    clientRequestKey.current = held;
+    const heldQuote = {
+      quoteToken: sent.quoteToken,
+      subtotal: sent.confirmedTotal,
+      surcharges: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.surcharges : [],
+      discounts: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.discounts : [],
+      total: sent.confirmedTotal,
+      currencyUnit: sent.currencyUnit,
+      tariffVersionId: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.tariffVersionId : 'held',
+      expiresAt: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.expiresAt : '',
+    };
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
-      serviceId: confirmedRequest.serviceId,
+      serviceId: sent.serviceId,
       serviceTitle: booking.selectedService.title,
       serviceSubtitle: booking.selectedService.subtitle,
       pricingType: booking.selectedService.pricingType,
@@ -354,15 +376,15 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       timeSlot: booking.selectedTimeSlot,
       durationHours: booking.durationHours,
       genderPreference: booking.genderPreference,
-      serviceOptions: confirmedRequest.options,
+      serviceOptions: sent.options,
       recurringFrequency: booking.recurringFrequency,
       customerTier: booking.customerTier,
       address: addressDetails,
-      pricing: serverQuoteAsFinalPrice(confirmedQuote),
-      quoteToken: confirmedQuote.quoteToken,
-      confirmedTotal: confirmedQuote.total,
-      quoteCurrencyUnit: confirmedQuote.currencyUnit,
-      quoteQuantity: confirmedRequest.quantity,
+      pricing: serverQuoteAsFinalPrice(heldQuote),
+      quoteToken: sent.quoteToken,
+      confirmedTotal: sent.confirmedTotal,
+      quoteCurrencyUnit: sent.currencyUnit,
+      quoteQuantity: sent.quantity,
       timeline: [
         {
           step: 'SUBMITTED',
@@ -374,7 +396,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         },
       ],
       notes: booking.notes,
-      clientRequestId: held.id,
+      clientRequestId: sent.id,
       createdAt: now,
       updatedAt: now,
     };
@@ -386,7 +408,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       result = { success: false };
     }
     submitGuard.current.finish(result.success);
-    if (result.success) clientRequestKey.current = null;
+    clientRequestKey.current = attemptAfterSubmit(sent, result);
     if (result.success) {
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);

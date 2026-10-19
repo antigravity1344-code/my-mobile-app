@@ -25,7 +25,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onStartBooking }) => {
       <div className="bg-gradient-to-r from-sky-600 to-indigo-600 rounded-2xl p-4 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 space-y-1.5">
           <span className="inline-block px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-medium backdrop-blur">
-            تخفیف ویژه سفارش اول 🎁
+            رزرو آنلاین
           </span>
           <h3 className="text-base font-bold">پاکشو؛ نظافت راحت و مطمئن</h3>
           <p className="text-xs text-sky-100">سفارش آنلاین متخصصین تاییدشده با تضمین کیفیت</p>
@@ -92,7 +92,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onStartBooking }) => {
           <Calendar className="w-5 h-5 text-amber-600 shrink-0" />
           <div>
             <p className="text-xs font-bold">نظافت دوره‌ای منزل</p>
-            <p className="text-[10px] text-amber-700">تا ۱۰٪ تخفیف ویژه رزرو هفتگی یا ماهانه</p>
+            <p className="text-[10px] text-amber-700">رزرو هفتگی یا ماهانه را هنگام ثبت سفارش انتخاب کنید.</p>
           </div>
         </div>
         <button

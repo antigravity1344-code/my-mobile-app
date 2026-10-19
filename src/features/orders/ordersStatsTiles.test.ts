@@ -15,14 +15,16 @@ describe('orders stats tiles', () => {
     expect(style('statNumber')).toContain("textAlign: 'center'");
     expect(style('statIconWrap')).toContain("alignItems: 'center'");
   });
-  it('«مجموع خرید» shows the full amount in toman, one line, shrinking to fit', () => {
+  it('«مجموع خرید» keeps one line and does not combine unlike currencies', () => {
     expect(src).not.toContain('هـ.ت');
     expect(src).not.toContain('/ 1000');
-    expect(src).toMatch(/numberOfLines=\{1\}\s+adjustsFontSizeToFit[^>]*>\s*\{formatTomanAmount\(stats\.totalSpent\)\}/);
+    expect(src).toMatch(/numberOfLines=\{1\}\s+adjustsFontSizeToFit/);
+    expect(src).toContain('stats.spentMixed');
+    expect(src).toContain('formatStoredAmount(stats.totalSpent, stats.spentCurrencyUnit)');
   });
 });
 
-describe('formatTomanAmount (same as order card price)', () => {
+describe('formatTomanAmount (historical orders without a server unit)', () => {
   it('Persian digits, Persian thousands separator, «تومان»', () => {
     expect(formatTomanAmount(600000)).toBe('۶۰۰٬۰۰۰ تومان');
     expect(formatTomanAmount(1250000)).toBe('۱٬۲۵۰٬۰۰۰ تومان');
@@ -31,7 +33,7 @@ describe('formatTomanAmount (same as order card price)', () => {
   });
   it('totalSpent counts completed orders only (cancelled and active excluded)', () => {
     const svc = readFileSync(join(__dirname, 'services', 'orderService.ts'), 'utf8');
-    expect(svc).toMatch(/else if \(order\.status === 'COMPLETED'\) \{\s*completedCount\+\+;\s*totalSpent \+= toFiniteNumber\(order\.pricing\?\.total, 0\);\s*\}/);
-    expect(svc.match(/totalSpent \+=/g)).toHaveLength(1);
+    expect(svc).toContain('summarizeCompletedSpend(orders)');
+    expect(svc).toMatch(/else if \(order\.status === 'COMPLETED'\)/);
   });
 });

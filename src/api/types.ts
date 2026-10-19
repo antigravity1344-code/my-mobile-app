@@ -60,6 +60,7 @@ export interface ApiOrder {
     discountAmount?: number;
     recurringDiscountDeferred?: boolean;
     total?: number;
+    currencyUnit?: string;
   } | null;
   address: string;
   date: string;

@@ -21,6 +21,7 @@ import {
   submittedTimeText,
 } from './orderPayload';
 import { expectedStartAtFromSelection } from '../../../utils/expectedStartAt';
+import { reloadedOrderMoney, summarizeCompletedSpend } from './money';
 
 const ORDER_STATUSES: OrderStatus[] = [
   'PENDING',
@@ -126,6 +127,7 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     ? (o.customerTier as (typeof tiers)[number])
     : 'NEW';
   const storedPricing = o.pricing && typeof o.pricing === 'object' ? o.pricing : null;
+  const reloadedMoney = reloadedOrderMoney({ price: o.price, pricing: storedPricing });
   // An old response without an event reference cannot safely identify the question being answered.
   const startPrompt = (o.startPrompt === 'confirm_report' || o.startPrompt === 'ask_started') &&
     typeof o.startPromptEventId === 'string' && o.startPromptEventId.trim()
@@ -176,6 +178,7 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     pricing: storedPricing && typeof storedPricing.total === 'number'
       ? { ...buildPricingFromApiPrice(o.price), ...storedPricing, total: storedPricing.total }
       : buildPricingFromApiPrice(o.price),
+    quoteCurrencyUnit: reloadedMoney.currencyUnit,
     createdAt,
     updatedAt: o.completedAt || o.cancelledAt || createdAt,
     cleaner: o.cleanerId
@@ -447,24 +450,25 @@ export const orderService = {
     let activeCount = 0;
     let completedCount = 0;
     let cancelledCount = 0;
-    let totalSpent = 0;
     for (const order of orders) {
       if (activeStatuses.includes(order.status)) {
         activeCount++;
       } else if (order.status === 'COMPLETED') {
         completedCount++;
-        totalSpent += toFiniteNumber(order.pricing?.total, 0);
       } else if (order.status === 'CANCELLED') {
         cancelledCount++;
       }
     }
+    const spent = summarizeCompletedSpend(orders);
 
     return {
       totalCount: orders.length,
       activeCount,
       completedCount,
       cancelledCount,
-      totalSpent,
+      totalSpent: spent.mixed ? 0 : spent.totalSpent,
+      spentCurrencyUnit: spent.currencyUnit,
+      spentMixed: spent.mixed,
     };
   },
 

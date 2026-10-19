@@ -10,7 +10,8 @@ import {
   Repeat,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { formatOrderAmount, isOrderCancellable } from '../services/orderService';
+import { isOrderCancellable } from '../services/orderService';
+import { formatStoredAmount } from '../services/money';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { orderAmountLabel } from '../orderStatusLabels';
@@ -130,7 +131,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.priceWrap}>
           <Text style={styles.priceLabel}>{orderAmountLabel(order.status, order.paymentStatus)}</Text>
           <Text style={styles.priceValue}>
-            {formatOrderAmount(order.pricing?.total)} تومان
+            {formatStoredAmount(order.pricing?.total, order.quoteCurrencyUnit)}
           </Text>
         </View>
 

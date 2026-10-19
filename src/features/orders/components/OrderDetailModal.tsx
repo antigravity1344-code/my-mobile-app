@@ -26,7 +26,8 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { formatOrderAmount, isOrderCancellable, type CancelQuote } from '../services/orderService';
+import { isOrderCancellable, type CancelQuote } from '../services/orderService';
+import { formatStoredAmount } from '../services/money';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 import { orderAmountLabel, paymentStatusDisplay } from '../orderStatusLabels';
@@ -321,7 +322,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.invoiceLine}>
                 <Text style={styles.invoiceLabel}>مبلغ پایه سرویس</Text>
                 <Text style={styles.invoiceValue}>
-                  {formatOrderAmount(subtotal)} تومان
+                  {formatStoredAmount(subtotal, order.quoteCurrencyUnit)}
                 </Text>
               </View>
 
@@ -331,7 +332,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     تخفیف رزرو زودهنگام ({toPersianDigits(Math.round(earlyBirdRate * 100))}٪)
                   </Text>
                   <Text style={styles.discountValue}>
-                    -{formatOrderAmount(earlyBirdAmount)} تومان
+                    -{formatStoredAmount(earlyBirdAmount, order.quoteCurrencyUnit)}
                   </Text>
                 </View>
               )}
@@ -342,7 +343,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                     تخفیف باشگاه مشتریان (سطح {customerTierLabel(order.customerTier) || '—'})
                   </Text>
                   <Text style={styles.discountValue}>
-                    -{formatOrderAmount(tierAmount)} تومان
+                    -{formatStoredAmount(tierAmount, order.quoteCurrencyUnit)}
                   </Text>
                 </View>
               )}
@@ -357,7 +358,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <View style={[styles.invoiceLine, styles.discountRow]}>
                   <Text style={styles.discountLabel}>تخفیف سفارش دوره‌ای</Text>
                   <Text style={styles.discountValue}>
-                    -{formatOrderAmount(recurringAmount)} تومان
+                    -{formatStoredAmount(recurringAmount, order.quoteCurrencyUnit)}
                   </Text>
                 </View>
               )}
@@ -367,7 +368,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>{orderAmountLabel(order.status, order.paymentStatus)}</Text>
                 <Text style={styles.totalValue}>
-                  {formatOrderAmount(totalAmount)} تومان
+                  {formatStoredAmount(totalAmount, order.quoteCurrencyUnit)}
                 </Text>
               </View>
 

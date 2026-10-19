@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { useOrders, formatOrderAmount, type OrderItem, type OrderStatus } from '../../features/orders';
+import { useOrders, type OrderItem, type OrderStatus } from '../../features/orders';
+import { formatStoredAmount } from '../../features/orders/services/money';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
 import { completedRecencyIso, selectSmartHero } from './selectSmartHero';
 import { formatJalaliDateTime } from '../../utils/jalaliDisplay';
@@ -313,7 +314,7 @@ function ActiveOrderHero({
   const tone = STATUS_TONE[order.status] ?? STATUS_TONE.PENDING;
   const time = orderTime(order);
   const place = orderPlace(order);
-  const amount = `${formatOrderAmount(order.pricing?.total)} تومان`;
+  const amount = formatStoredAmount(order.pricing?.total, order.quoteCurrencyUnit);
   const others = otherActiveCount.toLocaleString('fa-IR');
 
   return (

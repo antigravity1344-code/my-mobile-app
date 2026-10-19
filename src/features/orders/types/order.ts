@@ -101,4 +101,6 @@ export interface OrderStats {
   completedCount: number;
   cancelledCount: number;
   totalSpent: number;
+  spentCurrencyUnit: string | null;
+  spentMixed: boolean;
 }

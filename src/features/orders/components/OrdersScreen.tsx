@@ -27,7 +27,7 @@ import { formatOrderAmount } from '../services/orderService';
 import { startOrderStatusWatch } from '../services/orderStatusWatch';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderRatingModal } from './OrderRatingModal';
-import { formatTomanAmount } from '../services/money';
+import { formatStoredAmount } from '../services/money';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
@@ -172,7 +172,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
               adjustsFontSizeToFit
               minimumFontScale={0.6}
             >
-              {formatTomanAmount(stats.totalSpent)}
+              {stats.spentMixed ? 'واحدها متفاوت‌اند' : formatStoredAmount(stats.totalSpent, stats.spentCurrencyUnit)}
             </Text>
             <Text style={styles.statTitle}>مجموع خرید</Text>
           </View>

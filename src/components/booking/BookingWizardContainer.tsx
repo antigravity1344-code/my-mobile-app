@@ -5,9 +5,15 @@ import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { useOrders, type OrderItem } from '../../features/orders';
-import { bookingRequestFingerprint, clientRequestIdForAttempt, type HeldClientRequest } from '../../features/orders/services/clientRequestId';
+import {
+  attemptAfterSubmit,
+  bookingSelectionFingerprint,
+  resolveBookingSubmission,
+  type StoredBookingAttempt,
+} from '../../features/orders/services/clientRequestId';
 import {
   QUOTE_STALE_MESSAGE,
+  buildQuoteRequest,
   confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
@@ -69,17 +75,42 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
   const { addNewOrder } = useOrders();
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
-  const clientRequestKey = useRef<HeldClientRequest | null>(null);
+  const clientRequestKey = useRef<StoredBookingAttempt | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const builtSelection = quoteSelection ? buildQuoteRequest(quoteSelection) : null;
+  const selectionFingerprint = quoteSelection && selectedDate && selectedTimeSlot
+    ? bookingSelectionFingerprint({
+      serviceId: quoteSelection.serviceId,
+      options: builtSelection?.ok ? builtSelection.body.options : {},
+      quantity: builtSelection?.ok ? builtSelection.body.quantity : undefined,
+      durationHours,
+      date: selectedDate.dateString,
+      time: selectedTimeSlot.id,
+      address: {
+        district: addressDetails.district,
+        fullAddress: addressDetails.fullAddress,
+        plaque: normalizePersianDigits(addressDetails.plaque),
+        unit: normalizePersianDigits(addressDetails.unit),
+        floor: addressDetails.floor ?? '',
+        recipientName: addressDetails.recipientName,
+        contactPhone: normalizePersianDigits(addressDetails.contactPhone),
+        addressNotes: addressDetails.addressNotes ?? '',
+      },
+      genderPreference,
+      recurringFrequency,
+      notes,
+    })
+    : '';
+  const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
 
   const canSubmit = Boolean(
     selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque
-    && confirmable,
+    && (confirmable || recovering),
   );
 
   const submitPendingOrder = async () => {
-    if (!selectedService || !selectedDate || !selectedTimeSlot || !quoteSelection) return;
-    if (!confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
+    if (!selectedService || !selectedDate || !selectedTimeSlot || !quoteSelection || !selectionFingerprint) return;
+    if (!recovering && !confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
       refreshQuote();
       setSubmissionState('error');
       setSubmissionMessage(QUOTE_STALE_MESSAGE);
@@ -87,8 +118,17 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     }
     setSubmissionState('submitting');
     setSubmissionMessage(null);
-    const confirmedQuote = quoteView.quote;
-    const confirmedRequest = quoteView.request;
+    const freshQuote = quoteView.status === 'ready' ? quoteView.quote : null;
+    const freshRequest = quoteView.status === 'ready' ? quoteView.request : null;
+    const sent = resolveBookingSubmission(clientRequestKey.current, selectionFingerprint, {
+      quoteToken: freshQuote?.quoteToken ?? '',
+      confirmedTotal: freshQuote?.total ?? 0,
+      currencyUnit: freshQuote?.currencyUnit ?? '',
+      quantity: freshRequest?.quantity,
+      serviceId: freshRequest?.serviceId ?? quoteSelection.serviceId,
+      options: freshRequest?.options ?? (builtSelection?.ok ? builtSelection.body.options : {}),
+    });
+    clientRequestKey.current = sent;
     const now = new Date().toISOString();
     const normalizedAddress = {
       ...addressDetails,
@@ -96,37 +136,21 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       unit: normalizePersianDigits(addressDetails.unit),
       contactPhone: normalizePersianDigits(addressDetails.contactPhone),
     };
-
-    const fingerprint = bookingRequestFingerprint({
-      serviceId: confirmedRequest.serviceId,
-      options: confirmedRequest.options,
-      quantity: confirmedRequest.quantity,
-      durationHours,
-      confirmedTotal: confirmedQuote.total,
-      currencyUnit: confirmedQuote.currencyUnit,
-      date: selectedDate.dateString,
-      time: selectedTimeSlot.id,
-      address: {
-        district: normalizedAddress.district,
-        fullAddress: normalizedAddress.fullAddress,
-        plaque: normalizedAddress.plaque,
-        unit: normalizedAddress.unit,
-        floor: normalizedAddress.floor ?? '',
-        recipientName: normalizedAddress.recipientName,
-        contactPhone: normalizedAddress.contactPhone,
-        addressNotes: normalizedAddress.addressNotes ?? '',
-      },
-      genderPreference,
-      recurringFrequency,
-      notes,
-    });
-    const held = clientRequestIdForAttempt(clientRequestKey.current, fingerprint);
-    clientRequestKey.current = held;
+    const heldQuote = {
+      quoteToken: sent.quoteToken,
+      subtotal: sent.confirmedTotal,
+      surcharges: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.surcharges : [],
+      discounts: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.discounts : [],
+      total: sent.confirmedTotal,
+      currencyUnit: sent.currencyUnit,
+      tariffVersionId: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.tariffVersionId : 'held',
+      expiresAt: freshQuote && freshQuote.total === sent.confirmedTotal ? freshQuote.expiresAt : '',
+    };
 
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
       orderNumber: `TEMP-${Date.now()}`,
-      serviceId: confirmedRequest.serviceId,
+      serviceId: sent.serviceId,
       serviceTitle: selectedService.title,
       serviceSubtitle: selectedService.subtitle,
       pricingType: selectedService.pricingType,
@@ -137,15 +161,15 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       timeSlot: selectedTimeSlot,
       durationHours,
       genderPreference,
-      serviceOptions: confirmedRequest.options,
+      serviceOptions: sent.options,
       recurringFrequency,
       customerTier,
       address: normalizedAddress,
-      pricing: serverQuoteAsFinalPrice(confirmedQuote),
-      quoteToken: confirmedQuote.quoteToken,
-      confirmedTotal: confirmedQuote.total,
-      quoteCurrencyUnit: confirmedQuote.currencyUnit,
-      quoteQuantity: confirmedRequest.quantity,
+      pricing: serverQuoteAsFinalPrice(heldQuote),
+      quoteToken: sent.quoteToken,
+      confirmedTotal: sent.confirmedTotal,
+      quoteCurrencyUnit: sent.currencyUnit,
+      quoteQuantity: sent.quantity,
       timeline: [
         {
           step: 'SUBMITTED',
@@ -157,14 +181,14 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
         },
       ],
       notes,
-      clientRequestId: held.id,
+      clientRequestId: sent.id,
       createdAt: now,
       updatedAt: now,
     };
 
     const result = await addNewOrder(newOrder);
+    clientRequestKey.current = attemptAfterSubmit(sent, result);
     if (result.success) {
-      clientRequestKey.current = null;
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');
