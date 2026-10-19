@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   NO_TARIFF_MESSAGE,
   buildQuoteRequest,
+  confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
   parseServerQuote,
   quoteSelectionKey,
+  quoteViewForSelection,
   requestServerQuote,
   serverQuoteAsFinalPrice,
+  type QuoteSelection,
 } from './serverQuote';
 
 const quote = {
@@ -97,5 +100,36 @@ describe('server quote contract', () => {
     expect(isQuoteRefreshCode('PRICE_CHANGED')).toBe(true);
     expect(isQuoteRefreshCode('QUOTE_EXPIRED')).toBe(true);
     expect(isQuoteRefreshCode('ORDER_REQUEST_CONFLICT')).toBe(false);
+  });
+
+  it('keeps a previous quote unconfirmable when the selection changes or a new fetch starts', () => {
+    const selection: QuoteSelection = {
+      serviceId: 'home',
+      pricingType: 'hourly',
+      durationHours: 4,
+      serviceOptions: {},
+    };
+    const request = { serviceId: 'home', quantity: 4, options: {} };
+    const ready = { status: 'ready' as const, quote, request };
+    const stored = { key: JSON.stringify(request), generation: 1, view: ready };
+    expect(confirmableServerQuote(ready, selection, Date.parse('2098-01-01T00:00:00.000Z'))).toBe(true);
+    expect(quoteViewForSelection(stored, { ...selection, durationHours: 5 }, 1).status).toBe('loading');
+    expect(quoteViewForSelection(stored, selection, 2).status).toBe('loading');
+    expect(confirmableServerQuote(ready, { ...selection, durationHours: 5 })).toBe(false);
+  });
+
+  it('rejects an expired quote even when the selection still matches', () => {
+    const selection: QuoteSelection = {
+      serviceId: 'home',
+      pricingType: 'hourly',
+      durationHours: 4,
+      serviceOptions: {},
+    };
+    const request = { serviceId: 'home', quantity: 4, options: {} };
+    const ready = { status: 'ready' as const, quote, request };
+    const stored = { key: JSON.stringify(request), generation: 1, view: ready };
+    const afterExpiry = Date.parse('2100-01-01T00:00:00.000Z');
+    expect(confirmableServerQuote(ready, selection, afterExpiry)).toBe(false);
+    expect(quoteViewForSelection(stored, selection, 1, afterExpiry).status).toBe('loading');
   });
 });

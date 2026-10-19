@@ -2,7 +2,7 @@ import { X } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BottomSheetModal } from '../native/BottomSheetModal';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { calculatePrice, type PricingOptions } from '../../utils/pricing';
+import type { PricingOptions } from '../../utils/pricing';
 import type { CleaningService } from '../../types/service';
 import { colors, fontFamily, ui, TOUCH_MIN } from '../../theme';
 
@@ -28,15 +28,13 @@ export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) 
           <Text style={styles.heading}>جدول شفاف تعرفه‌ها</Text>
           <Pressable onPress={onClose} accessibilityLabel="بستن جدول تعرفه‌ها"><X size={20} color={colors.muted} /></Pressable>
         </View>
-        <Text style={styles.subtitle}>مبالغ نمونه‌اند و قبل از پرداخت با جزئیات سفارش محاسبه می‌شوند.</Text>
+        <Text style={styles.subtitle}>این فهرست فقط نوع خدمت را انتخاب می‌کند. مبلغ را سرور اعلام می‌کند.</Text>
         {SCENARIOS.map((scenario) => {
           const service = SERVICES_CATALOG.find((item) => item.id === scenario.serviceId);
           if (!service) return null;
-          const durationHours = Number(scenario.options.durationHours ?? service.estimatedDurationHours ?? 4);
-          const amount = calculatePrice(service, durationHours, scenario.options);
           return (
             <View key={scenario.title} style={styles.row}>
-              <View style={styles.rowText}><Text style={styles.title}>{scenario.title}</Text><Text style={styles.amount}>{amount.toLocaleString('fa-IR')} تومان</Text></View>
+              <View style={styles.rowText}><Text style={styles.title}>{scenario.title}</Text><Text style={styles.serverPrice}>قیمت را سرور اعلام می‌کند</Text></View>
               <Pressable onPress={() => { onClose(); onSelect(service, scenario.options); }} style={styles.button}><Text style={styles.buttonText}>انتخاب و رزرو</Text></Pressable>
             </View>
           );
@@ -56,7 +54,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: ui.divider },
   rowText: { flex: 1, gap: 4 },
   title: { color: colors.text, fontFamily: fontFamily.bold, textAlign: 'right' },
-  amount: { color: colors.teal, fontSize: 13, fontFamily: fontFamily.bold, textAlign: 'right' },
+  serverPrice: { color: colors.muted, fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'right' },
   button: { minHeight: TOUCH_MIN, backgroundColor: colors.tealSoft, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   buttonText: { color: colors.tealDark, fontSize: 12, fontFamily: fontFamily.bold },
 });

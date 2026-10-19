@@ -5,8 +5,10 @@ import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { useOrders, type OrderItem } from '../../features/orders';
-import { createClientRequestId } from '../../features/orders/services/clientRequestId';
+import { bookingRequestFingerprint, clientRequestIdForAttempt, type HeldClientRequest } from '../../features/orders/services/clientRequestId';
 import {
+  QUOTE_STALE_MESSAGE,
+  confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
   serverQuoteAsFinalPrice,
@@ -63,26 +65,30 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       serviceOptions,
     }
     : null;
-  const { view: quoteView, refreshQuote } = useCustomerPriceQuote(quoteSelection);
+  const { view: quoteView, confirmable, refreshQuote } = useCustomerPriceQuote(quoteSelection);
   const { addNewOrder } = useOrders();
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
-  const clientRequestKey = useRef<string | null>(null);
+  const clientRequestKey = useRef<HeldClientRequest | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
 
   const canSubmit = Boolean(
     selectedService && selectedDate && selectedTimeSlot && addressDetails.contactPhone && addressDetails.fullAddress && addressDetails.plaque
-    && quoteView.status === 'ready',
+    && confirmable,
   );
 
   const submitPendingOrder = async () => {
-    if (!selectedService || !selectedDate || !selectedTimeSlot || quoteView.status !== 'ready') return;
+    if (!selectedService || !selectedDate || !selectedTimeSlot || !quoteSelection) return;
+    if (!confirmableServerQuote(quoteView, quoteSelection, Date.now())) {
+      refreshQuote();
+      setSubmissionState('error');
+      setSubmissionMessage(QUOTE_STALE_MESSAGE);
+      return;
+    }
     setSubmissionState('submitting');
     setSubmissionMessage(null);
     const confirmedQuote = quoteView.quote;
     const confirmedRequest = quoteView.request;
-
-    if (!clientRequestKey.current) clientRequestKey.current = createClientRequestId();
     const now = new Date().toISOString();
     const normalizedAddress = {
       ...addressDetails,
@@ -90,6 +96,32 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       unit: normalizePersianDigits(addressDetails.unit),
       contactPhone: normalizePersianDigits(addressDetails.contactPhone),
     };
+
+    const fingerprint = bookingRequestFingerprint({
+      serviceId: confirmedRequest.serviceId,
+      options: confirmedRequest.options,
+      quantity: confirmedRequest.quantity,
+      durationHours,
+      confirmedTotal: confirmedQuote.total,
+      currencyUnit: confirmedQuote.currencyUnit,
+      date: selectedDate.dateString,
+      time: selectedTimeSlot.id,
+      address: {
+        district: normalizedAddress.district,
+        fullAddress: normalizedAddress.fullAddress,
+        plaque: normalizedAddress.plaque,
+        unit: normalizedAddress.unit,
+        floor: normalizedAddress.floor ?? '',
+        recipientName: normalizedAddress.recipientName,
+        contactPhone: normalizedAddress.contactPhone,
+        addressNotes: normalizedAddress.addressNotes ?? '',
+      },
+      genderPreference,
+      recurringFrequency,
+      notes,
+    });
+    const held = clientRequestIdForAttempt(clientRequestKey.current, fingerprint);
+    clientRequestKey.current = held;
 
     const newOrder: OrderItem = {
       id: `TEMP-${Date.now()}`,
@@ -125,7 +157,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
         },
       ],
       notes,
-      clientRequestId: clientRequestKey.current,
+      clientRequestId: held.id,
       createdAt: now,
       updatedAt: now,
     };
@@ -338,7 +370,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                 {quoteView.status === 'loading' || quoteView.status === 'idle' ? (
                   <span className="text-xs text-slate-500">در حال دریافت قیمت از سرور...</span>
                 ) : null}
-                {quoteView.status === 'ready' ? (
+                {confirmable && quoteView.status === 'ready' ? (
                   <>
                     <div className="flex justify-between text-xs text-slate-700">
                       <span>مبلغ جزء</span>

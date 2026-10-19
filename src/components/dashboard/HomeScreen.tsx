@@ -78,8 +78,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onStartBooking }) => {
                 <h5 className="text-xs font-bold text-slate-800 mt-1">{service.title}</h5>
                 <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{service.subtitle || service.description}</p>
               </div>
-              <div className="text-[10px] font-bold text-sky-600 mt-2">
-                از {service.basePrice.toLocaleString('fa-IR')} تومان
+              <div className="text-[10px] font-bold text-slate-500 mt-2">
+                قیمت را سرور اعلام می‌کند
               </div>
             </button>
           ))}

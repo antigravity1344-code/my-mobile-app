@@ -119,12 +119,12 @@ describe('batch4 #5: one idempotency key per booking', () => {
   it('addOrder sends the key and the wizard keeps it across retries until success', () => {
     expect(read('features/orders/services/orderService.ts')).toMatch(/clientRequestId: newOrder\.clientRequestId/);
     const wizard = read('components/booking/NativeBookingWizard.tsx');
-    expect(wizard).toMatch(/if \(!clientRequestKey\.current\) clientRequestKey\.current = createClientRequestId\(\)/);
-    expect(wizard).toMatch(/clientRequestId: clientRequestKey\.current/);
+    expect(wizard).toMatch(/clientRequestIdForAttempt\(clientRequestKey\.current, fingerprint\)/);
+    expect(wizard).toMatch(/clientRequestId: held\.id/);
     expect(wizard).toMatch(/if \(result\.success\) clientRequestKey\.current = null/);
     const webWizard = read('components/booking/BookingWizardContainer.tsx');
-    expect(webWizard).toMatch(/if \(!clientRequestKey\.current\) clientRequestKey\.current = createClientRequestId\(\)/);
-    expect(webWizard).toMatch(/clientRequestId: clientRequestKey\.current/);
-    expect(webWizard).toMatch(/clientRequestKey\.current = null/);
+    expect(webWizard).toMatch(/clientRequestIdForAttempt\(clientRequestKey\.current, fingerprint\)/);
+    expect(webWizard).toMatch(/clientRequestId: held\.id/);
+    expect(webWizard).toMatch(/if \(result\.success\) \{\s*clientRequestKey\.current = null/);
   });
 });

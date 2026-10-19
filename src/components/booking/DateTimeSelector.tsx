@@ -16,7 +16,6 @@ interface DateTimeSelectorProps {
   onChangeNotes: (notes: string) => void;
   onNext: () => void;
   onPrev: () => void;
-  hourlyEstimate?: number | null;
 }
 
 // تبدیل خالص میلادی→شمسی (Intl تقویم پارسی روی برخی موتورها سال خالی برمی‌گرداند).
@@ -28,7 +27,7 @@ const TIME_SLOTS = [
   { id: 'afternoon-1', startTime: '14:00', endTime: '16:00', label: 'ظهر (۱۴:۰۰ - ۱۶:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
   { id: 'afternoon-2', startTime: '16:00', endTime: '18:00', label: 'عصر (۱۶:۰۰ - ۱۸:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
   { id: 'evening-1', startTime: '18:00', endTime: '20:00', label: 'شب (۱۸:۰۰ - ۲۰:۰۰)', period: 'EVENING' as const, isAvailable: false },
-  { id: 'evening-2', startTime: '20:00', endTime: '22:00', label: 'شب دیر (۲۰:۰۰ - ۲۲:۰۰)', period: 'EVENING' as const, isAvailable: false, extraFee: 20000 },
+  { id: 'evening-2', startTime: '20:00', endTime: '22:00', label: 'شب دیر (۲۰:۰۰ - ۲۲:۰۰)', period: 'EVENING' as const, isAvailable: false },
 ];
 
 export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
@@ -44,7 +43,6 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
   onChangeNotes,
   onNext,
   onPrev,
-  hourlyEstimate = null,
 }) => {
   const [viewMode, setViewMode] = useState<'dates' | 'times'>('dates');
   const dateOptions = useMemo(() => generateDateOptions(), []);
@@ -161,11 +159,6 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                         {slot.startTime} - {slot.endTime}
                       </div>
                     </div>
-                    {slot.extraFee && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
-                        +{slot.extraFee.toLocaleString('fa-IR')} تومان
-                      </span>
-                    )}
                     {isSelected && (
                       <div className="w-5 h-5 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -198,11 +191,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
             </button>
           ))}
         </div>
-        {typeof hourlyEstimate === 'number' ? (
-          <p className="text-[11px] text-slate-400">
-            {durationHours} ساعت = {hourlyEstimate.toLocaleString('fa-IR')} تومان (برآورد)
-          </p>
-        ) : null}
+        <p className="text-[11px] text-slate-400">مبلغ این مدت را سرور اعلام می‌کند.</p>
       </div>
 
       <div className="space-y-3">

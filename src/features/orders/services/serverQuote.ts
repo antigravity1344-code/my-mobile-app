@@ -3,6 +3,8 @@ import type { PricingType } from '../../../types/service';
 
 export const NO_TARIFF_MESSAGE = 'تعرفه این خدمت هنوز تعیین نشده است.';
 export const CONNECTION_MESSAGE = 'ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
+export const QUOTE_EXPIRED_MESSAGE = 'اعتبار نمایش قیمت تمام شده است. قیمت را دوباره دریافت کنید.';
+export const QUOTE_STALE_MESSAGE = 'قیمت معتبر نیست. مبلغ جدید را ببینید و دوباره تأیید کنید.';
 
 const NON_OPTION_KEYS = new Set(['durationHours', 'price', 'total', 'basePrice', 'confirmedTotal', 'quoteToken']);
 
@@ -154,6 +156,42 @@ export function serverQuoteAsFinalPrice(quote: ServerQuote): FinalPrice {
 
 export function isQuoteRefreshCode(code: unknown): boolean {
   return code === 'PRICE_CHANGED' || code === 'QUOTE_EXPIRED';
+}
+
+export type StoredQuote = { key: string; generation: number; view: QuoteView };
+
+export function isQuoteUnexpired(quote: ServerQuote, now = Date.now()): boolean {
+  const expiresAt = Date.parse(quote.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
+
+/** A quote can be confirmed only when it is the current selection and its server expiry is still ahead. */
+export function confirmableServerQuote(
+  view: QuoteView,
+  selection: QuoteSelection | null,
+  now = Date.now(),
+): view is Extract<QuoteView, { status: 'ready' }> {
+  if (!selection || view.status !== 'ready' || !isQuoteUnexpired(view.quote, now)) return false;
+  const built = buildQuoteRequest(selection);
+  return built.ok && JSON.stringify(built.body) === JSON.stringify(view.request);
+}
+
+/** Drop a stored quote as soon as the selection or fetch generation changes, before the next response arrives. */
+export function quoteViewForSelection(
+  stored: StoredQuote,
+  selection: QuoteSelection | null,
+  generation: number,
+  now = Date.now(),
+): QuoteView {
+  if (!selection) return { status: 'idle' };
+  const built = buildQuoteRequest(selection);
+  if (!built.ok) return { status: 'unavailable', message: built.message };
+  const key = JSON.stringify(built.body);
+  if (stored.generation !== generation || stored.key !== key) return { status: 'loading' };
+  if (stored.view.status === 'ready' && (JSON.stringify(stored.view.request) !== key || !isQuoteUnexpired(stored.view.quote, now))) {
+    return { status: 'loading' };
+  }
+  return stored.view;
 }
 
 export async function requestServerQuote(body: QuoteRequestBody, transport?: QuoteTransport): Promise<QuoteView> {

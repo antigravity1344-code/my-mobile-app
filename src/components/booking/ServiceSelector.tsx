@@ -39,7 +39,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           <span>۱. انتخاب نوع سرویس نظافت</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-          خدمتی که نیاز دارید را انتخاب کنید. قیمت‌ها به‌صورت ساعتی یا ثابت محاسبه می‌شوند.
+          خدمتی که نیاز دارید را انتخاب کنید. قیمت را سرور پس از انتخاب اعلام می‌کند.
         </p>
       </div>
 
@@ -47,9 +47,6 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         {visibleServices.map((svc) => {
           const isSelected = selectedService?.id === svc.id;
           const isExpanded = expandedId === svc.id;
-          const priceLabel = svc.pricingType === 'hourly'
-            ? `${svc.basePrice.toLocaleString('fa-IR')} تومان/ساعت`
-            : `${svc.basePrice.toLocaleString('fa-IR')} تومان`;
 
           return (
             <div
@@ -81,7 +78,7 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                   <p className="text-xs text-slate-500 mt-0.5 truncate">{svc.subtitle}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-black text-emerald-600">{priceLabel}</div>
+                  <div className="text-[11px] font-bold text-slate-500">قیمت را سرور اعلام می‌کند</div>
                   {svc.estimatedDurationHours && (
                     <div className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
                       <Clock className="w-3 h-3" />
