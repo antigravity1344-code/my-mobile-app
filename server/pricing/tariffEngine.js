@@ -107,8 +107,9 @@ function validatePolicy(raw) {
     if (!version.services || typeof version.services !== 'object' || Array.isArray(version.services)) {
       fail('TARIFF_INVALID', 'خدمات تعرفه معتبر نیستند.');
     }
-    const services = {};
-    for (const [serviceId, service] of Object.entries(version.services)) {
+    const services = Object.create(null);
+    for (const serviceId of Object.keys(version.services)) {
+      const service = Object.hasOwn(version.services, serviceId) ? version.services[serviceId] : undefined;
       if (!serviceId || !service || typeof service !== 'object' || Array.isArray(service)) fail('TARIFF_INVALID', 'خدمت تعرفه معتبر نیست.');
       if (!MODELS.has(service.model)) fail('TARIFF_INVALID', 'مدل محاسبه تعرفه معتبر نیست.');
       assertSafeInteger(service.rate, 'TARIFF_INVALID', 'نرخ تعرفه باید عدد صحیح باشد.');
@@ -123,13 +124,18 @@ function validatePolicy(raw) {
           fail('TARIFF_INVALID', 'بازه مقدار خدمت نامعتبر است.');
         }
       }
-      services[serviceId] = {
+      Object.defineProperty(services, serviceId, {
+        value: {
         model: service.model,
         rate: service.rate,
         minQuantity: service.minQuantity == null ? null : service.minQuantity,
         maxQuantity: service.maxQuantity == null ? null : service.maxQuantity,
         ...copyAdjustments(service),
-      };
+      },
+        enumerable: true,
+        writable: false,
+        configurable: false,
+      });
     }
     return { id: version.id, status: version.status, validFrom, validTo, services };
   });
@@ -190,8 +196,13 @@ function quote(policy, input) {
   }
   const version = selectVersion(policy, input.at);
   if (typeof input.serviceId !== 'string' || input.serviceId.trim() === '') fail('INPUT_INVALID', 'خدمت مشخص نیست.');
+  if (!Object.hasOwn(version.services, input.serviceId)) {
+    fail('SERVICE_NOT_IN_TARIFF', 'این خدمت در تعرفه معتبر نیست.');
+  }
   const service = version.services[input.serviceId];
-  if (!service) fail('SERVICE_NOT_IN_TARIFF', 'این خدمت در تعرفه معتبر نیست.');
+  if (!service || typeof service !== 'object' || !MODELS.has(service.model)) {
+    fail('SERVICE_NOT_IN_TARIFF', 'این خدمت در تعرفه معتبر نیست.');
+  }
   const options = input.options == null ? {} : input.options;
   if (!options || typeof options !== 'object' || Array.isArray(options)) fail('INPUT_INVALID', 'گزینه‌ها معتبر نیستند.');
   const allowed = allowedOptionIds(service);
@@ -212,20 +223,20 @@ function quote(policy, input) {
   let subtotal = mulDivHalfUp(service.rate, quantity, 1);
   const breakdown = [{ kind: 'base', amount: subtotal }];
   for (const factor of service.factors) {
-    if (options[factor.optionId] !== factor.equals) continue;
+    if (!Object.hasOwn(options, factor.optionId) || options[factor.optionId] !== factor.equals) continue;
     const next = mulDivHalfUp(subtotal, factor.basisPoints, 10000);
     breakdown.push({ kind: 'factor', id: factor.id, amount: next - subtotal });
     subtotal = next;
   }
   for (const surcharge of service.surcharges) {
-    if (options[surcharge.optionId] !== true) continue;
+    if (!Object.hasOwn(options, surcharge.optionId) || options[surcharge.optionId] !== true) continue;
     if (!Number.isSafeInteger(subtotal + surcharge.amount)) fail('CALCULATION_INVALID', 'جمع هزینه جانبی نامعتبر است.');
     breakdown.push({ kind: 'surcharge', id: surcharge.id, amount: surcharge.amount });
     subtotal += surcharge.amount;
   }
   let discountTotal = 0;
   for (const discount of service.discounts) {
-    if (discount.optionId && options[discount.optionId] !== true) continue;
+    if (discount.optionId && (!Object.hasOwn(options, discount.optionId) || options[discount.optionId] !== true)) continue;
     const amount = mulDivHalfUp(subtotal, discount.basisPoints, 10000);
     if (!Number.isSafeInteger(discountTotal + amount)) fail('CALCULATION_INVALID', 'جمع تخفیف نامعتبر است.');
     discountTotal += amount;

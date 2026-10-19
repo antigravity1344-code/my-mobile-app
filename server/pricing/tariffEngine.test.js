@@ -101,6 +101,50 @@ test('invalid input, unknown service and client authority are rejected', () => {
   assert.throws(() => quote(loaded, { at, serviceId: 'flat', quantity: 4 }), (error) => error.code === 'INPUT_INVALID');
 });
 
+test('inherited service ids return SERVICE_NOT_IN_TARIFF', () => {
+  const loaded = policy({ hour: line('hourly', { rate: 4 }) });
+  for (const serviceId of ['toString', 'constructor', '__proto__']) {
+    assert.throws(
+      () => quote(loaded, { at, serviceId, quantity: 1 }),
+      (error) => error instanceof TariffError && error.code === 'SERVICE_NOT_IN_TARIFF',
+    );
+  }
+  assert.equal(quote(loaded, { at, serviceId: 'hour', quantity: 2 }).total, 8);
+});
+
+test('special catalog keys stay own service records', () => {
+  const services = { hour: line('hourly', { rate: 4 }) };
+  Object.defineProperty(services, '__proto__', {
+    value: line('fixed', { rate: 9 }),
+    enumerable: true,
+    configurable: true,
+  });
+  services.toString = line('fixed', { rate: 7 });
+  const loaded = validatePolicy({
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{
+      id: 'v-special',
+      status: 'published',
+      validFrom: '2026-01-01T00:00:00.000Z',
+      validTo: null,
+      services,
+    }],
+  });
+  const stored = loaded.versions[0].services;
+  assert.equal(Object.getPrototypeOf(stored), null);
+  assert.equal(Object.hasOwn(stored, 'toString'), true);
+  assert.equal(Object.hasOwn(stored, '__proto__'), true);
+  assert.equal(Object.hasOwn(stored, 'constructor'), false);
+  assert.equal(quote(loaded, { at, serviceId: 'hour', quantity: 2 }).total, 8);
+  assert.equal(quote(loaded, { at, serviceId: 'toString' }).total, 7);
+  assert.equal(quote(loaded, { at, serviceId: '__proto__' }).total, 9);
+  assert.throws(
+    () => quote(loaded, { at, serviceId: 'constructor', quantity: 1 }),
+    (error) => error instanceof TariffError && error.code === 'SERVICE_NOT_IN_TARIFF',
+  );
+});
+
 test('overlapping published versions and a missing trusted file are controlled errors', () => {
   assert.throws(() => policy({}, [
     { id: 'a', status: 'published', validFrom: '2026-01-01T00:00:00.000Z', validTo: null, services: {} },
