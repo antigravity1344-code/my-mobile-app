@@ -11,6 +11,13 @@ const {
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
+const { resolvePricingMode } = require('./pricing/pricingMode');
+const {
+  issueOrderQuote,
+  confirmOrderQuote,
+  mapPricingError,
+  serverRequestConflicts,
+} = require('./pricing/orderQuote');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -642,6 +649,29 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   });
 });
 
+// پیش‌نمایش قیمت. مبلغ فقط از تعرفه همین استقرار محاسبه می‌شود.
+app.post('/api/pricing/quote', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'CUSTOMER') {
+    return res.status(403).json({ success: false, message: 'فقط مشتری می‌تواند قیمت را ببیند.' });
+  }
+  if (resolvePricingMode() !== 'server') {
+    return res.status(409).json({
+      success: false,
+      code: 'PRICING_UNAVAILABLE',
+      message: 'نمایش قیمت سرور در این حالت فعال نیست.',
+    });
+  }
+  try {
+    const priced = issueOrderQuote(req.body || {}, new Date());
+    return res.json({ success: true, quote: priced });
+  } catch (error) {
+    const mapped = mapPricingError(error);
+    return res.status(mapped.status).json(mapped.body);
+  }
+});
+
 // 5. سفارش جدید
 app.post('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
@@ -681,15 +711,36 @@ app.post('/api/orders', (req, res) => {
       return res.status(400).json({ success: false, message: 'درخواست ثبت سفارش معتبر نیست. لطفاً دوباره تلاش کنید.' });
     }
     storedClientRequestId = clientRequestId;
+  }
+  const serverMode = resolvePricingMode() === 'server';
+  let serverPriced = null;
+  if (serverMode) {
+    try {
+      serverPriced = confirmOrderQuote(req.body || {}, new Date());
+    } catch (error) {
+      const mapped = mapPricingError(error);
+      return res.status(mapped.status).json(mapped.body);
+    }
+  }
+  if (storedClientRequestId) {
     const existing = store.findOrderByClientRequest(user.id, storedClientRequestId);
-    if (existing) return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
+    if (existing) {
+      if (serverPriced && serverRequestConflicts(existing, serverPriced)) {
+        return res.status(409).json({
+          success: false,
+          code: 'ORDER_REQUEST_CONFLICT',
+          message: 'این درخواست قبلاً با مبلغ دیگری ثبت شده است و مبلغ آن تغییر نمی‌کند.',
+        });
+      }
+      return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
+    }
   }
   const orderAddress = typeof address === 'string' ? address.trim().slice(0, 500) : '';
   if (!orderAddress) {
     return res.status(400).json({ success: false, message: 'آدرس سفارش الزامی است.' });
   }
-  const parsedPrice = parseOrderPrice(price);
-  if (parsedPrice == null) {
+  const parsedPrice = serverPriced ? serverPriced.price : parseOrderPrice(price);
+  if (!serverPriced && parsedPrice == null) {
     return res.status(400).json({
       success: false,
       message: `مبلغ سفارش باید عدد صحیح بین ${MIN_ORDER_PRICE} و ${MAX_ORDER_PRICE} تومان باشد.`
@@ -722,7 +773,7 @@ app.post('/api/orders', (req, res) => {
   const tiers = ['NEW', 'SILVER', 'GOLD', 'VIP'];
   const storedFrequency = frequencies.includes(recurringFrequency) ? recurringFrequency : null;
   const storedTier = tiers.includes(customerTier) ? customerTier : null;
-  const storedPricing = sanitizePricing(pricing);
+  const storedPricing = serverPriced ? serverPriced.pricing : sanitizePricing(pricing);
   // زمان مورد انتظار ساختاریافته (D-50): اختیاری برای اپ‌های قدیمی؛ مقدار نامعتبر رد می‌شود. هیچ قانون زمانی اعمال نمی‌شود.
   let storedExpectedStartAt = null;
   if (expectedStartAt !== undefined && expectedStartAt !== null && expectedStartAt !== '') {
@@ -770,7 +821,10 @@ app.post('/api/orders', (req, res) => {
   const savedOrder = store.transaction(() => {
     // بررسی دوباره داخل تراکنش: دو درخواست هم‌زمان با یک کلید فقط یک سفارش می‌سازند.
     const repeated = store.findOrderByClientRequest(user.id, storedClientRequestId);
-    if (repeated) return repeated;
+    if (repeated) {
+      if (serverPriced && serverRequestConflicts(repeated, serverPriced)) return { requestConflict: true };
+      return repeated;
+    }
     const order = store.createOrder(newOrder);
     store.addNotification(
       user.id,
@@ -782,6 +836,13 @@ app.post('/api/orders', (req, res) => {
     return order;
   });
 
+  if (savedOrder && savedOrder.requestConflict) {
+    return res.status(409).json({
+      success: false,
+      code: 'ORDER_REQUEST_CONFLICT',
+      message: 'این درخواست قبلاً با مبلغ دیگری ثبت شده است و مبلغ آن تغییر نمی‌کند.',
+    });
+  }
   res.json({ success: true, order: customerOrderView(savedOrder) });
 });
 
