@@ -887,6 +887,11 @@ function orderAreaFromAddress(address) {
   return first;
 }
 
+function workerOrderCurrencyView(order) {
+  const unit = order.pricing?.currencyUnit;
+  return typeof unit === 'string' && unit.trim() ? { currencyUnit: unit } : {};
+}
+
 /** سفارش باز برای فهرست «سفارش‌های جدید»: فقط اطلاعات لازم برای تصمیم پذیرش. */
 function workerAvailableOrderView(order) {
   const area = orderAreaFromAddress(order.address);
@@ -902,6 +907,7 @@ function workerAvailableOrderView(order) {
     date: order.date,
     time: order.time,
     price: order.price,
+    ...workerOrderCurrencyView(order),
     paymentMethod: order.paymentMethod,
     // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
     createdAt: order.createdAt,
@@ -930,7 +936,8 @@ function workerAssignedOrderView(order) {
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
   // سطح و ریز قیمت مشتری، شناسه مشتری و شناسه لغوکننده به متخصص فرستاده نمی‌شود (D-05، D-41، D-06).
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  const workerVisible = ratings === undefined ? rest : { ...rest, ratings: workerVisibleRatings(ratings) };
+  const workerVisible = { ...rest, ...workerOrderCurrencyView(order) };
+  if (ratings !== undefined) workerVisible.ratings = workerVisibleRatings(ratings);
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area, startReported: store.workerStartReported(order), startAcceptanceKey: store.startAcceptanceKey(order) };
   }

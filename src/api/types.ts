@@ -66,6 +66,8 @@ export interface ApiOrder {
   date: string;
   time: string;
   price: number;
+  /** Stored order currency exposed without the customer's pricing breakdown. */
+  currencyUnit?: string;
   notes?: string;
   status: string;
   paymentStatus?: string;

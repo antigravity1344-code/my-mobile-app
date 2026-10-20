@@ -24,6 +24,7 @@ import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { isAccountBlockedResponse } from '../../api/accountBlocked';
 import type { ApiOrder } from '../../api/types';
+import { formatStoredAmount } from '../../features/orders/services/money';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
 import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
 import {
@@ -65,6 +66,7 @@ interface NativeOrder {
   date: string;
   timeSlot: string;
   grossOrderAmount: number;
+  currencyUnit?: string;
   startReported: boolean | null;
   startAcceptanceKey: string | null;
   paymentMethod: 'ONLINE' | 'CASH';
@@ -134,6 +136,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       date: o.date || 'امروز',
       timeSlot: o.time || 'نامشخص',
       grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
+      currencyUnit: o.currencyUnit,
       startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
       startAcceptanceKey: typeof o.startAcceptanceKey === 'string' ? o.startAcceptanceKey : null,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
@@ -350,7 +353,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
             <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-            <Text style={styles.wageValue}>{(Number(order.grossOrderAmount) || 0).toLocaleString('fa-IR')} تومان</Text>
+            <Text style={styles.wageValue}>{formatStoredAmount(order.grossOrderAmount, order.currencyUnit)}</Text>
           </View>
         </View>
         {canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey) ? (
@@ -547,7 +550,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
                     <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-                    <Text style={styles.wageValue}>{(Number(order.grossOrderAmount) || 0).toLocaleString('fa-IR')} تومان</Text>
+                    <Text style={styles.wageValue}>{formatStoredAmount(order.grossOrderAmount, order.currencyUnit)}</Text>
                   </View>
 
                   {canAcceptWorkerOrder(order.status) ? (
