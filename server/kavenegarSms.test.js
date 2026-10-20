@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { sendOtp, normalizeIranMobile, useFakeSms } = require('./kavenegarSms');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { sendOtp, normalizeIranMobile, useFakeSms, writeFakeSmsOutbox } = require('./kavenegarSms');
 
 test('iran mobile numbers normalize to 09 format', () => {
   assert.equal(normalizeIranMobile('09120000000'), '09120000000');
@@ -80,4 +83,57 @@ test('test mode is the fake sender and does not imply production', () => {
 
 test('production cannot enable the fake sender through configuration', () => {
   assert.equal(useFakeSms({ NODE_ENV: 'production', PAKSHO_SMS_MODE: 'fake' }), false);
+});
+
+test('fake delivery is written only for an explicit non-production allowlist', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paksho-sms-'));
+  const file = path.join(dir, 'outbox.txt');
+  const env = {
+    NODE_ENV: 'development',
+    PAKSHO_SMS_MODE: 'fake',
+    PAKSHO_FAKE_SMS_PHONES: '09120000111,09120000112',
+    PAKSHO_FAKE_SMS_OUTBOX: file,
+  };
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', env), true);
+  assert.equal(writeFakeSmsOutbox('09121111111', '1002', env), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '1003', {
+    ...env,
+    NODE_ENV: 'production',
+    PAKSHO_SMS_MODE: 'fake',
+  }), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '12', env), false);
+  const lines = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/);
+  assert.deepEqual(lines, ['09120000111 1001']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('missing fake settings do not create an outbox', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paksho-sms-'));
+  const file = path.join(dir, 'outbox.txt');
+  const base = {
+    NODE_ENV: 'development',
+    PAKSHO_SMS_MODE: 'fake',
+    PAKSHO_FAKE_SMS_PHONES: '09120000111',
+    PAKSHO_FAKE_SMS_OUTBOX: file,
+  };
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', { ...base, PAKSHO_SMS_MODE: '' }), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', { ...base, NODE_ENV: 'test', PAKSHO_SMS_MODE: '' }), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', { ...base, PAKSHO_FAKE_SMS_PHONES: '' }), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', { ...base, PAKSHO_FAKE_SMS_OUTBOX: '' }), false);
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', { ...base, NODE_ENV: 'test' }), true);
+  assert.equal(fs.existsSync(file), true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('an outbox inside the repository is not written', () => {
+  const file = path.join(__dirname, 'sms-outbox-rejected.txt');
+  const env = {
+    NODE_ENV: 'development',
+    PAKSHO_SMS_MODE: 'fake',
+    PAKSHO_FAKE_SMS_PHONES: '09120000111',
+    PAKSHO_FAKE_SMS_OUTBOX: file,
+  };
+  assert.equal(writeFakeSmsOutbox('09120000111', '1001', env), false);
+  assert.equal(fs.existsSync(file), false);
 });

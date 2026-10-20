@@ -380,6 +380,13 @@ app.post('/api/auth/send-otp', async (req, res) => {
     lastSent: now,
     expires: now + OTP_TTL_MS
   });
+  if (kavenegarSms.useFakeSms()) {
+    try {
+      kavenegarSms.writeFakeSmsOutbox(phone, code);
+    } catch {
+      console.error('[Paksho] صندوق پیامک آزمایشی نوشته نشد.');
+    }
+  }
   window.count += 1;
   otpSendWindow.set(windowKey, window);
 
@@ -2133,12 +2140,30 @@ app.use((err, req, res, next) => {
   return res.status(500).json({ success: false, message: 'مشکلی پیش آمد. لطفاً دوباره تلاش کنید.' });
 });
 
+function listenHost(env = process.env) {
+  const raw = env.PAKSHO_BIND_HOST;
+  if (typeof raw !== 'string' || raw.trim() === '') return '0.0.0.0';
+  const requested = raw.trim();
+  if (requested === '127.0.0.1' || requested === 'localhost' || requested === '::1') return '127.0.0.1';
+  if (requested === '0.0.0.0') return '0.0.0.0';
+  const error = new Error('PAKSHO_BIND_HOST نامعتبر است.');
+  error.code = 'INVALID_BIND_HOST';
+  throw error;
+}
+
 if (require.main === module) {
   const { startCancelDueScheduler } = require('./cancelDueScheduler');
   startCancelDueScheduler(store);
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Paksho Secure Backend & Admin Dashboard running on http://0.0.0.0:${PORT}`);
+  let host;
+  try {
+    host = listenHost();
+  } catch {
+    console.error('[Paksho] میزبان شنود نامعتبر است. سرور بالا نمی‌آید.');
+    process.exit(1);
+  }
+  app.listen(PORT, host, () => {
+    console.log(`Paksho Secure Backend & Admin Dashboard running on http://${host}:${PORT}`);
   });
 }
 
-module.exports = { app, store };
+module.exports = { app, store, listenHost };
