@@ -19,6 +19,7 @@ const {
   mapPricingError,
   serverRequestConflicts,
 } = require('./pricing/orderQuote');
+const { registerDraft, publishVersion } = require('./pricing/tariffPublication');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -1302,6 +1303,44 @@ app.get('/api/loyalty', (req, res) => {
 });
 
 app.use('/api/admin', requireAdmin);
+
+function sendTariffPublication(res, result) {
+  if (result.ok) {
+    return res.json({
+      success: true,
+      revision: result.revision,
+      versionId: result.versionId,
+      idempotent: result.idempotent === true,
+    });
+  }
+  const status = result.code === 'INPUT_INVALID' ? 400 : 409;
+  return res.status(status).json({ success: false, code: result.code });
+}
+
+app.post('/api/admin/tariff-versions', (req, res) => {
+  const body = req.body || {};
+  return sendTariffPublication(res, registerDraft({
+    baseRevision: body.baseRevision,
+    requestId: body.requestId,
+    version: body.version,
+    actor: 'admin',
+    now: new Date(),
+  }));
+});
+
+app.post('/api/admin/tariff-versions/:id/publish', (req, res) => {
+  const body = req.body || {};
+  return sendTariffPublication(res, publishVersion({
+    versionId: req.params.id,
+    baseRevision: body.baseRevision,
+    requestId: body.requestId,
+    validFrom: body.validFrom,
+    validTo: body.validTo == null ? null : body.validTo,
+    supersede: body.supersede == null ? null : body.supersede,
+    actor: 'admin',
+    now: new Date(),
+  }));
+});
 
 // Read-only audit and command context, restricted to the existing authenticated admin role.
 app.get('/api/admin/orders/:orderId/start-events', (req, res) => {

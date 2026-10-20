@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { confirmOrderQuote, issueOrderQuote } = require('./orderQuote');
+const { seedCommittedPolicy } = require('./tariffPublication');
 
 process.env.NODE_ENV = 'test';
 process.env.PAKSHO_PRICING_MODE = 'server';
@@ -21,11 +22,12 @@ const TO = '2099-01-01T00:00:00.000Z';
 const NO_TARIFF = 'تعرفه این خدمت هنوز تعیین نشده است.';
 
 function writeTariff(versions) {
-  fs.writeFileSync(tariffPath, JSON.stringify({
+  const seeded = seedCommittedPolicy(process.env, {
     companyId: 'company-isolated',
     currencyUnit: 'minor',
     versions,
-  }));
+  });
+  if (!seeded.ok) throw new Error(seeded.code);
 }
 
 function published(id, services, window = {}) {

@@ -1,16 +1,12 @@
 'use strict';
 
 // Trust boundary: the deployment operator owns PAKSHO_TARIFF_FILE and PAKSHO_QUOTE_SECRET.
-// Object.freeze protects the loaded snapshot in memory only. Replacing the file is a new
-// publication; this stage does not add an admin panel or a disk lock. A published version
-// already stored on an order is never recalculated.
+// Quote and confirmation read only a tariff whose bytes match a committed publication record.
+// A published version already stored on an order is never recalculated.
 
 const crypto = require('crypto');
-const {
-  TariffError,
-  quote,
-  loadDeploymentTariff,
-} = require('./tariffEngine');
+const { TariffError, quote } = require('./tariffEngine');
+const { loadCommittedTariff } = require('./tariffPublication');
 
 // Technical quote lifetime, not a tariff and not a price.
 const QUOTE_TTL_MS = 15 * 60 * 1000;
@@ -94,7 +90,7 @@ function trustedQuote(selection, now) {
   if (!secret) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
   let policy;
   try {
-    policy = loadDeploymentTariff();
+    policy = loadCommittedTariff();
   } catch (error) {
     if (error instanceof TariffError) throw error;
     throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
