@@ -19,7 +19,7 @@ const {
   mapPricingError,
   serverRequestConflicts,
 } = require('./pricing/orderQuote');
-const { registerDraft, publishVersion } = require('./pricing/tariffPublication');
+const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -1304,6 +1304,14 @@ app.get('/api/loyalty', (req, res) => {
 
 app.use('/api/admin', requireAdmin);
 
+app.get('/api/admin/tariff-versions', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const result = readAdminTariff();
+  if (!result.ok) return res.status(409).json({ success: false, code: result.code });
+  const { revision, companyId, currencyUnit, versions } = result;
+  return res.json({ success: true, revision, companyId, currencyUnit, versions });
+});
+
 function sendTariffPublication(res, result) {
   if (result.ok) {
     return res.json({
@@ -1740,6 +1748,10 @@ app.delete('/api/admin/orders/:orderId', (_req, res) => {
 });
 
 // ------------------- مسیر وب داشبورد ادمین (ADMIN WEB DASHBOARD) -------------------
+app.get('/admin/tariff.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminTariff.js'));
+});
+
 app.get('/admin', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -1797,6 +1809,9 @@ app.get('/admin', (req, res) => {
       <button id="tabOrdersBtn" onclick="switchTab('orders')" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         📦 مدیریت سفارش‌ها
       </button>
+      <button id="tabTariffsBtn" onclick="switchTab('tariffs')" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
+        تعرفه خدمات
+      </button>
     </div>
 
     <!-- محتوای متخصصین -->
@@ -1815,8 +1830,18 @@ app.get('/admin', (req, res) => {
       </div>
     </div>
 
+    <section id="tabTariffs" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">تعرفه خدمات</h3>
+      <p class="text-sm text-slate-300">نرخ‌های تازه را ابتدا در پیش‌نویس ذخیره کنید و سپس زمان انتشار را تأیید کنید. مبلغ سفارش‌های ثبت‌شده تغییر نمی‌کند.</p>
+      <p id="tariffMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="tariffRefresh" type="button" onclick="loadAdminTariff()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تعرفه</button>
+      <button id="tariffRetry" type="button" onclick="retryAdminTariff()" hidden class="bg-amber-700 px-4 py-2 rounded-xl">بررسی نتیجه تلاش قبلی</button>
+      <div id="tariffContent" class="space-y-4"></div>
+    </section>
+
   </div>
 
+  <script src="/admin/tariff.js"></script>
   <script>
     let adminToken = sessionStorage.getItem('paksho_admin_token') || '';
 
@@ -1877,6 +1902,8 @@ app.get('/admin', (req, res) => {
         const ordersRes = await fetch('/api/admin/orders', { headers: adminHeaders() });
         const ordersData = await ordersRes.json();
         if (ordersData.success) renderOrders(ordersData.orders);
+
+        await loadAdminTariff();
 
       } catch (e) {
         console.error(e);
@@ -2049,16 +2076,14 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      if (tab === 'workers') {
-        document.getElementById('tabWorkers').classList.remove('hidden');
-        document.getElementById('tabOrders').classList.add('hidden');
-        document.getElementById('tabWorkersBtn').className = 'pb-3 border-b-2 border-sky-400 text-sky-400';
-        document.getElementById('tabOrdersBtn').className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white';
-      } else {
-        document.getElementById('tabWorkers').classList.add('hidden');
-        document.getElementById('tabOrders').classList.remove('hidden');
-        document.getElementById('tabWorkersBtn').className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white';
-        document.getElementById('tabOrdersBtn').className = 'pb-3 border-b-2 border-sky-400 text-sky-400';
+      for (const name of ['workers', 'orders', 'tariffs']) {
+        const suffix = name[0].toUpperCase() + name.slice(1);
+        const panel = document.getElementById('tab' + suffix);
+        panel.hidden = name !== tab;
+        panel.classList.toggle('hidden', name !== tab);
+        document.getElementById('tab' + suffix + 'Btn').className = name === tab
+          ? 'pb-3 border-b-2 border-sky-400 text-sky-400'
+          : 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white';
       }
     }
 

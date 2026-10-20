@@ -361,6 +361,31 @@ function currentState(env) {
   return { ok: true, document, records: readRecords(env) };
 }
 
+function readAdminTariff(env = process.env) {
+  return withLock(() => {
+    try {
+      const state = currentState(env);
+      if (!state.ok) return state;
+      const policy = validatePolicy(state.document);
+      return {
+        ok: true,
+        revision: state.document.revision,
+        companyId: policy.companyId,
+        currencyUnit: policy.currencyUnit,
+        versions: policy.versions.map((version) => ({
+          id: version.id,
+          status: version.status,
+          validFrom: new Date(version.validFrom).toISOString(),
+          validTo: version.validTo == null ? null : new Date(version.validTo).toISOString(),
+          services: version.services,
+        })),
+      };
+    } catch (error) {
+      return { ok: false, code: error instanceof TariffError ? error.code : 'TARIFF_DAMAGED' };
+    }
+  });
+}
+
 function versionBody(version) {
   return {
     id: version.id,
@@ -642,6 +667,7 @@ module.exports = {
   hashBytes,
   canonical,
   loadCommittedTariff,
+  readAdminTariff,
   registerDraft,
   publishVersion,
   adoptUnjournaledTariff,

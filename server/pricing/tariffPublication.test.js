@@ -5,12 +5,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { quote } = require('./tariffEngine');
+const { quote, validatePolicy } = require('./tariffEngine');
 const {
   adoptUnjournaledTariff,
   hashBytes,
   loadCommittedTariff,
   publishVersion,
+  readAdminTariff,
   registerDraft,
   seedCommittedPolicy,
 } = require('./tariffPublication');
@@ -615,4 +616,96 @@ test('an explicit adopt records a valid tariff that has no journal', () => {
   const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8').trim().split('\n');
   assert.equal(log.length, 1);
   assert.equal(log[0].includes('"state":"committed"'), true);
+});
+
+test('admin tariff read returns only validated fields, ISO dates and the unchanged revision and rates', () => {
+  const env = envFor('paksho-admin-read-');
+  const hidden = 'DO_NOT_EXPOSE_ADMIN_FIXTURE';
+  const raw = {
+    companyId: 'deployment-under-test', currencyUnit: 'minor', revision: 7,
+    path: hidden, journal: hidden, previousBytes: hidden, quoteToken: hidden, secret: hidden,
+    versions: [{
+      id: 'v1', status: 'published', validFrom: '2020-01-01T03:30:00+03:30',
+      validTo: '2027-01-01T03:30:00+03:30', secret: hidden,
+      services: {
+        hour: {
+          model: 'hourly', rate: 945, minQuantity: 2, maxQuantity: 8, secret: hidden,
+          surcharges: [{ id: 'extra', optionId: 'extra', amount: 5, previousBytes: hidden }],
+          factors: [{ id: 'factor', optionId: 'factor', basisPoints: 12000, quoteToken: hidden }],
+          discounts: [{ id: 'discount', basisPoints: 500, journal: hidden }],
+        },
+      },
+    }],
+  };
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, JSON.stringify(raw));
+  assert.equal(adoptUnjournaledTariff(env, { requestId: 'readtest01', now: NOW }).ok, true);
+  const before = fs.readFileSync(env.PAKSHO_TARIFF_FILE);
+  const logBefore = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`);
+  const result = readAdminTariff(env);
+  assert.deepEqual(result, {
+    ok: true, revision: 7, companyId: raw.companyId, currencyUnit: raw.currencyUnit,
+    versions: [{
+      id: 'v1', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: '2027-01-01T00:00:00.000Z',
+      services: validatePolicy(raw).versions[0].services,
+    }],
+  });
+  assert.equal(JSON.stringify(result).includes(hidden), false);
+  assert.deepEqual(fs.readFileSync(env.PAKSHO_TARIFF_FILE), before);
+  assert.deepEqual(fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`), logBefore);
+  const input = { at: FROM, serviceId: 'hour', quantity: 2, options: { extra: true, factor: true } };
+  assert.deepEqual(quote(validatePolicy(result), input), quote(validatePolicy(raw), input));
+});
+
+test('admin tariff read fails closed without a configured, committed and intact tariff', () => {
+  assert.deepEqual(readAdminTariff({}), { ok: false, code: 'TARIFF_NOT_CONFIGURED' });
+  const env = envFor('paksho-admin-read-missing-');
+  assert.deepEqual(readAdminTariff(env), { ok: false, code: 'TARIFF_NOT_CONFIGURED' });
+  assert.equal(fs.existsSync(env.PAKSHO_TARIFF_FILE), false);
+  assert.equal(fs.existsSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`), false);
+  const raw = JSON.stringify({
+    companyId: 'deployment-under-test', currencyUnit: 'minor', revision: 0,
+    versions: [{ id: 'v1', status: 'draft', validFrom: FROM, services: { hour: hour(6) } }],
+  });
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, raw);
+  assert.deepEqual(readAdminTariff(env), { ok: false, code: 'TARIFF_DAMAGED' });
+  assert.equal(fs.readFileSync(env.PAKSHO_TARIFF_FILE, 'utf8'), raw);
+  assert.equal(fs.existsSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`), false);
+  assert.equal(adoptUnjournaledTariff(env, { requestId: 'readtest01' }).ok, true);
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, '{broken');
+  assert.deepEqual(readAdminTariff(env), { ok: false, code: 'TARIFF_DAMAGED' });
+});
+
+test('admin tariff read validates the policy even when its journal hash matches', () => {
+  const env = envFor('paksho-admin-read-invalid-');
+  seed(env, []);
+  const invalid = document(env);
+  invalid.versions = [{ id: 'bad', status: 'draft', validFrom: FROM, services: { hour: hour(-1) } }];
+  const bytes = Buffer.from(JSON.stringify(invalid));
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, bytes);
+  fs.appendFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, `${JSON.stringify({
+    state: 'committed', requestId: 'readtest01', revision: invalid.revision, hash: hashBytes(bytes),
+  })}\n`);
+  assert.deepEqual(readAdminTariff(env), { ok: false, code: 'TARIFF_INVALID' });
+});
+
+test('admin tariff read requires a durable journal and succeeds after the flush failure clears', () => {
+  const env = envFor('paksho-admin-read-fsync-');
+  seed(env, [{ id: 'v1', status: 'draft', validFrom: FROM, validTo: null, services: { hour: hour(6) } }]);
+  const before = fs.readFileSync(env.PAKSHO_TARIFF_FILE);
+  const logBefore = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`);
+  const nativeFsync = fs.fsyncSync;
+  let attempts = 0;
+  fs.fsyncSync = () => { attempts += 1; throw new Error('injected read fsync failure'); };
+  try {
+    assert.deepEqual(readAdminTariff(env), { ok: false, code: 'TARIFF_DAMAGED' });
+    assert.equal(attempts, 1);
+  } finally {
+    fs.fsyncSync = nativeFsync;
+  }
+  const result = readAdminTariff(env);
+  assert.equal(result.ok, true);
+  assert.equal(result.revision, 1);
+  assert.equal(result.versions[0].services.hour.rate, 6);
+  assert.deepEqual(fs.readFileSync(env.PAKSHO_TARIFF_FILE), before);
+  assert.deepEqual(fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`), logBefore);
 });
