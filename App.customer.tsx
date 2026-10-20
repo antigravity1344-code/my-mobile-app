@@ -8,6 +8,7 @@ import { BookingProvider } from './src/context/BookingContext';
 import { OrdersProvider } from './src/features/orders';
 import { ProfileProvider } from './src/features/profile';
 import { NativeCustomerApp } from './src/components/native/NativeCustomerApp';
+import { SourceIdentityBadge } from './src/components/native/SourceIdentityBadge';
 
 function ProductionApp() {
   return (
@@ -26,19 +27,28 @@ function ProductionApp() {
 /** Preview mounts the real UI behind isolated storage/network. Reload clears the sandbox before real login. */
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
-  if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="customer" onExit={() => { beginPreviewShutdown(); reloadApp(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
-  if (mode === 'real') return <ProductionApp />;
+  const canPreview = previewAvailable();
+  const renderContent = () => {
+    if (!canPreview) return <ProductionApp />;
+    if (mode === 'preview') return <RealUiPreview role="customer" onExit={() => { beginPreviewShutdown(); reloadApp(); }} renderApp={(revision) => <ProductionApp key={revision} />} />;
+    if (mode === 'real') return <ProductionApp />;
+    return (
+      <View style={previewStyle.container}>
+        <Text style={previewStyle.title}>پاکشو — مشتری</Text>
+        <Text style={previewStyle.note}>نسخه توسعه | حالت پیش‌نمایش کاملاً آزمایشی</Text>
+        <Pressable style={previewStyle.button} onPress={() => { beginPreview('customer'); setMode('preview'); }}>
+          <Text style={previewStyle.buttonText}>ورود به پیش‌نمایش بدون پیامک</Text>
+        </Pressable>
+        <Pressable style={previewStyle.button} onPress={() => { endPreview(); setMode('real'); }}>
+          <Text style={previewStyle.buttonText}>ورود واقعی با پیامک</Text>
+        </Pressable>
+      </View>
+    );
+  };
   return (
-    <View style={previewStyle.container}>
-      <Text style={previewStyle.title}>پاکشو — مشتری</Text>
-      <Text style={previewStyle.note}>نسخه توسعه | حالت پیش‌نمایش کاملاً آزمایشی</Text>
-      <Pressable style={previewStyle.button} onPress={() => { beginPreview('customer'); setMode('preview'); }}>
-        <Text style={previewStyle.buttonText}>ورود به پیش‌نمایش بدون پیامک</Text>
-      </Pressable>
-      <Pressable style={previewStyle.button} onPress={() => { endPreview(); setMode('real'); }}>
-        <Text style={previewStyle.buttonText}>ورود واقعی با پیامک</Text>
-      </Pressable>
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>{renderContent()}</View>
+      <SourceIdentityBadge role="customer" mode={canPreview ? mode : 'real'} />
     </View>
   );
 }

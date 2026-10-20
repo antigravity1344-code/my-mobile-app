@@ -20,6 +20,8 @@ const {
   serverRequestConflicts,
 } = require('./pricing/orderQuote');
 const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
+const { readSourceIdentity, sourceIdentityScriptJson } = require('../tools/sourceIdentity.cjs');
+const SOURCE_IDENTITY = readSourceIdentity();
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -1760,6 +1762,7 @@ app.get('/admin/tariff.js', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
+  const identityJson = sourceIdentityScriptJson(SOURCE_IDENTITY);
   res.send(`
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -1848,8 +1851,22 @@ app.get('/admin', (req, res) => {
 
   </div>
 
+  <details class="max-w-6xl mx-auto mt-6 text-xs text-slate-300">
+    <summary id="sourceIdentitySummary" class="cursor-pointer">نسخه اجرا: مدیریت · نامشخص</summary>
+    <pre id="sourceIdentityDetails" class="whitespace-pre-wrap select-text mt-2"></pre>
+    <p>شناسه هنگام شروع سرور ثبت شده است.</p>
+  </details>
+
   <script src="/admin/tariff.js"></script>
   <script>
+    const sourceIdentity = ${identityJson};
+    const identityState = !sourceIdentity.commit || sourceIdentity.dirty == null ? 'منبع نامشخص'
+      : sourceIdentity.dirty ? 'تغییرات ثبت‌نشده' : 'بدون تغییر ثبت‌نشده';
+    const identityBranch = sourceIdentity.detached ? 'بدون شاخه (detached)' : sourceIdentity.branch || 'نامشخص';
+    document.getElementById('sourceIdentitySummary').textContent = 'نسخه اجرا: مدیریت · ' +
+      (sourceIdentity.commit ? sourceIdentity.commit.slice(0, 7) : 'نامشخص') + ' · ' + identityState;
+    document.getElementById('sourceIdentityDetails').textContent = 'نسخه: ' + (sourceIdentity.commit || 'نامشخص') +
+      '\\nشاخه: ' + identityBranch + '\\nوضعیت: ' + identityState;
     let adminToken = sessionStorage.getItem('paksho_admin_token') || '';
 
     async function ensureAdmin() {

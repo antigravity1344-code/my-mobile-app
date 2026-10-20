@@ -8,6 +8,7 @@ import { WorkerBookingProvider } from './src/context/WorkerBookingContext';
 import { ProfileProvider } from './src/features/profile';
 import { CleanersProvider } from './src/features/cleaners';
 import { NativeWorkerApp } from './src/components/native/NativeWorkerApp';
+import { SourceIdentityBadge } from './src/components/native/SourceIdentityBadge';
 
 function ProductionApp({ onPreviewExit }: { onPreviewExit?: () => void } = {}) {
   return (
@@ -27,19 +28,28 @@ function ProductionApp({ onPreviewExit }: { onPreviewExit?: () => void } = {}) {
 /** Preview mounts the real UI behind isolated storage/network. Reload clears the sandbox before real login. */
 export default function App() {
   const [mode, setMode] = useState<'select' | 'real' | 'preview'>('select');
-  if (!previewAvailable()) return <ProductionApp />;
-  if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { beginPreviewShutdown(); reloadApp(); }} renderApp={(revision) => <ProductionApp key={revision} onPreviewExit={() => { beginPreviewShutdown(); reloadApp(); }} />} />;
-  if (mode === 'real') return <ProductionApp />;
+  const canPreview = previewAvailable();
+  const renderContent = () => {
+    if (!canPreview) return <ProductionApp />;
+    if (mode === 'preview') return <RealUiPreview role="worker" onExit={() => { beginPreviewShutdown(); reloadApp(); }} renderApp={(revision) => <ProductionApp key={revision} onPreviewExit={() => { beginPreviewShutdown(); reloadApp(); }} />} />;
+    if (mode === 'real') return <ProductionApp />;
+    return (
+      <View style={previewStyle.container}>
+        <Text style={previewStyle.title}>پاکشو — متخصص</Text>
+        <Text style={previewStyle.note}>نسخه توسعه | حالت پیش‌نمایش کاملاً آزمایشی</Text>
+        <Pressable style={previewStyle.button} onPress={() => { beginPreview('worker'); setMode('preview'); }}>
+          <Text style={previewStyle.buttonText}>ورود به پیش‌نمایش بدون پیامک</Text>
+        </Pressable>
+        <Pressable style={previewStyle.button} onPress={() => { endPreview(); setMode('real'); }}>
+          <Text style={previewStyle.buttonText}>ورود واقعی با پیامک</Text>
+        </Pressable>
+      </View>
+    );
+  };
   return (
-    <View style={previewStyle.container}>
-      <Text style={previewStyle.title}>پاکشو — متخصص</Text>
-      <Text style={previewStyle.note}>نسخه توسعه | حالت پیش‌نمایش کاملاً آزمایشی</Text>
-      <Pressable style={previewStyle.button} onPress={() => { beginPreview('worker'); setMode('preview'); }}>
-        <Text style={previewStyle.buttonText}>ورود به پیش‌نمایش بدون پیامک</Text>
-      </Pressable>
-      <Pressable style={previewStyle.button} onPress={() => { endPreview(); setMode('real'); }}>
-        <Text style={previewStyle.buttonText}>ورود واقعی با پیامک</Text>
-      </Pressable>
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>{renderContent()}</View>
+      <SourceIdentityBadge role="worker" mode={canPreview ? mode : 'real'} />
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import {
   Sparkles,
   Home,
@@ -21,6 +21,7 @@ import { OrdersProvider, OrdersScreen } from './src/features/orders';
 import { ProfileProvider, ProfileScreen } from './src/features/profile';
 import { CleanersProvider } from './src/features/cleaners';
 import { MobileAuthModal } from './src/features/auth';
+import { SourceIdentityBadge } from './src/components/native/SourceIdentityBadge';
 
 
 // داشبورد اصلی وب با قابلیت سوئیچ بین حالت ویزارد و شبیه‌ساز موبایل
@@ -33,6 +34,7 @@ export function MainDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100 font-sans" dir="rtl">
+      <SourceIdentityBadge role="web-dashboard" mode={viewMode === 'simulator' ? 'simulator' : 'dashboard'} />
       {/* هدر بالای صفحه */}
       <header className="bg-slate-950 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50">
         <div className="flex items-center gap-3">
@@ -369,7 +371,10 @@ export default function App(props?: Record<string, unknown>) {
             {Platform.OS === 'web' ? (
               <MainDashboard />
             ) : (
-              <NativeAppContainer initialFlavor={flavor} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flex: 1 }}><NativeAppContainer initialFlavor={flavor} /></View>
+                <SourceIdentityBadge role="generic-app" mode="real" />
+              </View>
             )}
           </CleanersProvider>
         </ProfileProvider>
