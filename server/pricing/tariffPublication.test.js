@@ -464,6 +464,79 @@ test('adopt stays out of quote until fsync succeeds, then the same request can r
   assert.equal(log.includes('"state":"committed"'), true);
 });
 
+for (const withRevision of [false, true]) {
+  test(`adopt rejects a real fsync and abort failure, then retries safely (${withRevision ? 'revision zero' : 'legacy'})`, () => {
+    const env = envFor('paksho-adopt-durable-');
+    const logPath = `${env.PAKSHO_TARIFF_FILE}.publication.jsonl`;
+    const original = {
+      companyId: 'deployment-under-test',
+      currencyUnit: 'minor',
+      ...(withRevision ? { revision: 0 } : {}),
+      versions: [{
+        id: 'v-file', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+        services: { hour: hour(6) },
+      }],
+    };
+    const originalBytes = Buffer.from(JSON.stringify(original));
+    fs.writeFileSync(env.PAKSHO_TARIFF_FILE, originalBytes);
+    const nativeOpen = fs.openSync;
+    const nativeClose = fs.closeSync;
+    const nativeFsync = fs.fsyncSync;
+    const journalFds = new Set();
+    let failing = true;
+    let commitFsyncFailed = false;
+    fs.openSync = function (file, flags, ...args) {
+      if (failing && commitFsyncFailed && file === logPath && flags === 'a') {
+        throw new Error('injected abort append failure');
+      }
+      const fd = nativeOpen.call(fs, file, flags, ...args);
+      if (file === logPath) journalFds.add(fd);
+      return fd;
+    };
+    fs.closeSync = function (fd) {
+      journalFds.delete(fd);
+      return nativeClose.call(fs, fd);
+    };
+    fs.fsyncSync = function (fd) {
+      if (failing && journalFds.has(fd) && fs.readFileSync(logPath, 'utf8').includes('"state":"committed"')) {
+        commitFsyncFailed = true;
+        throw new Error('injected journal fsync failure');
+      }
+      return nativeFsync.call(fs, fd);
+    };
+    try {
+      const input = { requestId: 'adopt0001', actor: 'admin', now: NOW };
+      const failed = adoptUnjournaledTariff(env, input);
+      assert.equal(commitFsyncFailed, true);
+      assert.equal(failed.ok, false);
+      assert.equal(failed.code, 'IO_FAILED');
+      assert.deepEqual(fs.readFileSync(env.PAKSHO_TARIFF_FILE), originalBytes);
+      const uncertainLog = fs.readFileSync(logPath, 'utf8');
+      assert.equal(uncertainLog.includes('"state":"committed"'), true);
+      assert.equal(uncertainLog.includes('"state":"aborted"'), false);
+      assert.throws(() => loadCommittedTariff(env), (error) => error.code === 'TARIFF_INVALID');
+      assert.equal(adoptUnjournaledTariff(env, input).ok, false);
+      failing = false;
+      const retried = adoptUnjournaledTariff(env, input);
+      assert.equal(retried.ok, true, retried.code);
+      const priced = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 2 });
+      assert.equal(priced.total, 12);
+      assert.equal(priced.tariffVersionId, 'v-file');
+      assert.equal(document(env).currencyUnit, original.currencyUnit);
+      assert.deepEqual(document(env).versions, original.versions);
+      const replay = adoptUnjournaledTariff(env, input);
+      assert.equal(replay.ok, true);
+      assert.equal(replay.idempotent, true);
+      assert.equal(replay.revision, retried.revision);
+      assert.equal(fs.readFileSync(logPath, 'utf8').startsWith(uncertainLog), true);
+    } finally {
+      fs.openSync = nativeOpen;
+      fs.closeSync = nativeClose;
+      fs.fsyncSync = nativeFsync;
+    }
+  });
+}
+
 test('a retry after abort recovers a cut that happened after rename', () => {
   const env = envFor('paksho-r1-retry-');
   seed(env, [{

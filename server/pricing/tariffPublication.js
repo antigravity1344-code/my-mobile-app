@@ -74,6 +74,20 @@ function readRecords(env) {
   return records;
 }
 
+function readDurableRecords(env) {
+  const file = logFile(env);
+  if (file && fs.existsSync(file)) {
+    // A readable committed line may have survived an unsuccessful writer fsync.
+    const fd = fs.openSync(file, 'r+');
+    try {
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+  return readRecords(env);
+}
+
 function withdrawnCommitIndexes(records) {
   const withdrawn = new Set();
   for (let i = 0; i < records.length; i += 1) {
@@ -179,7 +193,7 @@ function recoverUnlocked(env, io = defaultIo()) {
   if (!livePath) return { ok: false, code: 'TARIFF_NOT_CONFIGURED' };
   let records;
   try {
-    records = readRecords(env);
+    records = readDurableRecords(env);
   } catch (error) {
     return { ok: false, code: 'TARIFF_DAMAGED' };
   }
@@ -487,7 +501,7 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
     if (!livePath) return { ok: false, code: 'TARIFF_NOT_CONFIGURED' };
     let records = [];
     try {
-      records = readRecords(env);
+      records = readDurableRecords(env);
     } catch (error) {
       return { ok: false, code: 'TARIFF_DAMAGED' };
     }
@@ -514,13 +528,23 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
         versions: parsed.versions,
       }));
     const fileHash = hashBytes(bytes);
-    const durable = latestCommitted(records);
     const replay = committedForRequest(records, requestId);
     if (replay) {
-      if (replay.hash !== fileHash) return { ok: false, code: 'REQUEST_CONFLICT' };
-      return { ok: true, revision: replay.revision, versionId: replay.versionId, idempotent: true };
+      const liveHash = hashBytes(live);
+      if (replay.hash === liveHash) {
+        return { ok: true, revision: replay.revision, versionId: replay.versionId, idempotent: true };
+      }
+      if (replay.versionId !== 'adopt' || replay.previousHash !== liveHash) {
+        return { ok: false, code: 'REQUEST_CONFLICT' };
+      }
+      try {
+        appendRecord(env, { state: 'aborted', requestId, actor: 'admin', at: new Date().toISOString() }, defaultIo());
+        records = readDurableRecords(env);
+      } catch (error) {
+        return { ok: false, code: 'IO_FAILED' };
+      }
     }
-    if (durable) return { ok: false, code: 'TARIFF_INVALID' };
+    if (latestCommitted(records)) return { ok: false, code: 'TARIFF_INVALID' };
     const io = input.io || defaultIo();
     if (!live.equals(bytes)) {
       const temp = path.join(path.dirname(livePath), `.${path.basename(livePath)}.adopt.tmp`);
@@ -547,6 +571,7 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
         revision,
         versionId: 'adopt',
         hash: fileHash,
+        previousHash: hashBytes(live),
         actor: input.actor || 'admin',
         at: (input.now || new Date()).toISOString(),
       }, io);
@@ -557,7 +582,7 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
           appendRecord(env, { state: 'aborted', requestId, actor: 'admin', at: new Date().toISOString() }, defaultIo());
         }
       } catch (withdrawError) {
-        return { ok: false, code: 'IO_FAILED' };
+        // Restore still runs; trusted reads require a successful journal fsync.
       }
       if (!live.equals(bytes)) {
         try {
