@@ -367,28 +367,100 @@ function diskIo() {
   };
 }
 
-test('fsync after the committed append does not block the previous tariff', () => {
+function fsyncAfterCommit(active) {
+  const io = diskIo();
+  const appendLog = io.appendLog;
+  io.appendLog = (file, line) => {
+    appendLog(file, line);
+    if (active.fail && line.includes('"state":"committed"')) throw new Error('fsync');
+  };
+  return io;
+}
+
+test('a torn commit fsync does not announce success or replace the quoted tariff', () => {
   const env = envFor('paksho-r1-fsync-');
   seed(env, [{
     id: 'v1', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
     services: { hour: hour(3) },
   }]);
   const beforeLog = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
-  const io = diskIo();
-  const appendLog = io.appendLog;
-  io.appendLog = (file, line) => {
-    appendLog(file, line);
-    if (line.includes('"state":"committed"')) throw new Error('fsync');
-  };
   const result = registerDraft({
-    baseRevision: 1, requestId: 'register01', version: draft('v-next', 4), actor: 'admin', now: NOW, io,
+    baseRevision: 1, requestId: 'register01', version: draft('v-next', 4), actor: 'admin', now: NOW,
+    io: fsyncAfterCommit({ fail: true }),
   }, env);
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'IO_FAILED');
   const priced = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
   assert.equal(priced.tariffVersionId, 'v1');
   assert.equal(priced.total, 3);
   const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
   assert.equal(log.startsWith(beforeLog), true);
+});
+
+test('publish with supersede stays unquoted until fsync succeeds, then retry commits it', () => {
+  const env = envFor('paksho-r2-publish-');
+  seed(env, [{
+    id: 'v1', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+    services: { hour: hour(3) },
+  }]);
+  assert.equal(registerDraft({
+    baseRevision: 1, requestId: 'register01', version: draft('v2', 4, FROM), actor: 'admin', now: NOW,
+  }, env).ok, true);
+  const failing = { fail: true };
+  const body = {
+    baseRevision: 2, requestId: 'publish001', versionId: 'v2', validFrom: FROM, validTo: null,
+    supersede: { versionId: 'v1', validTo: FROM }, actor: 'admin', now: NOW,
+  };
+  const first = publishVersion({ ...body, io: fsyncAfterCommit(failing) }, env);
+  const second = publishVersion({ ...body, io: fsyncAfterCommit(failing) }, env);
+  assert.equal(first.ok, false);
+  assert.equal(first.code, 'IO_FAILED');
+  assert.equal(second.ok, false);
+  assert.equal(second.code, 'IO_FAILED');
+  const during = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
+  assert.equal(during.tariffVersionId, 'v1');
+  assert.equal(during.total, 3);
+  assert.equal(document(env).versions.find((item) => item.id === 'v1').validTo, null);
+  failing.fail = false;
+  const retried = publishVersion({ ...body, io: fsyncAfterCommit(failing) }, env);
+  assert.equal(retried.ok, true);
+  const after = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
+  assert.equal(after.tariffVersionId, 'v2');
+  assert.equal(after.total, 4);
+  assert.equal(document(env).versions.find((item) => item.id === 'v1').services.hour.rate, 3);
+  assert.equal(document(env).versions.find((item) => item.id === 'v1').validFrom, '2020-01-01T00:00:00.000Z');
+  const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
+  assert.equal(log.includes('"state":"committed"'), true);
+  assert.equal(log.includes('"state":"aborted"'), true);
+});
+
+test('adopt stays out of quote until fsync succeeds, then the same request can retry', () => {
+  const env = envFor('paksho-r2-adopt-');
+  const original = {
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{
+      id: 'v-file', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+      services: { hour: hour(6) },
+    }],
+  };
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, JSON.stringify(original));
+  const failing = { fail: true };
+  const first = adoptUnjournaledTariff(env, { requestId: 'adopt0001', actor: 'admin', now: NOW, io: fsyncAfterCommit(failing) });
+  const second = adoptUnjournaledTariff(env, { requestId: 'adopt0001', actor: 'admin', now: NOW, io: fsyncAfterCommit(failing) });
+  assert.equal(first.ok, false);
+  assert.equal(first.code, 'IO_FAILED');
+  assert.equal(second.ok, false);
+  assert.equal(second.code, 'IO_FAILED');
+  assert.throws(() => loadCommittedTariff(env), (error) => error.code === 'TARIFF_INVALID');
+  failing.fail = false;
+  const retried = adoptUnjournaledTariff(env, { requestId: 'adopt0001', actor: 'admin', now: NOW, io: fsyncAfterCommit(failing) });
+  assert.equal(retried.ok, true);
+  const priced = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 2 });
+  assert.equal(priced.tariffVersionId, 'v-file');
+  assert.equal(priced.total, 12);
+  const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
+  assert.equal(log.includes('"state":"aborted"'), true);
   assert.equal(log.includes('"state":"committed"'), true);
 });
 

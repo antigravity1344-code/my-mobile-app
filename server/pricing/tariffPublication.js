@@ -74,10 +74,27 @@ function readRecords(env) {
   return records;
 }
 
+function withdrawnCommitIndexes(records) {
+  const withdrawn = new Set();
+  for (let i = 0; i < records.length; i += 1) {
+    if (records[i].state !== 'aborted') continue;
+    for (let j = i - 1; j >= 0; j -= 1) {
+      if (records[j].requestId !== records[i].requestId) continue;
+      if (records[j].state === 'prepared' || records[j].state === 'aborted') break;
+      if (records[j].state === 'committed') {
+        withdrawn.add(j);
+        break;
+      }
+    }
+  }
+  return withdrawn;
+}
+
 function latestCommitted(records) {
+  const withdrawn = withdrawnCommitIndexes(records);
   let found = null;
-  for (const record of records) {
-    if (record.state === 'committed') found = record;
+  for (let i = 0; i < records.length; i += 1) {
+    if (records[i].state === 'committed' && !withdrawn.has(i)) found = records[i];
   }
   return found;
 }
@@ -96,20 +113,11 @@ function openPrepared(records) {
   return pending;
 }
 
-function committedLanded(env, requestId, fileHash) {
-  try {
-    return readRecords(env).some((record) => (
-      record.state === 'committed' && record.requestId === requestId && record.hash === fileHash
-    ));
-  } catch (error) {
-    return false;
-  }
-}
-
 function committedForRequest(records, requestId) {
+  const withdrawn = withdrawnCommitIndexes(records);
   let found = null;
-  for (const record of records) {
-    if (record.state === 'committed' && record.requestId === requestId) found = record;
+  for (let i = 0; i < records.length; i += 1) {
+    if (records[i].state === 'committed' && records[i].requestId === requestId && !withdrawn.has(i)) found = records[i];
   }
   return found;
 }
@@ -243,6 +251,8 @@ function failIo(env, liveBefore, requestId, io) {
     const pending = openPrepared(records);
     if (pending && pending.requestId === requestId) {
       appendRecord(env, { ...pending, state: 'aborted', previousBytes: undefined, at: new Date().toISOString() }, defaultIo());
+    } else if (latestCommitted(records) && latestCommitted(records).requestId === requestId) {
+      appendRecord(env, { state: 'aborted', requestId, actor: 'admin', at: new Date().toISOString() }, defaultIo());
     }
   } catch (error) {
     // A missing abort stays prepared. Quote recovery must not treat it as success.
@@ -303,9 +313,6 @@ function commitBytes(env, nextBytes, meta, io = defaultIo()) {
       at: meta.at,
     }, io);
   } catch (error) {
-    if (committedLanded(env, meta.requestId, nextHash)) {
-      return { ok: true, revision: meta.revision, versionId: meta.versionId, idempotent: false };
-    }
     return failIo(env, previous, meta.requestId, defaultIo());
   }
   return { ok: true, revision: meta.revision, versionId: meta.versionId, idempotent: false };
@@ -507,12 +514,13 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
         versions: parsed.versions,
       }));
     const fileHash = hashBytes(bytes);
+    const durable = latestCommitted(records);
     const replay = committedForRequest(records, requestId);
     if (replay) {
       if (replay.hash !== fileHash) return { ok: false, code: 'REQUEST_CONFLICT' };
       return { ok: true, revision: replay.revision, versionId: replay.versionId, idempotent: true };
     }
-    if (records.length > 0) return { ok: false, code: 'TARIFF_INVALID' };
+    if (durable) return { ok: false, code: 'TARIFF_INVALID' };
     const io = input.io || defaultIo();
     if (!live.equals(bytes)) {
       const temp = path.join(path.dirname(livePath), `.${path.basename(livePath)}.adopt.tmp`);
@@ -543,8 +551,13 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
         at: (input.now || new Date()).toISOString(),
       }, io);
     } catch (error) {
-      if (committedLanded(env, requestId, fileHash)) {
-        return { ok: true, revision, versionId: 'adopt', idempotent: false };
+      try {
+        const written = readRecords(env).some((record) => record.state === 'committed' && record.requestId === requestId);
+        if (written) {
+          appendRecord(env, { state: 'aborted', requestId, actor: 'admin', at: new Date().toISOString() }, defaultIo());
+        }
+      } catch (withdrawError) {
+        return { ok: false, code: 'IO_FAILED' };
       }
       if (!live.equals(bytes)) {
         try {
