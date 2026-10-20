@@ -83,15 +83,27 @@ function latestCommitted(records) {
 }
 
 function openPrepared(records) {
-  const closed = new Set();
-  for (const record of records) {
-    if (record.state === 'committed' || record.state === 'aborted') closed.add(record.requestId);
-  }
   let pending = null;
   for (const record of records) {
-    if (record.state === 'prepared' && !closed.has(record.requestId)) pending = record;
+    if (record.state === 'prepared') {
+      pending = record;
+      continue;
+    }
+    if (pending && record.requestId === pending.requestId && (record.state === 'committed' || record.state === 'aborted')) {
+      pending = null;
+    }
   }
   return pending;
+}
+
+function committedLanded(env, requestId, fileHash) {
+  try {
+    return readRecords(env).some((record) => (
+      record.state === 'committed' && record.requestId === requestId && record.hash === fileHash
+    ));
+  } catch (error) {
+    return false;
+  }
 }
 
 function committedForRequest(records, requestId) {
@@ -291,6 +303,9 @@ function commitBytes(env, nextBytes, meta, io = defaultIo()) {
       at: meta.at,
     }, io);
   } catch (error) {
+    if (committedLanded(env, meta.requestId, nextHash)) {
+      return { ok: true, revision: meta.revision, versionId: meta.versionId, idempotent: false };
+    }
     return failIo(env, previous, meta.requestId, defaultIo());
   }
   return { ok: true, revision: meta.revision, versionId: meta.versionId, idempotent: false };
@@ -457,6 +472,93 @@ function publishVersion(input, env = process.env) {
   });
 }
 
+function adoptUnjournaledTariff(env = process.env, input = {}) {
+  const requestId = input.requestId;
+  if (typeof requestId !== 'string' || !REQUEST_ID.test(requestId)) return { ok: false, code: 'INPUT_INVALID' };
+  return withLock(() => {
+    const livePath = tariffFile(env);
+    if (!livePath) return { ok: false, code: 'TARIFF_NOT_CONFIGURED' };
+    let records = [];
+    try {
+      records = readRecords(env);
+    } catch (error) {
+      return { ok: false, code: 'TARIFF_DAMAGED' };
+    }
+    const live = readBytes(livePath);
+    if (!live) return { ok: false, code: 'TARIFF_NOT_CONFIGURED' };
+    let parsed;
+    try {
+      parsed = JSON.parse(live.toString('utf8'));
+    } catch (error) {
+      return { ok: false, code: 'TARIFF_INVALID' };
+    }
+    try {
+      validatePolicy(parsed);
+    } catch (error) {
+      return { ok: false, code: 'TARIFF_INVALID' };
+    }
+    const revision = Number.isInteger(parsed.revision) ? parsed.revision : 0;
+    const bytes = Number.isInteger(parsed.revision)
+      ? live
+      : Buffer.from(canonical({
+        companyId: parsed.companyId,
+        currencyUnit: parsed.currencyUnit,
+        revision: 0,
+        versions: parsed.versions,
+      }));
+    const fileHash = hashBytes(bytes);
+    const replay = committedForRequest(records, requestId);
+    if (replay) {
+      if (replay.hash !== fileHash) return { ok: false, code: 'REQUEST_CONFLICT' };
+      return { ok: true, revision: replay.revision, versionId: replay.versionId, idempotent: true };
+    }
+    if (records.length > 0) return { ok: false, code: 'TARIFF_INVALID' };
+    const io = input.io || defaultIo();
+    if (!live.equals(bytes)) {
+      const temp = path.join(path.dirname(livePath), `.${path.basename(livePath)}.adopt.tmp`);
+      try {
+        io.writeTemp(temp, bytes);
+        io.replace(temp, livePath);
+      } catch (error) {
+        if (fs.existsSync(temp)) fs.rmSync(temp, { force: true });
+        if (!readBytes(livePath) || !readBytes(livePath).equals(live)) {
+          try {
+            restorePrevious(livePath, { previousBytes: live.toString('base64'), revision: 'adopt' }, defaultIo());
+          } catch (restoreError) {
+            return { ok: false, code: 'IO_FAILED' };
+          }
+        }
+        return { ok: false, code: 'IO_FAILED' };
+      }
+    }
+    try {
+      appendRecord(env, {
+        state: 'committed',
+        requestId,
+        bodyHash: fileHash,
+        revision,
+        versionId: 'adopt',
+        hash: fileHash,
+        actor: input.actor || 'admin',
+        at: (input.now || new Date()).toISOString(),
+      }, io);
+    } catch (error) {
+      if (committedLanded(env, requestId, fileHash)) {
+        return { ok: true, revision, versionId: 'adopt', idempotent: false };
+      }
+      if (!live.equals(bytes)) {
+        try {
+          restorePrevious(livePath, { previousBytes: live.toString('base64'), revision: 'adopt' }, defaultIo());
+        } catch (restoreError) {
+          return { ok: false, code: 'IO_FAILED' };
+        }
+      }
+      return { ok: false, code: 'IO_FAILED' };
+    }
+    return { ok: true, revision, versionId: 'adopt', idempotent: false };
+  });
+}
+
 function seedCommittedPolicy(env, document, options = {}) {
   const requestId = options.requestId || `seed${crypto.randomBytes(8).toString('hex')}`.slice(0, 64);
   if (!REQUEST_ID.test(requestId)) return { ok: false, code: 'INPUT_INVALID' };
@@ -504,6 +606,7 @@ module.exports = {
   loadCommittedTariff,
   registerDraft,
   publishVersion,
+  adoptUnjournaledTariff,
   seedCommittedPolicy,
   recoverUnlocked,
 };

@@ -7,6 +7,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { quote } = require('./tariffEngine');
 const {
+  adoptUnjournaledTariff,
+  hashBytes,
   loadCommittedTariff,
   publishVersion,
   registerDraft,
@@ -340,4 +342,132 @@ test('publication does not rewrite orders, and a new order still needs a committ
   const gate = routes.indexOf("app.use('/api/admin', requireAdmin)");
   const route = routes.indexOf("app.post('/api/admin/tariff-versions'");
   assert.equal(gate > -1 && route > gate, true);
+});
+
+function diskIo() {
+  return {
+    writeTemp(temp, bytes) {
+      const fd = fs.openSync(temp, 'w');
+      try {
+        fs.writeSync(fd, bytes);
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
+    replace(temp, live) {
+      const aside = `${live}.aside`;
+      if (fs.existsSync(live)) fs.renameSync(live, aside);
+      fs.renameSync(temp, live);
+      if (fs.existsSync(aside)) fs.rmSync(aside, { force: true });
+    },
+    appendLog(file, line) {
+      fs.appendFileSync(file, line);
+    },
+  };
+}
+
+test('fsync after the committed append does not block the previous tariff', () => {
+  const env = envFor('paksho-r1-fsync-');
+  seed(env, [{
+    id: 'v1', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+    services: { hour: hour(3) },
+  }]);
+  const beforeLog = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
+  const io = diskIo();
+  const appendLog = io.appendLog;
+  io.appendLog = (file, line) => {
+    appendLog(file, line);
+    if (line.includes('"state":"committed"')) throw new Error('fsync');
+  };
+  const result = registerDraft({
+    baseRevision: 1, requestId: 'register01', version: draft('v-next', 4), actor: 'admin', now: NOW, io,
+  }, env);
+  assert.equal(result.ok, true);
+  const priced = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
+  assert.equal(priced.tariffVersionId, 'v1');
+  assert.equal(priced.total, 3);
+  const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
+  assert.equal(log.startsWith(beforeLog), true);
+  assert.equal(log.includes('"state":"committed"'), true);
+});
+
+test('a retry after abort recovers a cut that happened after rename', () => {
+  const env = envFor('paksho-r1-retry-');
+  seed(env, [{
+    id: 'v1', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+    services: { hour: hour(3) },
+  }]);
+  const version = draft('v-next', 4);
+  const abortIo = diskIo();
+  abortIo.replace = () => { throw new Error('replace'); };
+  const aborted = registerDraft({
+    baseRevision: 1, requestId: 'register01', version, actor: 'admin', now: NOW, io: abortIo,
+  }, env);
+  assert.equal(aborted.ok, false);
+  assert.equal(aborted.code, 'IO_FAILED');
+  const previous = fs.readFileSync(env.PAKSHO_TARIFF_FILE);
+  const saved = document(env);
+  const next = {
+    companyId: saved.companyId,
+    currencyUnit: saved.currencyUnit,
+    revision: saved.revision + 1,
+    versions: [...saved.versions, {
+      id: version.id, status: 'draft', validFrom: version.validFrom, validTo: null, services: version.services,
+    }],
+  };
+  const nextBytes = Buffer.from(JSON.stringify(next));
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, nextBytes);
+  fs.appendFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, `${JSON.stringify({
+    state: 'prepared',
+    requestId: 'register01',
+    bodyHash: 'retry-body',
+    revision: next.revision,
+    versionId: version.id,
+    hash: hashBytes(nextBytes),
+    previousHash: hashBytes(previous),
+    previousBytes: previous.toString('base64'),
+    actor: 'admin',
+    at: NOW.toISOString(),
+  })}\n`);
+  const restored = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
+  assert.equal(restored.tariffVersionId, 'v1');
+  assert.equal(restored.total, 3);
+  const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8');
+  assert.equal(log.includes('"state":"aborted"'), true);
+  const retry = registerDraft({
+    baseRevision: document(env).revision, requestId: 'register01', version, actor: 'admin', now: NOW,
+  }, env);
+  assert.equal(retry.ok, true);
+  const after = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 1 });
+  assert.equal(after.tariffVersionId, 'v1');
+  assert.equal(after.total, 3);
+  assert.equal(document(env).versions.find((item) => item.id === 'v1').services.hour.rate, 3);
+  assert.equal(fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8').includes('"state":"aborted"'), true);
+});
+
+test('an explicit adopt records a valid tariff that has no journal', () => {
+  const env = envFor('paksho-r1-adopt-');
+  const original = {
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{
+      id: 'v-file', status: 'published', validFrom: '2020-01-01T00:00:00.000Z', validTo: null,
+      services: { hour: hour(6) },
+    }],
+  };
+  fs.writeFileSync(env.PAKSHO_TARIFF_FILE, JSON.stringify(original));
+  assert.throws(() => loadCommittedTariff(env), (error) => error.code === 'TARIFF_INVALID');
+  assert.equal(seedCommittedPolicy(env, original).ok, false);
+  const adopted = adoptUnjournaledTariff(env, { requestId: 'adopt0001', actor: 'admin', now: NOW });
+  assert.equal(adopted.ok, true);
+  const priced = quote(loadCommittedTariff(env), { at: FROM, serviceId: 'hour', quantity: 2 });
+  assert.equal(priced.tariffVersionId, 'v-file');
+  assert.equal(priced.total, 12);
+  assert.equal(document(env).versions[0].services.hour.rate, 6);
+  const again = adoptUnjournaledTariff(env, { requestId: 'adopt0002', actor: 'admin', now: NOW });
+  assert.equal(again.ok, false);
+  const log = fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`, 'utf8').trim().split('\n');
+  assert.equal(log.length, 1);
+  assert.equal(log[0].includes('"state":"committed"'), true);
 });
