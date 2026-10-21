@@ -48,3 +48,15 @@ Verification has limits: it is not a defense against a malicious concurrent proc
 Validation so far: 10 node:test cases passed; syntax check passed; read-only preflight on the actual working tree correctly refused uncommitted files. The complete build/install path has NOT been run through this new command yet. Existing APK installations are not retroactively attested by it.
 
 The existing preview packages have not been renamed, re-iconed or removed in this change. Exact-package launching avoids relying on their similar launcher icons; visual distinction remains follow-up work.
+
+
+## Supervised correction: explicit lab API and separate acceptance (2026-10-21)
+
+This section supersedes the earlier build command and validation count. build-install now requires --api-url http://127.0.0.1:3000/api explicitly; the value is set only in the child build environment, not in .env. RN resets Metro cache; only the JS bundle task is rerun, preserving native incremental builds.
+
+    node scripts/verified-phone.cjs build-install --commit <FULL_SHA> --branch <EXPECTED_BRANCH> --role customer --serial R83X900E9CB --api-url http://127.0.0.1:3000/api
+    node scripts/verified-phone.cjs verify-installed --apk <APK_PATH> --role worker --serial R83X900E9CB
+
+verify-installed inspects the provided artifact and existing foreground app only: no build, install, launch, taps, Git mutation or evidence-file write. Launch the approved package separately when required. Artifact hash/package/signature and foreground acceptance do not prove embedded source identity: sourceAcceptance stays not-checked until the supervisor compares expanded badge SHA, branch, role and dirty state. Current checkout cannot retrospectively identify an old dirty artifact.
+
+Independent supervisor validation: syntax, diff check and 29 tests passed; verify-installed passed on the actual installed worker APK (artifact and foreground matched, source not checked by the command). Expanded badges of both installed apps separately show b74dd66, agent/d60-phone-lab-login, dirty. Host/installed hashes matched for both roles. Existing customer bundle contains 192.168.1.2 API target; lab reverse uses loopback. A fresh build with the old implicit API configuration was cancelled before installation. Complete corrected build/install and UI acceptance remain pending. Existing preview packages unchanged.
