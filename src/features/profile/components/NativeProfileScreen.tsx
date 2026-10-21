@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
+import { type } from '../../../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
@@ -89,6 +91,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             <Text style={styles.sectionTitle}>ویرایش اطلاعات هویتی</Text>
           </View>
           <TextInput
+            {...RTL_SINGLE_LINE_INPUT}
             style={styles.input}
             value={editName}
             onChangeText={setEditName}
@@ -96,6 +99,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             placeholderTextColor="#94a3b8"
           />
           <TextInput
+            {...RTL_SINGLE_LINE_INPUT}
             style={styles.input}
             value={editNationalId}
             onChangeText={setEditNationalId}
@@ -105,6 +109,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             maxLength={10}
           />
           <TextInput
+            {...RTL_SINGLE_LINE_INPUT}
             style={styles.input}
             value={editBirthDate}
             onChangeText={setEditBirthDate}
@@ -204,28 +209,34 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f8fafc' },
   content: { padding: 16, gap: 14 },
   profileCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '800', fontSize: 20 },
+  avatarText: { ...type.bold, fontWeight: '400', color: '#fff', fontSize: 20 },
   userMeta: { flex: 1, alignItems: 'flex-end', gap: 2 },
-  name: { color: '#0f172a', fontWeight: '800', fontSize: 16 },
-  phone: { color: '#475569', fontSize: 13 },
+  name: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 16, textAlign: 'right' },
+  phone: { ...type.regular, ...fa, fontWeight: '400', color: '#475569', fontSize: 13, textAlign: 'right' },
   section: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', gap: 8 },
   sectionHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  sectionTitle: { color: '#0f172a', fontWeight: '800', fontSize: 14 },
-  muted: { textAlign: 'right', color: '#64748b', fontSize: 12 },
-  loyaltyTitle: { textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 16 },
-  wallet: { textAlign: 'right', color: '#059669', fontWeight: '900', fontSize: 20 },
+  sectionTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 14, textAlign: 'right' },
+  muted: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b', fontSize: 12 },
+  loyaltyTitle: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#0f172a', fontSize: 16 },
+  wallet: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#059669', fontSize: 20 },
   input: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    minHeight: 44,
     textAlign: 'right',
     color: '#0f172a',
     backgroundColor: '#f8fafc',
@@ -233,27 +244,29 @@ const styles = StyleSheet.create({
   saveBtn: {
     backgroundColor: '#0284c7',
     borderRadius: 12,
+    minHeight: 48,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  saveBtnText: { color: '#fff', fontWeight: '800' },
-  addBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#0284c7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  saveBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
+  addBtn: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#0284c7', paddingHorizontal: 12, borderRadius: 10 },
+  addBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff', fontSize: 12 },
   mainAddressBlock: { marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 8 },
-  mainAddressBtn: { alignSelf: 'stretch', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc', paddingVertical: 13, borderRadius: 12 },
-  mainAddressBtnText: { color: '#0369a1', fontWeight: '800', fontSize: 14 },
-  subSectionTitle: { textAlign: 'right', color: '#334155', fontWeight: '700', fontSize: 13 },
+  mainAddressBtn: { alignSelf: 'stretch', minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc', paddingVertical: 13, borderRadius: 12 },
+  mainAddressBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', fontSize: 14 },
+  subSectionTitle: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#334155', fontSize: 13 },
   addressCard: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#e2e8f0' },
   addressDefault: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
   addressTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  addressTitle: { color: '#0f172a', fontWeight: '800' },
-  defaultBadge: { color: '#0369a1', backgroundColor: '#e0f2fe', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10, fontWeight: '700' },
-  addressLine: { textAlign: 'right', color: '#475569', fontSize: 12 },
+  addressTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', textAlign: 'right' },
+  defaultBadge: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', backgroundColor: '#e0f2fe', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10 },
+  addressLine: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 12 },
   addressActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 8 },
-  secondaryBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: '#e0f2fe' },
-  secondaryBtnText: { color: '#0369a1', fontWeight: '700', fontSize: 12 },
-  dangerBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: '#fee2e2' },
-  dangerBtnText: { color: '#b91c1c', fontWeight: '700', fontSize: 12 },
-  logoutBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca', marginTop: 4 },
-  logoutText: { color: '#b91c1c', fontWeight: '800' },
+  secondaryBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#e0f2fe' },
+  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', fontSize: 12 },
+  dangerBtn: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#fee2e2' },
+  dangerBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#b91c1c', fontSize: 12 },
+  logoutBtn: { minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca', marginTop: 4 },
+  logoutText: { ...type.bold, ...fa, fontWeight: '400', color: '#b91c1c' },
 });

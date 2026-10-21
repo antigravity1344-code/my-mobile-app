@@ -108,3 +108,12 @@ _None found._
 - وضعیت PRهای #9، #10، #12 و CI را روی SHAهای زنده بررسی کن؛ «قابل ادغام» به معنای «ادغام شده و آزموده روی نسخه نهایی» نیست. CI اجرا‌نشده مساوی شکست تست نیست.
 - هیچ Merge، Rebase، Force Push، حذف شاخه، تغییر CI/تنظیمات، تصمیم D-60 یا Push مستقیم روی شاخه مرجع بدون تأیید صریح مالک انجام نشود. تنها checkpoint روی شاخه اختصاصی موجود طبق سیاست قبلی مجاز است.
 - هر مأموریت با معیار پذیرش مشخص، کمترین تغییر، شواهد واقعی و گزارش کوتاه در GitHub تمام می‌شود؛ هدف نزدیک شدن به تست گوشی است.
+
+
+## الزام تشخیص نسخه — ۲۰۲۶-۱۰-۲۱
+
+پیش از ساخت، نصب، تأیید تست گوشی یا تحویل، بخش «روش ثابت اثبات نسخه و تحویل» در `docs/SOURCE_IDENTITY.md` را بخوان و زنجیره شواهد آن را ثبت کن. نام شاخه، آیکون، نشان dirty یا نصب موفق به‌تنهایی اثبات نسخه نیست. مسیر، SHA، تغییرات ثبت‌نشده، APK نصب‌شده و بسته واقعاً بازشده را تفکیک کن. این الزام مجوز commit/push، حذف، جابه‌جایی یا ادغام شاخه‌ها نیست.
+
+
+### Verified device workflow (2026-10-21)
+Read docs/SOURCE_IDENTITY.md before any standalone APK build/install acceptance. Use scripts/verified-phone.cjs with the approved full SHA, branch, role and exact phone serial; never infer identity from launcher icons. Current implementation passed 10 guard tests and dirty-tree preflight; complete build/install validation remains pending. Do not erase or stash work just to pass the guard. This does not authorize commit/push or branch operations.
