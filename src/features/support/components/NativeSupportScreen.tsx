@@ -52,8 +52,10 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const sheetKb = useSheetKeyboard(composeOpen);
   const mounted = useRef(true);
+  const loadGeneration = useRef(0);
 
   const loadMessages = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     if (!user?.id) {
       if (!mounted.current) return;
       setMessages([]);
@@ -62,7 +64,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
     }
     setLoading(true);
     const res = await apiFetch('/support/messages');
-    if (!mounted.current) return;
+    if (!mounted.current || generation !== loadGeneration.current) return;
     const saved = Array.isArray(res.messages) ? res.messages : [];
     setMessages(saved.filter((m: SupportMessage) => m && m.userId === user.id));
     setError(res.success ? null : (res.message || 'دریافت پیام‌ها انجام نشد. لطفاً دوباره تلاش کنید.'));
@@ -72,8 +74,10 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   useEffect(() => {
     mounted.current = true;
     void loadMessages();
+    const pendingLoads = loadGeneration;
     return () => {
       mounted.current = false;
+      pendingLoads.current++;
     };
   }, [loadMessages]);
 
@@ -178,7 +182,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
         {error && !composeOpen ? (
           <View style={styles.errorBox}>
             <Text style={styles.error}>{error}</Text>
-            <Pressable onPress={() => void loadMessages()} style={styles.retry} accessibilityRole="button">
+            <Pressable onPress={() => void loadMessages()} style={styles.retry} accessibilityRole="button" disabled={loading} accessibilityState={{ disabled: loading }}>
               <Text style={styles.retryText}>تلاش دوباره</Text>
             </Pressable>
           </View>

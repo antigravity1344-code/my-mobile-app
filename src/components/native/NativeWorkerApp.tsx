@@ -26,10 +26,12 @@ import {
   type WorkerSessionUser,
 } from './workerLoginStorage';
 import { useAccountBlockedLogout } from './useAccountBlockedLogout';
+import { useAppFonts } from '../../theme';
 
 type UserData = WorkerSessionUser;
 
 export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPreviewExit }) => {
+  const [fontsLoaded, fontError] = useAppFonts();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -125,7 +127,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
   // حساب مسدودشده توسط مدیر: پیام سرور، سپس خروج با همین handleLogout.
   useAccountBlockedLogout(isLoggedIn, handleLogout);
 
-  if (isLoading) {
+  if (isLoading || (!fontsLoaded && !fontError)) {
     return <View style={styles.loadingContainer} />;
   }
 

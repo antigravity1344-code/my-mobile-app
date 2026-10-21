@@ -205,7 +205,7 @@ function main(argv) {
         Object.assign(evidence, update);
         fs.writeFileSync(record, JSON.stringify(evidence, null, 2) + '\n');
       },
-      install: () => ad(['install', '-r', '--user', '0', apk]),
+      install: () => run(adb, ['-s', opts.serial, 'install', '-r', '--user', '0', apk], { timeout: 180000 }),
       launch: () => {
         const resolution = ad(['shell', 'cmd', 'package', 'resolve-activity', '--brief', '--user', '0', PACKAGES[opts.role]]);
         const activity = resolution.split(/\r?\n/).find(l => l.trim().startsWith(PACKAGES[opts.role] + '/'));

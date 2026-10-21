@@ -103,11 +103,12 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             style={styles.input}
             value={editNationalId}
             onChangeText={setEditNationalId}
-            placeholder="کد ملی (۱۰ رقم، اختیاری اگر قبلاً ثبت شده)"
+            placeholder="کد ملی ۱۰ رقمی"
             placeholderTextColor="#94a3b8"
             keyboardType="number-pad"
             maxLength={10}
           />
+          <Text style={styles.muted}>اگر کد ملی را قبلاً ثبت کرده‌اید، وارد کردن دوبارهٔ آن اختیاری است.</Text>
           <TextInput
             {...RTL_SINGLE_LINE_INPUT}
             style={styles.input}
