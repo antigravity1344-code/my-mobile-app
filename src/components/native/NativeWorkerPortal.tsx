@@ -513,7 +513,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         {!loading && activeTab === 'available' ? (
           filteredOrders.length === 0 ? (
             ordersState.error ? null : <View style={styles.emptyBox}>
-              <CheckCircle size={40} color="#94a3b8" />
+              <CheckCircle size={40} color="#0284c7" />
               <Text style={styles.emptyTitle}>سفارشی برای پذیرش موجود نیست</Text>
             </View>
           ) : (
@@ -577,7 +577,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         ) : !loading && activeTab === 'my_jobs' ? (
           myAcceptedOrders.length === 0 ? (
             ordersState.error ? null : <View style={styles.emptyBox}>
-              <Briefcase size={40} color="#94a3b8" />
+              <Briefcase size={40} color="#0284c7" />
               <Text style={styles.emptyTitle}>هنوز سفارشی نپذیرفته‌اید</Text>
             </View>
           ) : (
@@ -585,7 +585,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               {reviewJobs.map(renderJobCard)}
               {activeJobs.length === 0 && reviewJobs.length === 0 ? (
                 <View style={styles.emptyBox}>
-                  <Briefcase size={40} color="#94a3b8" />
+                  <Briefcase size={40} color="#0284c7" />
                   <Text style={styles.emptyTitle}>کار فعالی ندارید</Text>
                 </View>
               ) : (
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#ffffff', fontSize: 12,
   },
-  headerBar: { backgroundColor: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#334155', paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16
+  headerBar: { backgroundColor: '#0f172a', borderBottomWidth: 1, borderBottomColor: '#334155', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16
   },
   workerProfile: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 12
   },
@@ -685,25 +685,25 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#065f46', fontSize: 12, flex: 1, textAlign: 'right'
   },
-  tabBar: { flexDirection: 'row-reverse', backgroundColor: '#1e293b', marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4
+  tabBar: { flexDirection: 'row-reverse', backgroundColor: '#ffffff', marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4
   },
   tabItem: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10,
     minHeight: 44,
   },
-  tabItemActive: { backgroundColor: '#059669'
+  tabItemActive: { backgroundColor: '#0284c7'
   },
   tabText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#94a3b8', fontSize: 12,
+    color: '#475569', fontSize: 12,
   },
   tabTextActive: { color: '#ffffff'
   },
   categoryViewport: { flexGrow: 0, flexShrink: 0 },
   categoryScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: 'row-reverse', alignItems: 'center'
   },
-  categoryChip: { flexShrink: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
+  categoryChip: { flexShrink: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0',
     minHeight: 44,
   },
   categoryChipActive: { backgroundColor: '#0284c7', borderColor: '#0284c7'
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#94a3b8', fontSize: 11,
+    color: '#475569', fontSize: 12,
   },
   categoryChipTextActive: {
     ...type.bold,
@@ -722,21 +722,21 @@ const styles = StyleSheet.create({
   },
   listContent: { padding: 16, paddingBottom: 40, gap: 14
   },
-  emptyBox: { backgroundColor: '#1e293b', borderRadius: 20, padding: 32, alignItems: 'center', justifyContent: 'center', marginTop: 20
+  emptyBox: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, alignItems: 'center', justifyContent: 'center', marginTop: 20
   },
   emptyTitle: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff', fontSize: 15, marginTop: 12, marginBottom: 6
+    color: '#0f172a', fontSize: 17, marginTop: 12, marginBottom: 6
   },
   emptyDesc: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#94a3b8', fontSize: 12, textAlign: 'center', lineHeight: 18
+    color: '#64748b', fontSize: 12, textAlign: 'center', lineHeight: 18
   },
-  orderCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
+  orderCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
   },
   myJobCard: { borderLeftWidth: 4, borderLeftColor: '#059669'
   },
@@ -849,7 +849,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 14, color: '#059669'
   },
-  acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
+  acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#0284c7', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
     minHeight: 44,
   },
   acceptButtonText: {

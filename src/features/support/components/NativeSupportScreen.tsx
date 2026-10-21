@@ -31,6 +31,7 @@ export interface SupportUser {
 
 interface Props {
   user: SupportUser;
+  appearance?: 'customer' | 'worker';
 }
 
 type SupportMessage = {
@@ -42,7 +43,8 @@ type SupportMessage = {
   status: 'OPEN';
 };
 
-export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
+export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'customer' }) => {
+  const workerAppearance = appearance === 'worker';
   const [openFaqId, setOpenFaqId] = useState<string | null>(SUPPORT_FAQ[0]?.id ?? null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -132,9 +134,9 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, workerAppearance && workerStyles.root]}>
       <ScrollView ref={pageScrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
+        <View style={[styles.hero, workerAppearance && workerStyles.hero]}>
           <HelpCircle size={22} color="#0284c7" />
           <Text style={styles.heroTitle}>پشتیبانی پاکشو</Text>
           <Text style={styles.heroSub}>{SUPPORT_GREETING}</Text>
@@ -151,16 +153,16 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             <Text style={styles.secondaryBtnText}>ارسال پیام</Text>
           </Pressable>
         </View>
-        <Text style={styles.phoneHint}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
+        <Text style={[styles.phoneHint, workerAppearance && workerStyles.phoneHint]}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
 
-        <Text style={styles.sectionTitle}>سوالات متداول</Text>
+        <Text style={[styles.sectionTitle, workerAppearance && workerStyles.sectionTitle]}>سوالات متداول</Text>
         {SUPPORT_FAQ.map((item) => {
           const open = openFaqId === item.id;
           return (
             <Pressable
               key={item.id}
               onPress={() => setOpenFaqId(open ? null : item.id)}
-              style={[styles.faqCard, open && styles.faqOpen]}
+              style={[styles.faqCard, workerAppearance && workerStyles.faqCard, open && styles.faqOpen]}
             >
               <View style={styles.faqHeader}>
                 <Text style={styles.faqQ}>{item.question}</Text>
@@ -172,7 +174,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
         })}
 
         <Text
-          style={styles.sectionTitle}
+          style={[styles.sectionTitle, workerAppearance && workerStyles.sectionTitle]}
           onLayout={(e) => {
             messagesYRef.current = e.nativeEvent.layout.y;
           }}
@@ -190,13 +192,13 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color="#0f766e" />
-            <Text style={styles.empty}>در حال دریافت پیام‌ها...</Text>
+            <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>در حال دریافت پیام‌ها...</Text>
           </View>
         ) : !error && messages.length === 0 ? (
-          <Text style={styles.empty}>هنوز پیامی ثبت نشده است.</Text>
+          <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>هنوز پیامی ثبت نشده است.</Text>
         ) : (
           messages.map((msg) => (
-            <View key={msg.id} style={styles.msgCard}>
+            <View key={msg.id} style={[styles.msgCard, workerAppearance && workerStyles.msgCard]}>
               <View style={styles.msgTop}>
                 <Text style={styles.msgSubject}>{msg.subject}</Text>
                 <Text style={styles.msgStatus}>باز</Text>
@@ -231,14 +233,14 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
               onChangeText={setSubject}
               placeholder="موضوع"
               placeholderTextColor="#94a3b8"
-              style={styles.input}
+              style={[styles.input, workerAppearance && workerStyles.input]}
             />
             <TextInput
               value={body}
               onChangeText={setBody}
               placeholder="متن پیام"
               placeholderTextColor="#94a3b8"
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, workerAppearance && workerStyles.input, styles.textArea]}
               multiline
             />
             {error ? <Text style={[styles.error, styles.modalError]}>{error}</Text> : null}
@@ -254,6 +256,17 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
     </View>
   );
 };
+
+const workerStyles = StyleSheet.create({
+  root: { backgroundColor: '#0f172a' },
+  hero: { borderRadius: 24, padding: 20 },
+  phoneHint: { color: '#cbd5e1' },
+  sectionTitle: { color: '#ffffff' },
+  empty: { color: '#cbd5e1' },
+  faqCard: { borderRadius: 24, padding: 20, minHeight: 44 },
+  msgCard: { borderRadius: 24, padding: 20 },
+  input: { backgroundColor: '#f8fafc', borderRadius: 14, minHeight: 48 },
+});
 
 const fa = {
   writingDirection: 'rtl' as const,

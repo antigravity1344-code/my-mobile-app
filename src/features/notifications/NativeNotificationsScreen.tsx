@@ -34,9 +34,11 @@ function formatNotificationText(text: unknown): string {
 type NativeNotificationsScreenProps = {
   /** اگر داده شود، لمس اعلانِ مربوط به یک سفارش همان سفارش را باز می‌کند (اپ مشتری). */
   onOpenOrder?: (orderId: string) => void;
+  appearance?: 'customer' | 'worker';
 };
 
-export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps> = ({ onOpenOrder }) => {
+export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps> = ({ onOpenOrder, appearance = 'customer' }) => {
+  const workerAppearance = appearance === 'worker';
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,13 +74,13 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>اعلان‌های سفارش</Text>
-      <Text style={styles.hint}>اعلان‌های مربوط به سفارش‌های شما اینجا نمایش داده می‌شود.</Text>
+    <ScrollView style={workerAppearance && workerStyles.root} contentContainerStyle={[styles.content, workerAppearance && workerStyles.content]}>
+      <Text style={[styles.title, workerAppearance && workerStyles.title]}>اعلان‌های سفارش</Text>
+      <Text style={[styles.hint, workerAppearance && workerStyles.hint]}>اعلان‌های مربوط به سفارش‌های شما اینجا نمایش داده می‌شود.</Text>
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color="#0f766e" />
-          <Text style={styles.hint}>در حال خواندن اعلان‌ها...</Text>
+          <Text style={[styles.hint, workerAppearance && workerStyles.hint]}>در حال خواندن اعلان‌ها...</Text>
         </View>
       ) : null}
       {error && !loading ? (
@@ -89,9 +91,9 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
           </Pressable>
         </View>
       ) : null}
-      {!loading && !error && items.length === 0 ? <Text style={styles.empty}>اعلانی ثبت نشده است.</Text> : null}
+      {!loading && !error && items.length === 0 ? <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>اعلانی ثبت نشده است.</Text> : null}
       {items.map((item) => (
-        <Pressable key={item.id} onPress={() => void openNotification(item)} style={[styles.card, !item.readAt && styles.unread]}>
+        <Pressable key={item.id} onPress={() => void openNotification(item)} style={[styles.card, workerAppearance && workerStyles.card, !item.readAt && styles.unread]}>
           <Text style={styles.cardTitle}>{formatNotificationText(item.title)}</Text>
           <Text style={styles.body}>{formatNotificationText(item.body)}</Text>
           <Text style={styles.meta}>{formatJalaliDateTime(item.createdAt, { withTime: true })}</Text>
@@ -100,6 +102,15 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
     </ScrollView>
   );
 };
+
+const workerStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0f172a' },
+  content: { padding: 20, gap: 12 },
+  title: { color: '#ffffff' },
+  hint: { color: '#cbd5e1' },
+  empty: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, color: '#64748b' },
+  card: { borderRadius: 24, padding: 20, minHeight: 44 },
+});
 
 const fa = {
   writingDirection: 'rtl' as const,

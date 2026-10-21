@@ -26,7 +26,7 @@ import {
   type WorkerSessionUser,
 } from './workerLoginStorage';
 import { useAccountBlockedLogout } from './useAccountBlockedLogout';
-import { useAppFonts } from '../../theme';
+import { type, useAppFonts } from '../../theme';
 
 type UserData = WorkerSessionUser;
 
@@ -171,17 +171,21 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
         <View style={styles.bannerActions}>
           <Pressable
             onPress={() => setMainView(mainView === 'alerts' ? 'work' : 'alerts')}
+            accessibilityRole="button"
+            accessibilityLabel="اعلان‌ها"
             style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
           >
             <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
           </Pressable>
           <Pressable
             onPress={() => setMainView(mainView === 'support' ? 'work' : 'support')}
+            accessibilityRole="button"
+            accessibilityLabel="پشتیبانی"
             style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
           >
             <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
           </Pressable>
-          <Pressable onPress={handleLogout} style={styles.logoutIconButton}>
+          <Pressable onPress={handleLogout} style={styles.logoutIconButton} accessibilityRole="button" accessibilityLabel="خروج از حساب">
             <LogOut size={16} color="#94a3b8" />
           </Pressable>
         </View>
@@ -191,9 +195,9 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
       {/* اگر تایید شده: کارتابل سفارش‌ها */}
       <View style={styles.content}>
         {mainView === 'alerts' ? (
-          <NativeNotificationsScreen />
+          <NativeNotificationsScreen appearance="worker" />
         ) : mainView === 'support' ? (
-          <NativeSupportScreen user={{ id: userData.id, name: userData.name || '', phone: userData.phone }} />
+          <NativeSupportScreen appearance="worker" user={{ id: userData.id, name: userData.name || '', phone: userData.phone }} />
         ) : isApproved ? (
           <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
         ) : (
@@ -217,9 +221,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    flexWrap: 'wrap',
+    gap: 12,
+    backgroundColor: '#0f172a',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
@@ -227,37 +233,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+    minWidth: 140,
   },
   avatarImage: {
     width: 38,
     height: 38,
     borderRadius: 19,
     borderWidth: 2,
-    borderColor: '#16a34a',
+    borderColor: '#0284c7',
   },
   userDetails: {
     alignItems: 'flex-start',
+    flex: 1,
   },
   userNameText: {
+    ...type.bold,
+    writingDirection: 'rtl',
+    includeFontPadding: false,
     color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '400',
     textAlign: 'right',
   },
   roleBadgeWorker: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0284c7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
     marginTop: 2,
   },
   roleBadgeText: {
+    ...type.regular,
+    writingDirection: 'rtl',
+    includeFontPadding: false,
     color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '400',
   },
   bannerActions: {
     flexDirection: 'row-reverse',
@@ -266,8 +281,12 @@ const styles = StyleSheet.create({
   },
   logoutIconButton: {
     padding: 8,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 10,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#1e293b',
   },
   ordersActiveButton: { backgroundColor: '#0284c7' },
   content: {

@@ -206,7 +206,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       >
         <View style={styles.formCard}>
           <View style={styles.header}>
-            <ShieldCheck size={26} color="#16a34a" />
+            <ShieldCheck size={26} color="#0284c7" />
             <Text style={styles.title}>ثبت‌نام و احراز هویت متخصصین</Text>
           </View>
           <Text style={styles.subtitle}>
@@ -386,9 +386,9 @@ const styles = StyleSheet.create({
   },
   formCard: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     elevation: 6,
 
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748b',
     textAlign: 'right',
     marginBottom: 16,
@@ -459,9 +459,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
     minHeight: 48,
+    paddingVertical: 12,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 13,
@@ -514,7 +515,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
     minHeight: 48,
     gap: 8,
@@ -537,12 +538,12 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   submitBtn: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0284c7',
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
-    minHeight: 44,
+    minHeight: 48,
   },
   submitBtnText: {
     ...type.bold,
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 24,
