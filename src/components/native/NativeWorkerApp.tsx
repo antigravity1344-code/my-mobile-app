@@ -159,7 +159,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
               <Briefcase size={10} color="#fff" />
               <Text style={styles.roleBadgeText}>
                 {isApproved
-                  ? 'پنل کارتابل متخصصین'
+                  ? 'پنل متخصص'
                   : userData.status === 'PENDING_VERIFICATION'
                     ? 'در انتظار تایید مدارک'
                     : 'تکمیل مدارک هویتی'}
@@ -221,7 +221,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 12,
     backgroundColor: '#0f172a',
     paddingHorizontal: 16,
@@ -234,9 +233,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
-    minWidth: 140,
+    flexShrink: 1,
+    minWidth: 0,
   },
   avatarImage: {
+    flexShrink: 0,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -244,8 +245,10 @@ const styles = StyleSheet.create({
     borderColor: '#0284c7',
   },
   userDetails: {
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   userNameText: {
     ...type.bold,
@@ -257,6 +260,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   roleBadgeWorker: {
+    alignSelf: 'flex-end',
+    maxWidth: '100%',
+    flexShrink: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
@@ -267,6 +273,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   roleBadgeText: {
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: 'right',
     ...type.regular,
     writingDirection: 'rtl',
     includeFontPadding: false,
@@ -275,6 +284,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   bannerActions: {
+    flexShrink: 0,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
