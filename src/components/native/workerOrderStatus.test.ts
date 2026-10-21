@@ -56,7 +56,7 @@ describe('workerOrderStatus', () => {
 
   it('allows actions only where the server allows them', () => {
     expect(ALL.filter(canAcceptWorkerOrder)).toEqual(['PENDING']);
-    expect(ALL.filter(canCompleteWorkerOrder)).toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
+    expect(ALL.filter((status) => canCompleteWorkerOrder(status))).toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
     expect(ALL.filter(isActiveWorkerJob)).toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
     for (const status of ['CANCELLED', 'COMPLETED', 'UNKNOWN', 'PENDING'] as WorkerOrderStatus[]) {
       expect(canCompleteWorkerOrder(status)).toBe(false);
@@ -65,6 +65,14 @@ describe('workerOrderStatus', () => {
     expect(canCallWorkerCustomer('ACCEPTED', '09121234567')).toBe(true);
     expect(canCallWorkerCustomer('IN_PROGRESS', '09121234567')).toBe(true);
     expect(canCallWorkerCustomer('ACCEPTED', '')).toBe(false);
+  });
+
+  it('blocks completion only during an unresolved start dispute', () => {
+    for (const status of ALL) expect(canCompleteWorkerOrder(status, 'disputed')).toBe(false);
+    for (const startStatus of [undefined, null, 'not_recorded', 'worker_reported', 'customer_confirmed', 'admin_resolved']) {
+      expect(ALL.filter((status) => canCompleteWorkerOrder(status, startStatus)))
+        .toEqual(['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']);
+    }
   });
 
   it('offers start reporting only on active jobs explicitly marked unreported', () => {

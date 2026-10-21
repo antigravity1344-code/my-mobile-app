@@ -69,6 +69,7 @@ interface NativeOrder {
   grossOrderAmount: number;
   currencyUnit?: string;
   startReported: boolean | null;
+  startStatus: string | null;
   startAcceptanceKey: string | null;
   paymentMethod: 'ONLINE' | 'CASH';
   detailsNote: string;
@@ -139,6 +140,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
       currencyUnit: o.currencyUnit,
       startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
+      startStatus: typeof o.startStatus === 'string' ? o.startStatus : null,
       startAcceptanceKey: typeof o.startAcceptanceKey === 'string' ? o.startAcceptanceKey : null,
       paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
       detailsNote: describeWorkerServiceFacts(o),
@@ -253,7 +255,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const confirmCompleteOrder = (order: NativeOrder) => {
-    if (!user?.id || !canCompleteWorkerOrder(order.status)) return;
+    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus)) return;
     if (busyOrderIds.includes(order.id)) return;
     Alert.alert(
       'اتمام کار',
@@ -267,7 +269,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const handleCompleteOrder = async (order: NativeOrder) => {
-    if (!user?.id || !canCompleteWorkerOrder(order.status)) return;
+    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus)) return;
     if (!beginOrderAction(order.id)) return;
     try {
       const res = await apiFetch('/orders/' + order.id + '/complete', {
@@ -371,7 +373,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         ) : active && order.startReported ? (
           <Text style={styles.startStatusText}>شروع کار اعلام شده است.</Text>
         ) : null}
-        {canCompleteWorkerOrder(order.status) ? (
+        {canCompleteWorkerOrder(order.status, order.startStatus) ? (
           <Pressable
             onPress={() => confirmCompleteOrder(order)}
             disabled={busy}

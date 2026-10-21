@@ -73,8 +73,8 @@ export function canAcceptWorkerOrder(status: WorkerOrderStatus): boolean {
 }
 
 /** تکمیل از هر وضعیت فعال؛ PENDING و سفارش بسته دکمه «اتمام کار» ندارند. */
-export function canCompleteWorkerOrder(status: WorkerOrderStatus): boolean {
-  return isActiveWorkerJob(status);
+export function canCompleteWorkerOrder(status: WorkerOrderStatus, startStatus?: string | null): boolean {
+  return isActiveWorkerJob(status) && startStatus !== 'disputed';
 }
 
 /** Only show start reporting when the server explicitly says it has not been reported. */

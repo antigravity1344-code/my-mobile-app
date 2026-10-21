@@ -1152,6 +1152,9 @@ app.put('/api/orders/:orderId/complete', (req, res) => {
   }
 
   const completed = store.tryCompleteOrder(orderId, cleaner);
+  if (completed.code === 'start-disputed') {
+    return res.status(409).json({ success: false, code: 'START_DISPUTED', message: 'اختلاف شروع کار هنوز بررسی نشده است. تا بررسی پشتیبانی امکان اتمام سفارش نیست.' });
+  }
   if (completed.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
   if (completed.code === 'bad-status') {
     return res.status(400).json({ success: false, message: 'این سفارش در وضعیت فعلی قابل تکمیل نیست.' });
