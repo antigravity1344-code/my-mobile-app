@@ -456,6 +456,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.categoryViewport}
           contentContainerStyle={[styles.categoryScroll, { flexDirection: 'row-reverse' }]}
         >
           {[
@@ -699,9 +700,10 @@ const styles = StyleSheet.create({
   },
   tabTextActive: { color: '#ffffff'
   },
-  categoryScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: 'row-reverse'
+  categoryViewport: { flexGrow: 0, flexShrink: 0 },
+  categoryScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: 'row-reverse', alignItems: 'center'
   },
-  categoryChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
+  categoryChip: { flexShrink: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
     minHeight: 44,
   },
   categoryChipActive: { backgroundColor: '#0284c7', borderColor: '#0284c7'

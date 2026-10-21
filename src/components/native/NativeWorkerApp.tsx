@@ -5,10 +5,10 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, HelpCircle, LogOut } from 'lucide-react-native';
 import { WorkerAuthScreen } from './WorkerAuthScreen';
 import { WorkerOnboardingScreen } from './WorkerOnboardingScreen';
@@ -133,7 +133,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
 
   if (!isLoggedIn || !userData) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
         <WorkerAuthScreen onLogin={handleLogin} />
       </SafeAreaView>
@@ -143,7 +143,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
   const isApproved = userData.status === 'APPROVED' || userData.status === 'ACTIVE';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
 
       {/* نوار بالای اپ متخصصین */}
