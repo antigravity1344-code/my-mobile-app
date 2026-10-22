@@ -2,19 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { previewActive } from './previewRuntime';
 import {
   View,
-  Text,
-  Pressable,
   StyleSheet,
+  SafeAreaView as RNSafeAreaView,
   StatusBar,
-  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, HelpCircle, LogOut } from 'lucide-react-native';
+import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerAuthScreen } from './WorkerAuthScreen';
 import { WorkerOnboardingScreen } from './WorkerOnboardingScreen';
+import { WorkerHomeScreen } from './WorkerHomeScreen';
+import { WorkerTabBar, type WorkerTab } from './WorkerTabBar';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
 import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
+import { NativeProfileScreen } from '../../features/profile';
+// NativeProfileScreen نیاز به useProfile ندارد اگر فقط onLogout را بگیرد
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
@@ -26,16 +27,16 @@ import {
   type WorkerSessionUser,
 } from './workerLoginStorage';
 import { useAccountBlockedLogout } from './useAccountBlockedLogout';
-import { type, useAppFonts } from '../../theme';
+import { colors, useCustomerFonts } from '../../theme/customerHome';
 
 type UserData = WorkerSessionUser;
 
 export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPreviewExit }) => {
-  const [fontsLoaded, fontError] = useAppFonts();
+  const [fontsLoaded, fontError] = useCustomerFonts();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mainView, setMainView] = useState<'work' | 'support' | 'alerts'>('work');
+  const [mainView, setMainView] = useState<WorkerTab | 'alerts'>('home');
 
   const refreshWorkerFromServer = async (current: UserData) => {
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
@@ -54,7 +55,6 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
       await saveWorkerSession(appStorage, next);
       return next;
     }
-    // نشست منقضی/نامعتبر: فرم آنبوردینگ را با session مرده نگه ندار
     if (res && res.success === false && typeof res.message === 'string' && res.message.includes('ورود لازم')) {
       setIsLoggedIn(false);
       setUserData(null);
@@ -99,7 +99,6 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
       void refreshWorkerFromServer(current);
     }, 15000);
     return () => clearInterval(timer);
-    // فقط شناسه و وضعیت مهم‌اند؛ خودِ شیء userData هر بار تغییر می‌کند.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, userData?.id, userData?.status]);
 
@@ -121,95 +120,88 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
     await apiFetch('/auth/logout', { method: 'POST' });
     setIsLoggedIn(false);
     setUserData(null);
+    setMainView('home');
     await clearWorkerSession(appStorage);
   };
 
-  // حساب مسدودشده توسط مدیر: پیام سرور، سپس خروج با همین handleLogout.
   useAccountBlockedLogout(isLoggedIn, handleLogout);
 
-  if (isLoading || (!fontsLoaded && !fontError)) {
+  if (isLoading) {
     return <View style={styles.loadingContainer} />;
   }
 
   if (!isLoggedIn || !userData) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <RNSafeAreaView style={styles.safeAreaDark}>
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
         <WorkerAuthScreen onLogin={handleLogin} />
-      </SafeAreaView>
+      </RNSafeAreaView>
     );
+  }
+
+  if (!fontsLoaded && !fontError) {
+    return <View style={styles.homeLoading} />;
   }
 
   const isApproved = userData.status === 'APPROVED' || userData.status === 'ACTIVE';
 
+  if (!isApproved) {
+    return (
+      <RNSafeAreaView style={styles.safeAreaDark}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+        <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
+      </RNSafeAreaView>
+    );
+  }
+
+  const activeTab: WorkerTab = mainView === 'alerts' ? 'home' : mainView;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+    <EdgeSafeAreaView style={styles.homeShell} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
 
-      {/* نوار بالای اپ متخصصین */}
-      <View style={styles.roleBanner}>
-        <View style={styles.userInfoRow}>
-          <Image
-            source={previewActive() ? undefined : { uri: userData.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150' }}
-            style={styles.avatarImage}
-          />
-          <View style={styles.userDetails}>
-            <Text style={styles.userNameText}>{userData.name || ''}</Text>
-            <View style={styles.roleBadgeWorker}>
-              <Briefcase size={10} color="#fff" />
-              <Text style={styles.roleBadgeText}>
-                {isApproved
-                  ? 'پنل متخصص'
-                  : userData.status === 'PENDING_VERIFICATION'
-                    ? 'در انتظار تایید مدارک'
-                    : 'تکمیل مدارک هویتی'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.bannerActions}>
-          <Pressable
-            onPress={() => setMainView(mainView === 'alerts' ? 'work' : 'alerts')}
-            accessibilityRole="button"
-            accessibilityLabel="اعلان‌ها"
-            style={[styles.logoutIconButton, mainView === 'alerts' && styles.ordersActiveButton]}
-          >
-            <Bell size={16} color={mainView === 'alerts' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable
-            onPress={() => setMainView(mainView === 'support' ? 'work' : 'support')}
-            accessibilityRole="button"
-            accessibilityLabel="پشتیبانی"
-            style={[styles.logoutIconButton, mainView === 'support' && styles.ordersActiveButton]}
-          >
-            <HelpCircle size={16} color={mainView === 'support' ? '#fff' : '#94a3b8'} />
-          </Pressable>
-          <Pressable onPress={handleLogout} style={styles.logoutIconButton} accessibilityRole="button" accessibilityLabel="خروج از حساب">
-            <LogOut size={16} color="#94a3b8" />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* اگر هنوز تایید نشده: فرم دریافت مدارک یا وضعیت انتظار */}
-      {/* اگر تایید شده: کارتابل سفارش‌ها */}
       <View style={styles.content}>
-        {mainView === 'alerts' ? (
-          <NativeNotificationsScreen appearance="worker" />
-        ) : mainView === 'support' ? (
-          <NativeSupportScreen appearance="worker" user={{ id: userData.id, name: userData.name || '', phone: userData.phone }} />
-        ) : isApproved ? (
+        {mainView === 'home' ? (
+          <WorkerHomeScreen
+            userName={userData.name}
+            userAvatar={userData.avatar}
+            onOpenProfile={() => setMainView('profile')}
+            onOpenOrders={() => setMainView('new_orders')}
+            onOpenNotifications={() => setMainView('alerts')}
+            onOpenSupport={() => setMainView('support')}
+          />
+        ) : mainView === 'new_orders' ? (
           <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
+        ) : mainView === 'my_jobs' ? (
+          <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
+        ) : mainView === 'profile' ? (
+          <NativeProfileScreen onLogout={handleLogout} />
+        ) : mainView === 'alerts' ? (
+          <NativeNotificationsScreen appearance="worker" />
         ) : (
-          <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
+          <NativeSupportScreen
+            appearance="worker"
+            user={{
+              id: userData.id,
+              name: userData.name || '',
+              phone: userData.phone,
+            }}
+          />
         )}
       </View>
-    </SafeAreaView>
+
+      <WorkerTabBar
+        active={activeTab}
+        onChange={(tab) => {
+          setMainView(tab);
+        }}
+      />
+    </EdgeSafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  safeAreaDark: {
     flex: 1,
     backgroundColor: '#0f172a',
   },
@@ -217,88 +209,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f172a',
   },
-  roleBanner: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  userInfoRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
+  homeLoading: {
     flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
+    backgroundColor: colors.bg,
   },
-  avatarImage: {
-    flexShrink: 0,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 2,
-    borderColor: '#0284c7',
-  },
-  userDetails: {
-    alignItems: 'stretch',
+  homeShell: {
     flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
+    backgroundColor: colors.bg,
   },
-  userNameText: {
-    ...type.bold,
-    writingDirection: 'rtl',
-    includeFontPadding: false,
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '400',
-    textAlign: 'right',
-  },
-  roleBadgeWorker: {
-    alignSelf: 'flex-end',
-    maxWidth: '100%',
-    flexShrink: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 2,
-  },
-  roleBadgeText: {
-    flexShrink: 1,
-    minWidth: 0,
-    textAlign: 'right',
-    ...type.regular,
-    writingDirection: 'rtl',
-    includeFontPadding: false,
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  bannerActions: {
-    flexShrink: 0,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoutIconButton: {
-    padding: 8,
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: '#1e293b',
-  },
-  ordersActiveButton: { backgroundColor: '#0284c7' },
   content: {
     flex: 1,
   },

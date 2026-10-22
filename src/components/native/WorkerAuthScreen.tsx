@@ -13,7 +13,7 @@ import {
 import { Phone, Briefcase, ShieldCheck } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
-import { colors, fontFamily, radius, ui, TOUCH_MIN } from '../../theme';
+import { type } from '../../theme';
 
 interface WorkerAuthScreenProps {
   onLogin: (user: UserData, token: string) => void;
@@ -79,6 +79,8 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
     }
   };
 
+  const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -88,23 +90,23 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
         {/* هدر برند متخصصین */}
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}>
-            <Briefcase size={26} color={colors.white} />
+            <Briefcase size={26} color="#fff" />
           </View>
           <View>
-            <Text style={styles.brandTitle}>پاکشو متخصصین</Text>
-            <Text style={styles.brandSubtitle}>سامانه همکاران و متخصصین نظافت</Text>
+            <Text style={[styles.brandTitle, fa]}>پاکشو متخصصین</Text>
+            <Text style={[styles.brandSubtitle, fa]}>سامانه همکاران و متخصصین نظافت</Text>
           </View>
         </View>
 
         {/* کارت ورود */}
         <View style={styles.card}>
           <View style={styles.header}>
-            <ShieldCheck size={24} color={colors.teal} />
-            <Text style={styles.title}>
+            <ShieldCheck size={24} color="#0284c7" />
+            <Text style={[styles.title, fa]}>
               {step === 1 ? 'ورود به پنل متخصصین' : 'تایید شماره همراه'}
             </Text>
           </View>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, fa]}>
             {step === 1
               ? 'شماره تماس خود را جهت ورود به پنل متخصص وارد کنید.'
               : `کد تایید پیامک‌شده به شماره ${phoneNumber} را وارد کنید:`}
@@ -112,42 +114,42 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
 
           {errorMessage && (
             <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
+              <Text style={[styles.errorText, fa]}>{errorMessage}</Text>
             </View>
           )}
           {infoMessage && !errorMessage ? (
             <View style={styles.hintBox}>
-              <Text style={styles.hintText}>{infoMessage}</Text>
+              <Text style={[styles.hintText, fa]}>{infoMessage}</Text>
             </View>
           ) : null}
 
           {step === 1 ? (
             <>
-              {/* شماره همراه */}
-              <Text style={styles.inputLabel}>شماره همراه متخصص:</Text>
+              <Text style={[styles.inputLabel, fa]}>شماره همراه متخصص:</Text>
               <View style={styles.inputWrapper}>
-                <Phone size={18} color={colors.muted} />
+                <Phone size={18} color="#64748b" />
                 <TextInput
                   style={styles.input}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
                   keyboardType="phone-pad"
                   placeholder="مثال: ۰۹۱۲۲۲۲۲۲۲۲"
-                  placeholderTextColor={ui.placeholder}
+                  placeholderTextColor="#94a3b8"
+                  textAlign="right"
                 />
               </View>
 
               <Pressable onPress={handleNext} disabled={loading} style={styles.submitButton}>
                 {loading ? (
-                  <ActivityIndicator color={colors.white} />
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>ارسال کد تایید پیامکی ←</Text>
+                  <Text style={[styles.submitButtonText, fa]}>ارسال کد تایید پیامکی ←</Text>
                 )}
               </Pressable>
             </>
           ) : (
             <>
-              <Text style={styles.inputLabel}>کد تایید ۴ رقمی:</Text>
+              <Text style={[styles.inputLabel, fa]}>کد تایید ۴ رقمی:</Text>
               <TextInput
                 style={[styles.input, styles.otpInput]}
                 value={otpCode}
@@ -155,20 +157,19 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
                 keyboardType="numeric"
                 maxLength={4}
                 placeholder="کد ۴ رقمی"
-                placeholderTextColor={ui.placeholder}
+                placeholderTextColor="#94a3b8"
               />
-
 
               <Pressable onPress={handleVerify} disabled={loading} style={styles.submitButton}>
                 {loading ? (
-                  <ActivityIndicator color={colors.white} />
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitButtonText}>تایید نهایی و ورود به پنل متخصص</Text>
+                  <Text style={[styles.submitButtonText, fa]}>تایید نهایی و ورود به پنل متخصص</Text>
                 )}
               </Pressable>
 
               <Pressable onPress={() => setStep(1)} style={styles.backButton}>
-                <Text style={styles.backButtonText}>← تغییر شماره همراه</Text>
+                <Text style={[styles.backButtonText, fa]}>← تغییر شماره همراه</Text>
               </Pressable>
             </>
           )}
@@ -181,7 +182,7 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: '#0f172a',
   },
   scrollContent: {
     padding: 20,
@@ -203,28 +204,28 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.teal,
+    backgroundColor: '#0284c7',
   },
   brandTitle: {
+    ...type.bold,
+    fontWeight: '400',
     textAlign: 'right',
-    color: colors.text,
+    color: '#ffffff',
     fontSize: 24,
-    fontFamily: fontFamily.bold,
   },
   brandSubtitle: {
-    fontFamily: fontFamily.regular,
+    ...type.regular,
+    fontWeight: '400',
     textAlign: 'right',
-    color: colors.muted,
-    fontSize: 12,
+    color: '#94a3b8',
+    fontSize: 11,
     marginTop: 2,
   },
   card: {
-    borderColor: colors.border,
-    borderWidth: 1,
     width: '100%',
     maxWidth: 420,
     backgroundColor: '#ffffff',
-    borderRadius: radius.card,
+    borderRadius: 24,
     padding: 20,
     elevation: 6,
   },
@@ -235,108 +236,119 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
+    ...type.bold,
+    fontWeight: '400',
     fontSize: 17,
-    fontFamily: fontFamily.bold,
-    color: colors.text,
+    color: '#0f172a',
     textAlign: 'right',
   },
   subtitle: {
-    fontFamily: fontFamily.regular,
+    ...type.regular,
+    fontWeight: '400',
     fontSize: 12,
-    color: colors.muted,
+    color: '#64748b',
     textAlign: 'right',
     marginBottom: 18,
     lineHeight: 18,
   },
   errorBox: {
-    backgroundColor: ui.dangerBg,
+    backgroundColor: '#fee2e2',
     borderWidth: 1,
-    borderColor: ui.dangerBorder,
+    borderColor: '#fca5a5',
     padding: 10,
     borderRadius: 12,
     marginBottom: 14,
   },
   errorText: {
-    color: ui.dangerText,
+    ...type.bold,
+    fontWeight: '400',
+    color: '#b91c1c',
     fontSize: 12,
     textAlign: 'right',
-    fontFamily: fontFamily.bold,
   },
   inputLabel: {
+    ...type.bold,
+    fontWeight: '400',
     fontSize: 13,
-    fontFamily: fontFamily.bold,
-    color: colors.text,
+    color: '#334155',
     textAlign: 'right',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: ui.surfaceMuted,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: ui.inputBorder,
+    borderColor: '#cbd5e1',
     borderRadius: 14,
     paddingHorizontal: 12,
     marginBottom: 20,
-    height: 48,
+    minHeight: 48,
     gap: 8,
   },
   input: {
+    ...type.regular,
+    fontWeight: '400',
     flex: 1,
-    height: '100%',
-    color: colors.text,
+    minHeight: 44,
+    color: '#0f172a',
     textAlign: 'right',
     fontSize: 14,
-    fontFamily: fontFamily.semibold,
   },
   otpInput: {
-    backgroundColor: ui.surfaceMuted,
+    ...type.bold,
+    fontWeight: '400',
+    writingDirection: 'ltr',
+    includeFontPadding: false,
+    backgroundColor: '#f8fafc',
     borderWidth: 2,
-    borderColor: colors.teal,
+    borderColor: '#0284c7',
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 52,
     textAlign: 'center',
     fontSize: 22,
-    fontFamily: fontFamily.bold,
     letterSpacing: 8,
     marginBottom: 12,
   },
   hintBox: {
-    backgroundColor: ui.neutralBg,
+    backgroundColor: '#f1f5f9',
     borderRadius: 10,
     padding: 8,
     alignItems: 'center',
     marginBottom: 18,
   },
   hintText: {
-    fontSize: 12,
-    color: colors.muted,
-    fontFamily: fontFamily.semibold,
+    ...type.regular,
+    fontWeight: '400',
+    fontSize: 11,
+    color: '#64748b',
+    textAlign: 'center',
   },
   submitButton: {
-    minHeight: TOUCH_MIN + 4,
-    borderRadius: radius.button,
+    borderRadius: 16,
+    minHeight: 48,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.teal,
+    backgroundColor: '#0284c7',
   },
   submitButtonText: {
-    color: colors.white,
+    ...type.bold,
+    fontWeight: '400',
+    color: '#ffffff',
     fontSize: 14,
-    fontFamily: fontFamily.bold,
   },
   backButton: {
-    justifyContent: 'center',
-    minHeight: TOUCH_MIN,
     marginTop: 14,
-    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   backButtonText: {
-    color: colors.muted,
+    ...type.bold,
+    fontWeight: '400',
+    color: '#64748b',
     fontSize: 12,
-    fontFamily: fontFamily.bold,
   },
 });
