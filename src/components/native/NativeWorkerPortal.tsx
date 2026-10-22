@@ -18,7 +18,7 @@ import {
   User,
 } from 'lucide-react-native';
 import { UserData } from '../../types/user';
-import { type } from '../../theme';
+import { colors, radius, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
 import { appStorage } from '../../utils/storage';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { apiFetch } from '../../api/apiClient';
@@ -399,7 +399,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       <View style={styles.headerBar}>
         <View style={styles.workerProfile}>
           <View style={styles.avatarBox}>
-            <Briefcase size={22} color="#fff" />
+            <Briefcase size={22} color={colors.teal} />
           </View>
           <View>
             <View style={styles.nameRow}>
@@ -509,7 +509,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         </View>
       ) : null}
 
-      {loading && <ActivityIndicator size="large" color="#059669" style={{marginTop: 20}} />}
+      {loading && <ActivityIndicator size="large" color={colors.teal} style={{marginTop: 20}} />}
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         {!loading && activeTab === 'available' ? (
@@ -610,15 +610,15 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a'
+  container: { flex: 1, backgroundColor: colors.bg
   },
-  alertError: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: 'rgba(239, 68, 68, 0.12)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)'
+  alertError: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: 'rgba(239, 68, 68, 0.08)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)'
   },
   alertErrorText: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    flex: 1, color: '#fecaca', fontSize: 13, textAlign: 'right'
+    flex: 1, color: '#b91c1c', fontSize: 13, textAlign: 'right'
   },
   retryButton: { backgroundColor: '#ef4444', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
     minHeight: 44,
@@ -629,11 +629,11 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#ffffff', fontSize: 12,
   },
-  headerBar: { backgroundColor: '#0f172a', borderBottomWidth: 1, borderBottomColor: '#334155', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16
+  headerBar: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16
   },
   workerProfile: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 12
   },
-  avatarBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center'
+  avatarBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.tealSoft, alignItems: 'center', justifyContent: 'center'
   },
   nameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8
   },
@@ -641,43 +641,43 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    fontSize: 16, color: '#ffffff', textAlign: 'right'
+    fontSize: 16, color: colors.text, textAlign: 'right'
   },
-  onlineBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)'
+  onlineBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(13, 148, 136, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(13, 148, 136, 0.25)'
   },
-  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981'
+  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.teal
   },
   onlineText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#34d399', fontSize: 10,
+    color: colors.teal, fontSize: 10,
   },
   workerSub: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    fontSize: 11, color: '#94a3b8', textAlign: 'right', marginTop: 2
+    fontSize: 11, color: colors.muted, textAlign: 'right', marginTop: 2
   },
   headerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8
   },
-  switchButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+  switchButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: colors.teal, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
     minHeight: 44,
   },
   switchButtonText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff', fontSize: 11,
+    color: colors.white, fontSize: 11,
   },
-  logoutButton: { backgroundColor: '#334155', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
+  logoutButton: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
     minHeight: 44,
   },
   logoutButtonText: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#cbd5e1', fontSize: 11,
+    color: colors.muted, fontSize: 11,
   },
   alertSuccess: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#d1fae5', borderWidth: 1, borderColor: '#6ee7b7', padding: 12, marginHorizontal: 16, marginTop: 12, borderRadius: 14
   },
@@ -687,62 +687,62 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#065f46', fontSize: 12, flex: 1, textAlign: 'right'
   },
-  tabBar: { flexDirection: 'row-reverse', backgroundColor: '#ffffff', marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4
+  tabBar: { flexDirection: 'row-reverse', backgroundColor: colors.white, marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: colors.border, ...shadowSm
   },
   tabItem: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10,
     minHeight: 44,
   },
-  tabItemActive: { backgroundColor: '#0284c7'
+  tabItemActive: { backgroundColor: colors.teal
   },
   tabText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#475569', fontSize: 12,
+    color: colors.muted, fontSize: 12,
   },
-  tabTextActive: { color: '#ffffff'
+  tabTextActive: { color: colors.white
   },
   categoryViewport: { flexGrow: 0, flexShrink: 0 },
   categoryScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: 'row-reverse', alignItems: 'center'
   },
-  categoryChip: { flexShrink: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0',
+  categoryChip: { flexShrink: 0, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border,
     minHeight: 44,
   },
-  categoryChipActive: { backgroundColor: '#0284c7', borderColor: '#0284c7'
+  categoryChipActive: { backgroundColor: colors.teal, borderColor: colors.teal
   },
   categoryChipText: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#475569', fontSize: 12,
+    color: colors.muted, fontSize: 12,
   },
   categoryChipTextActive: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff',
+    color: colors.white,
   },
   listContent: { padding: 16, paddingBottom: 40, gap: 14
   },
-  emptyBox: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, alignItems: 'center', justifyContent: 'center', marginTop: 20
+  emptyBox: { backgroundColor: colors.white, borderRadius: 24, padding: 24, alignItems: 'center', justifyContent: 'center', marginTop: 20, ...shadowMd
   },
   emptyTitle: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#0f172a', fontSize: 17, marginTop: 12, marginBottom: 6
+    color: colors.text, fontSize: 17, marginTop: 12, marginBottom: 6
   },
   emptyDesc: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#64748b', fontSize: 12, textAlign: 'center', lineHeight: 18
+    color: colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18
   },
-  orderCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3
+  orderCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border, ...shadowMd
   },
-  myJobCard: { borderLeftWidth: 4, borderLeftColor: '#059669'
+  myJobCard: { borderLeftWidth: 4, borderLeftColor: colors.teal
   },
-  cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 10
+  cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10
   },
   titleArea: { flex: 1, alignItems: 'flex-end'
   },
@@ -750,15 +750,15 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    fontSize: 14, color: '#0f172a', textAlign: 'right'
+    fontSize: 14, color: colors.text, textAlign: 'right'
   },
-  badgeBox: { backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
+  badgeBox: { backgroundColor: colors.tealSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
   },
   badgeText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#0369a1', fontSize: 10,
+    color: colors.teal, fontSize: 10,
   },
   inProgressBadge: { backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
   },
@@ -768,13 +768,13 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#047857', fontSize: 10,
   },
-  completedBadge: { backgroundColor: '#e0f2fe', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
+  completedBadge: { backgroundColor: colors.tealSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
   },
   completedBadgeText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#0369a1', fontSize: 10,
+    color: colors.teal, fontSize: 10,
   },
   cancelledBadge: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
   },
@@ -784,13 +784,13 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#b91c1c', fontSize: 10,
   },
-  neutralBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8
+  neutralBadge: { backgroundColor: colors.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: colors.border
   },
   neutralBadgeText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#475569', fontSize: 10,
+    color: colors.muted, fontSize: 10,
   },
   historyCard: { opacity: 0.85
   },
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#94a3b8', fontSize: 12, textAlign: 'right', marginTop: 8
+    color: colors.muted, fontSize: 12, textAlign: 'right', marginTop: 8
   },
   buttonDisabled: { opacity: 0.6
   },
@@ -808,34 +808,34 @@ const styles = StyleSheet.create({
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    fontSize: 12, color: '#475569', textAlign: 'right', flex: 1
+    fontSize: 12, color: colors.muted, textAlign: 'right', flex: 1
   },
   boldText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#0f172a'
+    color: colors.text
   },
-  noteBox: { backgroundColor: '#f8fafc', borderRadius: 10, padding: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0'
+  noteBox: { backgroundColor: colors.bg, borderRadius: 10, padding: 8, marginBottom: 12, borderWidth: 1, borderColor: colors.border
   },
   noteText: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    color: '#64748b', fontSize: 11, textAlign: 'right'
+    color: colors.muted, fontSize: 11, textAlign: 'right'
   },
   actionButtonsRow: { marginTop: 4, marginBottom: 10
   },
-  callButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#059669', borderRadius: 12, paddingVertical: 10,
+  callButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.teal, borderRadius: 12, paddingVertical: 10,
     minHeight: 44,
   },
   callButtonText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff', fontSize: 12,
+    color: colors.white, fontSize: 12,
   },
-  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, marginTop: 4
+  cardFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 4
   },
   wageBox: { alignItems: 'flex-end'
   },
@@ -843,38 +843,38 @@ const styles = StyleSheet.create({
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    fontSize: 10, color: '#64748b'
+    fontSize: 10, color: colors.muted
   },
   wageValue: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    fontSize: 14, color: '#059669'
+    fontSize: 14, color: colors.teal
   },
-  acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#0284c7', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
+  acceptButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: colors.teal, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14,
     minHeight: 44,
   },
   acceptButtonText: {
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff', fontSize: 12,
+    color: colors.white, fontSize: 12,
   },
-  completeButton: { backgroundColor: '#0284c7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+  completeButton: { backgroundColor: colors.teal, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
     minHeight: 44,
   },
-  startButtonFull: { marginTop: 10, backgroundColor: '#0f766e', borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
+  startButtonFull: { marginTop: 10, backgroundColor: colors.teal, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
     minHeight: 44,
   },
   startStatusText: {
     ...type.regular,
     ...fa,
     fontWeight: '400',
-    marginTop: 10, fontSize: 12, color: '#0f766e', textAlign: 'right'
+    marginTop: 10, fontSize: 12, color: colors.teal, textAlign: 'right'
   },
   completeButtonFull: {
     marginTop: 10,
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -885,5 +885,5 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#ffffff', fontSize: 11,
+    color: colors.white, fontSize: 11,
   }});
