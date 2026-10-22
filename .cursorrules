@@ -1,0 +1,6 @@
+﻿
+## Running on the phone (no SMS)
+- Before starting Metro, set EXPO_PUBLIC_PAKSHO_UI_PREVIEW=1 so the app shows an SMS-free preview login next to the real login.
+- PowerShell: $env:EXPO_PUBLIC_PAKSHO_UI_PREVIEW="1"; npx expo start --port 8081
+- Both apps are already installed on the test phone; do not rebuild or reinstall, only start Metro.
+
