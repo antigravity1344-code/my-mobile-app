@@ -246,6 +246,56 @@ test('customer no opens one dispute; admin authenticated resolution is replay-sa
   assert.equal((await request(server, { method: 'PUT', pathname: adminPath, token: adminToken, body: { started: false } })).status, 401);
 });
 
+test('unresolved start disputes block worker completion without effects; existing admin resolution unlocks it', async (t) => {
+  const server = await harness.serverFor(t);
+  const { customer, worker, otherWorker, adminToken } = await actors(server);
+  for (const started of [false, true]) {
+    const order = await createOrder(server, customer);
+    await acceptOrder(server, worker, order.id);
+    const promptEventId = await reportThenPrompt(server, worker, customer, order.id);
+    assert.equal((await request(server, {
+      method: 'PUT', pathname: '/api/orders/' + order.id + '/start-response',
+      token: customer.token, body: { answer: 'no', promptEventId },
+    })).status, 200);
+    const completePath = '/api/orders/' + order.id + '/complete';
+    for (const status of ['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']) {
+      const current = store.getOrder(order.id);
+      current.status = status;
+      store.updateOrder(current);
+      const before = effects(order.id, [customer, worker, otherWorker]);
+      assert.equal(store.tryCompleteOrder(order.id, worker.user).code, 'start-disputed');
+      const rejected = await request(server, {
+        method: 'PUT', pathname: completePath, token: worker.token,
+        body: { startStatus: 'admin_resolved' },
+      });
+      assert.equal(rejected.status, 409);
+      assert.equal(rejected.json.code, 'START_DISPUTED');
+      assert.deepEqual(effects(order.id, [customer, worker, otherWorker]), before);
+      assert.equal(store.getOrder(order.id).startStatus, 'disputed');
+    }
+    const workerList = await request(server, { pathname: '/api/orders', token: worker.token });
+    assert.equal(workerList.json.orders.find((entry) => entry.id === order.id).startStatus, 'disputed');
+    const decision = await adminDecisionBody(server, adminToken, order.id, started,
+      'complete_dispute_' + String(started));
+    const resolved = await request(server, {
+      method: 'PUT', pathname: '/api/admin/orders/' + order.id + '/start-decision',
+      token: adminToken, body: decision,
+    });
+    assert.equal(resolved.status, 200);
+    assert.equal(resolved.json.order.startStatus, 'admin_resolved');
+    const complete = await request(server, {
+      method: 'PUT', pathname: completePath, token: worker.token, body: {},
+    });
+    assert.equal(complete.status, 200);
+    assert.equal(complete.json.order.status, 'COMPLETED');
+    assert.equal(complete.json.order.startStatus, 'admin_resolved');
+    assert.equal(store.getOrder(order.id).price, order.price);
+    assert.equal(eventCount(order.id, 'START_DENIED_BY_CUSTOMER'), 1);
+    assert.equal(eventCount(order.id, 'DISPUTE_OPENED'), 1);
+    assert.equal(eventCount(order.id, 'ADMIN_DECISION'), 1);
+  }
+});
+
 test('start and response reject forged actors, bad references, invalid sessions and blocked accounts without effects', async (t) => {
   const server = await harness.serverFor(t);
   const { customer, stranger, worker, otherWorker, adminToken } = await actors(server);

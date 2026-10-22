@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,13 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { HelpCircle, Phone, MessageCircle, ChevronDown, ChevronUp, X, Send } from 'lucide-react-native';
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
+import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
 import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
+import { type } from '../../../theme';
 import { apiFetch } from '../../../api/apiClient';
 import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
 import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE_DISPLAY, SUPPORT_TEL_URL } from '../supportConfig';
@@ -28,6 +31,7 @@ export interface SupportUser {
 
 interface Props {
   user: SupportUser;
+  appearance?: 'customer' | 'worker';
 }
 
 type SupportMessage = {
@@ -39,32 +43,45 @@ type SupportMessage = {
   status: 'OPEN';
 };
 
-export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
+export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'customer' }) => {
+  const workerAppearance = appearance === 'worker';
   const [openFaqId, setOpenFaqId] = useState<string | null>(SUPPORT_FAQ[0]?.id ?? null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [composeOpen, setComposeOpen] = useState(false);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const sheetKb = useSheetKeyboard(composeOpen);
+  const mounted = useRef(true);
+  const loadGeneration = useRef(0);
 
-  React.useEffect(() => {
-    let alive = true;
-    void (async () => {
-      if (!user?.id) {
-        setMessages([]);
-        return;
-      }
-      const res = await apiFetch('/support/messages');
-      if (!alive) return;
-      const saved = Array.isArray(res.messages) ? res.messages : [];
-      setMessages(saved.filter((m: SupportMessage) => m && m.userId === user.id));
-      if (!res.success) setError(res.message || 'دریافت پیام‌ها انجام نشد. لطفاً دوباره تلاش کنید.');
-    })();
-    return () => {
-      alive = false;
-    };
+  const loadMessages = useCallback(async () => {
+    const generation = ++loadGeneration.current;
+    if (!user?.id) {
+      if (!mounted.current) return;
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const res = await apiFetch('/support/messages');
+    if (!mounted.current || generation !== loadGeneration.current) return;
+    const saved = Array.isArray(res.messages) ? res.messages : [];
+    setMessages(saved.filter((m: SupportMessage) => m && m.userId === user.id));
+    setError(res.success ? null : (res.message || 'دریافت پیام‌ها انجام نشد. لطفاً دوباره تلاش کنید.'));
+    setLoading(false);
   }, [user?.id]);
+
+  useEffect(() => {
+    mounted.current = true;
+    void loadMessages();
+    const pendingLoads = loadGeneration;
+    return () => {
+      mounted.current = false;
+      pendingLoads.current++;
+    };
+  }, [loadMessages]);
 
   // After a successful send the sheet closes and the page scrolls to «پیام‌های شما», where the new
   // message is the first item (the list sits below the FAQ, out of view on most phones).
@@ -117,9 +134,9 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, workerAppearance && workerStyles.root]}>
       <ScrollView ref={pageScrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
+        <View style={[styles.hero, workerAppearance && workerStyles.hero]}>
           <HelpCircle size={22} color="#0284c7" />
           <Text style={styles.heroTitle}>پشتیبانی پاکشو</Text>
           <Text style={styles.heroSub}>{SUPPORT_GREETING}</Text>
@@ -136,16 +153,16 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             <Text style={styles.secondaryBtnText}>ارسال پیام</Text>
           </Pressable>
         </View>
-        <Text style={styles.phoneHint}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
+        <Text style={[styles.phoneHint, workerAppearance && workerStyles.phoneHint]}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
 
-        <Text style={styles.sectionTitle}>سوالات متداول</Text>
+        <Text style={[styles.sectionTitle, workerAppearance && workerStyles.sectionTitle]}>سوالات متداول</Text>
         {SUPPORT_FAQ.map((item) => {
           const open = openFaqId === item.id;
           return (
             <Pressable
               key={item.id}
               onPress={() => setOpenFaqId(open ? null : item.id)}
-              style={[styles.faqCard, open && styles.faqOpen]}
+              style={[styles.faqCard, workerAppearance && workerStyles.faqCard, open && styles.faqOpen]}
             >
               <View style={styles.faqHeader}>
                 <Text style={styles.faqQ}>{item.question}</Text>
@@ -157,18 +174,31 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
         })}
 
         <Text
-          style={styles.sectionTitle}
+          style={[styles.sectionTitle, workerAppearance && workerStyles.sectionTitle]}
           onLayout={(e) => {
             messagesYRef.current = e.nativeEvent.layout.y;
           }}
         >
           پیام‌های شما
         </Text>
-        {messages.length === 0 ? (
-          <Text style={styles.empty}>هنوز پیامی ثبت نشده است.</Text>
+        {error && !composeOpen ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.error}>{error}</Text>
+            <Pressable onPress={() => void loadMessages()} style={styles.retry} accessibilityRole="button" disabled={loading} accessibilityState={{ disabled: loading }}>
+              <Text style={styles.retryText}>تلاش دوباره</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {loading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color="#0f766e" />
+            <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>در حال دریافت پیام‌ها...</Text>
+          </View>
+        ) : !error && messages.length === 0 ? (
+          <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>هنوز پیامی ثبت نشده است.</Text>
         ) : (
           messages.map((msg) => (
-            <View key={msg.id} style={styles.msgCard}>
+            <View key={msg.id} style={[styles.msgCard, workerAppearance && workerStyles.msgCard]}>
               <View style={styles.msgTop}>
                 <Text style={styles.msgSubject}>{msg.subject}</Text>
                 <Text style={styles.msgStatus}>باز</Text>
@@ -198,21 +228,22 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
             </View>
             {senderLine ? <Text style={styles.modalHint}>{supportSenderLine(user.phone)}</Text> : null}
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               value={subject}
               onChangeText={setSubject}
               placeholder="موضوع"
               placeholderTextColor="#94a3b8"
-              style={styles.input}
+              style={[styles.input, workerAppearance && workerStyles.input]}
             />
             <TextInput
               value={body}
               onChangeText={setBody}
               placeholder="متن پیام"
               placeholderTextColor="#94a3b8"
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, workerAppearance && workerStyles.input, styles.textArea]}
               multiline
             />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={[styles.error, styles.modalError]}>{error}</Text> : null}
             <Pressable onPress={submitMessage} style={[styles.primaryBtn, styles.submitBtn]}>
               <Send size={16} color="#fff" />
               <Text style={styles.primaryBtnText}>ثبت پیام</Text>
@@ -226,40 +257,61 @@ export const NativeSupportScreen: React.FC<Props> = ({ user }) => {
   );
 };
 
+const workerStyles = StyleSheet.create({
+  root: { backgroundColor: '#0f172a' },
+  hero: { borderRadius: 24, padding: 20 },
+  phoneHint: { color: '#cbd5e1' },
+  sectionTitle: { color: '#ffffff' },
+  empty: { color: '#cbd5e1' },
+  faqCard: { borderRadius: 24, padding: 20, minHeight: 44 },
+  msgCard: { borderRadius: 24, padding: 20 },
+  input: { backgroundColor: '#f8fafc', borderRadius: 14, minHeight: 48 },
+});
+
+const fa = {
+  writingDirection: 'rtl' as const,
+  includeFontPadding: false,
+};
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f8fafc' },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
   hero: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0', gap: 6, alignItems: 'flex-end' },
-  heroTitle: { color: '#0f172a', fontWeight: '800', fontSize: 18 },
-  heroSub: { color: '#475569', fontSize: 13, textAlign: 'right', lineHeight: 20 },
-  meta: { color: '#94a3b8', fontSize: 11, textAlign: 'right' },
+  heroTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 18, textAlign: 'right' },
+  heroSub: { ...type.regular, ...fa, fontWeight: '400', color: '#475569', fontSize: 13, textAlign: 'right', lineHeight: 20 },
+  meta: { ...type.regular, ...fa, fontWeight: '400', color: '#94a3b8', fontSize: 11, textAlign: 'right' },
   actions: { flexDirection: 'row-reverse', gap: 8 },
-  primaryBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 13 },
-  primaryBtnText: { color: '#fff', fontWeight: '800' },
+  primaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 13 },
+  primaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
   submitBtn: { flex: 0, minHeight: 48 },
-  secondaryBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e0f2fe', borderRadius: 13, paddingVertical: 13 },
-  secondaryBtnText: { color: '#0369a1', fontWeight: '800' },
-  phoneHint: { textAlign: 'right', color: '#64748b', fontSize: 12 },
-  sectionTitle: { marginTop: 8, textAlign: 'right', color: '#0f172a', fontWeight: '800', fontSize: 15 },
+  secondaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e0f2fe', borderRadius: 13, paddingVertical: 13 },
+  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1' },
+  phoneHint: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b', fontSize: 12 },
+  sectionTitle: { ...type.bold, ...fa, fontWeight: '400', marginTop: 8, textAlign: 'right', color: '#0f172a', fontSize: 15 },
   faqCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', gap: 8 },
   faqOpen: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
   faqHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  faqQ: { flex: 1, textAlign: 'right', color: '#0f172a', fontWeight: '700', fontSize: 13 },
-  faqA: { textAlign: 'right', color: '#475569', fontSize: 12, lineHeight: 20 },
-  empty: { textAlign: 'right', color: '#64748b', fontSize: 12 },
+  faqQ: { ...type.bold, ...fa, fontWeight: '400', flex: 1, textAlign: 'right', color: '#0f172a', fontSize: 13 },
+  faqA: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 12, lineHeight: 20 },
+  empty: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b', fontSize: 12 },
+  loadingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   msgCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
   msgTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  msgSubject: { color: '#0f172a', fontWeight: '800', fontSize: 13 },
-  msgStatus: { color: '#047857', backgroundColor: '#ecfdf5', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10, fontWeight: '700' },
-  msgBody: { textAlign: 'right', color: '#475569', fontSize: 12, lineHeight: 19 },
-  msgMeta: { textAlign: 'right', color: '#94a3b8', fontSize: 11 },
+  msgSubject: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 13, textAlign: 'right', flex: 1 },
+  msgStatus: { ...type.bold, ...fa, fontWeight: '400', color: '#047857', backgroundColor: '#ecfdf5', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10 },
+  msgBody: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 12, lineHeight: 19 },
+  msgMeta: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#94a3b8', fontSize: 11 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#f8fafc', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, gap: 10 },
   modalHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  modalTitle: { color: '#0f172a', fontWeight: '800', fontSize: 16 },
-  closeBtn: { padding: 6 },
-  modalHint: { textAlign: 'right', color: '#64748b', fontSize: 12 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right' },
+  modalTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 16, textAlign: 'right' },
+  closeBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  modalHint: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b', fontSize: 12 },
+  input: { ...type.regular, ...fa, fontWeight: '400', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right' },
   textArea: { minHeight: 110, maxHeight: 160, textAlignVertical: 'top' },
-  error: { color: '#b91c1c', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10, textAlign: 'right' },
+  errorBox: { backgroundColor: '#fee2e2', padding: 10, borderRadius: 10, gap: 8 },
+  error: { ...type.regular, ...fa, fontWeight: '400', color: '#b91c1c', textAlign: 'right' },
+  modalError: { backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 },
+  retry: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  retryText: { ...type.bold, ...fa, fontWeight: '400', color: '#0f766e', textAlign: 'right' },
 });

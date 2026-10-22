@@ -13,6 +13,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
+import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
+import { type } from '../../theme';
 import { UserData } from '../../types/user';
 import {
   ID_DOC_SIZE_HINT,
@@ -204,7 +206,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       >
         <View style={styles.formCard}>
           <View style={styles.header}>
-            <ShieldCheck size={26} color="#16a34a" />
+            <ShieldCheck size={26} color="#0284c7" />
             <Text style={styles.title}>ثبت‌نام و احراز هویت متخصصین</Text>
           </View>
           <Text style={styles.subtitle}>
@@ -226,6 +228,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             }}
           >
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               style={styles.input}
               value={name}
               onChangeText={setName}
@@ -244,6 +247,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             }}
           >
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               style={styles.input}
               value={nationalId}
               onChangeText={setNationalId}
@@ -264,6 +268,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             }}
           >
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               style={styles.input}
               value={birthDate}
               onChangeText={setBirthDate}
@@ -300,6 +305,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           >
             <MapPin size={18} color="#64748b" />
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               style={styles.inputInner}
               value={city}
               onChangeText={setCity}
@@ -318,6 +324,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             }}
           >
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               style={styles.input}
               value={address}
               onChangeText={setAddress}
@@ -338,7 +345,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           >
             <CreditCard size={18} color="#64748b" />
             <TextInput
-              style={styles.inputInner}
+              style={[styles.inputInner, styles.shebaInput]}
               value={bankSheba}
               onChangeText={setBankSheba}
               onFocus={() => scrollFieldIntoView('bankSheba')}
@@ -362,9 +369,12 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+
   },
   container: {
     flexGrow: 1,
@@ -372,33 +382,43 @@ const styles = StyleSheet.create({
     paddingBottom: 220,
     alignItems: 'center',
     backgroundColor: '#0f172a',
+
   },
   formCard: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     elevation: 6,
+
   },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
+
   },
   title: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 17,
-    fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
+
   },
   subtitle: {
-    fontSize: 11,
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
+    fontSize: 12,
     color: '#64748b',
     textAlign: 'right',
     marginBottom: 16,
     lineHeight: 18,
+
   },
   errorBox: {
     flexDirection: 'row-reverse',
@@ -410,58 +430,84 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginBottom: 14,
+
   },
   errorText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#b91c1c',
     fontSize: 12,
-    fontWeight: '700',
     flex: 1,
     textAlign: 'right',
+
   },
   label: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
-    fontWeight: '700',
     color: '#334155',
     textAlign: 'right',
     marginBottom: 6,
+
   },
   input: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
-    height: 46,
+    minHeight: 48,
+    paddingVertical: 12,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 13,
     marginBottom: 14,
     justifyContent: 'center',
+
   },
   docInput: {
     marginBottom: 6,
+
   },
   docHint: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     color: '#64748b',
     fontSize: 11,
     textAlign: 'right',
     marginBottom: 14,
     lineHeight: 18,
+
   },
   docRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
+
   },
   docPlaceholder: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     color: '#94a3b8',
     fontSize: 13,
     textAlign: 'right',
+
   },
   docPickedText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     color: '#0f172a',
     fontSize: 13,
     textAlign: 'right',
+
   },
   inputWrapper: {
     flexDirection: 'row-reverse',
@@ -469,30 +515,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 12,
-    height: 46,
+    minHeight: 48,
     gap: 8,
     marginBottom: 14,
+
   },
   inputInner: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     flex: 1,
-    height: '100%',
+    minHeight: 44,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 13,
+
+  },
+  shebaInput: {
+    writingDirection: 'ltr',
+    textAlign: 'left',
   },
   submitBtn: {
-    backgroundColor: '#16a34a',
+    backgroundColor: '#0284c7',
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
+    minHeight: 48,
   },
   submitBtnText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '800',
+
   },
   statusContainer: {
     padding: 16,
@@ -500,15 +559,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexGrow: 1,
     backgroundColor: '#0f172a',
+
   },
   statusCard: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     elevation: 6,
+
   },
   statusIconWrapper: {
     width: 70,
@@ -518,20 +579,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+
   },
   statusTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 18,
-    fontWeight: '900',
     color: '#0f172a',
     textAlign: 'center',
     marginBottom: 8,
+
   },
   statusDesc: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
+
   },
   timeline: {
     alignSelf: 'stretch',
@@ -540,25 +609,35 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     marginBottom: 20,
+
   },
   timelineItem: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
+
   },
   timelineTextDone: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#166534',
     fontSize: 12,
-    fontWeight: '700',
+
   },
   timelineTextActive: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#854d0e',
     fontSize: 12,
-    fontWeight: '800',
+
   },
   timelineTextNext: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     color: '#94a3b8',
     fontSize: 12,
-    fontWeight: '600',
-  },
-});
+
+  }});

@@ -15,6 +15,7 @@ import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { useProfile } from '../context/ProfileContext';
 import { extraAddressIsDefault } from '../mainAddress';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
+import { type } from '../../../theme';
 import type { SavedAddress } from '../types/profile';
 
 interface Props {
@@ -115,7 +116,7 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>نشانی دقیق</Text>
-              <TextInput multiline value={fullAddress} onChangeText={setFullAddress} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={styles.input} />
+              <TextInput multiline value={fullAddress} onChangeText={setFullAddress} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea]} />
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>پلاک</Text>
@@ -146,17 +147,20 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
   card: { maxHeight: '92%', backgroundColor: '#f8fafc', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  headerTitle: { color: '#0f172a', fontWeight: '800', fontSize: 16 },
-  closeBtn: { padding: 6 },
+  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  headerTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 16, textAlign: 'right', flex: 1 },
+  closeBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   body: { padding: 16, gap: 12 },
   field: { gap: 6 },
-  label: { textAlign: 'right', color: '#334155', fontSize: 12, fontWeight: '700' },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right' },
-  error: { color: '#b91c1c', textAlign: 'right', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 },
-  submit: { marginTop: 8, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 14, alignItems: 'center' },
-  submitText: { color: '#fff', fontWeight: '800' },
+  label: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#334155', fontSize: 12 },
+  input: { ...type.regular, ...fa, fontWeight: '400', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, color: '#0f172a', textAlign: 'right' },
+  textArea: { minHeight: 88, textAlignVertical: 'top' },
+  error: { ...type.regular, ...fa, fontWeight: '400', color: '#b91c1c', textAlign: 'right', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 },
+  submit: { marginTop: 8, minHeight: 48, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  submitText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
 });

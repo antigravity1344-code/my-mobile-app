@@ -994,6 +994,7 @@ function createDataStore(filename) {
       if (!order) return { code: 'missing' };
       if (!['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'].includes(order.status)) return { code: 'bad-status' };
       if (order.cleanerId !== cleaner.id) return { code: 'forbidden' };
+      if (order.startStatus === 'disputed') return { code: 'start-disputed' };
       order.status = 'COMPLETED';
       order.completedAt = new Date().toISOString();
       order.cleanerName = cleaner.name || '';

@@ -317,6 +317,30 @@ test('server quote and confirmed order use the deployment tariff', async (t) => 
   process.env.PAKSHO_TARIFF_FILE = file;
   baseTariff();
 
+  // The first write commits, but its response never reaches the client.
+  const lostQuote = await quote({ serviceId: 'hourly', quantity: 2 });
+  const lostBody = orderBody(lostQuote.json.quote.quoteToken, 2000, {
+    serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2lostresponse',
+  });
+  const beforeLostIds = new Set((await orders()).map((order) => order.id));
+  const lostResponse = await request(server, {
+    method: 'POST', pathname: '/api/orders', token: customer.token,
+    body: lostBody, loseResponse: true,
+  });
+  assert.equal(lostResponse.responseLost, true);
+  const committedAfterLoss = await orders();
+  assert.equal(committedAfterLoss.length, beforeLostIds.size + 1);
+  const committedLostOrder = committedAfterLoss.find((order) => !beforeLostIds.has(order.id));
+  assert.equal(committedLostOrder.price, 2000);
+  const notesAfterLoss = (await notifications()).length;
+  const recoveredLost = await place(lostBody);
+  assert.equal(recoveredLost.status, 200);
+  assert.equal(recoveredLost.json.duplicate, true);
+  assert.equal(recoveredLost.json.order.id, committedLostOrder.id);
+  assert.equal(recoveredLost.json.order.price, 2000);
+  assert.equal((await orders()).length, committedAfterLoss.length);
+  assert.equal((await notifications()).length, notesAfterLoss);
+
   const replayQuote = await quote({ serviceId: 'hourly', quantity: 2 });
   const replayed = await place(orderBody(replayQuote.json.quote.quoteToken, 2000, {
     serviceId: 'hourly', quantity: 2, clientRequestId: 'stage2replay1',

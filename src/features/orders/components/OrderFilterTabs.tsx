@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { I18nManager, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { OrderFilterTab, OrderStats } from '../types/order';
 import { colors, fontFamily, ui, TOUCH_MIN } from '../../../theme';
 
@@ -27,8 +27,23 @@ export const OrderFilterTabs: React.FC<OrderFilterTabsProps> = ({
   onTabChange,
   stats,
 }) => {
+  const scrollRef = useRef<ScrollView>(null);
+  const initiallyPositioned = useRef(false);
   return (
-    <View style={styles.container}>
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      onContentSizeChange={() => {
+        if (!initiallyPositioned.current && scrollRef.current) {
+          // In a non-native-RTL runtime the row is reversed manually; begin at its right edge.
+          if (!I18nManager.isRTL) scrollRef.current.scrollToEnd({ animated: false });
+          initiallyPositioned.current = true;
+        }
+      }}
+    >
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         const count = tab.getCount(stats);
@@ -37,26 +52,33 @@ export const OrderFilterTabs: React.FC<OrderFilterTabsProps> = ({
           <Pressable
             key={tab.key}
             onPress={() => onTabChange(tab.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
             style={[styles.tab, isActive && styles.tabActive]}
           >
-            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+            <Text numberOfLines={1} style={[styles.tabText, isActive && styles.tabTextActive]}>
               {tab.label}
             </Text>
             <View style={[styles.countBadge, isActive && styles.countBadgeActive]}>
-              <Text style={[styles.countText, isActive && styles.countTextActive]}>
+              <Text numberOfLines={1} style={[styles.countText, isActive && styles.countTextActive]}>
                 {count.toLocaleString('fa-IR')}
               </Text>
             </View>
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexGrow: 0,
+  },
   container: {
+    minWidth: '100%',
     flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
     backgroundColor: colors.bg,
     borderRadius: 14,
     padding: 4,
@@ -64,7 +86,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     minHeight: TOUCH_MIN,
-    flex: 1,
+    flexShrink: 0,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -82,6 +104,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabText: {
+    flexShrink: 0,
     fontSize: 12,
     fontFamily: fontFamily.semibold,
     color: colors.muted,
@@ -91,6 +114,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
   },
   countBadge: {
+    flexShrink: 0,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,

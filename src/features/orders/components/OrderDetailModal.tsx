@@ -12,6 +12,8 @@ import {
 import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { SUPPORT_TEL_URL } from '../../support';
+import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
+import { type } from '../../../theme';
 import {
   X,
   Phone,
@@ -431,6 +433,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   {cancelPreview || 'آیا از لغو این سفارش اطمینان دارید؟ در صورت لغو، هماهنگی‌های انجام شده با کارشناس متوقف خواهد شد.'}
                 </Text>
                 <TextInput
+                  {...RTL_SINGLE_LINE_INPUT}
                   value={cancelReason}
                   onChangeText={setCancelReason}
                   placeholder="دلیل لغو (اختیاری)"
@@ -529,19 +532,44 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
-  startPromptBox: { backgroundColor: '#ecfdf5', borderColor: '#99f6e4', borderWidth: 1, borderRadius: 14, padding: 14, marginHorizontal: 16, marginTop: 10 },
-  startPromptTitle: { fontSize: 14, fontWeight: '800', color: '#115e59', textAlign: 'right' },
-  startPromptDescription: { marginTop: 6, fontSize: 12, color: '#134e4a', textAlign: 'right', lineHeight: 21 },
-  startPromptActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
-  startPromptYes: { flex: 1, backgroundColor: '#0f766e', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  startPromptYesText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  startPromptNo: { flex: 1, borderWidth: 1, borderColor: '#b91c1c', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  startPromptNoText: { color: '#b91c1c', fontWeight: '700', fontSize: 12 },
+  startPromptBox: { backgroundColor: '#ecfdf5', borderColor: '#99f6e4', borderWidth: 1, borderRadius: 14, padding: 14, marginHorizontal: 16, marginTop: 10
+  },
+  startPromptTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400', fontSize: 14, color: '#115e59', textAlign: 'right'
+  },
+  startPromptDescription: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400', marginTop: 6, fontSize: 12, color: '#134e4a', textAlign: 'right', lineHeight: 21
+  },
+  startPromptActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12
+  },
+  startPromptYes: { flex: 1, backgroundColor: '#0f766e', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    minHeight: 44,
+  },
+  startPromptYesText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400', color: '#fff', fontSize: 12
+  },
+  startPromptNo: { flex: 1, borderWidth: 1, borderColor: '#b91c1c', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    minHeight: 44,
+  },
+  startPromptNoText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400', color: '#b91c1c', fontSize: 12
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
+
   },
   container: {
     backgroundColor: '#fff',
@@ -552,6 +580,7 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+
   },
   header: {
     flexDirection: 'row-reverse',
@@ -561,36 +590,48 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+
   },
   headerTitleWrap: {
     alignItems: 'flex-end',
+
   },
   headerTopRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
+
   },
   headerTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 17,
-    fontWeight: '800',
     color: '#0f172a',
+
   },
   headerSubtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
+
   },
   closeBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+
   },
   body: {
     flex: 1,
     padding: 16,
+
   },
   serviceBox: {
     flexDirection: 'row-reverse',
@@ -602,6 +643,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
+
   },
   serviceIconWrap: {
     width: 42,
@@ -610,21 +652,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#bae6fd',
     alignItems: 'center',
     justifyContent: 'center',
+
   },
   serviceTextWrap: {
     flex: 1,
+
   },
   serviceTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 15,
-    fontWeight: '800',
     color: '#0369a1',
     textAlign: 'right',
+
   },
   serviceSubtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
     color: '#0284c7',
     textAlign: 'right',
     marginTop: 2,
+
   },
   card: {
     backgroundColor: '#fff',
@@ -633,24 +684,30 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
+
   },
   cardHeading: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
-    fontWeight: '800',
     color: '#334155',
     textAlign: 'right',
     marginBottom: 10,
+
   },
   cardHeadingRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
     marginBottom: 10,
+
   },
   cleanerRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
+
   },
   cleanerAvatar: {
     width: 44,
@@ -659,30 +716,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0f2fe',
     alignItems: 'center',
     justifyContent: 'center',
+
   },
   cleanerInfo: {
     flex: 1,
+
   },
   cleanerName: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 14,
-    fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
+
   },
   cleanerRatingRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
     marginTop: 3,
+
   },
   cleanerRatingText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
-    fontWeight: '800',
     color: '#b45309',
+
   },
   cleanerJobsText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 10,
     color: '#64748b',
+
   },
   infoRow: {
     flexDirection: 'row-reverse',
@@ -691,51 +761,76 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#f8fafc',
+
   },
   infoLabel: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
-    fontWeight: '700',
     color: '#64748b',
+
   },
   infoValue: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#0f172a',
-    fontWeight: '600',
     flex: 1,
     textAlign: 'right',
+
   },
   invoiceLine: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 6,
+
   },
   invoiceLabel: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
+
   },
   invoiceValue: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
-    fontWeight: '700',
     color: '#0f172a',
+
   },
   discountRow: {
     backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     borderRadius: 8,
     marginVertical: 2,
+
   },
   discountLabel: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
-    fontWeight: '700',
     color: '#047857',
+
   },
   discountValue: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
-    fontWeight: '800',
     color: '#059669',
+
   },
   deferredHint: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
     color: '#0369a1',
     backgroundColor: '#f0f9ff',
@@ -743,27 +838,36 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     textAlign: 'right',
     marginVertical: 4,
+
   },
   totalDivider: {
     height: 1,
     backgroundColor: '#cbd5e1',
     marginVertical: 8,
+
   },
   totalRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 4,
+
   },
   totalLabel: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 14,
-    fontWeight: '800',
     color: '#0f172a',
+
   },
   totalValue: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 16,
-    fontWeight: '900',
     color: '#059669',
+
   },
   paymentStatusBadge: {
     flexDirection: 'row-reverse',
@@ -773,47 +877,64 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     marginTop: 8,
+
   },
   paymentStatusText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
     color: '#475569',
-    fontWeight: '600',
+
   },
   ratingStarsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
     marginBottom: 8,
+
   },
   ratingScoreText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
-    fontWeight: '800',
     color: '#d97706',
     marginRight: 8,
+
   },
   commentText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#334155',
     lineHeight: 20,
     textAlign: 'right',
     fontStyle: 'italic',
     marginBottom: 8,
+
   },
   tagsContainer: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     gap: 6,
+
   },
   tagBadge: {
     backgroundColor: '#e0f2fe',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
+
   },
   tagBadgeText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 10,
-    fontWeight: '700',
     color: '#0369a1',
+
   },
   cancelBox: {
     backgroundColor: '#fef2f2',
@@ -822,26 +943,38 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
+
   },
   cancelBoxTitleRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
     marginBottom: 6,
+
   },
   cancelBoxTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
-    fontWeight: '800',
     color: '#991b1b',
+
   },
   cancelBoxDesc: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
     color: '#7f1d1d',
     lineHeight: 18,
     textAlign: 'right',
     marginBottom: 10,
+
   },
   cancelInput: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#fca5a5',
@@ -852,10 +985,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     color: '#0f172a',
     marginBottom: 10,
+
+    minHeight: 44,
   },
   cancelActionsRow: {
     flexDirection: 'row-reverse',
     gap: 8,
+
   },
   confirmCancelBtn: {
     flex: 1,
@@ -863,11 +999,16 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
+
+    minHeight: 44,
   },
   confirmCancelText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#fff',
     fontSize: 12,
-    fontWeight: '800',
+
   },
   abortCancelBtn: {
     paddingHorizontal: 16,
@@ -877,11 +1018,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#cbd5e1',
     alignItems: 'center',
+
+    minHeight: 44,
   },
   abortCancelText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#475569',
     fontSize: 12,
-    fontWeight: '700',
+
   },
   footer: {
     flexDirection: 'row-reverse',
@@ -890,6 +1036,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     gap: 8,
     backgroundColor: '#fff',
+
   },
   footerRatingBtn: {
     flex: 1,
@@ -900,11 +1047,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#f59e0b',
     paddingVertical: 12,
     borderRadius: 12,
+
+    minHeight: 44,
   },
   footerRatingText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#fff',
     fontSize: 12,
-    fontWeight: '800',
+
   },
   footerCancelBtn: {
     flex: 1,
@@ -913,11 +1065,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+
+    minHeight: 44,
   },
   footerCancelText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#b91c1c',
     fontSize: 12,
-    fontWeight: '800',
+
   },
   footerSupportBtn: {
     flexDirection: 'row-reverse',
@@ -929,10 +1086,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
+
+    minHeight: 44,
   },
   footerSupportText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#0369a1',
     fontSize: 12,
-    fontWeight: '700',
-  },
-});
+
+  }});

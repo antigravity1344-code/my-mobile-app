@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { Phone, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
+import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
+import { type } from '../../theme';
 
 interface UserData {
   id: string;
@@ -134,6 +136,7 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
               <View style={styles.inputWrapper}>
                 <Phone size={18} color="#64748b" />
                 <TextInput
+                  {...RTL_SINGLE_LINE_INPUT}
                   style={styles.input}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
@@ -183,6 +186,8 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -211,12 +216,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#0284c7',
   },
   brandTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     textAlign: 'right',
     color: '#ffffff',
     fontSize: 24,
-    fontWeight: '900',
   },
   brandSubtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     textAlign: 'right',
     color: '#94a3b8',
     fontSize: 11,
@@ -237,12 +247,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   title: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 17,
-    fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
   },
   subtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
     textAlign: 'right',
@@ -258,14 +273,18 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#b91c1c',
     fontSize: 12,
     textAlign: 'right',
-    fontWeight: '700',
   },
   inputLabel: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
-    fontWeight: '700',
     color: '#334155',
     textAlign: 'right',
     marginBottom: 8,
@@ -279,18 +298,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     marginBottom: 20,
-    height: 48,
+    minHeight: 48,
     gap: 8,
   },
   input: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     flex: 1,
-    height: '100%',
+    minHeight: 44,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 14,
-    fontWeight: '600',
   },
   otpInput: {
+    ...type.bold,
+    fontWeight: '400',
+    writingDirection: 'ltr',
+    includeFontPadding: false,
     backgroundColor: '#f8fafc',
     borderWidth: 2,
     borderColor: '#0284c7',
@@ -299,7 +324,6 @@ const styles = StyleSheet.create({
     height: 52,
     textAlign: 'center',
     fontSize: 22,
-    fontWeight: '900',
     letterSpacing: 8,
     marginBottom: 12,
   },
@@ -311,30 +335,39 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   hintText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
     color: '#64748b',
-    fontWeight: '600',
+    textAlign: 'center',
   },
   submitButton: {
     borderRadius: 16,
+    minHeight: 48,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0284c7',
   },
   submitButtonText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '800',
   },
   backButton: {
     marginTop: 14,
-    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   backButtonText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#64748b',
     fontSize: 12,
-    fontWeight: '700',
   },
 });

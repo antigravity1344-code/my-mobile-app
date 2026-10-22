@@ -617,8 +617,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 21,
     color: colors.teal,
-    textAlign: 'left',
-    paddingLeft: 8,
+    textAlign: 'right',
+    paddingRight: 8,
   },
   sectionTitle: {
     ...type.bold,
@@ -883,6 +883,8 @@ const styles = StyleSheet.create({
   heroMore: {
     alignSelf: 'flex-end',
     marginTop: 8,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   heroMoreText: {
     ...type.medium,

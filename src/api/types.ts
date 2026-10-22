@@ -88,6 +88,7 @@ export interface ApiOrder {
   startPromptEventId?: string | null;
   /** Worker-only flag provided after assignment. */
   startReported?: boolean;
+  startStatus?: string | null;
   startAcceptanceKey?: string | null;
 }
 

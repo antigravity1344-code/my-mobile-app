@@ -28,6 +28,8 @@ import { startOrderStatusWatch } from '../services/orderStatusWatch';
 import { OrderDetailModal } from './OrderDetailModal';
 import { OrderRatingModal } from './OrderRatingModal';
 import { formatStoredAmount } from '../services/money';
+import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
+import { type } from '../../../theme';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
@@ -183,6 +185,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
           <View style={styles.searchInputWrap}>
             <Search size={16} color="#94a3b8" />
             <TextInput
+              {...RTL_SINGLE_LINE_INPUT}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="جستجوی خدمت، محله یا متخصص..."
@@ -248,6 +251,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
         ) : loadError && orders.length === 0 ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>{loadError}</Text>
+            <Pressable onPress={() => void refreshOrders()} style={styles.retryBtn} accessibilityRole="button">
+              <Text style={styles.retryText}>تلاش دوباره</Text>
+            </Pressable>
           </View>
         ) : orders.length === 0 ? (
           <EmptyOrdersState
@@ -307,6 +313,8 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
   );
 };
 
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -327,20 +335,25 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   title: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 20,
-    fontWeight: '900',
     color: '#0f172a',
     textAlign: 'right',
   },
   subtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
     textAlign: 'right',
     marginTop: 2,
   },
   refreshBtn: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     backgroundColor: '#f0f9ff',
     borderWidth: 1,
@@ -376,15 +389,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statNumber: {
+    ...type.bold,
+    fontWeight: '400',
     fontSize: 15,
-    fontWeight: '900',
     color: '#0284c7',
     marginBottom: 2,
     textAlign: 'center',
   },
   statTitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 10,
-    fontWeight: '600',
     color: '#64748b',
     textAlign: 'center',
   },
@@ -403,10 +419,13 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
     borderRadius: 14,
     paddingHorizontal: 12,
-    height: 44,
+    minHeight: 44,
     gap: 8,
   },
   searchInput: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     flex: 1,
     fontSize: 12,
     color: '#0f172a',
@@ -443,13 +462,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sortTitle: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
-    fontWeight: '700',
     color: '#475569',
   },
   sortChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: '#f1f5f9',
   },
@@ -457,13 +479,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#0284c7',
   },
   sortChipText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 11,
-    fontWeight: '600',
     color: '#64748b',
   },
   sortChipTextActive: {
+    ...type.bold,
+    fontWeight: '400',
     color: '#fff',
-    fontWeight: '700',
   },
   tabsWrap: {
     marginBottom: 14,
@@ -474,9 +499,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
     color: '#64748b',
-    fontWeight: '600',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  retryText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
+    color: '#0f766e',
+    textAlign: 'center',
   },
   ordersList: {
     gap: 4,

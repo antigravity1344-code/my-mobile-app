@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { UserCheck, MapPin } from 'lucide-react-native';
 import { BottomSheetModal } from './BottomSheetModal';
+import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
+import { type } from '../../theme';
 import { apiFetch } from '../../api/apiClient';
 import type { ApiUser } from '../../api/types';
 
@@ -183,6 +185,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
               <View onLayout={registerField('name')}>
                 <Text style={styles.label}>نام و نام خانوادگی:</Text>
                 <TextInput
+                  {...RTL_SINGLE_LINE_INPUT}
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
@@ -196,6 +199,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
               <View onLayout={registerField('nationalId')}>
                 <Text style={styles.label}>کد ملی ۱۰ رقمی:</Text>
                 <TextInput
+                  {...RTL_SINGLE_LINE_INPUT}
                   style={styles.input}
                   value={nationalId}
                   onChangeText={setNationalId}
@@ -211,6 +215,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
               <View onLayout={registerField('birthDate')}>
                 <Text style={styles.label}>تاریخ تولد:</Text>
                 <TextInput
+                  {...RTL_SINGLE_LINE_INPUT}
                   style={styles.input}
                   value={birthDate}
                   onChangeText={setBirthDate}
@@ -226,6 +231,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
                 <View style={styles.inputWrapper}>
                   <MapPin size={18} color="#64748b" />
                   <TextInput
+                    {...RTL_SINGLE_LINE_INPUT}
                     style={styles.inputInner}
                     value={address}
                     onChangeText={setAddress}
@@ -253,6 +259,8 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
     </BottomSheetModal>
   );
 };
+
+const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 
 const styles = StyleSheet.create({
   flex: {
@@ -298,12 +306,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 18,
-    fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
+    flex: 1,
   },
   subtitle: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
     textAlign: 'right',
@@ -319,25 +333,32 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#b91c1c',
     fontSize: 12,
     textAlign: 'right',
-    fontWeight: '700',
   },
   label: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     fontSize: 13,
-    fontWeight: '700',
     color: '#334155',
     textAlign: 'right',
     marginBottom: 6,
   },
   input: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 48,
+    minHeight: 48,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 14,
@@ -351,27 +372,34 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
     borderRadius: 12,
     paddingHorizontal: 12,
-    height: 48,
+    minHeight: 48,
     gap: 8,
     marginBottom: 20,
   },
   inputInner: {
+    ...type.regular,
+    ...fa,
+    fontWeight: '400',
     flex: 1,
-    height: '100%',
+    minHeight: 44,
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 14,
   },
   submitBtn: {
     backgroundColor: '#0284c7',
+    minHeight: 48,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 10,
   },
   submitBtnText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '800',
   },
 });
