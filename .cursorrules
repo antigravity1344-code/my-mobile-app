@@ -1,0 +1,37 @@
+# Paksho — Cursor Bot Rules
+
+## شاخه اصلی
+شاخه پیش‌فرض و مرجع توسعه `ui/customer-home-redesign` است، نه `main`.
+قبل از هر کاری تأیید کن روی این شاخه هستی:
+```
+git branch --show-current
+```
+اگر نبودی:
+```
+git checkout ui/customer-home-redesign
+git pull origin ui/customer-home-redesign
+```
+
+## راه‌اندازی Metro
+برای تست روی گوشی **همیشه** با این دستور Metro را start کن:
+```powershell
+adb reverse tcp:8081 tcp:8081
+$env:EXPO_PUBLIC_PAKSHO_UI_PREVIEW="1"
+npx expo start --port 8081 --clear
+```
+
+بدون `EXPO_PUBLIC_PAKSHO_UI_PREVIEW="1"` اپ فقط ورود با پیامک واقعی نشان می‌دهد و قابل تست نیست.
+با این متغیر، اپ دو گزینه نشان می‌دهد: **ورود به پیش‌نمایش بدون پیامک** و ورود واقعی.
+برای تست همیشه از گزینه پیش‌نمایش (بدون پیامک) استفاده کن.
+
+## package names
+- اپ مشتری: `com.paksho.customer`
+- اپ متخصص: `com.paksho.worker`
+هرگز از suffix دیگری استفاده نکن.
+
+## ممنوع بدون اجازه مالک
+- merge / rebase
+- force push
+- حذف شاخه
+- push مستقیم به `ui/customer-home-redesign`
+- تغییر CI یا تنظیمات
