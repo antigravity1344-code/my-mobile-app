@@ -477,6 +477,33 @@ app.get('/api/users/me', (req, res) => {
   res.json({ success: true, user: publicUser(authUser) });
 });
 
+// درجهٔ داخلی خود متخصص (D-67، D-71). فقط برای خود او؛ آستانه، امتیاز و موجودی فرستاده نمی‌شود.
+// خواندن ردیفی نمی‌سازد و نبودن ردیف یعنی خاکستری (D-40).
+app.get('/api/workers/me/tier', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'WORKER') {
+    return res.status(403).json({ success: false, message: 'درجه فقط برای متخصص است.' });
+  }
+  const account = store.getUserPoints(authUser.id);
+  res.json({
+    success: true,
+    tierKey: account && account.tierKey ? account.tierKey : 'gray',
+    tierSince: account && account.tierSince ? account.tierSince : null,
+  });
+});
+
+// میانگین ستارهٔ خود متخصص (D-73). فقط برای خود او؛ نظر و برچسب مشتری فرستاده نمی‌شود (D-32).
+app.get('/api/workers/me/rating', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'WORKER') {
+    return res.status(403).json({ success: false, message: 'میانگین ستاره فقط برای متخصص است.' });
+  }
+  const stats = store.workerRatingStats(authUser.id);
+  res.json({ success: true, average: stats.average, count: stats.count });
+});
+
 // 3. پروفایل مشتری
 app.put('/api/users/customer-profile', (req, res) => {
   const authUser = requireUser(req, res);
@@ -1528,7 +1555,12 @@ app.get('/api/admin/orders', (req, res) => {
 
 // قوانین امتیاز فقط از مسیر مدیر و فقط با نسخه جدید ثبت می‌شوند (D-04). ویرایش و حذف وجود ندارد.
 app.get('/api/admin/point-rules', (req, res) => {
-  res.json({ success: true, rules: store.listPointRules() });
+  res.json({
+    success: true,
+    rules: store.listPointRules(),
+    effectiveWorkerTier: store.effectiveTierRule('tiers.worker'),
+    effectiveEarn: store.effectiveEarnRule(),
+  });
 });
 
 app.post('/api/admin/point-rules', (req, res) => {
@@ -1771,6 +1803,14 @@ app.get('/admin/tariff.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminTariff.js'));
 });
 
+app.get('/admin/tiers.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminTiers.js'));
+});
+
+app.get('/admin/points.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminPoints.js'));
+});
+
 app.get('/admin', (req, res) => {
   const identityJson = sourceIdentityScriptJson(SOURCE_IDENTITY);
   res.send(`
@@ -1832,6 +1872,12 @@ app.get('/admin', (req, res) => {
       <button id="tabTariffsBtn" onclick="switchTab('tariffs')" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         تعرفه خدمات
       </button>
+      <button id="tabTiersBtn" onclick="switchTab('tiers'); loadAdminTiers()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
+        قانون درجه‌ها
+      </button>
+      <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
+        قانون امتیاز
+      </button>
     </div>
 
     <!-- محتوای متخصصین -->
@@ -1859,6 +1905,22 @@ app.get('/admin', (req, res) => {
       <div id="tariffContent" class="space-y-4"></div>
     </section>
 
+    <section id="tabTiers" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">قانون درجه‌های متخصص</h3>
+      <p class="text-sm text-slate-300">تا وقتی نسخهٔ فعالی ثبت نشده، پیش‌فرض سامانه به کار می‌رود: نقره‌ای با ۲۰ سفارش موفق و میانگین ستارهٔ حداقل ۴، طلایی با ۱۰۰ سفارش موفق و میانگین حداقل ۴٫۵. متخصصی که هنوز ستاره‌ای نگرفته شرط میانگین را ندارد. هر تغییر نسخهٔ جدید می‌سازد و نسخه‌های قبلی می‌مانند. درجهٔ متخصص پایین نمی‌آید و با تکمیل سفارش بعدی‌اش به‌روز می‌شود.</p>
+      <p id="tierMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="tierRefresh" type="button" onclick="loadAdminTiers()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون درجه‌ها</button>
+      <div id="tierContent" class="space-y-4"></div>
+    </section>
+
+    <section id="tabPoints" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">قانون امتیاز</h3>
+      <p class="text-sm text-slate-300">تا وقتی نسخهٔ فعالی ثبت نشده، پیش‌فرض سامانه به کار می‌رود: هر سفارش موفق ۵ امتیاز برای مشتری و ۵ امتیاز برای متخصص، و ۲ امتیاز اضافه برای متخصص وقتی مشتری ۵ ستاره بدهد. هر تغییر نسخهٔ جدید می‌سازد و امتیازهای قبلی عوض نمی‌شوند.</p>
+      <p id="pointsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="pointsRefresh" type="button" onclick="loadAdminPoints()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون امتیاز</button>
+      <div id="pointsContent" class="space-y-4"></div>
+    </section>
+
   </div>
 
   <details class="max-w-6xl mx-auto mt-6 text-xs text-slate-300">
@@ -1868,6 +1930,8 @@ app.get('/admin', (req, res) => {
   </details>
 
   <script src="/admin/tariff.js"></script>
+  <script src="/admin/tiers.js"></script>
+<script src="/admin/points.js"></script>
   <script>
     const sourceIdentity = ${identityJson};
     const identityState = !sourceIdentity.commit || sourceIdentity.dirty == null ? 'منبع نامشخص'
@@ -2110,7 +2174,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

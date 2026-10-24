@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors, shadowSm } from '../../theme/customerHome';
 import { previewScenario, setPreviewScenario, type Scenario } from './previewRuntime';
 
 const scenarios: Array<[Scenario, string]> = [
@@ -20,19 +21,20 @@ export function RealUiPreview({ role, onExit, renderApp }: {
 }) {
   const [selected, setSelected] = useState<Scenario>(previewScenario());
   const [revision, setRevision] = useState(0);
+  const w = role === 'worker';
   return (
-    <View style={styles.container}>
-      <View style={styles.toolbar}>
-        <Text style={styles.title}>حالت پیش‌نمایش | {role === 'worker' ? 'متخصص' : 'مشتری'}</Text>
+    <View style={[styles.container, w && workerStyles.container]}>
+      <View style={[styles.toolbar, w && workerStyles.toolbar]}>
+        <Text style={[styles.title, w && workerStyles.title]}>حالت پیش‌نمایش | {role === 'worker' ? 'متخصص' : 'مشتری'}</Text>
         <Pressable onPress={onExit} accessibilityRole="button">
-          <Text style={styles.exit}>خروج از پیش‌نمایش</Text>
+          <Text style={[styles.exit, w && workerStyles.exit]}>خروج از پیش‌نمایش</Text>
         </Pressable>
         <ScrollView horizontal contentContainerStyle={styles.scenarios}>
           {scenarios.map(([key, label]) => (
             <Pressable key={key} accessibilityRole="button"
               onPress={() => { setPreviewScenario(key); setSelected(key); setRevision((v) => v + 1); }}
-              style={[styles.chip, selected === key && styles.active]}>
-              <Text style={[styles.chipText, selected === key && styles.activeText]}>{label}</Text>
+              style={[styles.chip, w && workerStyles.chip, selected === key && (w ? workerStyles.active : styles.active)]}>
+              <Text style={[styles.chipText, w && workerStyles.chipText, selected === key && (w ? workerStyles.activeText : styles.activeText)]}>{label}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -52,4 +54,16 @@ const styles = StyleSheet.create({
   chipText: { color: '#fff', fontSize: 11 },
   activeText: { color: '#164a63', fontWeight: '800' },
   app: { flex: 1 },
+});
+
+// Light theme for the worker (specialist) app only; customer look unchanged.
+const workerStyles = StyleSheet.create({
+  container: { backgroundColor: colors.bg },
+  toolbar: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, ...shadowSm },
+  title: { color: colors.text },
+  exit: { color: colors.teal },
+  chip: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  chipText: { color: colors.text },
+  active: { backgroundColor: colors.teal, borderColor: colors.teal },
+  activeText: { color: colors.white, fontWeight: '800' },
 });

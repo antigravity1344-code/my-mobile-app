@@ -47,7 +47,7 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
     setLoading(true);
     const res = await apiFetch('/notifications');
     if (!res.success || !Array.isArray(res.notifications)) {
-      setError(res.message || 'خواندن اعلان‌ها ممکن نشد.');
+      setError(res.message || 'اعلان‌ها دریافت نشدند. دوباره تلاش کنید.');
       setLoading(false);
       return;
     }
@@ -80,7 +80,7 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color="#0f766e" />
-          <Text style={[styles.hint, workerAppearance && workerStyles.hint]}>در حال خواندن اعلان‌ها...</Text>
+          <Text style={[styles.hint, workerAppearance && workerStyles.hint]}>در حال دریافت اعلان‌ها...</Text>
         </View>
       ) : null}
       {error && !loading ? (
@@ -91,7 +91,7 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
           </Pressable>
         </View>
       ) : null}
-      {!loading && !error && items.length === 0 ? <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>اعلانی ثبت نشده است.</Text> : null}
+      {!loading && !error && items.length === 0 ? <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>هنوز اعلانی ندارید.</Text> : null}
       {items.map((item) => (
         <Pressable key={item.id} onPress={() => void openNotification(item)} style={[styles.card, workerAppearance && workerStyles.card, !item.readAt && styles.unread]}>
           <Text style={styles.cardTitle}>{formatNotificationText(item.title)}</Text>

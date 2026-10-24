@@ -3,7 +3,7 @@ import { SERVICES_CATALOG } from '../../config/servicesData';
 const GENDER_LABELS: Record<string, string> = {
   FEMALE: 'خانم',
   MALE: 'آقا',
-  NO_PREFERENCE: 'بدون ترجیح',
+  NO_PREFERENCE: 'فرقی ندارد',
 };
 
 export type WorkerServiceCategory = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';

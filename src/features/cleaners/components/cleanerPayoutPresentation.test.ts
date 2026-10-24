@@ -11,7 +11,7 @@ describe('unapproved specialist settlement policy', () => {
 
   it('worker orders show the gross amount without a fixed payout deduction', () => {
     const source = readFileSync(join(__dirname, '../../../components/native/NativeWorkerPortal.tsx'), 'utf8');
-    expect(source).toContain('مبلغ سفارش');
+    expect(source).toContain('workerPriceLine(order.serviceId, order.rawPrice');
     expect(source).not.toContain('منتظر تأیید مشتری بمانید');
     expect(source).not.toMatch(/price\s*\*\s*0\.8/);
   });

@@ -1,7 +1,8 @@
 /**
  * هسته امتیاز (مرحله ۲ معماری، D-03 / D-04 / D-30).
- * هیچ مبلغ، جریمه، آستانه یا تعداد فرصتی در این فایل ثابت نشده است.
- * اثر امتیازی فقط وقتی رخ می‌دهد که قانون فعالِ همان کلید در point_rules منتشر شده باشد.
+ * هیچ مبلغ، جریمه، آستانه یا تعداد فرصتی در این فایل ثابت نشده است؛ تنها استثناها قانون پیش‌فرض درجهٔ متخصص (D-71)
+ * و قانون پیش‌فرض امتیاز سفارش موفق (D-72) هستند.
+ * جز این دو، اثر امتیازی فقط وقتی رخ می‌دهد که قانون فعالِ همان کلید در point_rules منتشر شده باشد.
  * سطح‌بندی جریمه بر اساس زمان لغو نهایی نشده و اینجا اعمال نمی‌شود؛ اگر قانون cancel.penalty منتشر شود فقط یک مقدار amount خوانده می‌شود.
  */
 const crypto = require('crypto');
@@ -9,6 +10,27 @@ const crypto = require('crypto');
 const LEDGER_UNITS = new Set(['points', 'free_cancel']);
 const ACTORS = new Set(['system', 'admin']);
 const TIER_RANKS = Object.freeze({ gray: 0, silver: 1, gold: 2, gold_plus: 3 });
+/**
+ * قانون پیش‌فرض درجهٔ متخصص (D-71). فقط وقتی به کار می‌رود که قانون فعال tiers.worker در point_rules نباشد.
+ * خاکستری پایه است، نقره‌ای با ۲۰ سفارش موفق و میانگین ستارهٔ حداقل ۴، طلایی با ۱۰۰ سفارش موفق و میانگین حداقل ۴٫۵
+ * (اصلاح D-71، ۲ آبان ۱۴۰۵). شرط امتیاز ندارد و طلایی پلاس در پیش‌فرض نیست.
+ * هر استقرار می‌تواند با POST /api/admin/point-rules نسخهٔ خودش را ثبت کند.
+ */
+const DEFAULT_WORKER_TIER_RULE = Object.freeze({
+  levels: Object.freeze([
+    Object.freeze({ tierKey: 'gray' }),
+    Object.freeze({ tierKey: 'silver', minPoints: 0, minCompleted: 20, minRating: 4 }),
+    Object.freeze({ tierKey: 'gold', minPoints: 0, minCompleted: 100, minRating: 4.5 }),
+  ]),
+});
+/**
+ * قانون پیش‌فرض امتیاز (D-72). فقط وقتی به کار می‌رود که قانون فعال earn.orderCompleted در point_rules نباشد.
+ * هر سفارش موفق: ۵ امتیاز برای مشتری و ۵ برای متخصص؛ اگر مشتری ۵ ستاره بدهد، متخصص ۲ امتیاز اضافه می‌گیرد.
+ * ردیف‌های دفتر که از این پیش‌فرض ساخته می‌شوند ruleVersion = 0 دارند.
+ */
+const DEFAULT_EARN_RULE = Object.freeze({ customerAmount: 5, workerAmount: 5, workerFiveStarBonus: 2 });
+const DEFAULT_RULE_VERSION = 0;
+const MAX_RATING = 5;
 const ACTIVE_ORDER_STATUSES = Object.freeze(['ACCEPTED', 'IN_PROGRESS', 'CONFIRMED', 'ASSIGNED']);
 const RULE_KEY_PATTERN = /^[a-z][A-Za-z0-9.]{0,63}$/;
 const REASON_CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
@@ -136,6 +158,9 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
   const countWorkerCompleted = database.prepare(
     "SELECT COUNT(*) AS n FROM orders WHERE cleanerId = ? AND status = 'COMPLETED'"
   );
+  const listWorkerRatings = database.prepare(
+    "SELECT ratingsJson FROM orders WHERE cleanerId = ? AND status = 'COMPLETED' AND ratingsJson IS NOT NULL"
+  );
 
   function newId(prefix) {
     return prefix + Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
@@ -242,6 +267,9 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
   }
 
   function knownRule(ruleKey, ruleVersion) {
+    if (ruleKey === 'earn.orderCompleted' && ruleVersion === DEFAULT_RULE_VERSION) {
+      return { ruleKey, version: DEFAULT_RULE_VERSION, value: { ...DEFAULT_EARN_RULE }, active: true };
+    }
     if (!RULE_KEY_PATTERN.test(ruleKey) || !Number.isInteger(ruleVersion) || ruleVersion < 1) return null;
     return ruleFromRow(selectRuleVersion.get(ruleKey, ruleVersion));
   }
@@ -432,28 +460,75 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
     return stmt.get(userId).n;
   }
 
-  function parseTierRule(value) {
+  /** میانگین ستاره‌ای که مشتری‌ها به سفارش‌های موفق این متخصص داده‌اند (D-73)؛ گرد شده تا یک رقم اعشار. */
+  function workerRatingStats(userId) {
+    if (typeof userId !== 'string' || !userId) return { average: null, count: 0 };
+    let sum = 0;
+    let count = 0;
+    for (const row of listWorkerRatings.all(userId)) {
+      let ratings = null;
+      try {
+        ratings = JSON.parse(row.ratingsJson);
+      } catch (error) {
+        ratings = null;
+      }
+      const value = ratings && ratings.customerRating;
+      if (!Number.isInteger(value) || value < 1 || value > MAX_RATING) continue;
+      sum += value;
+      count += 1;
+    }
+    if (count === 0) return { average: null, count: 0 };
+    return { average: Math.round((sum / count) * 10) / 10, count };
+  }
+
+  // minRating اختیاری است (اصلاح D-71): صفر یا نبودنش یعنی شرط ستاره ندارد. فقط برای tiers.worker پذیرفته می‌شود.
+  function parseTierRule(value, allowRating) {
     if (!isPlainObject(value) || Object.keys(value).length !== 1 || !Array.isArray(value.levels)) return null;
     if (value.levels.length === 0) return null;
+    const allowedKeys = allowRating ? ['tierKey', 'minPoints', 'minCompleted', 'minRating'] : ['tierKey', 'minPoints', 'minCompleted'];
     const levels = [];
     for (const level of value.levels) {
       if (!isPlainObject(level)) return null;
-      if (Object.keys(level).some((key) => !['tierKey', 'minPoints', 'minCompleted'].includes(key))) return null;
+      if (Object.keys(level).some((key) => !allowedKeys.includes(key))) return null;
       if (!Object.prototype.hasOwnProperty.call(TIER_RANKS, level.tierKey)) return null;
       if (level.tierKey === 'gray') {
-        levels.push({ tierKey: 'gray', minPoints: 0, minCompleted: 0, rank: 0 });
+        levels.push({ tierKey: 'gray', minPoints: 0, minCompleted: 0, minRating: 0, rank: 0 });
         continue;
       }
       if (!Number.isInteger(level.minPoints) || level.minPoints < 0) return null;
       if (!Number.isInteger(level.minCompleted) || level.minCompleted < 0) return null;
+      const minRating = level.minRating == null ? 0 : level.minRating;
+      if (typeof minRating !== 'number' || !Number.isFinite(minRating) || minRating < 0 || minRating > MAX_RATING) return null;
+      if (Math.round(minRating * 10) !== minRating * 10) return null;
       levels.push({
         tierKey: level.tierKey,
         minPoints: level.minPoints,
         minCompleted: level.minCompleted,
+        minRating,
         rank: TIER_RANKS[level.tierKey],
       });
     }
     return levels;
+  }
+
+  /** قانون امتیاز مؤثر (D-72): آخرین نسخهٔ فعال، وگرنه پیش‌فرض با نسخهٔ ۰. نسخهٔ فعالِ نامعتبر null است. */
+  function effectiveEarnRule() {
+    const rule = rulesFor('earn.orderCompleted');
+    if (rule && rule.active) {
+      if (!isEarnValue(rule.value)) return null;
+      return { source: 'rule', ruleKey: rule.ruleKey, version: rule.version, value: rule.value };
+    }
+    return { source: 'default', ruleKey: 'earn.orderCompleted', version: DEFAULT_RULE_VERSION, value: { ...DEFAULT_EARN_RULE } };
+  }
+
+  /** قانون درجهٔ مؤثر: آخرین نسخهٔ فعال، وگرنه برای متخصص پیش‌فرض D-71. برای مشتری بدون قانون فعال null است. */
+  function effectiveTierRule(ruleKey) {
+    const rule = rulesFor(ruleKey);
+    if (rule && rule.active) return { source: 'rule', version: rule.version, value: rule.value };
+    if (ruleKey === 'tiers.worker') {
+      return { source: 'default', version: null, value: JSON.parse(JSON.stringify(DEFAULT_WORKER_TIER_RULE)) };
+    }
+    return null;
   }
 
   function recomputeTier(userId) {
@@ -463,14 +538,17 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
       const account = getUserPoints(userId);
       if (!account) return { code: 'no-account' };
       const ruleKey = user.role === 'WORKER' ? 'tiers.worker' : 'tiers.customer';
-      const rule = rulesFor(ruleKey);
-      if (!rule || !rule.active) return { code: 'ok', tierKey: account.tierKey, changed: false };
-      const levels = parseTierRule(rule.value);
+      const rule = effectiveTierRule(ruleKey);
+      if (!rule) return { code: 'ok', tierKey: account.tierKey, changed: false };
+      const levels = parseTierRule(rule.value, ruleKey === 'tiers.worker');
       if (!levels) return { code: 'rule-unsupported', tierKey: account.tierKey, changed: false };
       const completed = countCompleted(userId, user.role);
+      const stars = user.role === 'WORKER' ? workerRatingStats(userId) : { average: null, count: 0 };
+      // متخصص بدون هیچ ستاره شرط حداقل میانگین را ندارد (اصلاح D-71).
+      const ratingOk = (level) => !level.minRating || (stars.count > 0 && stars.average >= level.minRating);
       let best = { tierKey: 'gray', rank: 0 };
       for (const level of levels) {
-        if (account.balance >= level.minPoints && completed >= level.minCompleted && level.rank >= best.rank) {
+        if (account.balance >= level.minPoints && completed >= level.minCompleted && ratingOk(level) && level.rank >= best.rank) {
           best = level;
         }
       }
@@ -494,14 +572,14 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
     if (ruleKey === 'cancel.penalty') return isPenaltyValue(value);
     if (ruleKey === 'cancel.freeAllowance') return parseAllowance(value) != null;
     if (ruleKey === 'earn.orderCompleted') return isEarnValue(value);
-    if (ruleKey === 'tiers.customer' || ruleKey === 'tiers.worker') return parseTierRule(value) != null;
+    if (ruleKey === 'tiers.customer' || ruleKey === 'tiers.worker') return parseTierRule(value, ruleKey === 'tiers.worker') != null;
     return true;
   }
 
   function isEarnValue(value) {
     if (!isPlainObject(value)) return false;
     const keys = Object.keys(value);
-    const allowed = new Set(['customerAmount', 'workerAmount']);
+    const allowed = new Set(['customerAmount', 'workerAmount', 'workerFiveStarBonus']);
     if (keys.length === 0 || keys.some((key) => !allowed.has(key))) return false;
     return keys.every((key) => Number.isInteger(value[key]) && value[key] >= 0);
   }
@@ -717,12 +795,13 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
   function onOrderEvent(event) {
     if (!event || (event.name !== 'completed' && event.name !== 'rated')) return { code: 'invalid' };
     return transaction(() => {
-      if (event.name === 'rated') return { code: 'ok', effects: [] };
       const order = event.order;
       if (!order || typeof order.id !== 'string' || !order.id) return { code: 'invalid' };
+      if (event.name === 'rated') return onRated(order);
       const effects = [];
-      const earn = rulesFor('earn.orderCompleted');
-      if (earn && earn.active && isEarnValue(earn.value)) {
+      const rawEarn = rulesFor('earn.orderCompleted');
+      const earn = effectiveEarnRule();
+      if (earn) {
         if (order.customerId && earn.value.customerAmount > 0) {
           effects.push(
             postEntry({
@@ -755,8 +834,8 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
             })
           );
         }
-      } else if (earn && earn.active) {
-        effects.push({ code: 'rule-unsupported', ruleKey: earn.ruleKey });
+      } else {
+        effects.push({ code: 'rule-unsupported', ruleKey: rawEarn ? rawEarn.ruleKey : 'earn.orderCompleted' });
       }
       const free = earnFreeCancel(order);
       if (free) effects.push(free);
@@ -764,7 +843,8 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
         ensureAccount(order.customerId);
         effects.push(recomputeTier(order.customerId));
       }
-      if (order.cleanerId && rulesFor('tiers.worker') && rulesFor('tiers.worker').active) {
+      // درجهٔ متخصص همیشه ارزیابی می‌شود؛ بدون قانون فعال، پیش‌فرض D-71 به کار می‌رود.
+      if (order.cleanerId && effectiveTierRule('tiers.worker')) {
         const worker = getUser(order.cleanerId);
         if (worker) {
           ensureRow(worker);
@@ -775,14 +855,49 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
     });
   }
 
+  // جایزهٔ ۵ ستاره برای متخصص (D-72). هر سفارش فقط یک بار امتیاز می‌گیرد؛ امتیازدهنده (مشتری) چیزی نمی‌گیرد (D-31).
+  function onRated(order) {
+    const effects = [];
+    const rating = order.ratings && order.ratings.customerRating;
+    if (!order.cleanerId || order.status !== 'COMPLETED') return { code: 'ok', effects };
+    const earn = effectiveEarnRule();
+    const bonus = earn && Number.isInteger(earn.value.workerFiveStarBonus) ? earn.value.workerFiveStarBonus : 0;
+    if (rating === MAX_RATING && bonus > 0) {
+      effects.push(
+        postEntry({
+          userId: order.cleanerId,
+          role: 'WORKER',
+          unit: 'points',
+          delta: bonus,
+          reasonCode: 'five_star_bonus',
+          orderId: order.id,
+          ruleKey: earn.ruleKey,
+          ruleVersion: earn.version,
+          idempotencyKey: 'earn:fivestar:' + order.id + ':worker',
+          actor: 'system',
+        })
+      );
+    }
+    // ستارهٔ تازه میانگین را عوض می‌کند، پس درجهٔ متخصص دوباره ارزیابی می‌شود.
+    const worker = getUser(order.cleanerId);
+    if (worker && effectiveTierRule('tiers.worker')) {
+      ensureRow(worker);
+      effects.push(recomputeTier(order.cleanerId));
+    }
+    return { code: 'ok', effects };
+  }
+
   return {
     publishRule,
     rulesFor,
+    effectiveEarnRule,
+    workerRatingStats,
     listPointRules,
     postEntry,
     postTransfer,
     reverseEntry,
     recomputeTier,
+    effectiveTierRule,
     quoteCancelPenalty,
     onOrderEvent,
     ensureAccount,
@@ -791,4 +906,4 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
   };
 }
 
-module.exports = { createPointsService };
+module.exports = { createPointsService, DEFAULT_WORKER_TIER_RULE, DEFAULT_EARN_RULE };

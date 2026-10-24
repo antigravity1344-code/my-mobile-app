@@ -339,44 +339,45 @@ if (!isMainThread) {
     db.close();
   });
 
-  test('completion awards points and free-cancel refills only from active rules; cancel and rating do not', () => {
+  test('completion awards the D-72 default without a rule, then the active rule; cancel and rating without bonus do not', () => {
     const { db } = freshStore();
     seedPair(db);
     accept(db, 'ORD-BARE');
     assert.equal(db.tryCompleteOrder('ORD-BARE', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
-    assert.equal(db.getUserPoints('USER-C'), null);
-    assert.equal(db.listLedger().length, 0);
+    assert.equal(db.getUserPoints('USER-C').balance, 5, 'default: 5 points for the customer');
+    assert.equal(db.getUserPoints('USER-W').balance, 5, 'default: 5 points for the worker');
+    assert.deepEqual(db.listLedger().map((row) => row.ruleVersion), [0, 0], 'default entries carry ruleVersion 0');
 
     const earn = publish(db, 'earn.orderCompleted', { customerAmount: 7, workerAmount: 6 });
     publish(db, 'cancel.freeAllowance', { initial: 2, earnEveryCompleted: 2, earnAmount: 2, cap: 4 });
     accept(db, 'ORD-1');
     assert.equal(db.tryCompleteOrder('ORD-1', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
-    assert.equal(db.getUserPoints('USER-C').balance, 7);
-    assert.equal(db.getUserPoints('USER-W').balance, 6);
+    assert.equal(db.getUserPoints('USER-C').balance, 12);
+    assert.equal(db.getUserPoints('USER-W').balance, 11);
     // ORD-BARE هم جزو سفارش‌های انجام‌شده است، پس با این تکمیل شمارش به ۲ می‌رسد و یک‌بار فرصت تا سقف اضافه می‌شود.
     assert.equal(db.getUserPoints('USER-C').freeCancelsRemaining, 4);
     accept(db, 'ORD-2');
     assert.equal(db.tryCompleteOrder('ORD-2', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
-    assert.equal(db.getUserPoints('USER-C').balance, 14);
+    assert.equal(db.getUserPoints('USER-C').balance, 19);
     assert.equal(db.getUserPoints('USER-C').freeCancelsRemaining, 4);
     assert.equal(db.tryCompleteOrder('ORD-2', { id: 'USER-W', name: 'متخصص' }).code, 'bad-status');
-    assert.equal(db.getUserPoints('USER-C').balance, 14, 'a repeated completion does not award twice');
-    assert.equal(db.getUserPoints('USER-W').balance, 12);
+    assert.equal(db.getUserPoints('USER-C').balance, 19, 'a repeated completion does not award twice');
+    assert.equal(db.getUserPoints('USER-W').balance, 17);
     assert.equal(db.listLedger('USER-C').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:customer').length, 1);
     assert.equal(db.listLedger('USER-W').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:worker').length, 1);
     const replay = db.onOrderEvent({ name: 'completed', order: db.getOrder('ORD-2') });
     assert.equal(replay.code, 'ok');
     assert.equal(db.listLedger('USER-C').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:customer').length, 1);
     assert.equal(db.listLedger('USER-W').filter((row) => row.idempotencyKey === 'earn:completed:ORD-2:worker').length, 1);
-    assert.equal(db.getUserPoints('USER-C').balance, 14);
-    assert.equal(db.getUserPoints('USER-W').balance, 12);
+    assert.equal(db.getUserPoints('USER-C').balance, 19);
+    assert.equal(db.getUserPoints('USER-W').balance, 17);
 
     const rated = db.createRating('ORD-2', 'USER-C', { customerRating: 5, customerComment: 'خوب بود' });
     assert.equal(rated.code, 'ok');
     assert.equal(db.listLedger('USER-C').some((row) => row.reasonCode === 'rating'), false);
     assert.equal(db.listLedger('USER-W').some((row) => row.reasonCode === 'rating'), false);
-    assert.equal(db.getUserPoints('USER-C').balance, 14);
-    assert.equal(db.getUserPoints('USER-W').balance, 12);
+    assert.equal(db.getUserPoints('USER-C').balance, 19);
+    assert.equal(db.getUserPoints('USER-W').balance, 17, 'an active rule without workerFiveStarBonus gives no bonus');
 
     publish(db, 'cancel.penalty', { amount: 4 });
     const beforeCancel = db.getUserPoints('USER-C').balance;
@@ -649,9 +650,10 @@ if (!isMainThread) {
     assert.equal(afterStars.tier, 'NEW', 'self-given stars do not promote');
     assert.equal(afterStars.discountPercentage, 0);
     assert.equal(afterStars.nextTierOrderTarget, 0);
-    assert.equal(db.getUserPoints('USER-C'), null);
-    assert.equal(db.getUserPoints('USER-W'), null);
-    assert.equal(db.listLedger().length, 0);
+    // پیش‌فرض D-72: هر سفارش ۵ امتیاز برای هر طرف و ۲ امتیاز جایزهٔ ۵ ستاره برای متخصص.
+    assert.equal(db.getUserPoints('USER-C').balance, 15);
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'gray');
+    assert.equal(db.getUserPoints('USER-W').balance, 21);
 
     publish(db, 'earn.orderCompleted', { customerAmount: 7, workerAmount: 6 });
     publish(db, 'tiers.customer', {
@@ -686,8 +688,176 @@ if (!isMainThread) {
     assert.equal(top.tier, 'VIP');
     assert.equal(top.title, 'ویژه');
     assert.equal(top.discountPercentage, 0);
-    assert.equal(db.getUserPoints('USER-W').balance, 6);
+    assert.equal(db.getUserPoints('USER-W').balance, 27);
     assert.equal(db.listLedger().some((row) => row.reasonCode === 'rating'), false);
     db.close();
+  });
+
+  test('worker tier uses the built-in default when no active tiers.worker rule exists (D-71)', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    assert.equal(db.getUserPoints('USER-W'), null, 'reading creates no row');
+    const effective = db.effectiveTierRule('tiers.worker');
+    assert.equal(effective.source, 'default');
+    assert.deepEqual(effective.value.levels.map((level) => level.tierKey), ['gray', 'silver', 'gold']);
+    assert.equal(effective.value.levels[1].minCompleted, 20);
+    assert.equal(effective.value.levels[2].minCompleted, 100);
+    assert.equal(effective.value.levels[1].minRating, 4);
+    assert.equal(effective.value.levels[2].minRating, 4.5);
+    assert.equal(db.effectiveTierRule('tiers.customer'), null, 'customers get no default');
+    for (let i = 1; i <= 20; i += 1) {
+      accept(db, 'ORD-DEF-' + i);
+      assert.equal(db.tryCompleteOrder('ORD-DEF-' + i, { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+      if (i === 19) assert.equal(db.getUserPoints('USER-W').tierKey, 'gray');
+    }
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'gray', 'no ratings means the minimum average is not met');
+    assert.equal(db.createRating('ORD-DEF-1', 'USER-C', { customerRating: 3 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'gray', 'an average of 3 is below silver');
+    assert.equal(db.createRating('ORD-DEF-2', 'USER-C', { customerRating: 5 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'silver');
+    db.close();
+  });
+
+  test('an active admin tiers.worker rule overrides the default; an inactive one falls back (D-71)', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    publish(db, 'tiers.worker', {
+      levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 0, minCompleted: 1 }],
+    });
+    assert.equal(db.effectiveTierRule('tiers.worker').source, 'rule');
+    accept(db, 'ORD-OVR-1');
+    assert.equal(db.tryCompleteOrder('ORD-OVR-1', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'silver');
+    const off = db.publishRule({
+      ruleKey: 'tiers.worker',
+      value: { levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 0, minCompleted: 1 }] },
+      active: false,
+      actor: 'admin',
+    });
+    assert.equal(off.code, 'ok');
+    assert.equal(db.effectiveTierRule('tiers.worker').source, 'default');
+    db.close();
+  });
+
+  test('five stars give the worker the default +2 once; lower stars and the customer get nothing (D-72)', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    accept(db, 'ORD-STAR-1');
+    assert.equal(db.tryCompleteOrder('ORD-STAR-1', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.createRating('ORD-STAR-1', 'USER-C', { customerRating: 5 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').balance, 7);
+    assert.equal(db.getUserPoints('USER-C').balance, 5, 'rating gives the rater nothing (D-31)');
+    db.onOrderEvent({ name: 'rated', order: db.getOrder('ORD-STAR-1') });
+    assert.equal(db.getUserPoints('USER-W').balance, 7, 'a replayed rating does not award twice');
+    assert.equal(db.listLedger('USER-W').filter((row) => row.reasonCode === 'five_star_bonus').length, 1);
+    assert.equal(db.createRating('ORD-STAR-1', 'USER-C', { customerRating: 5 }).code, 'duplicate');
+    accept(db, 'ORD-STAR-2');
+    assert.equal(db.tryCompleteOrder('ORD-STAR-2', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.createRating('ORD-STAR-2', 'USER-C', { customerRating: 4 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').balance, 12);
+    assert.deepEqual(db.workerRatingStats('USER-W'), { average: 4.5, count: 2 });
+    assert.deepEqual(db.workerRatingStats('USER-C'), { average: null, count: 0 });
+
+    publish(db, 'earn.orderCompleted', { customerAmount: 1, workerAmount: 2, workerFiveStarBonus: 9 });
+    accept(db, 'ORD-STAR-3');
+    assert.equal(db.tryCompleteOrder('ORD-STAR-3', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.createRating('ORD-STAR-3', 'USER-C', { customerRating: 5 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').balance, 23, 'admin numbers are used');
+    assert.equal(db.getUserPoints('USER-C').balance, 11);
+    db.publishRule({ ruleKey: 'earn.orderCompleted', value: { customerAmount: 1 }, active: false, actor: 'admin' });
+    assert.equal(db.effectiveEarnRule().source, 'default', 'an inactive version falls back to the default');
+    assert.equal(db.publishRule({ ruleKey: 'earn.orderCompleted', value: { workerFiveStarBonus: -1 }, actor: 'admin' }).code, 'invalid');
+    db.close();
+  });
+
+  test('admin minRating on tiers.worker is validated and applied; tiers.customer refuses it (D-71 amendment)', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    const bad = (value, key = 'tiers.worker') => db.publishRule({ ruleKey: key, value, actor: 'admin' }).code;
+    assert.equal(bad({ levels: [{ tierKey: 'silver', minPoints: 0, minCompleted: 0, minRating: 5.5 }] }), 'invalid');
+    assert.equal(bad({ levels: [{ tierKey: 'silver', minPoints: 0, minCompleted: 0, minRating: 4.55 }] }), 'invalid');
+    assert.equal(bad({ levels: [{ tierKey: 'silver', minPoints: 0, minCompleted: 0, minRating: '4' }] }), 'invalid');
+    assert.equal(bad({ levels: [{ tierKey: 'silver', minPoints: 0, minCompleted: 0, minRating: 4 }] }, 'tiers.customer'), 'invalid');
+    publish(db, 'tiers.worker', { levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 0, minCompleted: 1, minRating: 4.5 }] });
+    accept(db, 'ORD-MR-1');
+    assert.equal(db.tryCompleteOrder('ORD-MR-1', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'gray');
+    assert.equal(db.createRating('ORD-MR-1', 'USER-C', { customerRating: 4 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'gray', '4 is below 4.5');
+    accept(db, 'ORD-MR-2');
+    assert.equal(db.tryCompleteOrder('ORD-MR-2', { id: 'USER-W', name: 'متخصص' }).code, 'ok');
+    assert.equal(db.createRating('ORD-MR-2', 'USER-C', { customerRating: 5 }).code, 'ok');
+    assert.equal(db.getUserPoints('USER-W').tierKey, 'silver', 'rating promotes immediately');
+    publish(db, 'tiers.worker', { levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 0, minCompleted: 0 }] });
+    assert.equal(db.effectiveTierRule('tiers.worker').source, 'rule');
+    db.close();
+  });
+
+  test('GET /api/workers/me/rating returns only the own average and count and refuses customers (D-73)', async (t) => {
+    const server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    const worker = await login(server, '09120001081', 'WORKER');
+    const customer = await login(server, '09120001082', 'CUSTOMER');
+    assert.equal((await request(server, { pathname: '/api/workers/me/rating' })).status, 401);
+    assert.equal((await request(server, { pathname: '/api/workers/me/rating', token: customer.token })).status, 403);
+    const fresh = await request(server, { pathname: '/api/workers/me/rating', token: worker.token });
+    assert.deepEqual(fresh.json, { success: true, average: null, count: 0 });
+    const admin = await request(server, {
+      method: 'POST',
+      pathname: '/api/admin/login',
+      body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+    });
+    const rules = await request(server, { pathname: '/api/admin/point-rules', token: admin.json.token });
+    assert.ok(rules.json.effectiveEarn);
+    assert.ok(['default', 'rule'].includes(rules.json.effectiveEarn.source));
+  });
+
+  test('GET /api/workers/me/tier returns only the own tier and refuses customers (D-71)', async (t) => {
+    const server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    const worker = await login(server, '09120001071', 'WORKER');
+    const customer = await login(server, '09120001072', 'CUSTOMER');
+    const anonymous = await request(server, { pathname: '/api/workers/me/tier' });
+    assert.equal(anonymous.status, 401);
+    const fresh = await request(server, { pathname: '/api/workers/me/tier', token: worker.token });
+    assert.equal(fresh.status, 200);
+    assert.deepEqual(fresh.json, { success: true, tierKey: 'gray', tierSince: null });
+    assert.equal(store.getUserPoints(worker.user.id), null, 'the read wrote no row');
+    const denied = await request(server, { pathname: '/api/workers/me/tier', token: customer.token });
+    assert.equal(denied.status, 403);
+
+    const admin = await request(server, {
+      method: 'POST',
+      pathname: '/api/admin/login',
+      body: { password: process.env.PAKSHO_ADMIN_PASSWORD },
+    });
+    const rules = await request(server, { pathname: '/api/admin/point-rules', token: admin.json.token });
+    assert.ok(rules.json.effectiveWorkerTier);
+    const published = await request(server, {
+      method: 'POST',
+      pathname: '/api/admin/point-rules',
+      token: admin.json.token,
+      body: { ruleKey: 'tiers.worker', value: { levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 0, minCompleted: 0 }] } },
+    });
+    assert.equal(published.status, 200);
+    const after = await request(server, { pathname: '/api/admin/point-rules', token: admin.json.token });
+    assert.equal(after.json.effectiveWorkerTier.source, 'rule');
+    store.ensureAccount(worker.user.id);
+    assert.equal(store.recomputeTier(worker.user.id).tierKey, 'silver');
+    const own = await request(server, { pathname: '/api/workers/me/tier', token: worker.token });
+    assert.equal(own.json.tierKey, 'silver');
+    assert.equal(typeof own.json.tierSince, 'string');
+    assert.deepEqual(Object.keys(own.json).sort(), ['success', 'tierKey', 'tierSince']);
+    const me = await request(server, { pathname: '/api/users/me', token: worker.token });
+    assert.equal('tierKey' in me.json.user, false, 'publicUser carries no tier');
+    // برای اجراهای بعدی همین فایل، قانون فعال متخصص خاموش می‌شود.
+    await request(server, {
+      method: 'POST',
+      pathname: '/api/admin/point-rules',
+      token: admin.json.token,
+      body: { ruleKey: 'tiers.worker', value: { levels: [{ tierKey: 'gray' }] }, active: false },
+    });
   });
 }

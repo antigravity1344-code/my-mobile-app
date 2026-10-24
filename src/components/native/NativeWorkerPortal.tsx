@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,59 +24,24 @@ import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { isAccountBlockedResponse } from '../../api/accountBlocked';
-import type { ApiOrder } from '../../api/types';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
-import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
 import {
   canAcceptWorkerOrder,
   canCallWorkerCustomer,
   canCompleteWorkerOrder,
   canReportWorkerStart,
   isActiveWorkerJob,
-  normalizeWorkerOrderStatus,
   partitionWorkerJobs,
-  preAcceptOrderView,
-  workerOrderArea,
   workerStatusLabel,
   workerStatusTone,
-  type WorkerOrderStatus,
   type WorkerStatusTone,
 } from './workerOrderStatus';
-import {
-  applyWorkerOrdersLoad,
-  classifyWorkerOrdersResponse,
-  shouldStartWorkerOrdersFetch,
-  showsWorkerOrdersSpinner,
-  type WorkerOrdersFetchMode,
-  type WorkerOrdersResponse,
-  type WorkerOrdersState,
-} from './workerOrdersFetch';
+import { useWorkerOrders, type WorkerOrdersHandle } from './useWorkerOrders';
+import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
+import { workerPriceLine } from './workerHomeModel';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
-
-interface NativeOrder {
-  id: string;
-  serviceTitle: string;
-  category: WorkerServiceCategory | null;
-  badge: string;
-  customerName: string;
-  phone: string;
-  district: string;
-  address: string;
-  date: string;
-  timeSlot: string;
-  grossOrderAmount: number;
-  currencyUnit?: string;
-  startReported: boolean | null;
-  startStatus: string | null;
-  startAcceptanceKey: string | null;
-  paymentMethod: 'ONLINE' | 'CASH';
-  detailsNote: string;
-  /** وضعیت خام سرور (CANCELLED/CONFIRMED دیگر به OPEN تبدیل نمی‌شوند). */
-  status: WorkerOrderStatus;
-  createdAt: string;
-}
 
 interface NativeWorkerPortalProps {
   user: UserData;
@@ -84,6 +49,10 @@ interface NativeWorkerPortalProps {
   onLogout?: () => void;
   /** وقتی سرور نشست را نامعتبر می‌داند (۴۰۱)، دکمه «ورود دوباره» این را صدا می‌زند. */
   onSessionExpired?: () => void;
+  /** تب اول هنگام باز شدن (از خانه یا نوار پایین). */
+  initialTab?: 'available' | 'my_jobs';
+  /** منبع مشترک سفارش‌ها از پوستهٔ اپ متخصص (خانه، نشان نوار پایین و این پنل). */
+  orders: WorkerOrdersHandle<NativeOrder>;
 }
 
 export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
@@ -91,23 +60,12 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   onSwitchToCustomer,
   onLogout,
   onSessionExpired,
+  initialTab,
+  orders,
 }) => {
   const [activeCategory, setActiveCategory] = useState<SpecialistCategory>('all');
-  const [activeTab, setActiveTab] = useState<'available' | 'my_jobs'>('available');
-  const [ordersState, setOrdersState] = useState<WorkerOrdersState<NativeOrder>>({
-    available: [],
-    mine: [],
-    error: null,
-    sessionExpired: false,
-  });
-  const availableOrders = ordersState.available;
-  const myAcceptedOrders = ordersState.mine;
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'available' | 'my_jobs'>(initialTab ?? 'available');
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
-  // تعداد درخواست‌های در جریان و شماره آخرین درخواست؛ پاسخ کهنه‌تر از آخرین درخواست اعمال نمی‌شود.
-  const fetchesInFlight = useRef(0);
-  const latestFetchId = useRef(0);
-  const sessionExpiredRef = useRef(false);
   // جلوگیری از ارسال دوباره پذیرش/تکمیل برای همان سفارش تا پاسخ قبلی برسد
   const actionsInFlight = useRef<Set<string>>(new Set());
   const [busyOrderIds, setBusyOrderIds] = useState<string[]>([]);
@@ -124,72 +82,9 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     setBusyOrderIds(Array.from(actionsInFlight.current));
   };
 
-  const mapBackendOrder = (o: ApiOrder): NativeOrder => {
-    const classified = classifyWorkerOrder(o);
-    return {
-      id: o.id,
-      serviceTitle: o.serviceTitle || 'نظافت منزل',
-      category: classified.category,
-      badge: classified.badge,
-      customerName: o.customerName || 'مشتری',
-      phone: o.customerPhone || '',
-      district: workerOrderArea(o),
-      address: o.address || '',
-      date: o.date || 'امروز',
-      timeSlot: o.time || 'نامشخص',
-      grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
-      currencyUnit: o.currencyUnit,
-      startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
-      startStatus: typeof o.startStatus === 'string' ? o.startStatus : null,
-      startAcceptanceKey: typeof o.startAcceptanceKey === 'string' ? o.startAcceptanceKey : null,
-      paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
-      detailsNote: describeWorkerServiceFacts(o),
-      status: normalizeWorkerOrderStatus(o.status),
-      createdAt: o.createdAt || '',
-    };
-  };
-
-  const fetchOrders = useCallback(async (mode: WorkerOrdersFetchMode) => {
-    if (mode === 'poll' && sessionExpiredRef.current) return;
-    if (!shouldStartWorkerOrdersFetch(mode, fetchesInFlight.current > 0)) return;
-    const fetchId = ++latestFetchId.current;
-    fetchesInFlight.current += 1;
-    if (showsWorkerOrdersSpinner(mode)) setLoading(true);
-    try {
-      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-      const available = classifyWorkerOrdersResponse(await apiFetch('/orders/available'));
-      let mine: WorkerOrdersResponse | null = null;
-      if (user?.id && available.kind !== 'expired' && available.kind !== 'blocked') {
-        // توکن سراسری است؛ پیش از درخواست دوم دوباره توکن متخصص گذاشته می‌شود.
-        await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-        mine = classifyWorkerOrdersResponse(await apiFetch('/orders'));
-      }
-      if (fetchId !== latestFetchId.current) return;
-      // سفارش باز: نام مشتری می‌ماند؛ تلفن، یادداشت و نشانی دقیق قبل از پذیرش نمی‌ماند.
-      const availableMapped: WorkerOrdersResponse =
-        available.kind === 'ok'
-          ? { kind: 'ok', orders: (available.orders as ApiOrder[]).map((o) => mapBackendOrder(preAcceptOrderView(o))) }
-          : available;
-      const mineMapped: WorkerOrdersResponse | null =
-        mine && mine.kind === 'ok' ? { kind: 'ok', orders: (mine.orders as ApiOrder[]).map(mapBackendOrder) } : mine;
-      setOrdersState((prev) => {
-        const next = applyWorkerOrdersLoad(prev, { available: availableMapped, mine: mineMapped }, mode);
-        sessionExpiredRef.current = next.sessionExpired;
-        return next;
-      });
-    } catch (e) {
-      console.warn('Error fetching worker orders', e);
-    } finally {
-      fetchesInFlight.current -= 1;
-      if (fetchId === latestFetchId.current) setLoading(false);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    void fetchOrders('initial');
-    const interval = setInterval(() => void fetchOrders('poll'), 10000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
+  const { ordersState, loading, fetchOrders } = orders;
+  const availableOrders = ordersState.available;
+  const myAcceptedOrders = ordersState.mine;
 
   const showActionError = (message: string) => {
     Alert.alert('خطا', message, [{ text: 'باشه' }]);
@@ -208,10 +103,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
         // حساب مسدود: دیالوگ و خروج را useAccountBlockedLogout نشان می‌دهد؛ دیالوگ دوم لازم نیست.
-        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'خطا در پذیرش سفارش');
+        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'پذیرش سفارش انجام نشد.');
       }
     } catch {
-      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+      showActionError('اتصال اینترنت را بررسی و دوباره تلاش کنید.');
     } finally {
       endOrderAction(order.id);
       // بعد از موفقیت یا خطا (مثلاً سفارشی که مشتری لغو کرده) فهرست‌ها تازه می‌شوند تا کارت کهنه نماند.
@@ -235,7 +130,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         showActionError(res.message || 'شروع کار ثبت نشد.');
       }
     } catch {
-      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید.');
+      showActionError('اتصال اینترنت را بررسی و دوباره تلاش کنید.');
     } finally {
       endOrderAction(order.id);
       void fetchOrders('after-action');
@@ -281,10 +176,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
         // حساب مسدود: دیالوگ و خروج را useAccountBlockedLogout نشان می‌دهد؛ دیالوگ دوم لازم نیست.
-        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'خطا در تکمیل سفارش');
+        if (!isAccountBlockedResponse(res)) showActionError(res.message || 'ثبت اتمام سفارش انجام نشد.');
       }
     } catch {
-      showActionError('ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
+      showActionError('اتصال اینترنت را بررسی و دوباره تلاش کنید.');
     } finally {
       endOrderAction(order.id);
       void fetchOrders('after-action');
@@ -355,8 +250,9 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
-            <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-            <Text style={styles.wageValue}>{formatStoredAmount(order.grossOrderAmount, order.currencyUnit)}</Text>
+            <Text style={styles.wageValue}>
+              {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit))}
+            </Text>
           </View>
         </View>
         {canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey) ? (
@@ -406,7 +302,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               <Text style={styles.workerName}>{user?.name || ''}</Text>
               <View style={styles.onlineBadge}>
                 <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>آماده کار</Text>
+                <Text style={styles.onlineText}>آمادهٔ کار</Text>
               </View>
             </View>
             <Text style={styles.workerSub}>مشاهده و پذیرش سفارشات</Text>
@@ -417,7 +313,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           {onSwitchToCustomer && (
             <Pressable onPress={onSwitchToCustomer} style={styles.switchButton}>
               <User size={14} color="#0284c7" />
-              <Text style={styles.switchButtonText}>نمای مشتری</Text>
+              <Text style={styles.switchButtonText}>رفتن به پنل مشتری</Text>
             </Pressable>
           )}
           {onLogout && (
@@ -462,8 +358,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           contentContainerStyle={[styles.categoryScroll, { flexDirection: 'row-reverse' }]}
         >
           {[
-            { id: 'all', label: 'همه تخصص‌ها' },
-            { id: 'cleaner', label: 'نظافتچی منزل' },
+            { id: 'all', label: 'همهٔ تخصص‌ها' },
+            { id: 'cleaner', label: 'نظافت منزل' },
             { id: 'hourly_laborer', label: 'کارگر ساعتی' },
           ].map(cat => (
             <Pressable
@@ -553,8 +449,9 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 
                 <View style={styles.cardFooter}>
                   <View style={styles.wageBox}>
-                    <Text style={styles.wageLabel}>مبلغ سفارش:</Text>
-                    <Text style={styles.wageValue}>{formatStoredAmount(order.grossOrderAmount, order.currencyUnit)}</Text>
+                    <Text style={styles.wageValue}>
+                      {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit))}
+                    </Text>
                   </View>
 
                   {canAcceptWorkerOrder(order.status) ? (
@@ -887,3 +784,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: colors.white, fontSize: 11,
   }});
+
+/** نسخهٔ مستقل برای نماهایی که پوستهٔ اپ متخصص را ندارند (NativeAppContainer). */
+export const NativeWorkerPortalStandalone: React.FC<Omit<NativeWorkerPortalProps, 'orders'>> = (props) => {
+  const orders = useWorkerOrders<NativeOrder>(props.user?.id, mapWorkerOrder);
+  return <NativeWorkerPortal {...props} orders={orders} />;
+};

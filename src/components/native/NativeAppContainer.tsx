@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { User, Briefcase, LogOut, ArrowRightLeft } from 'lucide-react-native';
 import { NativeAuthScreen, UserRole, NativeAuthUser } from './NativeAuthScreen';
-import { NativeWorkerPortal } from './NativeWorkerPortal';
+import { NativeWorkerPortalStandalone as NativeWorkerPortal } from './NativeWorkerPortal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { useProfile } from '../../features/profile';
 import { appStorage } from '../../utils/storage';

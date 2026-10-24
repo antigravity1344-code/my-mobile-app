@@ -97,6 +97,8 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     return { success: true, notifications: [{ id: 'PREVIEW-N-1', orderId: 'PREVIEW-ORDER-1', title: 'اعلان نمایشی', body: 'این اعلان واقعی نیست.', createdAt: '2026-10-12T08:00:00.000Z', readAt: null }] };
   if (path === '/wallet') return { success: true, balance: 0, transactions: [] };
   if (path === '/loyalty') return { success: true, loyalty: { tier: 'NEW', title: 'عضو جدید', discountPercentage: 0, completedOrdersCount: 0, nextTierOrderTarget: 0 } };
+  if (path === '/workers/me/tier') return { success: true, tierKey: 'gray', tierSince: null };
+  if (path === '/workers/me/rating') return { success: true, average: null, count: 0 };
   if (path === '/users/addresses') return { success: true, addresses: [] };
   if (path === '/users/me') return { success: true, user: {
     id: role === 'worker' ? 'PREVIEW-WORKER' : 'PREVIEW-CUSTOMER',

@@ -82,6 +82,7 @@ vi.mock('lucide-react-native', () => ({
 }));
 vi.mock('../../api/apiClient', () => ({ apiFetch: harness.api }));
 vi.mock('../../theme', () => ({ type: { regular: {}, bold: {} } }));
+vi.mock('../../theme/customerHome', () => ({ colors: {}, radius: {}, shadowMd: {}, shadowSm: {} }));
 vi.mock('../../components/native/BottomSheetModal', () => ({ BottomSheetModal: 'BottomSheetModal' }));
 vi.mock('../../components/native/useSheetKeyboard', () => ({ useSheetKeyboard: () => ({}) }));
 vi.mock('../../utils/jalaliDisplay', () => ({ formatJalaliDateTime: () => 'date' }));

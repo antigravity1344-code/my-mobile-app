@@ -18,9 +18,10 @@ import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
 import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { type } from '../../../theme';
+import { colors as wc, radius as wr, shadowMd as wShadowMd, shadowSm as wShadowSm } from '../../../theme/customerHome';
 import { apiFetch } from '../../../api/apiClient';
 import { formatJalaliDateTime } from '../../../utils/jalaliDisplay';
-import { SUPPORT_FAQ, SUPPORT_HOURS, SUPPORT_PHONE_DISPLAY, SUPPORT_TEL_URL } from '../supportConfig';
+import { SUPPORT_FAQ, SUPPORT_HOURS, WORKER_SUPPORT_FAQ, SUPPORT_PHONE_DISPLAY, SUPPORT_TEL_URL } from '../supportConfig';
 import { SUPPORT_GREETING, supportSenderLine } from '../supportGreeting';
 
 export interface SupportUser {
@@ -45,7 +46,8 @@ type SupportMessage = {
 
 export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'customer' }) => {
   const workerAppearance = appearance === 'worker';
-  const [openFaqId, setOpenFaqId] = useState<string | null>(SUPPORT_FAQ[0]?.id ?? null);
+  const faqItems = appearance === 'worker' ? WORKER_SUPPORT_FAQ : SUPPORT_FAQ;
+  const [openFaqId, setOpenFaqId] = useState<string | null>(faqItems[0]?.id ?? null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [composeOpen, setComposeOpen] = useState(false);
   const [subject, setSubject] = useState('');
@@ -98,7 +100,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
 
   const callSupport = () => {
     void Linking.openURL(SUPPORT_TEL_URL).catch(() => {
-      Alert.alert('خطا', 'امکان برقراری تماس فراهم نشد.');
+      Alert.alert('خطا', 'تماس برقرار نشد.');
     });
   };
 
@@ -137,38 +139,38 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
     <View style={[styles.root, workerAppearance && workerStyles.root]}>
       <ScrollView ref={pageScrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.hero, workerAppearance && workerStyles.hero]}>
-          <HelpCircle size={22} color="#0284c7" />
-          <Text style={styles.heroTitle}>پشتیبانی پاکشو</Text>
-          <Text style={styles.heroSub}>{SUPPORT_GREETING}</Text>
-          <Text style={styles.meta}>ساعات پاسخگویی: {SUPPORT_HOURS}</Text>
+          <HelpCircle size={22} color={workerAppearance ? wc.teal : '#0284c7'} />
+          <Text style={[styles.heroTitle, workerAppearance && workerStyles.heroTitle]}>پشتیبانی پاکشو</Text>
+          <Text style={[styles.heroSub, workerAppearance && workerStyles.heroSub]}>{SUPPORT_GREETING}</Text>
+          <Text style={[styles.meta, workerAppearance && workerStyles.meta]}>ساعات پاسخگویی: {SUPPORT_HOURS}</Text>
         </View>
 
         <View style={styles.actions}>
-          <Pressable onPress={callSupport} style={styles.primaryBtn}>
+          <Pressable onPress={callSupport} style={[styles.primaryBtn, workerAppearance && workerStyles.primaryBtn]}>
             <Phone size={16} color="#fff" />
             <Text style={styles.primaryBtnText}>تماس با پشتیبانی</Text>
           </Pressable>
-          <Pressable onPress={() => setComposeOpen(true)} style={styles.secondaryBtn}>
-            <MessageCircle size={16} color="#0369a1" />
-            <Text style={styles.secondaryBtnText}>ارسال پیام</Text>
+          <Pressable onPress={() => setComposeOpen(true)} style={[styles.secondaryBtn, workerAppearance && workerStyles.secondaryBtn]}>
+            <MessageCircle size={16} color={workerAppearance ? wc.teal : '#0369a1'} />
+            <Text style={[styles.secondaryBtnText, workerAppearance && workerStyles.secondaryBtnText]}>ارسال پیام</Text>
           </Pressable>
         </View>
         <Text style={[styles.phoneHint, workerAppearance && workerStyles.phoneHint]}>شماره: {SUPPORT_PHONE_DISPLAY}</Text>
 
         <Text style={[styles.sectionTitle, workerAppearance && workerStyles.sectionTitle]}>سوالات متداول</Text>
-        {SUPPORT_FAQ.map((item) => {
+        {faqItems.map((item) => {
           const open = openFaqId === item.id;
           return (
             <Pressable
               key={item.id}
               onPress={() => setOpenFaqId(open ? null : item.id)}
-              style={[styles.faqCard, workerAppearance && workerStyles.faqCard, open && styles.faqOpen]}
+              style={[styles.faqCard, workerAppearance && workerStyles.faqCard, open && styles.faqOpen, open && workerAppearance && workerStyles.faqOpen]}
             >
               <View style={styles.faqHeader}>
-                <Text style={styles.faqQ}>{item.question}</Text>
-                {open ? <ChevronUp size={16} color="#0284c7" /> : <ChevronDown size={16} color="#64748b" />}
+                <Text style={[styles.faqQ, workerAppearance && workerStyles.textMain]}>{item.question}</Text>
+                {open ? <ChevronUp size={16} color={workerAppearance ? wc.teal : '#0284c7'} /> : <ChevronDown size={16} color="#64748b" />}
               </View>
-              {open ? <Text style={styles.faqA}>{item.answer}</Text> : null}
+              {open ? <Text style={[styles.faqA, workerAppearance && workerStyles.textMuted]}>{item.answer}</Text> : null}
             </Pressable>
           );
         })}
@@ -191,7 +193,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
         ) : null}
         {loading ? (
           <View style={styles.loadingRow}>
-            <ActivityIndicator color="#0f766e" />
+            <ActivityIndicator color={workerAppearance ? wc.teal : '#0f766e'} />
             <Text style={[styles.empty, workerAppearance && workerStyles.empty]}>در حال دریافت پیام‌ها...</Text>
           </View>
         ) : !error && messages.length === 0 ? (
@@ -200,11 +202,11 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
           messages.map((msg) => (
             <View key={msg.id} style={[styles.msgCard, workerAppearance && workerStyles.msgCard]}>
               <View style={styles.msgTop}>
-                <Text style={styles.msgSubject}>{msg.subject}</Text>
-                <Text style={styles.msgStatus}>باز</Text>
+                <Text style={[styles.msgSubject, workerAppearance && workerStyles.textMain]}>{msg.subject}</Text>
+                <Text style={[styles.msgStatus, workerAppearance && workerStyles.msgStatus]}>در انتظار پاسخ</Text>
               </View>
-              <Text style={styles.msgBody}>{msg.body}</Text>
-              <Text style={styles.msgMeta}>{formatJalaliDateTime(msg.createdAt, { withTime: true })}</Text>
+              <Text style={[styles.msgBody, workerAppearance && workerStyles.textMuted]}>{msg.body}</Text>
+              <Text style={[styles.msgMeta, workerAppearance && workerStyles.meta]}>{formatJalaliDateTime(msg.createdAt, { withTime: true })}</Text>
             </View>
           ))
         )}
@@ -219,9 +221,9 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           onLayout={sheetKb.onOverlayLayout}
         >
-          <View style={[styles.modalCard, { paddingBottom: 16 + sheetLayout.contentBottomInset }]}>
+          <View style={[styles.modalCard, workerAppearance && workerStyles.modalCard, { paddingBottom: 16 + sheetLayout.contentBottomInset }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>پیام به پشتیبانی</Text>
+              <Text style={[styles.modalTitle, workerAppearance && workerStyles.textMain]}>پیام به پشتیبانی</Text>
               <Pressable onPress={() => setComposeOpen(false)} style={styles.closeBtn}>
                 <X size={20} color="#64748b" />
               </Pressable>
@@ -244,7 +246,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
               multiline
             />
             {error ? <Text style={[styles.error, styles.modalError]}>{error}</Text> : null}
-            <Pressable onPress={submitMessage} style={[styles.primaryBtn, styles.submitBtn]}>
+            <Pressable onPress={submitMessage} style={[styles.primaryBtn, workerAppearance && workerStyles.primaryBtn, styles.submitBtn]}>
               <Send size={16} color="#fff" />
               <Text style={styles.primaryBtnText}>ثبت پیام</Text>
             </Pressable>
@@ -258,14 +260,25 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
 };
 
 const workerStyles = StyleSheet.create({
-  root: { backgroundColor: '#0f172a' },
-  hero: { borderRadius: 24, padding: 20 },
-  phoneHint: { color: '#cbd5e1' },
-  sectionTitle: { color: '#ffffff' },
-  empty: { color: '#cbd5e1' },
-  faqCard: { borderRadius: 24, padding: 20, minHeight: 44 },
-  msgCard: { borderRadius: 24, padding: 20 },
-  input: { backgroundColor: '#f8fafc', borderRadius: 14, minHeight: 48 },
+  root: { backgroundColor: wc.bg },
+  hero: { backgroundColor: wc.white, borderRadius: 20, padding: 20, borderColor: wc.border, ...wShadowMd },
+  heroTitle: { color: wc.text },
+  heroSub: { color: wc.muted },
+  meta: { color: wc.mutedLight },
+  textMain: { color: wc.text },
+  textMuted: { color: wc.muted },
+  primaryBtn: { backgroundColor: wc.teal, borderRadius: wr.button, ...wShadowSm },
+  secondaryBtn: { backgroundColor: wc.tealSoft, borderRadius: wr.button },
+  secondaryBtnText: { color: wc.tealDark },
+  phoneHint: { color: wc.muted },
+  sectionTitle: { color: wc.text },
+  empty: { color: wc.muted },
+  faqCard: { backgroundColor: wc.white, borderRadius: wr.card, padding: 16, minHeight: 44, borderColor: wc.border, ...wShadowSm },
+  faqOpen: { backgroundColor: wc.white, borderColor: wc.teal },
+  msgCard: { backgroundColor: wc.white, borderRadius: wr.card, padding: 16, borderColor: wc.border, ...wShadowSm },
+  msgStatus: { color: wc.tealDark, backgroundColor: wc.tealSoft },
+  modalCard: { backgroundColor: wc.bg },
+  input: { backgroundColor: wc.white, borderRadius: wr.button, minHeight: 48, borderColor: 'rgba(31, 42, 40, 0.12)', color: wc.text },
 });
 
 const fa = {

@@ -6,16 +6,9 @@ import {
   SafeAreaView as RNSafeAreaView,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerAuthScreen } from './WorkerAuthScreen';
 import { WorkerOnboardingScreen } from './WorkerOnboardingScreen';
-import { WorkerHomeScreen } from './WorkerHomeScreen';
-import { WorkerTabBar, type WorkerTab } from './WorkerTabBar';
-import { NativeWorkerPortal } from './NativeWorkerPortal';
-import { NativeSupportScreen } from '../../features/support';
-import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
-import { NativeProfileScreen } from '../../features/profile';
-// NativeProfileScreen نیاز به useProfile ندارد اگر فقط onLogout را بگیرد
+import { WorkerMainShell, type WorkerMainView } from './WorkerMainShell';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
@@ -36,7 +29,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mainView, setMainView] = useState<WorkerTab | 'alerts'>('home');
+  const [mainView, setMainView] = useState<WorkerMainView>('home');
 
   const refreshWorkerFromServer = async (current: UserData) => {
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
@@ -154,50 +147,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
     );
   }
 
-  const activeTab: WorkerTab = mainView === 'alerts' ? 'home' : mainView;
-
-  return (
-    <EdgeSafeAreaView style={styles.homeShell} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
-
-      <View style={styles.content}>
-        {mainView === 'home' ? (
-          <WorkerHomeScreen
-            userName={userData.name}
-            userAvatar={userData.avatar}
-            onOpenProfile={() => setMainView('profile')}
-            onOpenOrders={() => setMainView('new_orders')}
-            onOpenNotifications={() => setMainView('alerts')}
-            onOpenSupport={() => setMainView('support')}
-          />
-        ) : mainView === 'new_orders' ? (
-          <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
-        ) : mainView === 'my_jobs' ? (
-          <NativeWorkerPortal user={userData} onSessionExpired={handleLogout} />
-        ) : mainView === 'profile' ? (
-          <NativeProfileScreen onLogout={handleLogout} />
-        ) : mainView === 'alerts' ? (
-          <NativeNotificationsScreen appearance="worker" />
-        ) : (
-          <NativeSupportScreen
-            appearance="worker"
-            user={{
-              id: userData.id,
-              name: userData.name || '',
-              phone: userData.phone,
-            }}
-          />
-        )}
-      </View>
-
-      <WorkerTabBar
-        active={activeTab}
-        onChange={(tab) => {
-          setMainView(tab);
-        }}
-      />
-    </EdgeSafeAreaView>
-  );
+  return <WorkerMainShell user={userData} mainView={mainView} onChangeView={setMainView} onLogout={handleLogout} />;
 };
 
 const styles = StyleSheet.create({

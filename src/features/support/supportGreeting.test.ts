@@ -35,7 +35,7 @@ describe('support: after sending, the new message is shown', () => {
 describe('support sheet: «ثبت پیام» button keeps its height (label visible)', () => {
   const src = readFileSync(join(__dirname, 'components', 'NativeSupportScreen.tsx'), 'utf8');
   it('submit button does not use flex:1 inside the column sheet', () => {
-    expect(src).toMatch(/<Pressable onPress=\{submitMessage\} style=\{\[styles\.primaryBtn, styles\.submitBtn\]\}>/);
+    expect(src).toMatch(/<Pressable onPress=\{submitMessage\} style=\{\[styles\.primaryBtn, (workerAppearance && workerStyles\.primaryBtn, )?styles\.submitBtn\]\}>/);
     expect(src).toMatch(/submitBtn: \{ flex: 0, minHeight: 48 \}/);
   });
 });

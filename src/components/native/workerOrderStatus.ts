@@ -37,11 +37,11 @@ export const WORKER_ACTIVE_STATUSES: readonly WorkerOrderStatus[] = [
 export const WORKER_STATUS_LABEL: Record<WorkerOrderStatus, string> = {
   PENDING: 'در انتظار پذیرش',
   ACCEPTED: CUSTOMER_ORDER_STATUS_LABELS.ACCEPTED,
-  CONFIRMED: 'تأیید شده',
-  ASSIGNED: 'تخصیص داده شده',
+  CONFIRMED: 'تأییدشده',
+  ASSIGNED: 'تخصیص‌یافته',
   IN_PROGRESS: 'در حال انجام',
-  COMPLETED: 'انجام شده',
-  CANCELLED: 'لغو شده',
+  COMPLETED: 'انجام‌شده',
+  CANCELLED: 'لغوشده',
   CANCEL_REQUESTED: 'درخواست لغو در حال بررسی',
   UNKNOWN: 'وضعیت نامشخص',
 };

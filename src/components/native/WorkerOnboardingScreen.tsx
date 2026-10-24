@@ -65,7 +65,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           </View>
           <Text style={styles.statusTitle}>مدارک شما در انتظار بررسی قرار دارد</Text>
           <Text style={styles.statusDesc}>
-            اطلاعات هویتی و مدارک شما توسط تیم پشتیبانی پاکشو در حال بررسی است. پس از تایید نهایی، پنل دریافت سفارش‌ها برای شما فعال خواهد شد.
+            اطلاعات هویتی و مدارک شما توسط مدیریت در حال بررسی است. پس از تأیید نهایی، پنل دریافت سفارش‌ها برای شما فعال خواهد شد.
           </Text>
 
           <View style={styles.timeline}>
@@ -79,11 +79,11 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             </View>
             <View style={styles.timelineItem}>
               <Clock size={18} color="#eab308" />
-              <Text style={styles.timelineTextActive}>بررسی مدارک توسط مدیریت (در حال انجام...)</Text>
+              <Text style={styles.timelineTextActive}>بررسی مدارک (در حال انجام)</Text>
             </View>
             <View style={styles.timelineItem}>
               <ShieldCheck size={18} color="#94a3b8" />
-              <Text style={styles.timelineTextNext}>تایید نهایی و شروع کار در اپلیکیشن</Text>
+              <Text style={styles.timelineTextNext}>تأیید نهایی و شروع کار در اپ</Text>
             </View>
           </View>
 
@@ -168,7 +168,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
         base64: true,
       });
     } catch {
-      setErrorMsg('باز کردن گالری ممکن نشد. اگر مشکل ادامه داشت، اپ متخصص را دوباره نصب کنید.');
+      setErrorMsg('باز کردن گالری ممکن نشد. اگر مشکل ادامه داشت، با پشتیبانی تماس بگیرید.');
       return;
     }
     if (result.canceled || !result.assets[0]) return;
@@ -210,7 +210,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             <Text style={styles.title}>ثبت‌نام و احراز هویت متخصصین</Text>
           </View>
           <Text style={styles.subtitle}>
-            جهت تایید هویت و فعال‌سازی حساب کاربری متخصص، لطفاً مدارک و اطلاعات زیر را کامل فرمایید.
+            برای تأیید هویت و فعال شدن حساب، لطفاً اطلاعات زیر را کامل کنید.
           </Text>
 
           {errorMsg && (
@@ -336,7 +336,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           </View>
 
           {/* اطلاعات بانکی / شبا */}
-          <Text style={styles.label}>شماره شبا (جهت واریز و تسویه درآمد):</Text>
+          <Text style={styles.label}>شماره شبا (جهت تسویه حساب):</Text>
           <View
             style={styles.inputWrapper}
             onLayout={(e) => {
@@ -360,7 +360,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitBtnText}>ارسال مدارک برای بررسی و تایید مدیریت ←</Text>
+              <Text style={styles.submitBtnText}>ارسال مدارک</Text>
             )}
           </Pressable>
         </View>

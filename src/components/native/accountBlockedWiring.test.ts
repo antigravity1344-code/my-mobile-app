@@ -25,6 +25,6 @@ describe('blocked account → dialog + logout wiring', () => {
   });
 
   it('the worker portal does not ask for /orders once the account is blocked', () => {
-    expect(read('NativeWorkerPortal.tsx')).toMatch(/available\.kind !== 'expired' && available\.kind !== 'blocked'/);
+    expect(read('useWorkerOrders.ts')).toMatch(/available\.kind !== 'expired' && available\.kind !== 'blocked'/);
   });
 });
