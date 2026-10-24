@@ -1,5 +1,12 @@
 # راهنمای ایجنت‌های پروژه پاکشو
 
+## قانون اصلی (از ۲ آبان ۱۴۰۵)
+- شاخه کار: `main` (دیگر `ui/customer-home-redesign` نه).
+- پوشه واقعی: `C:\Users\mohammad\Desktop\my-mobile-app` — نه `my-mobile-app-ui`.
+- همه تغییرات را روی `main` کامیت و `git push origin main` کنید.
+- اگر این قانون با متن پایین تضاد داشت، این قانون معتبر است.
+
+
 **لینک مستقیم سند اصلی تحویل (برای همه ایجنت‌ها):** https://github.com/antigravity1344-code/my-mobile-app/blob/ui/customer-home-redesign/docs/PROJECT_HANDOFF.fa.md
 
 **الزام شروع:** صرف مشاهده این لینک کافی نیست؛ سند اصلی را باز کن، بخوان و در گزارش اولیه تأیید کن که بررسی شده است.

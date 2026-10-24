@@ -1,5 +1,12 @@
 # Paksho — Cursor Bot Rules
 
+## قانون اصلی (از ۲ آبان ۱۴۰۵)
+- شاخه کار: `main` (دیگر `ui/customer-home-redesign` نه).
+- پوشه واقعی: `C:\Users\mohammad\Desktop\my-mobile-app` — نه `my-mobile-app-ui`.
+- همه تغییرات را روی `main` کامیت و `git push origin main` کنید.
+- اگر این قانون با متن پایین تضاد داشت، این قانون معتبر است.
+
+
 ## شاخه اصلی
 شاخه پیش‌فرض و مرجع توسعه `ui/customer-home-redesign` است، نه `main`.
 قبل از هر کاری تأیید کن روی این شاخه هستی:
