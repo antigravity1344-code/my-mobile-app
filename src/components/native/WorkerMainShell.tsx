@@ -14,7 +14,7 @@ import { WORKER_RATING_ENDPOINT, workerRatingFromResponse, type WorkerRating } f
 import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
-import { NativeProfileScreen } from '../../features/profile';
+import { WorkerAddressScreen } from './WorkerAddressScreen';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
@@ -129,7 +129,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
         ) : mainView === 'my_jobs' ? (
           <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} />
         ) : mainView === 'profile' ? (
-          <NativeProfileScreen onLogout={onLogout} />
+          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} />
         ) : mainView === 'alerts' ? (
           <NativeNotificationsScreen appearance="worker" />
         ) : (

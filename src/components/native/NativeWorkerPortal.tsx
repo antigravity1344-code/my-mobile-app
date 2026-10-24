@@ -18,7 +18,7 @@ import {
   User,
 } from 'lucide-react-native';
 import { UserData } from '../../types/user';
-import { colors, radius, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
+import { colors, shadowMd, shadowSm, type } from '../../theme/customerHome';
 import { appStorage } from '../../utils/storage';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { apiFetch } from '../../api/apiClient';

@@ -466,6 +466,10 @@ function createDataStore(filename) {
       skillsJson = ?, bankSheba = ?, idDoc = ?, createdAt = ?
     WHERE id = ?
   `);
+  // D-63: a residence edit must not rewrite verification, encrypted fields or documents.
+  const updateWorkerAddressStmt = database.prepare(
+    "UPDATE users SET address = ? WHERE id = ? AND role = 'WORKER' RETURNING address"
+  );
   const selectUser = database.prepare('SELECT * FROM users WHERE id = ?');
   const selectUserByPhone = database.prepare('SELECT * FROM users WHERE phone = ? AND role = ?');
   const listUsersStmt = database.prepare('SELECT * FROM users ORDER BY seq ASC');
@@ -672,6 +676,12 @@ function createDataStore(filename) {
       throw new Error('USER_NOT_FOUND');
     }
     return getUser(user.id);
+  }
+
+  function updateWorkerAddress(userId, address) {
+    const row = updateWorkerAddressStmt.get(address, userId);
+    if (!row) throw new Error('WORKER_NOT_FOUND');
+    return row.address;
   }
 
   function getOrder(id) {
@@ -1661,6 +1671,7 @@ function createDataStore(filename) {
     listUsers,
     createUser,
     updateUser,
+    updateWorkerAddress,
     getOrder,
     getOrders,
     listOrders,

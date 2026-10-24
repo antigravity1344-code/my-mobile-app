@@ -511,6 +511,42 @@ app.get('/api/workers/me/rating', (req, res) => {
   res.json({ success: true, average: stats.average, count: stats.count });
 });
 
+// D-63: residence only; independent of onboarding and its verification transitions.
+app.route('/api/workers/me/address')
+  .all((req, res, next) => {
+    const authUser = requireUser(req, res);
+    if (!authUser) return;
+    if (authUser.role !== 'WORKER') {
+      return res.status(403).json({ success: false, message: 'این بخش فقط برای متخصص است.' });
+    }
+    if (Object.keys(req.query).length) {
+      return res.status(400).json({ success: false, message: 'پارامتر اضافی مجاز نیست.' });
+    }
+    res.set('Cache-Control', 'no-store');
+    res.locals.workerAddressUser = authUser;
+    next();
+  })
+  .get((req, res) => {
+    res.json({ success: true, address: res.locals.workerAddressUser.address });
+  })
+  .put((req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        Object.keys(body).length !== 1 || !Object.hasOwn(body, 'address')) {
+      return res.status(400).json({ success: false, message: 'فقط فیلد آدرس مجاز است.' });
+    }
+    const address = typeof body.address === 'string' ? body.address.trim() : '';
+    if (!address || address.length > 300 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(address)) {
+      return res.status(400).json({ success: false, message: 'آدرس باید متن معتبر بین ۱ تا ۳۰۰ نویسه باشد.' });
+    }
+    try {
+      const saved = store.updateWorkerAddress(res.locals.workerAddressUser.id, address);
+      res.json({ success: true, address: saved });
+    } catch {
+      res.status(500).json({ success: false, message: 'ذخیره آدرس انجام نشد. دوباره تلاش کنید.' });
+    }
+  });
+
 // 3. پروفایل مشتری
 app.put('/api/users/customer-profile', (req, res) => {
   const authUser = requireUser(req, res);

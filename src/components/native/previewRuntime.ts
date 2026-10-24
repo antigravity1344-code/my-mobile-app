@@ -104,6 +104,9 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     };
   }
   if (path === '/workers/me/rating') return { success: true, average: null, count: 0 };
+  if (path === '/workers/me/address' && role === 'worker') {
+    return { success: true, address: 'تهران، خیابان نمونه، پلاک آزمایشی' };
+  }
   if (path === '/users/addresses') return { success: true, addresses: [] };
   if (path === '/users/me') return { success: true, user: {
     id: role === 'worker' ? 'PREVIEW-WORKER' : 'PREVIEW-CUSTOMER',
