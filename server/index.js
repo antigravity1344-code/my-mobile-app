@@ -360,9 +360,10 @@ app.post('/api/auth/send-otp', async (req, res) => {
     });
   }
 
-  const code = generateOtpCode();
+  const devCode = kavenegarSms.devFixedOtp();
+  const code = devCode || generateOtpCode();
   let delivery;
-  if (kavenegarSms.useFakeSms()) {
+  if (devCode || kavenegarSms.useFakeSms()) {
     delivery = { ok: true };
   } else {
     delivery = await kavenegarSms.sendOtp(phone, code);
@@ -390,6 +391,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
   window.count += 1;
   otpSendWindow.set(windowKey, window);
 
+  if (devCode) {
+    return res.json({ success: true, message: 'حالت توسعه: پیامک ارسال نشد. کد ۱۲۳۴ را وارد کنید.' });
+  }
   res.json({
     success: true,
     message: 'کد تایید پیامک شد.'
@@ -486,10 +490,13 @@ app.get('/api/workers/me/tier', (req, res) => {
     return res.status(403).json({ success: false, message: 'درجه فقط برای متخصص است.' });
   }
   const account = store.getUserPoints(authUser.id);
+  const progress = store.workerTierProgress(authUser.id);
   res.json({
     success: true,
     tierKey: account && account.tierKey ? account.tierKey : 'gray',
     tierSince: account && account.tierSince ? account.tierSince : null,
+    // D-75: درجهٔ بعد و مقدار باقی‌مانده؛ قانون نامعتبر یعنی null.
+    next: progress ? progress.next : null,
   });
 });
 

@@ -61,7 +61,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
     let isMounted = true;
     const restoreState = async () => {
       if (previewActive()) {
-        const demo: UserData = { id: 'PREVIEW-WORKER', name: 'متخصص نمونه', phone: '09000000000', avatar: '', role: 'WORKER', status: 'ACTIVE' };
+        const demo: UserData = { id: 'PREVIEW-WORKER', name: 'علی رضایی', phone: '09000000000', avatar: '', role: 'WORKER', status: 'ACTIVE' };
         setUserData(demo);
         setIsLoggedIn(true);
         setIsLoading(false);

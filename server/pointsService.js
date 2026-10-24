@@ -531,6 +531,44 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
     return null;
   }
 
+  /**
+   * پیشرفت متخصص تا درجهٔ بعد (D-75). فقط خواندنی است و هیچ ردیفی نمی‌سازد یا عوض نمی‌کند.
+   * قانون نامعتبر یا نبودن متخصص null می‌دهد تا اپ چیزی نشان ندهد.
+   */
+  function workerTierProgress(userId) {
+    const user = getUser(userId);
+    if (!user || user.role !== 'WORKER') return null;
+    const rule = effectiveTierRule('tiers.worker');
+    const levels = rule ? parseTierRule(rule.value, true) : null;
+    if (!levels) return null;
+    const account = getUserPoints(userId);
+    const tierKey = account && Object.prototype.hasOwnProperty.call(TIER_RANKS, account.tierKey) ? account.tierKey : 'gray';
+    const balance = account ? account.balance : 0;
+    const completed = countCompleted(userId, 'WORKER');
+    const stars = workerRatingStats(userId);
+    const next = levels
+      .filter((level) => level.rank > TIER_RANKS[tierKey])
+      .sort((a, b) => a.rank - b.rank)[0];
+    if (!next) return { tierKey, next: null };
+    const ratingMet = !next.minRating || (stars.count > 0 && stars.average >= next.minRating);
+    const parts = [];
+    if (next.minCompleted > 0) parts.push(Math.min(1, completed / next.minCompleted));
+    if (next.minPoints > 0) parts.push(Math.min(1, Math.max(0, balance) / next.minPoints));
+    if (next.minRating > 0) parts.push(stars.count > 0 ? Math.min(1, stars.average / next.minRating) : 0);
+    const progress = parts.length ? Math.round((parts.reduce((s, v) => s + v, 0) / parts.length) * 100) / 100 : 1;
+    return {
+      tierKey,
+      next: {
+        tierKey: next.tierKey,
+        remainingOrders: Math.max(0, next.minCompleted - completed),
+        remainingPoints: Math.max(0, next.minPoints - balance),
+        minRating: next.minRating || null,
+        ratingMet,
+        progress,
+      },
+    };
+  }
+
   function recomputeTier(userId) {
     return transaction(() => {
       const user = getUser(userId);
@@ -897,6 +935,7 @@ function createPointsService({ database, transaction, getUser, getOrder }) {
     postTransfer,
     reverseEntry,
     recomputeTier,
+    workerTierProgress,
     effectiveTierRule,
     quoteCancelPenalty,
     onOrderEvent,

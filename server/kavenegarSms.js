@@ -22,6 +22,16 @@ function useFakeSms(env = process.env) {
   return env.NODE_ENV !== 'production' && (env.NODE_ENV === 'test' || env.PAKSHO_SMS_MODE === 'fake');
 }
 
+const DEV_FIXED_OTP_CODE = '1234';
+
+// D-74: dev-only fixed OTP. Requires NODE_ENV exactly 'development' AND PAKSHO_DEV_OTP_BYPASS=1.
+// Any other NODE_ENV (production, test, unset) disables it.
+function devFixedOtp(env = process.env) {
+  return env.NODE_ENV === 'development' && env.PAKSHO_DEV_OTP_BYPASS === '1'
+    ? DEV_FIXED_OTP_CODE
+    : null;
+}
+
 function explicitFakeSms(env = process.env) {
   const nodeEnv = env.NODE_ENV;
   return nodeEnv !== 'production'
@@ -97,6 +107,8 @@ module.exports = {
   readConfig,
   normalizeIranMobile,
   useFakeSms,
+  devFixedOtp,
+  DEV_FIXED_OTP_CODE,
   allowlistedFakePhone,
   writeFakeSmsOutbox,
   sendOtp,

@@ -1709,6 +1709,7 @@ function createDataStore(filename) {
     postTransfer: pointsApi.postTransfer,
     reverseEntry: pointsApi.reverseEntry,
     recomputeTier: pointsApi.recomputeTier,
+    workerTierProgress: pointsApi.workerTierProgress,
     effectiveTierRule: pointsApi.effectiveTierRule,
     effectiveEarnRule: pointsApi.effectiveEarnRule,
     workerRatingStats: pointsApi.workerRatingStats,

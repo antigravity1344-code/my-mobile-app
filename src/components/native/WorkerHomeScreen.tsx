@@ -13,6 +13,7 @@ import {
   IconTabOrders,
   IconTabUser,
 } from './icons/CustomerIcons';
+import { Medal, Star } from 'lucide-react-native';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { canAcceptWorkerOrder, partitionWorkerJobs, workerStatusLabel } from './workerOrderStatus';
@@ -27,7 +28,7 @@ import {
   workerTodayJobsCount,
   workerWeeklyIncome,
 } from './workerHomeModel';
-import { workerTierBadge, type WorkerTierKey } from './workerTier';
+import { workerTierBadge, workerTierProgressText, type WorkerTierKey, type WorkerTierNext } from './workerTier';
 import { workerRatingText, type WorkerRating } from './workerRating';
 
 export type WorkerHomeOrdersTab = 'available' | 'my_jobs';
@@ -39,6 +40,7 @@ type Props = {
   hasUnread?: boolean;
   /** درجهٔ خود متخصص از سرور (D-71)؛ null یعنی نشانی نمایش داده نشود. */
   tierKey?: WorkerTierKey | null;
+  tierNext?: WorkerTierNext | null;
   /** میانگین ستارهٔ خود متخصص (D-73)؛ null یعنی «—». */
   rating?: WorkerRating | null;
   ordersState: WorkerOrdersState<NativeOrder>;
@@ -88,6 +90,7 @@ export function WorkerHomeScreen({
   userAvatar,
   hasUnread,
   tierKey,
+  tierNext,
   rating,
   ordersState,
   hasLoaded,
@@ -109,6 +112,7 @@ export function WorkerHomeScreen({
   const currentJob = partitionWorkerJobs(ordersState.mine).active[0] ?? null;
   const income = workerWeeklyIncome();
   const tierBadge = workerTierBadge(tierKey);
+  const tierProgress = workerTierProgressText(tierNext);
 
   const stats = [
     { label: 'کار امروز', value: known ? workerStatText(workerTodayJobsCount(ordersState.mine)) : WORKER_STAT_PLACEHOLDER },
@@ -162,18 +166,31 @@ export function WorkerHomeScreen({
             <Circle cx="8%" cy="10%" r="56" fill="#FFFFFF" fillOpacity={0.06} />
           </Svg>
         </View>
-        <Text style={styles.welcomeTitle}>{workerGreeting(userName)}</Text>
-        {tierBadge ? (
-          <View style={styles.tierRow}>
+        <View style={styles.nameRow}>
+          <Text style={[styles.welcomeTitle, styles.welcomeTitleInRow]}>{workerGreeting(userName)}</Text>
+          {tierBadge ? (
             <View
               accessible
-              accessibilityLabel={tierBadge.label}
+              accessibilityLabel={`سطح ${tierBadge.label}`}
               style={[
                 styles.tierBadge,
                 { backgroundColor: tierBadge.background, borderColor: tierBadge.border, borderWidth: tierBadge.borderWidth },
               ]}
             >
+              {tierBadge.icon === 'star' ? (
+                <Star size={12} color={tierBadge.iconColor} fill={tierBadge.iconColor} />
+              ) : (
+                <Medal size={12} color={tierBadge.iconColor} />
+              )}
               <Text style={[styles.tierBadgeText, { color: tierBadge.color }]}>{tierBadge.label}</Text>
+            </View>
+          ) : null}
+        </View>
+        {tierProgress && tierNext ? (
+          <View style={styles.tierProgress} accessible accessibilityLabel={tierProgress}>
+            <Text style={styles.tierProgressText} numberOfLines={2}>{tierProgress}</Text>
+            <View style={styles.tierTrack}>
+              <View style={[styles.tierFill, { width: `${Math.round(tierNext.progress * 100)}%` }]} />
             </View>
           </View>
         ) : null}
@@ -366,9 +383,17 @@ const styles = StyleSheet.create({
     ...type.bold, ...fa, fontSize: 22, lineHeight: 34, color: colors.white, textAlign: 'center', marginBottom: 14,
     textShadowColor: 'rgba(0,0,0,0.18)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  tierRow: { alignItems: 'center', marginTop: -6, marginBottom: 14 },
-  tierBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
-  tierBadgeText: { ...type.bold, ...fa, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  nameRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  welcomeTitleInRow: { marginBottom: 0 },
+  tierBadge: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 4, borderRadius: radius.pill,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  tierBadgeText: { ...type.semibold, ...fa, fontSize: 11, lineHeight: 18, textAlign: 'center' },
+  tierProgress: { marginTop: -6, marginBottom: 14, alignItems: 'center', gap: 6 },
+  tierProgressText: { ...type.medium, ...fa, fontSize: 12, lineHeight: 18, color: 'rgba(255,255,255,0.92)', textAlign: 'center' },
+  tierTrack: { width: '60%', height: 4, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden', flexDirection: 'row-reverse' },
+  tierFill: { height: 4, borderRadius: radius.pill, backgroundColor: colors.white },
   statsRow: { flexDirection: 'row-reverse', gap: 8 },
   statBox: {
     flex: 1, minHeight: 64, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)',

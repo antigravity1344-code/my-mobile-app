@@ -793,6 +793,34 @@ if (!isMainThread) {
     db.close();
   });
 
+  test('worker tier progress reports the next tier and remaining amounts without writing (D-75)', () => {
+    const { db } = freshStore();
+    seedPair(db);
+    const ledgerBefore = db.listLedger('USER-W').length;
+    const start = db.workerTierProgress('USER-W');
+    assert.deepEqual(start, {
+      tierKey: 'gray',
+      next: { tierKey: 'silver', remainingOrders: 20, remainingPoints: 0, minRating: 4, ratingMet: false, progress: 0 },
+    });
+    assert.equal(db.listLedger('USER-W').length, ledgerBefore, 'reading progress writes nothing');
+    assert.equal(db.workerTierProgress('USER-C'), null, 'customers have no worker progress');
+    assert.equal(db.workerTierProgress('USER-MISSING'), null);
+    accept(db, 'ORD-PR-1');
+    assert.equal(db.tryCompleteOrder('ORD-PR-1', { id: 'USER-W', name: 'w' }).code, 'ok');
+    assert.equal(db.createRating('ORD-PR-1', 'USER-C', { customerRating: 3 }).code, 'ok');
+    const low = db.workerTierProgress('USER-W').next;
+    assert.equal(low.remainingOrders, 19);
+    assert.equal(low.ratingMet, false, '3 stars is below 4');
+    publish(db, 'tiers.worker', { levels: [{ tierKey: 'gray' }, { tierKey: 'silver', minPoints: 100, minCompleted: 2 }] });
+    const pts = db.workerTierProgress('USER-W').next;
+    assert.equal(pts.minRating, null);
+    assert.equal(pts.ratingMet, true);
+    assert.equal(pts.remainingOrders, 1);
+    assert.equal(pts.remainingPoints, 100 - db.getUserPoints('USER-W').balance);
+    assert.ok(pts.progress > 0 && pts.progress < 1);
+    db.close();
+  });
+
   test('GET /api/workers/me/rating returns only the own average and count and refuses customers (D-73)', async (t) => {
     const server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -823,7 +851,9 @@ if (!isMainThread) {
     assert.equal(anonymous.status, 401);
     const fresh = await request(server, { pathname: '/api/workers/me/tier', token: worker.token });
     assert.equal(fresh.status, 200);
-    assert.deepEqual(fresh.json, { success: true, tierKey: 'gray', tierSince: null });
+    assert.equal(fresh.json.tierKey, 'gray');
+    assert.equal(fresh.json.tierSince, null);
+    assert.ok(fresh.json.next === null || typeof fresh.json.next.tierKey === 'string', 'D-75 next tier');
     assert.equal(store.getUserPoints(worker.user.id), null, 'the read wrote no row');
     const denied = await request(server, { pathname: '/api/workers/me/tier', token: customer.token });
     assert.equal(denied.status, 403);
@@ -849,7 +879,8 @@ if (!isMainThread) {
     const own = await request(server, { pathname: '/api/workers/me/tier', token: worker.token });
     assert.equal(own.json.tierKey, 'silver');
     assert.equal(typeof own.json.tierSince, 'string');
-    assert.deepEqual(Object.keys(own.json).sort(), ['success', 'tierKey', 'tierSince']);
+    assert.deepEqual(Object.keys(own.json).sort(), ['next', 'success', 'tierKey', 'tierSince']);
+    assert.equal(own.json.next, null, 'no tier above the highest published level');
     const me = await request(server, { pathname: '/api/users/me', token: worker.token });
     assert.equal('tierKey' in me.json.user, false, 'publicUser carries no tier');
     // برای اجراهای بعدی همین فایل، قانون فعال متخصص خاموش می‌شود.

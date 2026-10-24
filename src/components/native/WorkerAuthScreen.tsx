@@ -13,7 +13,7 @@ import {
 import { Phone, Briefcase, ShieldCheck } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { UserData } from '../../types/user';
-import { type } from '../../theme';
+import { colors, radius, shadowMd, type } from '../../theme/customerHome';
 
 interface WorkerAuthScreenProps {
   onLogin: (user: UserData, token: string) => void;
@@ -90,10 +90,10 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
         {/* هدر برند متخصصین */}
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}>
-            <Briefcase size={26} color="#fff" />
+            <Briefcase size={26} color={colors.white} />
           </View>
           <View>
-            <Text style={[styles.brandTitle, fa]}>پاکشو متخصصین</Text>
+            <Text style={[styles.brandTitle, fa]}>پاکشوی متخصصین</Text>
             <Text style={[styles.brandSubtitle, fa]}>سامانه همکاران و متخصصین نظافت</Text>
           </View>
         </View>
@@ -101,7 +101,7 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
         {/* کارت ورود */}
         <View style={styles.card}>
           <View style={styles.header}>
-            <ShieldCheck size={24} color="#0284c7" />
+            <ShieldCheck size={24} color={colors.teal} />
             <Text style={[styles.title, fa]}>
               {step === 1 ? 'ورود به پنل متخصصین' : 'تایید شماره همراه'}
             </Text>
@@ -127,21 +127,21 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
             <>
               <Text style={[styles.inputLabel, fa]}>شماره همراه متخصص:</Text>
               <View style={styles.inputWrapper}>
-                <Phone size={18} color="#64748b" />
+                <Phone size={18} color={colors.muted} />
                 <TextInput
                   style={styles.input}
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
                   keyboardType="phone-pad"
                   placeholder="مثال: ۰۹۱۲۲۲۲۲۲۲۲"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.mutedLight}
                   textAlign="right"
                 />
               </View>
 
               <Pressable onPress={handleNext} disabled={loading} style={styles.submitButton}>
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.white} />
                 ) : (
                   <Text style={[styles.submitButtonText, fa]}>ارسال کد تایید پیامکی ←</Text>
                 )}
@@ -157,12 +157,12 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
                 keyboardType="numeric"
                 maxLength={4}
                 placeholder="کد ۴ رقمی"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.mutedLight}
               />
 
               <Pressable onPress={handleVerify} disabled={loading} style={styles.submitButton}>
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.white} />
                 ) : (
                   <Text style={[styles.submitButtonText, fa]}>تایید نهایی و ورود به پنل متخصص</Text>
                 )}
@@ -182,7 +182,7 @@ export const WorkerAuthScreen: React.FC<WorkerAuthScreenProps> = ({ onLogin }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
     padding: 20,
@@ -204,30 +204,30 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   brandTitle: {
     ...type.bold,
-    fontWeight: '400',
     textAlign: 'right',
-    color: '#ffffff',
+    color: colors.text,
     fontSize: 24,
   },
   brandSubtitle: {
     ...type.regular,
-    fontWeight: '400',
     textAlign: 'right',
-    color: '#94a3b8',
+    color: colors.muted,
     fontSize: 11,
     marginTop: 2,
   },
   card: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
+    backgroundColor: colors.white,
+    borderRadius: radius.card + 4,
     padding: 20,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadowMd,
   },
   header: {
     flexDirection: 'row-reverse',
@@ -237,16 +237,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...type.bold,
-    fontWeight: '400',
     fontSize: 17,
-    color: '#0f172a',
+    color: colors.text,
     textAlign: 'right',
   },
   subtitle: {
     ...type.regular,
-    fontWeight: '400',
     fontSize: 12,
-    color: '#64748b',
+    color: colors.muted,
     textAlign: 'right',
     marginBottom: 18,
     lineHeight: 18,
@@ -261,25 +259,23 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...type.bold,
-    fontWeight: '400',
     color: '#b91c1c',
     fontSize: 12,
     textAlign: 'right',
   },
   inputLabel: {
     ...type.bold,
-    fontWeight: '400',
     fontSize: 13,
-    color: '#334155',
+    color: colors.text,
     textAlign: 'right',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: 'rgba(31, 42, 40, 0.14)',
     borderRadius: 14,
     paddingHorizontal: 12,
     marginBottom: 20,
@@ -288,21 +284,19 @@ const styles = StyleSheet.create({
   },
   input: {
     ...type.regular,
-    fontWeight: '400',
     flex: 1,
     minHeight: 44,
-    color: '#0f172a',
+    color: colors.text,
     textAlign: 'right',
     fontSize: 14,
   },
   otpInput: {
     ...type.bold,
-    fontWeight: '400',
     writingDirection: 'ltr',
     includeFontPadding: false,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.white,
     borderWidth: 2,
-    borderColor: '#0284c7',
+    borderColor: colors.teal,
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 52,
@@ -312,7 +306,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   hintBox: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.tealSoft,
     borderRadius: 10,
     padding: 8,
     alignItems: 'center',
@@ -320,23 +314,21 @@ const styles = StyleSheet.create({
   },
   hintText: {
     ...type.regular,
-    fontWeight: '400',
     fontSize: 11,
-    color: '#64748b',
+    color: colors.tealDark,
     textAlign: 'center',
   },
   submitButton: {
-    borderRadius: 16,
+    borderRadius: radius.button,
     minHeight: 48,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   submitButtonText: {
     ...type.bold,
-    fontWeight: '400',
-    color: '#ffffff',
+    color: colors.white,
     fontSize: 14,
   },
   backButton: {
@@ -347,8 +339,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...type.bold,
-    fontWeight: '400',
-    color: '#64748b',
+    color: colors.muted,
     fontSize: 12,
   },
 });

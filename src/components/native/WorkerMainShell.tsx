@@ -9,7 +9,7 @@ import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
 import { requestWorkerAccept } from './workerAcceptOrder';
 import { WORKER_SESSION_EXPIRED_MESSAGE } from './workerOrdersFetch';
 import { workerTabBadge } from './workerHomeModel';
-import { WORKER_TIER_ENDPOINT, workerTierFromResponse, type WorkerTierKey } from './workerTier';
+import { WORKER_TIER_ENDPOINT, workerTierFromResponse, workerTierNextFromResponse, type WorkerTierKey, type WorkerTierNext } from './workerTier';
 import { WORKER_RATING_ENDPOINT, workerRatingFromResponse, type WorkerRating } from './workerRating';
 import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
@@ -41,6 +41,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
   const [unreadCount, setUnreadCount] = useState(0);
   // درجهٔ خود متخصص (D-71)؛ خطا یا پاسخ نامعتبر یعنی هیچ نشانی نمایش داده نشود.
   const [tierKey, setTierKey] = useState<WorkerTierKey | null>(null);
+  const [tierNext, setTierNext] = useState<WorkerTierNext | null>(null);
   // میانگین ستارهٔ خود متخصص (D-73)؛ خطا یعنی «—».
   const [rating, setRating] = useState<WorkerRating | null>(null);
 
@@ -64,9 +65,12 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
   const loadTier = useCallback(async () => {
     try {
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-      setTierKey(workerTierFromResponse(await apiFetch(WORKER_TIER_ENDPOINT)));
+      const response = await apiFetch(WORKER_TIER_ENDPOINT);
+      setTierKey(workerTierFromResponse(response));
+      setTierNext(workerTierNextFromResponse(response));
     } catch {
       setTierKey(null);
+      setTierNext(null);
     }
   }, []);
   const loadRating = useCallback(async () => {
@@ -109,6 +113,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
             userAvatar={user.avatar}
             hasUnread={unreadCount > 0}
             tierKey={tierKey}
+            tierNext={tierNext}
             rating={rating}
             ordersState={ordersState}
             hasLoaded={hasLoaded}

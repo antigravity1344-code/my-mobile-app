@@ -12,6 +12,7 @@ process.env.PAKSHO_WORKER_DOC_DIR = path.join(tmp, 'docs');
 process.env.PAKSHO_ADMIN_PASSWORD = 'paksho-test-admin';
 process.env.NODE_ENV = 'development';
 process.env.PAKSHO_SMS_MODE = '';
+process.env.PAKSHO_DEV_OTP_BYPASS = ''; // a local server/.env may enable D-74; this test needs real-SMS mode
 process.env.KAVENEGAR_API_KEY = '';
 process.env.KAVENEGAR_OTP_TEMPLATE = '';
 

@@ -29,15 +29,18 @@ export function RealUiPreview({ role, onExit, renderApp }: {
         <Pressable onPress={onExit} accessibilityRole="button">
           <Text style={[styles.exit, w && workerStyles.exit]}>خروج از پیش‌نمایش</Text>
         </Pressable>
+        {/* D-76: تب‌های وضعیت فقط برای پیش‌نمایش مشتری؛ متخصص با حالت پیش‌فرض «در انتظار» می‌ماند. */}
+        {!w ? (
         <ScrollView horizontal contentContainerStyle={styles.scenarios}>
           {scenarios.map(([key, label]) => (
             <Pressable key={key} accessibilityRole="button"
               onPress={() => { setPreviewScenario(key); setSelected(key); setRevision((v) => v + 1); }}
-              style={[styles.chip, w && workerStyles.chip, selected === key && (w ? workerStyles.active : styles.active)]}>
-              <Text style={[styles.chipText, w && workerStyles.chipText, selected === key && (w ? workerStyles.activeText : styles.activeText)]}>{label}</Text>
+              style={[styles.chip, selected === key && styles.active]}>
+              <Text style={[styles.chipText, selected === key && styles.activeText]}>{label}</Text>
             </Pressable>
           ))}
         </ScrollView>
+        ) : null}
       </View>
       <View style={styles.app}>{renderApp(revision)}</View>
     </View>
@@ -62,8 +65,4 @@ const workerStyles = StyleSheet.create({
   toolbar: { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, ...shadowSm },
   title: { color: colors.text },
   exit: { color: colors.teal },
-  chip: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
-  chipText: { color: colors.text },
-  active: { backgroundColor: colors.teal, borderColor: colors.teal },
-  activeText: { color: colors.white, fontWeight: '800' },
 });
