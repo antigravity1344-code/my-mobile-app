@@ -6,6 +6,7 @@
  * سطح‌بندی جریمه بر اساس زمان لغو نهایی نشده و اینجا اعمال نمی‌شود؛ اگر قانون cancel.penalty منتشر شود فقط یک مقدار amount خوانده می‌شود.
  */
 const crypto = require('crypto');
+const { migrateLegacyPointsRoles } = require('./legacyPointsRoles');
 
 const LEDGER_UNITS = new Set(['points', 'free_cancel']);
 const ACTORS = new Set(['system', 'admin']);
@@ -39,6 +40,7 @@ const MAX_NOTE_LENGTH = 500;
 const MAX_RULE_JSON = 4000;
 
 function createPointsService({ database, transaction, getUser, getOrder }) {
+  migrateLegacyPointsRoles(database, transaction);
   database.exec(`
     CREATE TABLE IF NOT EXISTS point_rules (
       id TEXT PRIMARY KEY,
