@@ -121,12 +121,15 @@ function createdTime(value: unknown): number {
   return Number.isFinite(time) ? time : 0;
 }
 
-/** کارهای متخصص: فعال‌ها (جدیدترین اول) و سوابق یعنی انجام‌شده/لغوشده/نامشخص (جدیدترین اول). */
+/** کارهای متخصص: فعال‌ها و سوابق بسته‌شده/نامشخص؛ سفارش بازِ PENDING در تب سفارش‌های جدید می‌ماند. */
 export function partitionWorkerJobs<T extends { status: WorkerOrderStatus; createdAt?: string }>(
   orders: readonly T[],
 ): { active: T[]; history: T[] } {
   const newestFirst = (left: T, right: T) => createdTime(right.createdAt) - createdTime(left.createdAt);
   const active = orders.filter((order) => isActiveWorkerJob(order.status)).slice().sort(newestFirst);
-  const history = orders.filter((order) => !isActiveWorkerJob(order.status)).slice().sort(newestFirst);
+  const history = orders
+    .filter((order) => order.status !== 'PENDING' && !isActiveWorkerJob(order.status))
+    .slice()
+    .sort(newestFirst);
   return { active, history };
 }

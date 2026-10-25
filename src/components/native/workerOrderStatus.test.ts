@@ -99,6 +99,17 @@ describe('workerOrderStatus', () => {
     expect(active.some((o) => o.status === 'CANCELLED' || o.status === 'COMPLETED')).toBe(false);
   });
 
+  it('keeps unaccepted orders out of both active jobs and history without changing the source list', () => {
+    const pending = { id: 'open', status: 'PENDING' as WorkerOrderStatus, createdAt: '2026-10-08T08:00:00.000Z' };
+    const completed = { id: 'done', status: 'COMPLETED' as WorkerOrderStatus, createdAt: '2026-10-07T08:00:00.000Z' };
+    const orders = Object.freeze([pending, completed]);
+
+    expect(partitionWorkerJobs(orders)).toEqual({ active: [], history: [completed] });
+    expect(partitionWorkerJobs([pending])).toEqual({ active: [], history: [] });
+    expect(orders).toEqual([pending, completed]);
+    expect(canAcceptWorkerOrder(pending.status)).toBe(true);
+  });
+
   it('derives the area from the server field or the first address segment', () => {
     expect(workerOrderArea({ area: 'سعادت‌آباد', address: 'سعادت‌آباد' })).toBe('سعادت‌آباد');
     expect(workerOrderArea({ address: 'شهرک غرب، خیابان ایران زمین، پلاک ۴' })).toBe('شهرک غرب');
