@@ -13,6 +13,7 @@ import { WORKER_SESSION_EXPIRED_MESSAGE } from './workerOrdersFetch';
 import { workerTabBadge } from './workerHomeModel';
 import { WORKER_TIER_ENDPOINT, workerTierFromResponse, workerTierNextFromResponse, type WorkerTierKey, type WorkerTierNext } from './workerTier';
 import { WORKER_RATING_ENDPOINT, workerRatingFromResponse, type WorkerRating } from './workerRating';
+import { loadWorkerWeeklyIncome, type WorkerWeeklyIncomeReport } from '../../features/worker/services/workerFinance';
 import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
@@ -50,6 +51,9 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
   const [tierNext, setTierNext] = useState<WorkerTierNext | null>(null);
   // میانگین ستارهٔ خود متخصص (D-73)؛ خطا یعنی «—».
   const [rating, setRating] = useState<WorkerRating | null>(null);
+  const [weeklyIncome, setWeeklyIncome] = useState<WorkerWeeklyIncomeReport | null>(null);
+  const [weeklyIncomeError, setWeeklyIncomeError] = useState<string | null>(null);
+  const [weeklyIncomeLoading, setWeeklyIncomeLoading] = useState(false);
 
   // پایان نشست روی خانه همان خروج موجود را صدا می‌زند (حساب مسدود را useAccountBlockedLogout جدا مدیریت می‌کند).
   const expired = ordersState.sessionExpired && ordersState.error === WORKER_SESSION_EXPIRED_MESSAGE;
@@ -87,6 +91,18 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
       setRating(null);
     }
   }, []);
+  const loadWeeklyIncome = useCallback(async () => {
+    setWeeklyIncomeLoading(true);
+    const result = await loadWorkerWeeklyIncome();
+    if (result.success) {
+      setWeeklyIncome(result.value);
+      setWeeklyIncomeError(null);
+    } else {
+      setWeeklyIncome(null);
+      setWeeklyIncomeError(result.message);
+    }
+    setWeeklyIncomeLoading(false);
+  }, []);
   // خانه اعلان، درجه و میانگین ستاره را تازه می‌کند؛ کارت بازخورد همان میانگین را دوباره می‌خواند.
   useEffect(() => {
     if (mainView === 'feedbacks') {
@@ -97,7 +113,8 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
     void loadUnread();
     void loadTier();
     void loadRating();
-  }, [mainView, loadUnread, loadTier, loadRating]);
+    void loadWeeklyIncome();
+  }, [mainView, loadUnread, loadTier, loadRating, loadWeeklyIncome]);
 
   const handleAccept = async (order: NativeOrder) => {
     if (acceptingId) return;
@@ -126,6 +143,9 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
             tierKey={tierKey}
             tierNext={tierNext}
             rating={rating}
+            weeklyIncome={weeklyIncome}
+            weeklyIncomeError={weeklyIncomeError}
+            weeklyIncomeLoading={weeklyIncomeLoading}
             ordersState={ordersState}
             hasLoaded={hasLoaded}
             acceptingId={acceptingId}

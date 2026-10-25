@@ -104,6 +104,9 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     };
   }
   if (path === '/workers/me/rating') return { success: true, average: null, count: 0 };
+  if (path === '/workers/me/weekly-income') {
+    return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+  }
   if (path === '/workers/me/address' && role === 'worker') {
     return { success: true, address: 'تهران، خیابان نمونه، پلاک آزمایشی' };
   }

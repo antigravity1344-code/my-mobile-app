@@ -127,6 +127,39 @@ test('wallet failure rolls back completion, events, points, timestamp and snapsh
     assert.equal(h.store.workerWallet.read(f.worker.user.id).transactions.length,1);
   } finally {db.close();}
 });
+function insertSnapshot(db, {orderId, workerId='worker', gross, commission, net, unit='تومان', createdAt}) {
+  db.prepare(`INSERT INTO worker_commission_snapshots
+    (orderId,requestId,workerId,grossAmount,actualHours,currencyUnit,policyVersion,rateBps,commissionAmount,netAmount,createdAt)
+    VALUES (?,?,?,?,2,?,0,2500,?,?,?)`)
+    .run(orderId, 'request:'+orderId, workerId, gross, unit, commission, net, createdAt);
+}
+test('weekly income uses finalized snapshots in the Tehran Saturday week and ignores top-ups', t=>{
+  const {db,wallet}=memory();t.after(()=>db.close());
+  const now=new Date('2026-10-25T10:00:00.000Z');
+  insertSnapshot(db,{orderId:'in-week-toman',gross:4000,commission:1000,net:3000,createdAt:'2026-10-24T08:00:00.000Z'});
+  insertSnapshot(db,{orderId:'in-week-rial',gross:800,commission:200,net:600,unit:'ریال',createdAt:'2026-10-26T09:00:00.000Z'});
+  insertSnapshot(db,{orderId:'previous-friday',gross:90000,commission:22500,net:67500,createdAt:'2026-10-23T20:29:00.000Z'});
+  credit(db,'worker',5000,'تومان','topup-not-income');
+  const report=wallet.readWeeklyIncome('worker',now);
+  assert.deepEqual(report.weekStart,{year:1405,month:8,day:2});
+  assert.deepEqual(report.weekEnd,{year:1405,month:8,day:8});
+  assert.deepEqual(report.totals,[
+    {currencyUnit:'تومان',jobCount:1,grossAmount:4000,commissionAmount:1000,netAmount:3000},
+    {currencyUnit:'ریال',jobCount:1,grossAmount:800,commissionAmount:200,netAmount:600},
+  ]);
+  assert.deepEqual(wallet.readWeeklyIncome('other',now).totals,[]);
+});
+test('weekly income endpoint is session-owned and excludes extra query selectors', async t=>{
+  const f=await fixture(t);
+  const empty=await f.request('/api/workers/me/weekly-income');
+  assert.equal(empty.status,200);
+  assert.equal(empty.json.success,true);
+  assert.equal(empty.json.report.calendar,'jalali');
+  assert.deepEqual(empty.json.report.totals,[]);
+  assert.equal((await f.request('/api/workers/me/weekly-income',f.customer.token)).status,403);
+  assert.equal((await f.request('/api/workers/me/weekly-income','bad')).status,401);
+  assert.equal((await f.request('/api/workers/me/weekly-income?workerId=other')).status,400);
+});
 test('historical completed orders gain no guessed debt; wallet survives reopening the database',async t=>{
   const f=await fixture(t);const id=f.create();h.store.updateOrder({...h.store.getOrder(id),status:'COMPLETED',cleanerId:f.worker.user.id});
   assert.deepEqual(h.store.workerWallet.read(f.worker.user.id).balances,[]);
