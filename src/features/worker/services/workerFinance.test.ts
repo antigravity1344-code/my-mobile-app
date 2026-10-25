@@ -7,7 +7,9 @@ vi.mock('../../../components/native/workerLoginStorage', () => ({ WORKER_TOKEN_K
 import {
   loadWorkerCommissionPolicy,
   loadWorkerWallet,
+  loadWorkerWeeklyIncome,
   parseWorkerWalletResponse,
+  parseWorkerWeeklyIncomeResponse,
 } from './workerFinance';
 
 const walletResponse = {
@@ -83,5 +85,42 @@ describe('worker finance client contracts', () => {
     let preview = false;
     const result = await loadWorkerWallet(async () => { preview = true; return walletResponse; }, () => preview, async () => undefined);
     expect(result.success).toBe(false);
+  });
+
+  it('parses a jalali weekly income report and rejects top-up shaped payloads', () => {
+    const parsed = parseWorkerWeeklyIncomeResponse({
+      success: true,
+      report: {
+        calendar: 'jalali',
+        weekStart: { year: 1405, month: 8, day: 2 },
+        weekEnd: { year: 1405, month: 8, day: 8 },
+        totals: [{ currencyUnit: 'تومان', jobCount: 2, grossAmount: 4000, commissionAmount: 1000, netAmount: 3000 }],
+      },
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.value.totals[0].netAmount).toBe(3000);
+    expect(parseWorkerWeeklyIncomeResponse({
+      success: true,
+      report: { calendar: 'jalali', weekStart: { year: 1405, month: 8, day: 2 }, weekEnd: { year: 1405, month: 8, day: 8 }, totals: [{ currencyUnit: 'تومان', jobCount: 0, grossAmount: 5000, commissionAmount: 0, netAmount: 5000 }] },
+    }).success).toBe(false);
+  });
+
+  it('loads only the own weekly-income endpoint and skips preview requests', async () => {
+    const prepareAuth = vi.fn(async () => undefined);
+    const request = vi.fn(async () => ({
+      success: true,
+      report: {
+        calendar: 'jalali',
+        weekStart: { year: 1405, month: 8, day: 2 },
+        weekEnd: { year: 1405, month: 8, day: 8 },
+        totals: [],
+      },
+    }));
+    const result = await loadWorkerWeeklyIncome(request, () => false, prepareAuth);
+    expect(prepareAuth).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledWith('/workers/me/weekly-income');
+    expect(result.success).toBe(true);
+    expect((await loadWorkerWeeklyIncome(request, () => true, prepareAuth)).success).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { rateToBasisPoints } = require('./commissionPolicy');
+const { jalaliDayFromIso, saturdayWeekRange, isJalaliDayInWeek } = require('./jalaliWeek');
 
 function createWorkerWallet({ database, transaction, commissionPolicy }) {
   database.exec(`
@@ -44,6 +45,8 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
   const debit = database.prepare(`INSERT INTO worker_wallet_entries
     (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'COMMISSION',?,?,?,?)`);
+  const snapshots = database.prepare(`SELECT orderId, grossAmount, commissionAmount, netAmount, currencyUnit, createdAt
+    FROM worker_commission_snapshots WHERE workerId=?`);
 
   function read(workerId) {
     const transactions = rows.all(workerId);
@@ -98,7 +101,55 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
       return existing.get(order.id);
     });
   }
+  function toSafeAmount(value) {
+    const amount = Number(value);
+    if (!Number.isSafeInteger(amount)) throw new Error('INCOME_AMOUNT_OVERFLOW');
+    return amount;
+  }
+
+  // Current Jalali Saturday–Friday week from finalized completion snapshots only.
+  // Wallet top-ups and reservation prices are not work income.
+  function readWeeklyIncome(workerId, now = new Date()) {
+    const week = saturdayWeekRange(now.getTime());
+    if (!week) throw new Error('INVALID_INCOME_WEEK');
+    const groups = new Map();
+    for (const row of snapshots.all(workerId)) {
+      if (!Number.isSafeInteger(row.grossAmount) || !Number.isSafeInteger(row.commissionAmount) || !Number.isSafeInteger(row.netAmount)) {
+        throw new Error('INVALID_INCOME_AMOUNT');
+      }
+      const day = jalaliDayFromIso(row.createdAt);
+      if (!day) throw new Error('INVALID_INCOME_DATE');
+      if (!isJalaliDayInWeek(day, week)) continue;
+      const current = groups.get(row.currencyUnit) || {
+        currencyUnit: row.currencyUnit,
+        jobCount: 0n,
+        grossAmount: 0n,
+        commissionAmount: 0n,
+        netAmount: 0n,
+      };
+      current.jobCount += 1n;
+      current.grossAmount += BigInt(row.grossAmount);
+      current.commissionAmount += BigInt(row.commissionAmount);
+      current.netAmount += BigInt(row.netAmount);
+      groups.set(row.currencyUnit, current);
+    }
+    return {
+      calendar: 'jalali',
+      weekStart: week.start,
+      weekEnd: week.end,
+      totals: Array.from(groups.values())
+        .map((item) => ({
+          currencyUnit: item.currencyUnit,
+          jobCount: toSafeAmount(item.jobCount),
+          grossAmount: toSafeAmount(item.grossAmount),
+          commissionAmount: toSafeAmount(item.commissionAmount),
+          netAmount: toSafeAmount(item.netAmount),
+        }))
+        .sort((a, b) => (a.currencyUnit < b.currencyUnit ? -1 : a.currencyUnit > b.currencyUnit ? 1 : 0)),
+    };
+  }
+
   // No credit API is exposed: only a future verified gateway adapter may add TOPUP entries.
-  return { read, chargeCompletion };
+  return { read, chargeCompletion, readWeeklyIncome };
 }
 module.exports = { createWorkerWallet };

@@ -88,12 +88,22 @@ describe('worker home model', () => {
     expect(workerTodayJobsCount(mine, now)).toBe(2);
   });
 
-  it('weekly income stays unavailable without real payout data; weekdays start Saturday', () => {
+  it('weekly income is available only from a jalali snapshot report; weekdays start Saturday', () => {
     expect(workerWeeklyIncome()).toEqual({ available: false });
+    expect(workerWeeklyIncome(null)).toEqual({ available: false });
+    const report = {
+      calendar: 'jalali' as const,
+      weekStart: { year: 1405, month: 8, day: 2 },
+      weekEnd: { year: 1405, month: 8, day: 8 },
+      totals: [{ currencyUnit: 'تومان', jobCount: 1, grossAmount: 1000, commissionAmount: 250, netAmount: 750 }],
+    };
+    expect(workerWeeklyIncome(report)).toEqual({ available: true, report });
     expect(WORKER_WEEKDAY_LABELS[0]).toBe('ش');
     expect(WORKER_WEEKDAY_LABELS).toHaveLength(7);
     const home = read('WorkerHomeScreen.tsx');
-    expect(home).toContain('گزارش درآمد هنوز فعال نشده است.');
+    expect(home).toContain('شارژ کیف پول درآمد کاری نیست');
+    expect(home).toContain('workerWeeklyIncome(weeklyIncome)');
+    expect(home).not.toContain('گزارش درآمد هنوز فعال نشده است.');
     expect(home).toContain('onOpenCard?.(card)');
     expect(home).not.toContain('به‌زودی');
   });

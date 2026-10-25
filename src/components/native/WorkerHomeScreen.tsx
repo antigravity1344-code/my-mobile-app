@@ -28,6 +28,12 @@ import {
   workerTodayJobsCount,
   workerWeeklyIncome,
 } from './workerHomeModel';
+import {
+  workerWeeklyIncomeJobCount,
+  workerWeeklyIncomeNetText,
+  workerWeeklyIncomeWeekLabel,
+} from './workerWeeklyIncome';
+import type { WorkerWeeklyIncomeReport } from '../../features/worker/services/workerFinance';
 import { workerTierBadge, workerTierProgressText, type WorkerTierKey, type WorkerTierNext } from './workerTier';
 import { workerRatingText, type WorkerRating } from './workerRating';
 import { WORKER_HOME_CARD_KEYS, WORKER_HOME_CARD_LABEL, type WorkerHomeCardKey } from './workerHomeCards';
@@ -44,6 +50,9 @@ type Props = {
   tierNext?: WorkerTierNext | null;
   /** میانگین ستارهٔ خود متخصص (D-73)؛ null یعنی «—». */
   rating?: WorkerRating | null;
+  weeklyIncome?: WorkerWeeklyIncomeReport | null;
+  weeklyIncomeError?: string | null;
+  weeklyIncomeLoading?: boolean;
   ordersState: WorkerOrdersState<NativeOrder>;
   hasLoaded: boolean;
   acceptingId: string | null;
@@ -93,6 +102,9 @@ export function WorkerHomeScreen({
   tierKey,
   tierNext,
   rating,
+  weeklyIncome,
+  weeklyIncomeError,
+  weeklyIncomeLoading,
   ordersState,
   hasLoaded,
   acceptingId,
@@ -112,7 +124,7 @@ export function WorkerHomeScreen({
   const preview = available.slice(0, 2);
   const more = available.length - preview.length;
   const currentJob = partitionWorkerJobs(ordersState.mine).active[0] ?? null;
-  const income = workerWeeklyIncome();
+  const income = workerWeeklyIncome(weeklyIncome);
   const tierBadge = workerTierBadge(tierKey);
   const tierProgress = workerTierProgressText(tierNext);
 
@@ -349,11 +361,30 @@ export function WorkerHomeScreen({
         })}
       </View>
 
-      {/* درآمد این هفته */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>درآمد این هفته</Text>
-        {income.available ? null : (
-          <Text style={styles.stateText}>گزارش درآمد هنوز فعال نشده است.</Text>
+        <Text style={styles.stateText}>فقط کارهای قطعی‌شده با اسنپ‌شات پایان کار. شارژ کیف پول درآمد کاری نیست.</Text>
+        {weeklyIncomeLoading ? (
+          <ActivityIndicator color={colors.teal} />
+        ) : weeklyIncomeError ? (
+          <Text style={styles.stateText}>{weeklyIncomeError}</Text>
+        ) : income.available ? (
+          <>
+            <Text style={styles.metaText}>{workerWeeklyIncomeWeekLabel(income.report)}</Text>
+            <Text style={styles.metaText}>{workerWeeklyIncomeJobCount(income.report)}</Text>
+            {income.report.totals.map((total) => (
+              <View key={total.currencyUnit} style={styles.incomeRow}>
+                <Text style={styles.priceText}>
+                  {workerWeeklyIncomeNetText(total, (amount, unit) => formatStoredAmount(amount, unit))}
+                </Text>
+                <Text style={styles.metaText}>
+                  مبلغ کارها: {formatStoredAmount(total.grossAmount, total.currencyUnit)} · کمیسیون: {formatStoredAmount(total.commissionAmount, total.currencyUnit)}
+                </Text>
+              </View>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.stateText}>گزارش درآمد این هفته دریافت نشد.</Text>
         )}
       </View>
     </ScrollView>
@@ -435,6 +466,7 @@ const styles = StyleSheet.create({
   statusChipText: { ...type.semibold, ...fa, fontSize: 12, lineHeight: 18, color: colors.amberText, textAlign: 'center' },
   metaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   metaText: { ...type.regular, ...fa, flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted, textAlign: 'right' },
+  incomeRow: { gap: 4 },
   priceText: { ...type.semibold, ...fa, fontSize: 13.5, lineHeight: 21, color: colors.text, textAlign: 'right' },
   primaryBtn: {
     minHeight: 46, borderRadius: radius.button, backgroundColor: colors.teal,
