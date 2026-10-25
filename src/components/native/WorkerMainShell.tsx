@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerHomeScreen } from './WorkerHomeScreen';
+import { WorkerHomeCardScreen } from './WorkerHomeCardScreens';
+import { WORKER_HOME_CARD_KEYS, type WorkerHomeCardKey } from './workerHomeCards';
 import { WorkerTabBar, type WorkerTab } from './WorkerTabBar';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
 import { useWorkerOrders } from './useWorkerOrders';
@@ -21,7 +23,11 @@ import { attachStoredAuthToken } from '../../api/authToken';
 import { WORKER_TOKEN_KEY, type WorkerSessionUser } from './workerLoginStorage';
 import { colors } from '../../theme/customerHome';
 
-export type WorkerMainView = WorkerTab | 'alerts';
+export type WorkerMainView = WorkerTab | 'alerts' | WorkerHomeCardKey;
+
+function isWorkerHomeCard(view: WorkerMainView): view is WorkerHomeCardKey {
+  return (WORKER_HOME_CARD_KEYS as readonly string[]).includes(view);
+}
 
 type Props = {
   user: WorkerSessionUser;
@@ -81,8 +87,12 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
       setRating(null);
     }
   }, []);
-  // هر بار که خانه باز می‌شود، اعلان‌ها، درجه و میانگین ستاره تازه می‌شوند.
+  // خانه اعلان، درجه و میانگین ستاره را تازه می‌کند؛ کارت بازخورد همان میانگین را دوباره می‌خواند.
   useEffect(() => {
+    if (mainView === 'feedbacks') {
+      void loadRating();
+      return;
+    }
     if (mainView !== 'home') return;
     void loadUnread();
     void loadTier();
@@ -100,7 +110,8 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
     void fetchOrders('after-action');
   };
 
-  const activeTab: WorkerTab = mainView === 'alerts' ? 'home' : mainView;
+  const activeTab: WorkerTab = mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
+  const cardKnown = hasLoaded && !ordersState.sessionExpired && !(!!ordersState.error && ordersState.available.length === 0 && ordersState.mine.length === 0);
   const newOrdersBadge = hasLoaded && !ordersState.sessionExpired ? workerTabBadge(ordersState.available.length) : null;
 
   return (
@@ -123,6 +134,15 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
             onOpenProfile={() => onChangeView('profile')}
             onOpenOrders={(tab) => onChangeView(tab === 'my_jobs' ? 'my_jobs' : 'new_orders')}
             onOpenNotifications={() => onChangeView('alerts')}
+            onOpenCard={(card) => onChangeView(card)}
+          />
+        ) : isWorkerHomeCard(mainView) ? (
+          <WorkerHomeCardScreen
+            card={mainView}
+            mine={ordersState.mine}
+            known={cardKnown}
+            rating={rating}
+            onBack={() => onChangeView('home')}
           />
         ) : mainView === 'new_orders' ? (
           <NativeWorkerPortal key="new_orders" initialTab="available" orders={orders} user={user} onSessionExpired={onLogout} />

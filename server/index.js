@@ -550,6 +550,59 @@ app.route('/api/workers/me/address')
     }
   });
 
+function normalizeWorkerSkills(skills) {
+  if (!Array.isArray(skills)) return null;
+  const out = [];
+  const seen = new Set();
+  for (const raw of skills) {
+    if (typeof raw !== 'string') return null;
+    const id = raw.trim();
+    if (!id || id.length > 40) return null;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length > 20) return null;
+  }
+  return out;
+}
+
+// مهارت‌های ثبت‌شده متخصص؛ فقط skillsJson عوض می‌شود و مسیر ثبت‌نام صدا زده نمی‌شود.
+app.route('/api/workers/me/skills')
+  .all((req, res, next) => {
+    const authUser = requireUser(req, res);
+    if (!authUser) return;
+    if (authUser.role !== 'WORKER') {
+      return res.status(403).json({ success: false, message: 'این بخش فقط برای متخصص است.' });
+    }
+    if (Object.keys(req.query).length) {
+      return res.status(400).json({ success: false, message: 'پارامتر اضافی مجاز نیست.' });
+    }
+    res.set('Cache-Control', 'no-store');
+    res.locals.workerSkillsUser = authUser;
+    next();
+  })
+  .get((req, res) => {
+    const skills = Array.isArray(res.locals.workerSkillsUser.skills) ? res.locals.workerSkillsUser.skills : [];
+    res.json({ success: true, skills });
+  })
+  .put((req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        Object.keys(body).length !== 1 || !Object.hasOwn(body, 'skills')) {
+      return res.status(400).json({ success: false, message: 'فقط فیلد خدمات مجاز است.' });
+    }
+    const skills = normalizeWorkerSkills(body.skills);
+    if (!skills) {
+      return res.status(400).json({ success: false, message: 'فهرست خدمات معتبر نیست.' });
+    }
+    try {
+      const saved = store.updateWorkerSkills(res.locals.workerSkillsUser.id, skills);
+      res.json({ success: true, skills: saved });
+    } catch {
+      res.status(500).json({ success: false, message: 'ذخیره خدمات انجام نشد. دوباره تلاش کنید.' });
+    }
+  });
+
 // 3. پروفایل مشتری
 app.put('/api/users/customer-profile', (req, res) => {
   const authUser = requireUser(req, res);

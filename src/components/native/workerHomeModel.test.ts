@@ -94,6 +94,8 @@ describe('worker home model', () => {
     expect(WORKER_WEEKDAY_LABELS).toHaveLength(7);
     const home = read('WorkerHomeScreen.tsx');
     expect(home).toContain('گزارش درآمد هنوز فعال نشده است.');
+    expect(home).toContain('onOpenCard?.(card)');
+    expect(home).not.toContain('به‌زودی');
   });
 
   it('home has no reject/cancel button and no hardcoded tier and no online toggle', () => {

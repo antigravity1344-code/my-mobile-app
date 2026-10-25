@@ -107,11 +107,15 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
   if (path === '/workers/me/address' && role === 'worker') {
     return { success: true, address: 'تهران، خیابان نمونه، پلاک آزمایشی' };
   }
+  if (path === '/workers/me/skills' && role === 'worker') {
+    return { success: true, skills: ['home_unit_cleaning'] };
+  }
   if (path === '/users/addresses') return { success: true, addresses: [] };
   if (path === '/users/me') return { success: true, user: {
     id: role === 'worker' ? 'PREVIEW-WORKER' : 'PREVIEW-CUSTOMER',
     phone: '09000000000', name: role === 'worker' ? 'علی رضایی' : 'مشتری نمونه',
-    role: role === 'worker' ? 'WORKER' : 'CUSTOMER', status: 'ACTIVE'
+    role: role === 'worker' ? 'WORKER' : 'CUSTOMER', status: 'ACTIVE',
+    skills: role === 'worker' ? ['home_unit_cleaning'] : [],
   }};
   return { success: false, message: 'اطلاعات این بخش هنوز در پیش‌نمایش نمونه‌سازی نشده است.' };
 }
