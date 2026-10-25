@@ -44,6 +44,9 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
   const debit = database.prepare(`INSERT INTO worker_wallet_entries
     (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'COMMISSION',?,?,?,?)`);
+  const findEntry = database.prepare('SELECT * FROM worker_wallet_entries WHERE sourceKey=?');
+  const credit = database.prepare(`INSERT INTO worker_wallet_entries
+    (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'TOPUP',?,?,NULL,?)`);
 
   function read(workerId) {
     const transactions = rows.all(workerId);
@@ -98,7 +101,27 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
       return existing.get(order.id);
     });
   }
-  // No credit API is exposed: only a future verified gateway adapter may add TOPUP entries.
-  return { read, chargeCompletion };
+  // Called only after a server-side provider adapter has verified the payment.
+  // The worker top-up route does not call this, and a browser payload is not proof.
+  function creditVerifiedTopup(input) {
+    if (!input || typeof input.sourceKey !== 'string' || !/^topup:[a-z0-9-]+:[A-Za-z0-9._:-]{1,128}$/.test(input.sourceKey)
+      || typeof input.workerId !== 'string' || !input.workerId || input.workerId.length > 80
+      || !Number.isSafeInteger(input.amount) || input.amount < 1
+      || typeof input.currencyUnit !== 'string' || input.currencyUnit.trim().length < 1 || input.currencyUnit.length > 64) {
+      return { code: 'invalid' };
+    }
+    return transaction(() => {
+      const prior = findEntry.get(input.sourceKey);
+      if (prior) {
+        const same = prior.type === 'TOPUP' && prior.workerId === input.workerId
+          && prior.amount === input.amount && prior.currencyUnit === input.currencyUnit && prior.orderId == null;
+        return { code: same ? 'duplicate' : 'conflict' };
+      }
+      credit.run(crypto.randomUUID(), input.workerId, input.sourceKey, input.amount, input.currencyUnit, new Date().toISOString());
+      read(input.workerId);
+      return { code: 'ok' };
+    });
+  }
+  return { read, chargeCompletion, creditVerifiedTopup };
 }
 module.exports = { createWorkerWallet };
