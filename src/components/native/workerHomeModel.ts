@@ -96,11 +96,13 @@ export function workerTodayJobsCount(
   }).length;
 }
 
-/**
- * درآمد هفتگی فقط از دادهٔ واقعی تسویه ساخته می‌شود. سیاست تسویهٔ متخصص هنوز تعیین نشده
- * و سرور مبلغ قابل پرداخت به متخصص را نمی‌فرستد؛ پس فعلاً همیشه «در دسترس نیست».
- * مبلغ ناخالص سفارش درآمد متخصص نیست و برای تخمین استفاده نمی‌شود.
- */
-export function workerWeeklyIncome(): { available: false } {
-  return { available: false };
+export type { WorkerWeeklyIncomeReport as WorkerWeeklyIncomeInput } from './workerWeeklyIncome';
+import type { WorkerWeeklyIncomeReport } from './workerWeeklyIncome';
+
+/** گزارش هفته فقط وقتی موجود است که اسنپ‌شات‌های قطعی از سرور رسیده باشند. */
+export function workerWeeklyIncome(
+  report?: WorkerWeeklyIncomeReport | null,
+): { available: false } | { available: true; report: WorkerWeeklyIncomeReport } {
+  if (!report || report.calendar !== 'jalali' || !Array.isArray(report.totals)) return { available: false };
+  return { available: true, report };
 }

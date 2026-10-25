@@ -476,6 +476,9 @@ function createDataStore(filename) {
   const updateWorkerAddressStmt = database.prepare(
     "UPDATE users SET address = ? WHERE id = ? AND role = 'WORKER' RETURNING address"
   );
+  const updateWorkerSkillsStmt = database.prepare(
+    "UPDATE users SET skillsJson = ? WHERE id = ? AND role = 'WORKER' RETURNING skillsJson"
+  );
   const selectUser = database.prepare('SELECT * FROM users WHERE id = ?');
   const selectUserByPhone = database.prepare('SELECT * FROM users WHERE phone = ? AND role = ?');
   const listUsersStmt = database.prepare('SELECT * FROM users ORDER BY seq ASC');
@@ -688,6 +691,12 @@ function createDataStore(filename) {
     const row = updateWorkerAddressStmt.get(address, userId);
     if (!row) throw new Error('WORKER_NOT_FOUND');
     return row.address;
+  }
+
+  function updateWorkerSkills(userId, skills) {
+    const row = updateWorkerSkillsStmt.get(jsonArray(skills), userId);
+    if (!row) throw new Error('WORKER_NOT_FOUND');
+    return parseJson(row.skillsJson, []);
   }
 
   function getOrder(id) {
@@ -1683,6 +1692,7 @@ function createDataStore(filename) {
     createUser,
     updateUser,
     updateWorkerAddress,
+    updateWorkerSkills,
     getOrder,
     getOrders,
     listOrders,

@@ -33,6 +33,8 @@ describe('negative preview mutations', () => {
     ['/auth/logout', 'POST'],
     ['/loyalty', 'PATCH'],
     ['/users/me', 'PUT'],
+    ['/workers/me/skills', 'PUT'],
+    ['/workers/me/address', 'PUT'],
   ];
   it.each(operations)('denies %s %s without false positive success', async (endpoint, method) => {
     const network = vi.fn();
