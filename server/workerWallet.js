@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { rateToBasisPoints } = require('./commissionPolicy');
+const { jalaliMonthFromIso } = require('./jalaliMonth');
 const { jalaliDayFromIso, saturdayWeekRange, isJalaliDayInWeek } = require('./jalaliWeek');
 
 function createWorkerWallet({ database, transaction, commissionPolicy }) {
@@ -174,6 +175,55 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
     };
   }
 
-  return { read, chargeCompletion, creditVerifiedTopup, readWeeklyIncome };
+  // Monthly totals come only from finalized completion snapshots. Wallet top-ups
+  // and reservation prices are not work income.
+  function readMonthlyIncome(workerId) {
+    const groups = new Map();
+    for (const row of snapshots.all(workerId)) {
+      if (!Number.isSafeInteger(row.grossAmount) || !Number.isSafeInteger(row.commissionAmount) || !Number.isSafeInteger(row.netAmount)) {
+        throw new Error('INVALID_INCOME_AMOUNT');
+      }
+      const month = jalaliMonthFromIso(row.createdAt);
+      if (!month) throw new Error('INVALID_INCOME_DATE');
+      const key = `${month.year}-${String(month.month).padStart(2, '0')}\0${row.currencyUnit}`;
+      const current = groups.get(key) || {
+        year: month.year,
+        month: month.month,
+        currencyUnit: row.currencyUnit,
+        jobCount: 0n,
+        grossAmount: 0n,
+        commissionAmount: 0n,
+        netAmount: 0n,
+      };
+      current.jobCount += 1n;
+      current.grossAmount += BigInt(row.grossAmount);
+      current.commissionAmount += BigInt(row.commissionAmount);
+      current.netAmount += BigInt(row.netAmount);
+      groups.set(key, current);
+    }
+    const months = new Map();
+    for (const item of groups.values()) {
+      const monthKey = `${item.year}-${String(item.month).padStart(2, '0')}`;
+      const month = months.get(monthKey) || { calendar: 'jalali', year: item.year, month: item.month, totals: [] };
+      month.totals.push({
+        currencyUnit: item.currencyUnit,
+        jobCount: toSafeAmount(item.jobCount),
+        grossAmount: toSafeAmount(item.grossAmount),
+        commissionAmount: toSafeAmount(item.commissionAmount),
+        netAmount: toSafeAmount(item.netAmount),
+      });
+      months.set(monthKey, month);
+    }
+    return {
+      months: Array.from(months.values())
+        .map((item) => ({
+          ...item,
+          totals: item.totals.sort((a, b) => (a.currencyUnit < b.currencyUnit ? -1 : a.currencyUnit > b.currencyUnit ? 1 : 0)),
+        }))
+        .sort((a, b) => (a.year === b.year ? b.month - a.month : b.year - a.year)),
+    };
+  }
+
+  return { read, chargeCompletion, creditVerifiedTopup, readWeeklyIncome, readMonthlyIncome };
 }
 module.exports = { createWorkerWallet };

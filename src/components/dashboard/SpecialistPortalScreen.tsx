@@ -22,6 +22,7 @@ import { attachStoredAuthToken } from '../../api/authToken';
 import type { ApiOrder } from '../../api/types';
 import { WORKER_TOKEN_KEY } from '../native/workerLoginStorage';
 import { appStorage } from '../../utils/storage';
+import { WorkerIncomeReportPanel } from './WorkerIncomeReportPanel';
 import { WorkerWalletPanel } from './WorkerWalletPanel';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
@@ -313,7 +314,10 @@ export const SpecialistPortalScreen: React.FC = () => {
       </div>
 
       {portalView === 'wallet' ? (
-        <WorkerWalletPanel />
+        <div className="space-y-4">
+          <WorkerIncomeReportPanel />
+          <WorkerWalletPanel />
+        </div>
       ) : portalView === 'cleaners' ? (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <CleanersScreen />

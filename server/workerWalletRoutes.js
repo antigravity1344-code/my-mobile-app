@@ -24,6 +24,16 @@ function registerWorkerWalletRoutes(app, {store, requireUser}) {
       });
     } catch { return res.status(500).json({success:false,message:'گزارش درآمد هفته دریافت نشد؛ دوباره تلاش کنید.'}); }
   });
+  app.get('/api/workers/me/income-report', (req,res) => {
+    const user = worker(req,res); if (!user) return;
+    try {
+      return res.json({
+        success:true,
+        report:store.workerWallet.readMonthlyIncome(user.id),
+        message:'این گزارش مبلغ قطعی کارها، کمیسیون و سهم خالص است و شارژ کیف پول را شامل نمی‌شود.',
+      });
+    } catch { return res.status(500).json({success:false,message:'گزارش درآمد دریافت نشد؛ دوباره تلاش کنید.'}); }
+  });
   app.post('/api/workers/me/wallet/topup', (req,res) => {
     if (!worker(req,res)) return;
     return res.status(501).json({success:false,code:'PAYMENT_NOT_CONFIGURED',message:'درگاه شرکت متصل نیست؛ موجودی کیف پول تغییر نکرد.'});
