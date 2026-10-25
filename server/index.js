@@ -12,6 +12,7 @@ const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const { registerCommissionRoutes } = require('./commissionRoutes');
 const { registerCompletionRoutes } = require('./completionRoutes');
 const { registerWorkerWalletRoutes } = require('./workerWalletRoutes');
+const { registerPaymentSettingsRoutes } = require('./paymentSettingsRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -1365,6 +1366,7 @@ app.get('/api/loyalty', (req, res) => {
 registerCompletionRoutes(app, {store,requireUser,requireAdmin,customerView:customerOrderView,workerView:workerAssignedOrderView});
 registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, requireAdmin });
 registerWorkerWalletRoutes(app, {store,requireUser});
+registerPaymentSettingsRoutes(app, { settings: store.paymentSettings, requireAdmin });
 
 app.use('/api/admin', requireAdmin);
 
@@ -1834,6 +1836,9 @@ app.get('/admin/completion.js', (req,res) => res.type('application/javascript').
 app.get('/admin/commission.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminCommission.js'));
 });
+app.get('/admin/payment.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminPayment.js'));
+});
 
 app.get('/admin/points.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminPoints.js'));
@@ -1905,6 +1910,7 @@ app.get('/admin', (req, res) => {
       </button>
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
+      <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         قانون امتیاز
       </button>
@@ -1964,6 +1970,23 @@ app.get('/admin', (req, res) => {
       <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
       <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
     </section>
+    <section id="tabPayment" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">تنظیمات پرداخت شرکت</h3>
+      <p class="text-sm text-slate-300">هر استقرار تنظیم درگاه و حساب تسویه خودش را جدا نگه می‌دارد. تا وقتی درگاه پیاده‌سازی‌شده‌ای انتخاب و نزد همان درگاه تأیید نشده باشد، شارژ کیف پول متخصص انجام نمی‌شود. وارد کردن شماره حساب، مقصد تسویه بانکی را عوض نمی‌کند. رمز اتصال پس از ذخیره نمایش داده نمی‌شود و نباید در کد یا مخزن قرار بگیرد.</p>
+      <p id="paymentState" class="text-sm text-slate-300"></p>
+      <label for="paymentMerchantId" class="block text-sm">شناسه پذیرنده</label>
+      <input id="paymentMerchantId" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentSettlementLabel" class="block text-sm">عنوان حساب تسویه اعلام‌شده</label>
+      <input id="paymentSettlementLabel" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentSettlementReference" class="block text-sm">شماره حساب اعلام‌شده</label>
+      <input id="paymentSettlementReference" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentConnectionSecret" class="block text-sm">اطلاعات محرمانه اتصال</label>
+      <input id="paymentConnectionSecret" type="password" dir="ltr" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentClearSecret" class="block text-sm"><input id="paymentClearSecret" type="checkbox" disabled /> حذف رمز ذخیره‌شده</label>
+      <p id="paymentMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات پرداخت</button>
+      <button id="paymentSave" type="button" onclick="saveAdminPayment()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیمات پرداخت</button>
+    </section>
 
     <section id="tabPoints" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قانون امتیاز</h3>
@@ -1985,6 +2008,7 @@ app.get('/admin', (req, res) => {
   <script src="/admin/tiers.js"></script>
 <script src="/admin/points.js"></script>
   <script src="/admin/commission.js"></script>
+  <script src="/admin/payment.js"></script>
   <script src="/admin/completion.js"></script>
   <script>
     const sourceIdentity = ${identityJson};
@@ -2235,7 +2259,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'completion']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'completion', 'payment']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

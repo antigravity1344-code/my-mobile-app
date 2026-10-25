@@ -9,6 +9,8 @@ const { createCommissionPolicy } = require('./commissionPolicy');
 const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
+const { createPaymentSettings } = require('./paymentSettings');
+const { IMPLEMENTED_PAYMENT_PROVIDERS } = require('./paymentProviders');
 
 const USER_FIELDS = new Set([
   'id',
@@ -1647,6 +1649,13 @@ function createDataStore(filename) {
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
+  const paymentSettings = createPaymentSettings({
+    database,
+    transaction,
+    providers: IMPLEMENTED_PAYMENT_PROVIDERS,
+    wallet: workerWallet,
+    getUser,
+  });
   const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
   // Start-of-work events remain separate from the order's primary status and pricing.
   const orderStart = createOrderStart({
@@ -1666,6 +1675,7 @@ function createDataStore(filename) {
     ...orderStart,
     commissionPolicy,
     workerWallet,
+    paymentSettings,
     transaction,
     getUser,
     getUserByPhone,
