@@ -151,8 +151,8 @@ describe('worker home cards model', () => {
     expect(shell).toContain('onOpenCard={(card) => onChangeView(card)}');
     const cards = read('WorkerHomeCardScreens.tsx');
     expect(cards).toContain('WORKER_FEEDBACK_PRIVACY_NOTE');
-    expect(cards).toContain(WORKER_SERVICES_NOTE.slice(0, 20));
-    expect(cards).toContain(WORKER_TRANSACTIONS_NOTE.slice(0, 20));
+    expect(cards).toContain('WORKER_SERVICES_NOTE');
+    expect(cards).toContain('WORKER_TRANSACTIONS_NOTE');
     expect(cards).not.toMatch(/customerComment|order\.ratings|commentText/);
     expect(cards).not.toContain('درآمد این هفته');
   });
