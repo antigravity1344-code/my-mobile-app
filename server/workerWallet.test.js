@@ -52,6 +52,34 @@ test('financial history rejects update, delete and replacement through either un
   assert.throws(()=>db.exec(`INSERT OR REPLACE INTO worker_commission_snapshots SELECT 'other-order',requestId,workerId,grossAmount,actualHours,currencyUnit,policyVersion,rateBps,commissionAmount,netAmount,createdAt FROM worker_commission_snapshots`));
   assert.equal(wallet.read('worker').transactions.length,1);
 });
+function snapshot(db,{orderId,workerId='worker',amount=1000,unit='تومان',createdAt}) {
+  const fee=Number((BigInt(amount)*2500n+5000n)/10000n);
+  db.prepare(`INSERT INTO worker_commission_snapshots
+    (orderId,requestId,workerId,grossAmount,actualHours,currencyUnit,policyVersion,rateBps,commissionAmount,netAmount,createdAt)
+    VALUES (?,?,?,?,2,?,0,2500,?,?,?)`)
+    .run(orderId,'request:'+orderId,workerId,amount,unit,fee,amount-fee,createdAt);
+}
+test('monthly income uses finalized snapshots only and keeps currencies and Jalali months separate',t=>{
+  const {db,wallet}=memory();t.after(()=>db.close());
+  snapshot(db,{orderId:'mehr-1',amount:1000,createdAt:'2026-10-08T20:29:00.000Z'});
+  snapshot(db,{orderId:'mehr-2',amount:400,unit:'ریال',createdAt:'2026-10-08T20:30:00.000Z'});
+  snapshot(db,{orderId:'aban-1',amount:2000,createdAt:'2026-10-22T20:30:00.000Z'});
+  credit(db,'worker',500000);
+  db.prepare(`INSERT INTO worker_commission_snapshots
+    (orderId,requestId,workerId,grossAmount,actualHours,currencyUnit,policyVersion,rateBps,commissionAmount,netAmount,createdAt)
+    VALUES ('other-job','request:other-job','other',9000,2,'تومان',0,2500,2250,6750,'2026-10-22T20:30:00.000Z')`).run();
+  const report=wallet.readMonthlyIncome('worker');
+  assert.deepEqual(report,{months:[
+    {calendar:'jalali',year:1405,month:8,totals:[{currencyUnit:'تومان',jobCount:1,grossAmount:2000,commissionAmount:500,netAmount:1500}]},
+    {calendar:'jalali',year:1405,month:7,totals:[
+      {currencyUnit:'تومان',jobCount:1,grossAmount:1000,commissionAmount:250,netAmount:750},
+      {currencyUnit:'ریال',jobCount:1,grossAmount:400,commissionAmount:100,netAmount:300},
+    ]},
+  ]});
+  assert.deepEqual(wallet.readMonthlyIncome('other').months[0].totals[0].grossAmount,9000);
+  assert.equal(JSON.stringify(report).includes('TOPUP'),false);
+  assert.equal(JSON.stringify(report).includes('500000'),false);
+});
 test('safe-integer boundary stays exact and a ledger insert failure rolls back the snapshot',t=>{
   const {db,wallet}=memory();t.after(()=>db.close());
   const large=charge(wallet,'large',Number.MAX_SAFE_INTEGER);
@@ -109,8 +137,12 @@ test('wallet access is session-owned; no caller can forge a topup or use custome
   assert.equal((await f.request('/api/workers/me/wallet/topup',f.worker.token,'POST',{amount:100000,verified:true})).status,501);
   assert.deepEqual(h.store.workerWallet.read(f.worker.user.id).balances,[]);
   assert.equal((await f.request('/api/wallet',f.customer.token)).status,200);
+  assert.equal((await f.request('/api/workers/me/income-report',f.customer.token)).status,403);
+  assert.equal((await f.request('/api/workers/me/income-report','bad')).status,401);
+  assert.equal((await f.request('/api/workers/me/income-report?workerId=other')).status,400);
   h.store.updateUser({...h.store.getUser(f.worker.user.id),status:'BLOCKED'});
   assert.equal((await f.request('/api/workers/me/wallet')).status,403);
+  assert.equal((await f.request('/api/workers/me/income-report')).status,403);
 });
 test('wallet failure rolls back completion, events, points, timestamp and snapshot; safe retry charges once',async t=>{
   const f=await fixture(t);const id=f.create();h.store.tryAcceptOrder(id,h.store.getUser(f.worker.user.id));
@@ -130,11 +162,21 @@ test('wallet failure rolls back completion, events, points, timestamp and snapsh
 test('historical completed orders gain no guessed debt; wallet survives reopening the database',async t=>{
   const f=await fixture(t);const id=f.create();h.store.updateOrder({...h.store.getOrder(id),status:'COMPLETED',cleanerId:f.worker.user.id});
   assert.deepEqual(h.store.workerWallet.read(f.worker.user.id).balances,[]);
+  assert.deepEqual(h.store.workerWallet.readMonthlyIncome(f.worker.user.id).months,[]);
   const next=f.create();h.store.tryAcceptOrder(next,h.store.getUser(f.worker.user.id));
   const sent=await f.submit(next);await f.approve(next,sent.json.completion.requestId);
+  const report=await f.request('/api/workers/me/income-report');
+  assert.equal(report.status,200);
+  assert.equal(report.json.report.months.length,1);
+  assert.equal(report.json.report.months[0].totals[0].jobCount,1);
+  assert.equal(report.json.report.months[0].totals[0].grossAmount,1000);
+  assert.equal(report.json.report.months[0].totals[0].commissionAmount,250);
+  assert.equal(report.json.report.months[0].totals[0].netAmount,750);
+  assert.equal(String(report.json.message).includes('شارژ'),true);
   const db=new DatabaseSync(process.env.PAKSHO_SQLITE_PATH);
   try{
     const reopened=createWorkerWallet({database:db,transaction:fn=>fn(),commissionPolicy:h.store.commissionPolicy});
     assert.deepEqual(reopened.read(f.worker.user.id),h.store.workerWallet.read(f.worker.user.id));
+    assert.deepEqual(reopened.readMonthlyIncome(f.worker.user.id),h.store.workerWallet.readMonthlyIncome(f.worker.user.id));
   }finally{db.close();}
 });
