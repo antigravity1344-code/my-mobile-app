@@ -38,6 +38,15 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       createdAt TEXT NOT NULL,
       UNIQUE (providerId, idempotencyKey)
     );
+    CREATE TABLE IF NOT EXISTS worker_topup_intents (
+      id TEXT PRIMARY KEY,
+      workerId TEXT NOT NULL,
+      providerId TEXT NOT NULL,
+      settingsVersion INTEGER NOT NULL CHECK (settingsVersion > 0),
+      amount INTEGER NOT NULL CHECK (amount > 0),
+      currencyUnit TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
   `);
   const settingColumns = new Set(database.prepare('PRAGMA table_info(company_payment_settings)').all().map((column) => column.name));
   if (!settingColumns.has('is_default')) {
@@ -47,7 +56,7 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     CREATE UNIQUE INDEX IF NOT EXISTS company_payment_one_default
     ON company_payment_settings(is_default) WHERE is_default = 1;
   `);
-  for (const table of ['company_payment_settings', 'company_payment_verifications', 'worker_topup_receipts']) {
+  for (const table of ['company_payment_settings', 'company_payment_verifications', 'worker_topup_receipts', 'worker_topup_intents']) {
     for (const operation of ['UPDATE', 'DELETE']) {
       database.exec(`
         CREATE TRIGGER IF NOT EXISTS ${table}_no_${operation.toLowerCase()}
@@ -88,6 +97,10 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       WHERE id = NEW.id OR sourceKey = NEW.sourceKey OR (providerId = NEW.providerId AND idempotencyKey = NEW.idempotencyKey)
     )
     BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS worker_topup_intents_no_replace
+    BEFORE INSERT ON worker_topup_intents
+    WHEN EXISTS (SELECT 1 FROM worker_topup_intents WHERE id = NEW.id)
+    BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END;
   `);
 
   const latest = database.prepare('SELECT * FROM company_payment_settings ORDER BY version DESC LIMIT 1');
@@ -107,6 +120,10 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
   const insertReceipt = database.prepare(`INSERT INTO worker_topup_receipts
     (id, workerId, providerId, settingsVersion, idempotencyKey, providerReference, amount, currencyUnit, sourceKey, createdAt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const intentById = database.prepare('SELECT * FROM worker_topup_intents WHERE id = ?');
+  const insertIntent = database.prepare(`INSERT INTO worker_topup_intents
+    (id, workerId, providerId, settingsVersion, amount, currencyUnit, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`);
 
   function availableProviders() {
     return catalog.filter((provider) => provider && typeof provider.id === 'string').map((provider) => ({ id: provider.id }));
@@ -314,13 +331,14 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     };
   }
 
-  function matchingReceipt(row, proof, providerId) {
-    return row.workerId === proof.workerId
-      && row.providerId === providerId
-      && row.idempotencyKey === proof.idempotencyKey
-      && row.amount === proof.amount
-      && row.currencyUnit === proof.currencyUnit
-      && row.providerReference === proof.providerReference;
+  function matchingReceipt(row, intent, providerReference) {
+    return row.workerId === intent.workerId
+      && row.providerId === intent.providerId
+      && row.settingsVersion === intent.settingsVersion
+      && row.idempotencyKey === intent.id
+      && row.amount === intent.amount
+      && row.currencyUnit === intent.currencyUnit
+      && (providerReference == null || row.providerReference === providerReference);
   }
 
   function parseProof(proof) {
@@ -338,70 +356,181 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     };
   }
 
-  // Browser payloads are not payment proof. The active provider adapter must verify the notice.
-  function confirmVerifiedPayment(notice) {
-    const resolved = resolve();
-    if (resolved.code !== 'ok') return { code: 'not_configured' };
-    const currentView = resolved.settings;
-    const provider = providerById(catalog, currentView.providerId);
-    if (!provider || typeof provider.verifyPayment !== 'function') return { code: 'not_configured' };
-    let proof;
-    try {
-      proof = provider.verifyPayment(notice);
-    } catch {
-      return { code: 'unverified' };
+  function parsePaymentId(value) {
+    return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value) ? value : null;
+  }
+
+  function publicIntent(row) {
+    return {
+      id: row.id,
+      workerId: row.workerId,
+      providerId: row.providerId,
+      settingsVersion: row.settingsVersion,
+      amount: row.amount,
+      currencyUnit: row.currencyUnit,
+      createdAt: row.createdAt,
+    };
+  }
+
+  function parseStart(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return { code: 'invalid' };
+    const allowed = new Set(['id', 'workerId', 'amount', 'currencyUnit']);
+    if (Object.keys(input).some((key) => !allowed.has(key))) return { code: 'invalid' };
+    if (typeof input.workerId !== 'string' || input.workerId.length < 1 || input.workerId.length > 80
+      || /[\u0000-\u001f\u007f]/.test(input.workerId)
+      || !Number.isSafeInteger(input.amount) || input.amount < 1
+      || typeof input.currencyUnit !== 'string' || input.currencyUnit.trim().length < 1 || input.currencyUnit.trim().length > 64) {
+      return { code: 'invalid' };
     }
-    const parsed = parseProof(proof);
-    if (!parsed) return { code: 'unverified' };
-    const user = typeof getUser === 'function' ? getUser(parsed.workerId) : null;
+    const id = Object.hasOwn(input, 'id') ? parsePaymentId(input.id) : crypto.randomUUID();
+    if (!id) return { code: 'invalid' };
+    return { value: { id, workerId: input.workerId, amount: input.amount, currencyUnit: input.currencyUnit.trim() } };
+  }
+
+  function sameIntent(row, start) {
+    return row.workerId === start.workerId
+      && row.providerId === start.providerId
+      && row.settingsVersion === start.settingsVersion
+      && row.amount === start.amount
+      && row.currencyUnit === start.currencyUnit;
+  }
+
+  // Snapshot the current default settings. Later default changes do not retarget this payment.
+  function startVerifiedPayment(input) {
+    const parsed = parseStart(input);
+    if (parsed.code) return parsed;
+    const user = typeof getUser === 'function' ? getUser(parsed.value.workerId) : null;
     if (!user || user.role !== 'WORKER') return { code: 'unverified' };
     try {
       return transaction(() => {
-      const existing = receiptByKey.get(provider.id, parsed.idempotencyKey);
-      if (existing) return matchingReceipt(existing, parsed, provider.id)
-        ? { code: 'duplicate', receipt: publicReceipt(existing) }
-        : { code: 'conflict' };
-      const freshResolved = resolve();
-      if (freshResolved.code !== 'ok') return { code: 'not_configured' };
-      const fresh = byVersion.get(freshResolved.settings.version);
-      const freshView = viewOf(fresh);
-      if (!freshView.topupEnabled || freshView.providerId !== provider.id) return { code: 'not_configured' };
-      const sourceKey = `topup:${provider.id}:${parsed.idempotencyKey}`;
-      const credit = wallet.creditVerifiedTopup({
-        workerId: parsed.workerId,
-        amount: parsed.amount,
-        currencyUnit: parsed.currencyUnit,
-        sourceKey,
+        const resolved = resolve();
+        if (resolved.code !== 'ok') return { code: 'not_configured' };
+        const row = defaultRow.get();
+        const bound = viewOf(row);
+        if (!bound.topupEnabled || !row || !row.providerId) return { code: 'not_configured' };
+        const existing = intentById.get(parsed.value.id);
+        const next = {
+          ...parsed.value,
+          providerId: row.providerId,
+          settingsVersion: row.version,
+        };
+        if (existing) return sameIntent(existing, next)
+          ? { code: 'duplicate', payment: publicIntent(existing) }
+          : { code: 'conflict' };
+        insertIntent.run(
+          next.id,
+          next.workerId,
+          next.providerId,
+          next.settingsVersion,
+          next.amount,
+          next.currencyUnit,
+          new Date().toISOString()
+        );
+        return { code: 'ok', payment: publicIntent(intentById.get(next.id)) };
       });
-      if (credit.code !== 'ok' && credit.code !== 'duplicate') return { code: credit.code };
-      const createdAt = new Date().toISOString();
-      insertReceipt.run(
-        crypto.randomUUID(),
-        parsed.workerId,
-        provider.id,
-        fresh.version,
-        parsed.idempotencyKey,
-        parsed.providerReference,
-        parsed.amount,
-        parsed.currencyUnit,
-        sourceKey,
-        createdAt
-      );
-      return {
-        code: credit.code === 'duplicate' ? 'duplicate' : 'ok',
-        receipt: publicReceipt(receiptByKey.get(provider.id, parsed.idempotencyKey)),
-      };
-    });
     } catch (error) {
       const message = String(error && error.message);
       if (!/UNIQUE|immutable/i.test(message)) throw error;
-      const existing = receiptByKey.get(provider.id, parsed.idempotencyKey);
-      if (existing && matchingReceipt(existing, parsed, provider.id)) return { code: 'duplicate', receipt: publicReceipt(existing) };
+      const existing = intentById.get(parsed.value.id);
+      if (existing && existing.workerId === parsed.value.workerId
+        && existing.amount === parsed.value.amount
+        && existing.currencyUnit === parsed.value.currencyUnit) {
+        return { code: 'duplicate', payment: publicIntent(existing) };
+      }
       return { code: 'conflict' };
     }
   }
 
-  return { read, resolve, publish, markSettlementVerified, readConnectionSecret, confirmVerifiedPayment };
+  function boundSettingsContext(row) {
+    return {
+      settingsVersion: row.version,
+      providerId: row.providerId,
+      merchantId: row.merchantId,
+      settlementReference: row.settlementReference,
+      connectionSecret: row.secretCiphertext ? fieldCrypto.decryptString(row.secretCiphertext) : null,
+    };
+  }
+
+  function proofMatchesIntent(proof, intent) {
+    return proof.workerId === intent.workerId
+      && proof.amount === intent.amount
+      && proof.currencyUnit === intent.currencyUnit
+      && proof.idempotencyKey === intent.id;
+  }
+
+  // Browser payloads are not payment proof. Confirm against the settings version captured at start.
+  function confirmVerifiedPayment(notice) {
+    const paymentId = parsePaymentId(notice && notice.paymentId);
+    if (!paymentId) return { code: 'unverified' };
+    const intent = intentById.get(paymentId);
+    if (!intent) return { code: 'unverified' };
+    const settingsRow = byVersion.get(intent.settingsVersion);
+    if (!settingsRow || settingsRow.providerId !== intent.providerId) return { code: 'unverified' };
+    const existingReceipt = receiptByKey.get(intent.providerId, intent.id);
+    const boundView = viewOf(settingsRow);
+    const provider = providerById(catalog, intent.providerId);
+    if (!provider || typeof provider.verifyPayment !== 'function' || (!boundView.topupEnabled && !existingReceipt)) {
+      return { code: 'not_configured' };
+    }
+    let proof;
+    try {
+      proof = provider.verifyPayment(notice, boundSettingsContext(settingsRow));
+    } catch {
+      return { code: 'unverified' };
+    }
+    const parsed = parseProof(proof);
+    if (!parsed || !proofMatchesIntent(parsed, intent)) return { code: parsed ? 'conflict' : 'unverified' };
+    if (existingReceipt) {
+      return matchingReceipt(existingReceipt, intent, parsed.providerReference)
+        ? { code: 'duplicate', receipt: publicReceipt(existingReceipt) }
+        : { code: 'conflict' };
+    }
+    const user = typeof getUser === 'function' ? getUser(intent.workerId) : null;
+    if (!user || user.role !== 'WORKER') return { code: 'unverified' };
+    try {
+      return transaction(() => {
+        const freshIntent = intentById.get(paymentId);
+        const freshSettings = freshIntent ? byVersion.get(freshIntent.settingsVersion) : null;
+        if (!freshIntent || !freshSettings || freshSettings.providerId !== freshIntent.providerId) return { code: 'unverified' };
+        const existing = receiptByKey.get(freshIntent.providerId, freshIntent.id);
+        if (existing) return matchingReceipt(existing, freshIntent, parsed.providerReference)
+          ? { code: 'duplicate', receipt: publicReceipt(existing) }
+          : { code: 'conflict' };
+        const sourceKey = `topup:${freshIntent.providerId}:${freshIntent.id}`;
+        const credit = wallet.creditVerifiedTopup({
+          workerId: freshIntent.workerId,
+          amount: freshIntent.amount,
+          currencyUnit: freshIntent.currencyUnit,
+          sourceKey,
+        });
+        if (credit.code !== 'ok' && credit.code !== 'duplicate') return { code: credit.code };
+        insertReceipt.run(
+          crypto.randomUUID(),
+          freshIntent.workerId,
+          freshIntent.providerId,
+          freshIntent.settingsVersion,
+          freshIntent.id,
+          parsed.providerReference,
+          freshIntent.amount,
+          freshIntent.currencyUnit,
+          sourceKey,
+          new Date().toISOString()
+        );
+        return {
+          code: credit.code === 'duplicate' ? 'duplicate' : 'ok',
+          receipt: publicReceipt(receiptByKey.get(freshIntent.providerId, freshIntent.id)),
+        };
+      });
+    } catch (error) {
+      const message = String(error && error.message);
+      if (!/UNIQUE|immutable/i.test(message)) throw error;
+      const existing = receiptByKey.get(intent.providerId, intent.id);
+      if (existing && matchingReceipt(existing, intent)) return { code: 'duplicate', receipt: publicReceipt(existing) };
+      return { code: 'conflict' };
+    }
+  }
+
+  return { read, resolve, publish, markSettlementVerified, readConnectionSecret, startVerifiedPayment, confirmVerifiedPayment };
 }
 
 module.exports = { createPaymentSettings };

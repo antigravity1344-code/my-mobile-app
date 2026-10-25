@@ -61,23 +61,37 @@ function memory(users = new Map()) {
   };
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const wallet = createWorkerWallet({ database, transaction, commissionPolicy });
-  const provider = {
-    id: 'fixture-gateway',
-    verifyPayment(notice) {
-      if (!notice || notice.proof !== 'provider-server') return { ok: false };
-      if (notice.explode) throw new Error('provider transport failed');
-      return {
-        ok: true,
-        workerId: notice.workerId,
-        amount: notice.serverAmount,
-        currencyUnit: 'تومان',
-        idempotencyKey: notice.eventId,
-        providerReference: `ref-${notice.eventId}`,
-      };
-    },
-  };
-  const settings = createPaymentSettings({ database, transaction, providers: [provider], wallet, getUser: (id) => users.get(id) || null });
-  return { database, wallet, settings, provider };
+  function fixtureProvider(id) {
+    return {
+      id,
+      verifyPayment(notice, context) {
+        if (!notice || notice.proof !== 'provider-server') return { ok: false };
+        if (notice.explode) throw new Error('provider transport failed');
+        if (notice.expectedMerchant && (!context || context.merchantId !== notice.expectedMerchant)) return { ok: false };
+        if (notice.expectedSecret && (!context || context.connectionSecret !== notice.expectedSecret)) return { ok: false };
+        if (notice.expectedProvider && (!context || context.providerId !== notice.expectedProvider)) return { ok: false };
+        const paymentId = notice.paymentId;
+        return {
+          ok: true,
+          workerId: notice.workerId,
+          amount: notice.serverAmount,
+          currencyUnit: notice.currencyUnit || 'تومان',
+          idempotencyKey: paymentId,
+          providerReference: `ref-${paymentId}`,
+        };
+      },
+    };
+  }
+  const provider = fixtureProvider('fixture-gateway');
+  const otherProvider = fixtureProvider('fixture-gateway-b');
+  const settings = createPaymentSettings({
+    database,
+    transaction,
+    providers: [provider, otherProvider],
+    wallet,
+    getUser: (id) => users.get(id) || null,
+  });
+  return { database, wallet, settings, provider, otherProvider };
 }
 
 function savedBody(expectedVersion, extra = {}) {
@@ -185,6 +199,22 @@ test('one global default is stored; requesters without their own settings fall b
   }
 });
 
+function startBody(extra = {}) {
+  return { workerId: 'worker-1', amount: 500, currencyUnit: 'تومان', id: 'pay-1', ...extra };
+}
+
+function providerNotice(extra = {}) {
+  return {
+    proof: 'provider-server',
+    paymentId: 'pay-1',
+    workerId: 'worker-1',
+    serverAmount: 500,
+    amount: 1,
+    verified: true,
+    ...extra,
+  };
+}
+
 test('server-verified top-ups credit once, ignore browser claims, and stay tied to the settings version', () => {
   const users = new Map([
     ['worker-1', { id: 'worker-1', role: 'WORKER' }],
@@ -193,23 +223,33 @@ test('server-verified top-ups credit once, ignore browser claims, and stay tied 
   const { database, wallet, settings } = memory(users);
   try {
     settings.publish(savedBody(0));
-    const notice = { proof: 'provider-server', workerId: 'worker-1', eventId: 'evt-1', serverAmount: 500, amount: 1, verified: true };
-    assert.equal(settings.confirmVerifiedPayment(notice).code, 'not_configured');
+    const notice = providerNotice();
+    assert.equal(settings.startVerifiedPayment(startBody()).code, 'not_configured');
+    assert.equal(settings.confirmVerifiedPayment(notice).code, 'unverified');
     assert.equal(settings.markSettlementVerified(1).code, 'ok');
     wallet.chargeCompletion(
       { id: 'job-1', cleanerId: 'worker-1', pricing: { currencyUnit: 'تومان' } },
       { id: 'request:job-1', workerId: 'worker-1', finalAmount: 1000, actualHours: 2 }
     );
     assert.equal(wallet.read('worker-1').balances[0].balance, -250);
+    const started = settings.startVerifiedPayment(startBody());
+    assert.equal(started.code, 'ok');
+    assert.equal(started.payment.settingsVersion, 1);
+    assert.equal(started.payment.providerId, 'fixture-gateway');
     assert.equal(settings.confirmVerifiedPayment({ verified: true, amount: 999999, workerId: 'worker-1' }).code, 'unverified');
-    assert.equal(settings.confirmVerifiedPayment({ proof: 'provider-server', explode: true, workerId: 'worker-1', eventId: 'evt-x', serverAmount: 500 }).code, 'unverified');
-    assert.equal(settings.confirmVerifiedPayment({ ...notice, workerId: 'customer-1' }).code, 'unverified');
+    assert.equal(settings.confirmVerifiedPayment({
+      proof: 'provider-server', explode: true, paymentId: 'pay-1', workerId: 'worker-1', serverAmount: 500,
+    }).code, 'unverified');
+    assert.equal(settings.startVerifiedPayment(startBody({ workerId: 'customer-1', id: 'pay-customer' })).code, 'unverified');
     const credited = settings.confirmVerifiedPayment(notice);
     assert.equal(credited.code, 'ok');
     assert.equal(credited.receipt.settingsVersion, 1);
     assert.equal(credited.receipt.amount, 500);
+    assert.equal(credited.receipt.workerId, 'worker-1');
     assert.equal(wallet.read('worker-1').balances[0].balance, 250);
     assert.equal(wallet.read('worker-1').canAcceptNewOrders, true);
+    assert.equal(wallet.readWeeklyIncome('worker-1').totals.length, 1);
+    assert.equal(wallet.readWeeklyIncome('worker-1').totals[0].grossAmount, 1000);
     const ledger = database.prepare('SELECT id, amount, sourceKey FROM worker_wallet_entries ORDER BY rowid').all();
     const replay = settings.confirmVerifiedPayment(notice);
     assert.equal(replay.code, 'duplicate');
@@ -237,9 +277,132 @@ test('server-verified top-ups credit once, ignore browser claims, and stay tied 
       settlementReference: 'ACCT-DECLARED-2',
       isDefault: true,
     });
-    assert.equal(settings.confirmVerifiedPayment(notice).code, 'not_configured');
+    assert.equal(settings.confirmVerifiedPayment(notice).code, 'duplicate');
+    assert.equal(settings.startVerifiedPayment(startBody({ id: 'pay-after-default' })).code, 'not_configured');
     assert.equal(wallet.read('worker-1').balances[0].balance, 250);
     assert.equal(JSON.stringify(settings.read()).includes(SECRET), false);
+  } finally {
+    database.close();
+  }
+});
+
+test('started payments stay on their original settings after the default or connection changes', () => {
+  const users = new Map([
+    ['worker-1', { id: 'worker-1', role: 'WORKER' }],
+    ['worker-2', { id: 'worker-2', role: 'WORKER' }],
+  ]);
+  const { database, wallet, settings } = memory(users);
+  try {
+    settings.publish(savedBody(0));
+    assert.equal(settings.markSettlementVerified(1).code, 'ok');
+    const first = settings.startVerifiedPayment(startBody());
+    assert.equal(first.code, 'ok');
+    assert.equal(first.payment.settingsVersion, 1);
+    const secondStart = settings.startVerifiedPayment(startBody({ id: 'pay-2', amount: 300 }));
+    assert.equal(secondStart.code, 'ok');
+
+    const switched = settings.publish({
+      ...savedBody(1),
+      providerId: 'fixture-gateway-b',
+      merchantId: 'merchant-b',
+      settlementLabel: 'درگاه دوم',
+      settlementReference: 'ACCT-B-1',
+      connectionSecret: 'fixture-connection-secret-d80-beta',
+      isDefault: true,
+    });
+    assert.equal(switched.code, 'ok');
+    assert.equal(settings.markSettlementVerified(2).code, 'ok');
+    assert.equal(settings.resolve().settings.version, 2);
+    assert.equal(settings.resolve().settings.providerId, 'fixture-gateway-b');
+
+    const lateA = settings.confirmVerifiedPayment(providerNotice({
+      expectedMerchant: 'merchant-d80',
+      expectedSecret: SECRET,
+      expectedProvider: 'fixture-gateway',
+    }));
+    assert.equal(lateA.code, 'ok');
+    assert.equal(lateA.receipt.settingsVersion, 1);
+    assert.equal(lateA.receipt.providerId, 'fixture-gateway');
+    assert.equal(lateA.receipt.amount, 500);
+    assert.equal(wallet.read('worker-1').balances[0].balance, 500);
+
+    const replayA = settings.confirmVerifiedPayment(providerNotice({
+      expectedMerchant: 'merchant-d80',
+      expectedSecret: SECRET,
+      expectedProvider: 'fixture-gateway',
+    }));
+    assert.equal(replayA.code, 'duplicate');
+    assert.equal(replayA.receipt.id, lateA.receipt.id);
+    assert.equal(wallet.read('worker-1').balances[0].balance, 500);
+
+    assert.equal(settings.confirmVerifiedPayment(providerNotice({ serverAmount: 9999 })).code, 'conflict');
+    assert.equal(settings.confirmVerifiedPayment(providerNotice({ currencyUnit: 'ریال' })).code, 'conflict');
+    assert.equal(settings.confirmVerifiedPayment(providerNotice({ workerId: 'worker-2' })).code, 'conflict');
+    assert.equal(settings.confirmVerifiedPayment(providerNotice({ paymentId: 'missing-pay' })).code, 'unverified');
+    assert.equal(settings.confirmVerifiedPayment(providerNotice({
+      paymentId: 'pay-2',
+      serverAmount: 500,
+    })).code, 'conflict');
+    assert.equal(wallet.read('worker-1').balances[0].balance, 500);
+    assert.equal(wallet.read('worker-2').balances.length, 0);
+
+    const reconnect = settings.publish({
+      ...savedBody(2),
+      providerId: 'fixture-gateway',
+      merchantId: 'merchant-d80-new',
+      settlementLabel: 'اتصال تازه',
+      settlementReference: 'ACCT-DECLARED-9',
+      connectionSecret: 'fixture-connection-secret-d80-gamma',
+      isDefault: true,
+    });
+    assert.equal(reconnect.code, 'ok');
+    assert.equal(settings.markSettlementVerified(3).code, 'ok');
+    assert.equal(settings.resolve().settings.version, 3);
+    const stillOriginal = settings.confirmVerifiedPayment(providerNotice({
+      expectedMerchant: 'merchant-d80',
+      expectedSecret: SECRET,
+      expectedProvider: 'fixture-gateway',
+    }));
+    assert.equal(stillOriginal.code, 'duplicate');
+    assert.equal(stillOriginal.receipt.settingsVersion, 1);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM worker_wallet_entries WHERE type = ?').get('TOPUP').n, 1);
+
+    const later = settings.startVerifiedPayment(startBody({ id: 'pay-new' }));
+    assert.equal(later.code, 'ok');
+    assert.equal(later.payment.settingsVersion, 3);
+    assert.equal(later.payment.providerId, 'fixture-gateway');
+
+    database.exec("CREATE TRIGGER fail_receipt BEFORE INSERT ON worker_topup_receipts BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END");
+    try {
+      const failed = settings.confirmVerifiedPayment(providerNotice({
+        paymentId: 'pay-new',
+        serverAmount: 500,
+        expectedMerchant: 'merchant-d80-new',
+        expectedSecret: 'fixture-connection-secret-d80-gamma',
+        expectedProvider: 'fixture-gateway',
+      }));
+      assert.equal(failed.code, 'conflict');
+      assert.equal(database.prepare('SELECT COUNT(*) AS n FROM worker_topup_receipts').get().n, 1);
+      assert.equal(database.prepare('SELECT COUNT(*) AS n FROM worker_wallet_entries WHERE type = ?').get('TOPUP').n, 1);
+      assert.equal(wallet.read('worker-1').balances[0].balance, 500);
+    } finally {
+      database.exec('DROP TRIGGER fail_receipt');
+    }
+
+    const recovered = settings.confirmVerifiedPayment(providerNotice({
+      paymentId: 'pay-new',
+      serverAmount: 500,
+      expectedMerchant: 'merchant-d80-new',
+      expectedSecret: 'fixture-connection-secret-d80-gamma',
+      expectedProvider: 'fixture-gateway',
+    }));
+    assert.equal(recovered.code, 'ok');
+    assert.equal(recovered.receipt.settingsVersion, 3);
+    assert.equal(wallet.read('worker-1').balances[0].balance, 1000);
+    assert.equal(wallet.readWeeklyIncome('worker-1').totals.length, 0);
+    assert.equal(wallet.read('worker-1').canAcceptNewOrders, true);
+    assert.equal(JSON.stringify(settings.read()).includes(SECRET), false);
+    assert.equal(JSON.stringify(settings.read()).includes('fixture-connection-secret-d80-gamma'), false);
   } finally {
     database.close();
   }
@@ -429,7 +592,7 @@ test('admin payment settings are session-protected and cannot activate a browser
     const customerTopup = await request(server, '/api/wallet/topup', customer, 'POST', { amount: 500000, verified: true });
     assert.equal(customerTopup.status, 501);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM wallet_transactions').get().n, customerBefore);
-    assert.equal(store.paymentSettings.confirmVerifiedPayment({ verified: true, amount: 500000 }).code, 'not_configured');
+    assert.equal(store.paymentSettings.confirmVerifiedPayment({ verified: true, amount: 500000 }).code, 'unverified');
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM worker_topup_receipts').get().n, 0);
   });
 
