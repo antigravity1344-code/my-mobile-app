@@ -28,8 +28,15 @@ import {
   workerTodayJobsCount,
   workerWeeklyIncome,
 } from './workerHomeModel';
+import {
+  workerWeeklyIncomeJobCount,
+  workerWeeklyIncomeNetText,
+  workerWeeklyIncomeWeekLabel,
+} from './workerWeeklyIncome';
+import type { WorkerWeeklyIncomeReport } from '../../features/worker/services/workerFinance';
 import { workerTierBadge, workerTierProgressText, type WorkerTierKey, type WorkerTierNext } from './workerTier';
 import { workerRatingText, type WorkerRating } from './workerRating';
+import { WORKER_HOME_CARD_KEYS, WORKER_HOME_CARD_LABEL, type WorkerHomeCardKey } from './workerHomeCards';
 
 export type WorkerHomeOrdersTab = 'available' | 'my_jobs';
 
@@ -43,6 +50,9 @@ type Props = {
   tierNext?: WorkerTierNext | null;
   /** میانگین ستارهٔ خود متخصص (D-73)؛ null یعنی «—». */
   rating?: WorkerRating | null;
+  weeklyIncome?: WorkerWeeklyIncomeReport | null;
+  weeklyIncomeError?: string | null;
+  weeklyIncomeLoading?: boolean;
   ordersState: WorkerOrdersState<NativeOrder>;
   hasLoaded: boolean;
   acceptingId: string | null;
@@ -51,12 +61,12 @@ type Props = {
   onOpenProfile?: () => void;
   onOpenOrders?: (tab: WorkerHomeOrdersTab) => void;
   onOpenNotifications?: () => void;
+  onOpenCard?: (card: WorkerHomeCardKey) => void;
 };
 
 const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 
-/** میان‌برهایی که هنوز صفحهٔ واقعی ندارند؛ غیرفعال با برچسب «به‌زودی». */
-const SHORTCUTS = ['تقویم کاری', 'خدمات من', 'تراکنش‌ها', 'بازخوردها'] as const;
+const SHORTCUT_ICONS = [IconTabCalendar, IconTabOrders, IconTabCalendar, IconTabUser] as const;
 
 function ServiceIcon({ category }: { category: NativeOrder['category'] }) {
   if (category === 'painter') return <IconServicePaint />;
@@ -92,6 +102,9 @@ export function WorkerHomeScreen({
   tierKey,
   tierNext,
   rating,
+  weeklyIncome,
+  weeklyIncomeError,
+  weeklyIncomeLoading,
   ordersState,
   hasLoaded,
   acceptingId,
@@ -100,6 +113,7 @@ export function WorkerHomeScreen({
   onOpenProfile,
   onOpenOrders,
   onOpenNotifications,
+  onOpenCard,
 }: Props) {
   const avatarUri = (userAvatar || '').trim();
   const initial = (userName || '').trim().charAt(0);
@@ -110,7 +124,7 @@ export function WorkerHomeScreen({
   const preview = available.slice(0, 2);
   const more = available.length - preview.length;
   const currentJob = partitionWorkerJobs(ordersState.mine).active[0] ?? null;
-  const income = workerWeeklyIncome();
+  const income = workerWeeklyIncome(weeklyIncome);
   const tierBadge = workerTierBadge(tierKey);
   const tierProgress = workerTierProgressText(tierNext);
 
@@ -326,24 +340,51 @@ export function WorkerHomeScreen({
         </View>
       )}
 
-      {/* میان‌برها: هنوز صفحه ندارند */}
       <View style={styles.grid}>
-        {SHORTCUTS.map((label, i) => (
-          <View key={label} style={styles.shortcut} accessible accessibilityLabel={`${label}، به‌زودی`} accessibilityState={{ disabled: true }}>
-            <View style={styles.shortcutIcon}>
-              {i % 2 === 0 ? <IconTabCalendar color={colors.mutedLight} /> : <IconTabOrders color={colors.mutedLight} />}
-            </View>
-            <Text style={styles.shortcutLabel} numberOfLines={2}>{label}</Text>
-            <Text style={styles.soon}>به‌زودی</Text>
-          </View>
-        ))}
+        {WORKER_HOME_CARD_KEYS.map((card, i) => {
+          const label = WORKER_HOME_CARD_LABEL[card];
+          const Icon = SHORTCUT_ICONS[i];
+          return (
+            <Pressable
+              key={card}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              onPress={() => onOpenCard?.(card)}
+              style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}
+            >
+              <View style={styles.shortcutIcon}>
+                <Icon color={colors.teal} />
+              </View>
+              <Text style={styles.shortcutLabel} numberOfLines={2}>{label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      {/* درآمد این هفته */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>درآمد این هفته</Text>
-        {income.available ? null : (
-          <Text style={styles.stateText}>گزارش درآمد هنوز فعال نشده است.</Text>
+        <Text style={styles.stateText}>فقط کارهای قطعی‌شده با اسنپ‌شات پایان کار. شارژ کیف پول درآمد کاری نیست.</Text>
+        {weeklyIncomeLoading ? (
+          <ActivityIndicator color={colors.teal} />
+        ) : weeklyIncomeError ? (
+          <Text style={styles.stateText}>{weeklyIncomeError}</Text>
+        ) : income.available ? (
+          <>
+            <Text style={styles.metaText}>{workerWeeklyIncomeWeekLabel(income.report)}</Text>
+            <Text style={styles.metaText}>{workerWeeklyIncomeJobCount(income.report)}</Text>
+            {income.report.totals.map((total) => (
+              <View key={total.currencyUnit} style={styles.incomeRow}>
+                <Text style={styles.priceText}>
+                  {workerWeeklyIncomeNetText(total, (amount, unit) => formatStoredAmount(amount, unit))}
+                </Text>
+                <Text style={styles.metaText}>
+                  مبلغ کارها: {formatStoredAmount(total.grossAmount, total.currencyUnit)} · کمیسیون: {formatStoredAmount(total.commissionAmount, total.currencyUnit)}
+                </Text>
+              </View>
+            ))}
+          </>
+        ) : (
+          <Text style={styles.stateText}>گزارش درآمد این هفته دریافت نشد.</Text>
         )}
       </View>
     </ScrollView>
@@ -425,6 +466,7 @@ const styles = StyleSheet.create({
   statusChipText: { ...type.semibold, ...fa, fontSize: 12, lineHeight: 18, color: colors.amberText, textAlign: 'center' },
   metaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   metaText: { ...type.regular, ...fa, flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted, textAlign: 'right' },
+  incomeRow: { gap: 4 },
   priceText: { ...type.semibold, ...fa, fontSize: 13.5, lineHeight: 21, color: colors.text, textAlign: 'right' },
   primaryBtn: {
     minHeight: 46, borderRadius: radius.button, backgroundColor: colors.teal,
@@ -446,10 +488,9 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginTop: 4, marginBottom: 12 },
   shortcut: {
     width: '48.5%', minHeight: 88, backgroundColor: colors.white, borderRadius: 16, borderWidth: 1,
-    borderColor: colors.border, alignItems: 'center', justifyContent: 'center', padding: 10, gap: 4, opacity: 0.75,
+    borderColor: colors.border, alignItems: 'center', justifyContent: 'center', padding: 10, gap: 4,
   },
-  shortcutIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  shortcutLabel: { ...type.semibold, ...fa, fontSize: 13, lineHeight: 20, color: colors.muted, textAlign: 'center' },
-  soon: { ...type.regular, ...fa, fontSize: 11, lineHeight: 16, color: colors.mutedLight, textAlign: 'center' },
+  shortcutIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.tealSoft, alignItems: 'center', justifyContent: 'center' },
+  shortcutLabel: { ...type.semibold, ...fa, fontSize: 13, lineHeight: 20, color: colors.text, textAlign: 'center' },
   pressed: { opacity: 0.86 },
 });

@@ -10,8 +10,7 @@ const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
 const { createPaymentSettings } = require('./paymentSettings');
-const { createPaymentCharges } = require('./paymentCharges');
-const { implementedProviders } = require('./paymentProviders');
+const { IMPLEMENTED_PAYMENT_PROVIDERS } = require('./paymentProviders');
 
 const USER_FIELDS = new Set([
   'id',
@@ -477,6 +476,9 @@ function createDataStore(filename) {
   const updateWorkerAddressStmt = database.prepare(
     "UPDATE users SET address = ? WHERE id = ? AND role = 'WORKER' RETURNING address"
   );
+  const updateWorkerSkillsStmt = database.prepare(
+    "UPDATE users SET skillsJson = ? WHERE id = ? AND role = 'WORKER' RETURNING skillsJson"
+  );
   const selectUser = database.prepare('SELECT * FROM users WHERE id = ?');
   const selectUserByPhone = database.prepare('SELECT * FROM users WHERE phone = ? AND role = ?');
   const listUsersStmt = database.prepare('SELECT * FROM users ORDER BY seq ASC');
@@ -689,6 +691,12 @@ function createDataStore(filename) {
     const row = updateWorkerAddressStmt.get(address, userId);
     if (!row) throw new Error('WORKER_NOT_FOUND');
     return row.address;
+  }
+
+  function updateWorkerSkills(userId, skills) {
+    const row = updateWorkerSkillsStmt.get(jsonArray(skills), userId);
+    if (!row) throw new Error('WORKER_NOT_FOUND');
+    return parseJson(row.skillsJson, []);
   }
 
   function getOrder(id) {
@@ -1650,9 +1658,13 @@ function createDataStore(filename) {
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
-  const paymentProviders = implementedProviders();
-  const paymentSettings = createPaymentSettings({ database, transaction, providers: paymentProviders });
-  const paymentCharges = createPaymentCharges({ database, transaction, paymentSettings, workerWallet, providers: paymentProviders });
+  const paymentSettings = createPaymentSettings({
+    database,
+    transaction,
+    providers: IMPLEMENTED_PAYMENT_PROVIDERS,
+    wallet: workerWallet,
+    getUser,
+  });
   const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
   // Start-of-work events remain separate from the order's primary status and pricing.
   const orderStart = createOrderStart({
@@ -1673,7 +1685,6 @@ function createDataStore(filename) {
     commissionPolicy,
     workerWallet,
     paymentSettings,
-    paymentCharges,
     transaction,
     getUser,
     getUserByPhone,
@@ -1681,6 +1692,7 @@ function createDataStore(filename) {
     createUser,
     updateUser,
     updateWorkerAddress,
+    updateWorkerSkills,
     getOrder,
     getOrders,
     listOrders,

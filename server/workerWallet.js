@@ -1,6 +1,8 @@
 'use strict';
 const crypto = require('node:crypto');
 const { rateToBasisPoints } = require('./commissionPolicy');
+const { jalaliMonthFromIso } = require('./jalaliMonth');
+const { jalaliDayFromIso, saturdayWeekRange, isJalaliDayInWeek } = require('./jalaliWeek');
 
 function createWorkerWallet({ database, transaction, commissionPolicy }) {
   database.exec(`
@@ -44,9 +46,11 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
   const debit = database.prepare(`INSERT INTO worker_wallet_entries
     (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'COMMISSION',?,?,?,?)`);
+  const findEntry = database.prepare('SELECT * FROM worker_wallet_entries WHERE sourceKey=?');
   const credit = database.prepare(`INSERT INTO worker_wallet_entries
     (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'TOPUP',?,?,NULL,?)`);
-  const bySource = database.prepare('SELECT * FROM worker_wallet_entries WHERE sourceKey=?');
+  const snapshots = database.prepare(`SELECT orderId, grossAmount, commissionAmount, netAmount, currencyUnit, createdAt
+    FROM worker_commission_snapshots WHERE workerId=?`);
 
   function read(workerId) {
     const transactions = rows.all(workerId);
@@ -101,25 +105,125 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
       return existing.get(order.id);
     });
   }
-  function creditVerifiedTopup({ workerId, amount, currencyUnit, sourceKey }) {
-    if (typeof workerId !== 'string' || !workerId) throw new Error('INVALID_TOPUP_WORKER');
-    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('INVALID_TOPUP_AMOUNT');
-    if (typeof currencyUnit !== 'string' || !currencyUnit.trim() || currencyUnit.trim().length > 64) throw new Error('INVALID_CURRENCY_UNIT');
-    if (typeof sourceKey !== 'string' || !sourceKey.startsWith('topup:') || sourceKey.length > 200) throw new Error('INVALID_TOPUP_KEY');
-    const unit = currencyUnit.trim();
+  // Called only after a server-side provider adapter has verified the payment.
+  // The worker top-up route does not call this, and a browser payload is not proof.
+  function creditVerifiedTopup(input) {
+    if (!input || typeof input.sourceKey !== 'string' || !/^topup:[a-z0-9-]+:[A-Za-z0-9._:-]{1,128}$/.test(input.sourceKey)
+      || typeof input.workerId !== 'string' || !input.workerId || input.workerId.length > 80
+      || !Number.isSafeInteger(input.amount) || input.amount < 1
+      || typeof input.currencyUnit !== 'string' || input.currencyUnit.trim().length < 1 || input.currencyUnit.length > 64) {
+      return { code: 'invalid' };
+    }
     return transaction(() => {
-      const existing = bySource.get(sourceKey);
-      if (existing) {
-        if (existing.workerId !== workerId || existing.amount !== amount || existing.currencyUnit !== unit || existing.type !== 'TOPUP') {
-          throw new Error('TOPUP_CONFLICT');
-        }
-        return existing;
+      const prior = findEntry.get(input.sourceKey);
+      if (prior) {
+        const same = prior.type === 'TOPUP' && prior.workerId === input.workerId
+          && prior.amount === input.amount && prior.currencyUnit === input.currencyUnit && prior.orderId == null;
+        return { code: same ? 'duplicate' : 'conflict' };
       }
-      credit.run(crypto.randomUUID(), workerId, sourceKey, amount, unit, new Date().toISOString());
-      read(workerId);
-      return bySource.get(sourceKey);
+      credit.run(crypto.randomUUID(), input.workerId, input.sourceKey, input.amount, input.currencyUnit, new Date().toISOString());
+      read(input.workerId);
+      return { code: 'ok' };
     });
   }
-  return { read, chargeCompletion, creditVerifiedTopup };
+
+  function toSafeAmount(value) {
+    const amount = Number(value);
+    if (!Number.isSafeInteger(amount)) throw new Error('INCOME_AMOUNT_OVERFLOW');
+    return amount;
+  }
+
+  // Current Jalali Saturday–Friday week from finalized completion snapshots only.
+  // Wallet top-ups and reservation prices are not work income.
+  function readWeeklyIncome(workerId, now = new Date()) {
+    const week = saturdayWeekRange(now.getTime());
+    if (!week) throw new Error('INVALID_INCOME_WEEK');
+    const groups = new Map();
+    for (const row of snapshots.all(workerId)) {
+      if (!Number.isSafeInteger(row.grossAmount) || !Number.isSafeInteger(row.commissionAmount) || !Number.isSafeInteger(row.netAmount)) {
+        throw new Error('INVALID_INCOME_AMOUNT');
+      }
+      const day = jalaliDayFromIso(row.createdAt);
+      if (!day) throw new Error('INVALID_INCOME_DATE');
+      if (!isJalaliDayInWeek(day, week)) continue;
+      const current = groups.get(row.currencyUnit) || {
+        currencyUnit: row.currencyUnit,
+        jobCount: 0n,
+        grossAmount: 0n,
+        commissionAmount: 0n,
+        netAmount: 0n,
+      };
+      current.jobCount += 1n;
+      current.grossAmount += BigInt(row.grossAmount);
+      current.commissionAmount += BigInt(row.commissionAmount);
+      current.netAmount += BigInt(row.netAmount);
+      groups.set(row.currencyUnit, current);
+    }
+    return {
+      calendar: 'jalali',
+      weekStart: week.start,
+      weekEnd: week.end,
+      totals: Array.from(groups.values())
+        .map((item) => ({
+          currencyUnit: item.currencyUnit,
+          jobCount: toSafeAmount(item.jobCount),
+          grossAmount: toSafeAmount(item.grossAmount),
+          commissionAmount: toSafeAmount(item.commissionAmount),
+          netAmount: toSafeAmount(item.netAmount),
+        }))
+        .sort((a, b) => (a.currencyUnit < b.currencyUnit ? -1 : a.currencyUnit > b.currencyUnit ? 1 : 0)),
+    };
+  }
+
+  // Monthly totals come only from finalized completion snapshots. Wallet top-ups
+  // and reservation prices are not work income.
+  function readMonthlyIncome(workerId) {
+    const groups = new Map();
+    for (const row of snapshots.all(workerId)) {
+      if (!Number.isSafeInteger(row.grossAmount) || !Number.isSafeInteger(row.commissionAmount) || !Number.isSafeInteger(row.netAmount)) {
+        throw new Error('INVALID_INCOME_AMOUNT');
+      }
+      const month = jalaliMonthFromIso(row.createdAt);
+      if (!month) throw new Error('INVALID_INCOME_DATE');
+      const key = `${month.year}-${String(month.month).padStart(2, '0')}\0${row.currencyUnit}`;
+      const current = groups.get(key) || {
+        year: month.year,
+        month: month.month,
+        currencyUnit: row.currencyUnit,
+        jobCount: 0n,
+        grossAmount: 0n,
+        commissionAmount: 0n,
+        netAmount: 0n,
+      };
+      current.jobCount += 1n;
+      current.grossAmount += BigInt(row.grossAmount);
+      current.commissionAmount += BigInt(row.commissionAmount);
+      current.netAmount += BigInt(row.netAmount);
+      groups.set(key, current);
+    }
+    const months = new Map();
+    for (const item of groups.values()) {
+      const monthKey = `${item.year}-${String(item.month).padStart(2, '0')}`;
+      const month = months.get(monthKey) || { calendar: 'jalali', year: item.year, month: item.month, totals: [] };
+      month.totals.push({
+        currencyUnit: item.currencyUnit,
+        jobCount: toSafeAmount(item.jobCount),
+        grossAmount: toSafeAmount(item.grossAmount),
+        commissionAmount: toSafeAmount(item.commissionAmount),
+        netAmount: toSafeAmount(item.netAmount),
+      });
+      months.set(monthKey, month);
+    }
+    return {
+      months: Array.from(months.values())
+        .map((item) => ({
+          ...item,
+          totals: item.totals.sort((a, b) => (a.currencyUnit < b.currencyUnit ? -1 : a.currencyUnit > b.currencyUnit ? 1 : 0)),
+        }))
+        .sort((a, b) => (a.year === b.year ? b.month - a.month : b.year - a.year)),
+    };
+  }
+
+  return { read, chargeCompletion, creditVerifiedTopup, readWeeklyIncome, readMonthlyIncome };
 }
 module.exports = { createWorkerWallet };

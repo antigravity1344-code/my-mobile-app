@@ -12,7 +12,7 @@ const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const { registerCommissionRoutes } = require('./commissionRoutes');
 const { registerCompletionRoutes } = require('./completionRoutes');
 const { registerWorkerWalletRoutes } = require('./workerWalletRoutes');
-const { registerPaymentRoutes } = require('./paymentRoutes');
+const { registerPaymentSettingsRoutes } = require('./paymentSettingsRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -548,6 +548,59 @@ app.route('/api/workers/me/address')
       res.json({ success: true, address: saved });
     } catch {
       res.status(500).json({ success: false, message: 'ذخیره آدرس انجام نشد. دوباره تلاش کنید.' });
+    }
+  });
+
+function normalizeWorkerSkills(skills) {
+  if (!Array.isArray(skills)) return null;
+  const out = [];
+  const seen = new Set();
+  for (const raw of skills) {
+    if (typeof raw !== 'string') return null;
+    const id = raw.trim();
+    if (!id || id.length > 40) return null;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    if (out.length > 20) return null;
+  }
+  return out;
+}
+
+// مهارت‌های ثبت‌شده متخصص؛ فقط skillsJson عوض می‌شود و مسیر ثبت‌نام صدا زده نمی‌شود.
+app.route('/api/workers/me/skills')
+  .all((req, res, next) => {
+    const authUser = requireUser(req, res);
+    if (!authUser) return;
+    if (authUser.role !== 'WORKER') {
+      return res.status(403).json({ success: false, message: 'این بخش فقط برای متخصص است.' });
+    }
+    if (Object.keys(req.query).length) {
+      return res.status(400).json({ success: false, message: 'پارامتر اضافی مجاز نیست.' });
+    }
+    res.set('Cache-Control', 'no-store');
+    res.locals.workerSkillsUser = authUser;
+    next();
+  })
+  .get((req, res) => {
+    const skills = Array.isArray(res.locals.workerSkillsUser.skills) ? res.locals.workerSkillsUser.skills : [];
+    res.json({ success: true, skills });
+  })
+  .put((req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        Object.keys(body).length !== 1 || !Object.hasOwn(body, 'skills')) {
+      return res.status(400).json({ success: false, message: 'فقط فیلد خدمات مجاز است.' });
+    }
+    const skills = normalizeWorkerSkills(body.skills);
+    if (!skills) {
+      return res.status(400).json({ success: false, message: 'فهرست خدمات معتبر نیست.' });
+    }
+    try {
+      const saved = store.updateWorkerSkills(res.locals.workerSkillsUser.id, skills);
+      res.json({ success: true, skills: saved });
+    } catch {
+      res.status(500).json({ success: false, message: 'ذخیره خدمات انجام نشد. دوباره تلاش کنید.' });
     }
   });
 
@@ -1366,7 +1419,7 @@ app.get('/api/loyalty', (req, res) => {
 registerCompletionRoutes(app, {store,requireUser,requireAdmin,customerView:customerOrderView,workerView:workerAssignedOrderView});
 registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, requireAdmin });
 registerWorkerWalletRoutes(app, {store,requireUser});
-registerPaymentRoutes(app, {store,requireUser,requireAdmin});
+registerPaymentSettingsRoutes(app, { settings: store.paymentSettings, requireAdmin });
 
 app.use('/api/admin', requireAdmin);
 
@@ -1971,20 +2024,21 @@ app.get('/admin', (req, res) => {
       <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
     </section>
     <section id="tabPayment" class="space-y-4 hidden" hidden>
-      <h3 class="text-lg font-bold">تنظیمات پرداخت این شرکت</h3>
-      <p class="text-sm text-slate-300">فقط درگاه‌های واقعاً پیاده‌شده قابل انتخاب‌اند. اطلاعات اتصال در سرور همین استقرار می‌ماند و کلید محرمانه در پاسخ خواندن برنمی‌گردد. تغییر شماره حساب مقصد تسویه بانکی را عوض نمی‌کند؛ حساب باید نزد همان ارائه‌دهنده تأیید شده باشد. پرداخت‌های قبلی با تنظیم جدید بازنویسی نمی‌شوند.</p>
-      <label for="paymentProvider" class="block text-sm">درگاه</label>
-      <select id="paymentProvider" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2"></select>
+      <h3 class="text-lg font-bold">تنظیمات پرداخت شرکت</h3>
+      <p class="text-sm text-slate-300">هر استقرار تنظیم درگاه و حساب تسویه خودش را جدا نگه می‌دارد. تا وقتی درگاه پیاده‌سازی‌شده‌ای انتخاب و نزد همان درگاه تأیید نشده باشد، شارژ کیف پول متخصص انجام نمی‌شود. وارد کردن شماره حساب، مقصد تسویه بانکی را عوض نمی‌کند. رمز اتصال پس از ذخیره نمایش داده نمی‌شود و نباید در کد یا مخزن قرار بگیرد.</p>
+      <p id="paymentState" class="text-sm text-slate-300"></p>
       <label for="paymentMerchantId" class="block text-sm">شناسه پذیرنده</label>
-      <input id="paymentMerchantId" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentSecret" class="block text-sm">کلید محرمانه اتصال</label>
-      <input id="paymentSecret" type="password" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentSettlementAccount" class="block text-sm">حساب تسویه ثبت‌شده نزد درگاه</label>
-      <input id="paymentSettlementAccount" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label class="block text-sm"><input id="paymentSettlementConfirmed" type="checkbox" disabled /> حساب تسویه نزد ارائه‌دهنده برای همین شرکت تأیید شده است</label>
-      <p id="paymentChargeState" class="text-sm text-slate-300">شارژ واقعی هنوز غیرفعال است.</p>
+      <input id="paymentMerchantId" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentSettlementLabel" class="block text-sm">عنوان حساب تسویه اعلام‌شده</label>
+      <input id="paymentSettlementLabel" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentSettlementReference" class="block text-sm">شماره حساب اعلام‌شده</label>
+      <input id="paymentSettlementReference" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentConnectionSecret" class="block text-sm">اطلاعات محرمانه اتصال</label>
+      <input id="paymentConnectionSecret" type="password" dir="ltr" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="paymentClearSecret" class="block text-sm"><input id="paymentClearSecret" type="checkbox" disabled /> حذف رمز ذخیره‌شده</label>
+      <label for="paymentIsDefault" class="block text-sm"><input id="paymentIsDefault" type="checkbox" disabled /> پیش‌فرض سراسری این استقرار</label>
       <p id="paymentMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات</button>
+      <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات پرداخت</button>
       <button id="paymentSave" type="button" onclick="saveAdminPayment()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیمات پرداخت</button>
     </section>
 
@@ -2259,7 +2313,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'payment', 'completion']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'completion', 'payment']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

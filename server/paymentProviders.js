@@ -1,7 +1,12 @@
 'use strict';
-// D-80: only adapters that can start and verify a real charge belong here.
-// No live gateway has been selected yet, so the production catalog stays empty.
-function implementedProviders() {
-  return [];
+
+// D-80: a company may select only a gateway that has a real server-side adapter.
+// The first gateway and merchant account are not chosen yet, so this list stays empty.
+const IMPLEMENTED_PAYMENT_PROVIDERS = Object.freeze([]);
+
+function providerById(providers, id) {
+  if (typeof id !== 'string') return null;
+  return (Array.isArray(providers) ? providers : []).find((provider) => provider && provider.id === id) || null;
 }
-module.exports = { implementedProviders };
+
+module.exports = { IMPLEMENTED_PAYMENT_PROVIDERS, providerById };

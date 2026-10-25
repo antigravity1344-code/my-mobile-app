@@ -28,6 +28,33 @@ export type WorkerCommissionPolicy = {
   ratePercent: number;
   effectiveAt: string | null;
 };
+export type WorkerWeeklyIncomeTotal = {
+  currencyUnit: string;
+  jobCount: number;
+  grossAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+};
+export type WorkerWeeklyIncomeReport = {
+  calendar: 'jalali';
+  weekStart: { year: number; month: number; day: number };
+  weekEnd: { year: number; month: number; day: number };
+  totals: WorkerWeeklyIncomeTotal[];
+};
+export type WorkerIncomeTotal = {
+  currencyUnit: string;
+  jobCount: number;
+  grossAmount: number;
+  commissionAmount: number;
+  netAmount: number;
+};
+export type WorkerIncomeMonth = {
+  calendar: 'jalali';
+  year: number;
+  month: number;
+  totals: WorkerIncomeTotal[];
+};
+export type WorkerIncomeReport = { months: WorkerIncomeMonth[] };
 export type FinanceResult<T> = { success: true; value: T } | { success: false; message: string };
 export type FinanceRequester = (path: string, options?: RequestInit) => Promise<unknown>;
 export type WorkerAuthPreparer = () => Promise<void>;
@@ -105,6 +132,103 @@ export async function loadWorkerWallet(request: FinanceRequester = apiFetch, isP
     const response = await request('/workers/me/wallet');
     if (isPreview()) return { success: false, message: 'کیف پول واقعی در پیش‌نمایش در دسترس نیست.' };
     return parseWorkerWalletResponse(response);
+  } catch {
+    return { success: false, message: 'ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی و دوباره تلاش کنید.' };
+  }
+}
+
+function isJalaliDay(value: unknown): value is { year: number; month: number; day: number } {
+  return isRecord(value) && isAmount(value.year) && value.year >= 1
+    && isAmount(value.month) && value.month >= 1 && value.month <= 12
+    && isAmount(value.day) && value.day >= 1 && value.day <= 31;
+}
+
+export function parseWorkerWeeklyIncomeResponse(input: unknown): FinanceResult<WorkerWeeklyIncomeReport> {
+  if (!isRecord(input) || input.success !== true || !isRecord(input.report)) {
+    return { success: false, message: isRecord(input) && typeof input.message === 'string' ? input.message : 'گزارش درآمد هفته معتبر نیست.' };
+  }
+  const report = input.report;
+  if (report.calendar !== 'jalali' || !isJalaliDay(report.weekStart) || !isJalaliDay(report.weekEnd) || !Array.isArray(report.totals)) {
+    return { success: false, message: 'ساختار گزارش درآمد هفته معتبر نیست.' };
+  }
+  const totals: WorkerWeeklyIncomeTotal[] = [];
+  for (const total of report.totals) {
+    if (!isRecord(total) || typeof total.currencyUnit !== 'string' || !total.currencyUnit.trim()
+      || !isAmount(total.jobCount) || total.jobCount < 1
+      || !isAmount(total.grossAmount) || total.grossAmount < 0
+      || !isAmount(total.commissionAmount) || total.commissionAmount < 0
+      || !isAmount(total.netAmount) || total.netAmount < 0) {
+      return { success: false, message: 'مبالغ گزارش درآمد هفته معتبر نیست.' };
+    }
+    totals.push({
+      currencyUnit: total.currencyUnit,
+      jobCount: total.jobCount,
+      grossAmount: total.grossAmount,
+      commissionAmount: total.commissionAmount,
+      netAmount: total.netAmount,
+    });
+  }
+  return {
+    success: true,
+    value: {
+      calendar: 'jalali',
+      weekStart: report.weekStart,
+      weekEnd: report.weekEnd,
+      totals,
+    },
+  };
+}
+
+export async function loadWorkerWeeklyIncome(request: FinanceRequester = apiFetch, isPreview: () => boolean = previewActive, prepareAuth: WorkerAuthPreparer = prepareWorkerAuth): Promise<FinanceResult<WorkerWeeklyIncomeReport>> {
+  if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+  try {
+    await prepareAuth();
+    if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+    const response = await request('/workers/me/weekly-income');
+    if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+    return parseWorkerWeeklyIncomeResponse(response);
+  } catch {
+    return { success: false, message: 'ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی و دوباره تلاش کنید.' };
+  }
+}
+
+export function parseWorkerIncomeReportResponse(input: unknown): FinanceResult<WorkerIncomeReport> {
+  if (!isRecord(input) || input.success !== true || !isRecord(input.report) || !Array.isArray(input.report.months)) {
+    return { success: false, message: isRecord(input) && typeof input.message === 'string' ? input.message : 'گزارش درآمد معتبر نیست.' };
+  }
+  const months: WorkerIncomeMonth[] = [];
+  for (const row of input.report.months) {
+    if (!isRecord(row) || row.calendar !== 'jalali' || !isAmount(row.year) || row.year < 1 || !isAmount(row.month) || row.month < 1 || row.month > 12 || !Array.isArray(row.totals) || row.totals.length < 1) {
+      return { success: false, message: 'ساختار گزارش ماهانه معتبر نیست.' };
+    }
+    const totals: WorkerIncomeTotal[] = [];
+    for (const total of row.totals) {
+      if (!isRecord(total) || typeof total.currencyUnit !== 'string' || !total.currencyUnit.trim() || !isAmount(total.jobCount) || total.jobCount < 1
+        || !isAmount(total.grossAmount) || total.grossAmount < 0 || !isAmount(total.commissionAmount) || total.commissionAmount < 0
+        || !isAmount(total.netAmount) || total.netAmount < 0) {
+        return { success: false, message: 'مبالغ گزارش ماهانه معتبر نیست.' };
+      }
+      totals.push({
+        currencyUnit: total.currencyUnit,
+        jobCount: total.jobCount,
+        grossAmount: total.grossAmount,
+        commissionAmount: total.commissionAmount,
+        netAmount: total.netAmount,
+      });
+    }
+    months.push({ calendar: 'jalali', year: row.year, month: row.month, totals });
+  }
+  return { success: true, value: { months } };
+}
+
+export async function loadWorkerIncomeReport(request: FinanceRequester = apiFetch, isPreview: () => boolean = previewActive, prepareAuth: WorkerAuthPreparer = prepareWorkerAuth): Promise<FinanceResult<WorkerIncomeReport>> {
+  if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+  try {
+    await prepareAuth();
+    if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+    const response = await request('/workers/me/income-report');
+    if (isPreview()) return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };
+    return parseWorkerIncomeReportResponse(response);
   } catch {
     return { success: false, message: 'ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی و دوباره تلاش کنید.' };
   }

@@ -43,6 +43,7 @@ import {
 import { useWorkerOrders, type WorkerOrdersHandle } from './useWorkerOrders';
 import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
 import { workerPriceLine } from './workerHomeModel';
+import { WorkerIncomeReportNativePanel } from './WorkerIncomeReportNativePanel';
 import { WorkerWalletNativePanel } from './WorkerWalletNativePanel';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
@@ -532,7 +533,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             </>
           )
         ) : activeTab === 'wallet' ? (
-          <WorkerWalletNativePanel />
+          <>
+            <WorkerIncomeReportNativePanel />
+            <WorkerWalletNativePanel />
+          </>
         ) : null}
       </ScrollView>
     </View>
