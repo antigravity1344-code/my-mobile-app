@@ -1216,6 +1216,12 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       'points_ledger_no_delete',
       'points_ledger_no_overwrite',
       'points_ledger_no_update',
+      'worker_commission_snapshots_no_delete',
+      'worker_commission_snapshots_no_replace',
+      'worker_commission_snapshots_no_update',
+      'worker_wallet_entries_no_delete',
+      'worker_wallet_entries_no_replace',
+      'worker_wallet_entries_no_update',
     ]);
     raw.close();
   });

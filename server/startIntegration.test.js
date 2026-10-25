@@ -4,6 +4,8 @@ const { createTestHarness } = require('./testAuthHarness');
 
 const harness = createTestHarness('paksho-start-isolated-');
 const { store, request } = harness;
+// Zero-commission fixture isolates start/points/privacy regressions from debt; workerWallet.test.js covers the 25% debt rule.
+assert.equal(store.commissionPolicy.publish({ratePercent:0,expectedVersion:store.commissionPolicy.read().version}).code,'ok');
 const activeCompletionPolicy = store.completionPolicy.read();
 assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
 function completionPayload(orderId) {

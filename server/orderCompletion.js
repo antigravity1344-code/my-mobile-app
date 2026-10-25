@@ -41,7 +41,7 @@ function createOrderCompletion({ database, transaction, getOrder, updateOrder, p
     order.status = 'COMPLETED'; order.completedAt = new Date().toISOString();
     updateOrder(order);
     setStatus.run('completed', row.id);
-    onCompleted(getOrder(order.id));
+    onCompleted(getOrder(order.id), row);
     addNotification(order.customerId, order.id, 'ORDER_COMPLETED', 'سفارش تکمیل شد', 'پایان کار سفارش تأیید شد.');
     addNotification(row.workerId, order.id, 'ORDER_COMPLETED', 'تکمیل سفارش', 'پایان کار سفارش تأیید شد.');
   }

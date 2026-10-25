@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } f
 import { apiFetch } from '../../api/apiClient';
 import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
 import { type } from '../../theme';
+import { loadWorkerCommissionPolicy, type WorkerCommissionPolicy } from '../../features/worker/services/workerFinance';
 import { UserData } from '../../types/user';
 import {
   ID_DOC_SIZE_HINT,
@@ -43,8 +44,22 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [picking, setPicking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [commissionPolicy, setCommissionPolicy] = useState<WorkerCommissionPolicy | null>(null);
+  const [commissionPolicyLoading, setCommissionPolicyLoading] = useState(true);
+  const [commissionPolicyError, setCommissionPolicyError] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const fieldY = useRef<Record<string, number>>({});
+
+  const refreshCommissionPolicy = async () => {
+    setCommissionPolicyLoading(true);
+    setCommissionPolicyError(null);
+    const result = await loadWorkerCommissionPolicy();
+    if (result.success) setCommissionPolicy(result.value);
+    else { setCommissionPolicy(null); setCommissionPolicyError(result.message); }
+    setCommissionPolicyLoading(false);
+  };
+
+  useEffect(() => { void refreshCommissionPolicy(); }, []);
 
   const scrollFieldIntoView = (key: string) => {
     const y = fieldY.current[key];
@@ -94,6 +109,10 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
 
   // فرم ثبت اطلاعات و ارسال مدارک هویتی
   const handleSubmitDocs = async () => {
+    if (!commissionPolicy) {
+      setErrorMsg('پیش از ارسال مدارک باید درصد جاری کمیسیون از سرور دریافت شود.');
+      return;
+    }
     if (!name.trim()) {
       setErrorMsg('لطفاً نام و نام خانوادگی را وارد کنید.');
       return;
@@ -212,6 +231,14 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           <Text style={styles.subtitle}>
             برای تأیید هویت و فعال شدن حساب، لطفاً اطلاعات زیر را کامل کنید.
           </Text>
+
+          <View style={styles.financeDisclosure}>
+            <Text style={styles.financeDisclosureTitle}>شرایط پرداخت و کمیسیون</Text>
+            {commissionPolicyLoading ? <Text style={styles.financeDisclosureText}>در حال دریافت درصد جاری از سرور…</Text> : null}
+            {commissionPolicy ? <Text style={styles.financeDisclosureText}>درصد جاری کمیسیون: {commissionPolicy.ratePercent}٪</Text> : null}
+            <Text style={styles.financeDisclosureText}>مشتری هزینه کار را مستقیم به شما می‌پردازد. کمیسیون شرکت از اعتبار کیف پول شما کسر می‌شود. اگر مانده کیف پول منفی باشد، امکان پذیرش سفارش جدید ندارید.</Text>
+            {commissionPolicyError ? <View><Text accessibilityRole="alert" style={styles.financeDisclosureError}>{commissionPolicyError}</Text><Pressable onPress={() => void refreshCommissionPolicy()} disabled={commissionPolicyLoading}><Text style={styles.financeRetry}>دریافت دوباره</Text></Pressable></View> : null}
+          </View>
 
           {errorMsg && (
             <View style={styles.errorBox}>
@@ -356,7 +383,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
             />
           </View>
 
-          <Pressable onPress={handleSubmitDocs} disabled={loading} style={styles.submitBtn}>
+          <Pressable onPress={handleSubmitDocs} disabled={loading || commissionPolicyLoading || !commissionPolicy} style={[styles.submitBtn, (commissionPolicyLoading || !commissionPolicy) && styles.submitDisabled]}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -545,6 +572,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     minHeight: 48,
   },
+  submitDisabled: { opacity: 0.55 },
+  financeDisclosure: { borderWidth: 1, borderColor: '#bae6fd', borderRadius: 12, backgroundColor: '#f0f9ff', padding: 12, gap: 6 },
+  financeDisclosureTitle: { ...type.bold, textAlign: 'right', color: '#0c4a6e' },
+  financeDisclosureText: { ...type.regular, textAlign: 'right', color: '#334155', lineHeight: 22 },
+  financeDisclosureError: { ...type.regular, textAlign: 'right', color: '#b91c1c' },
+  financeRetry: { ...type.bold, textAlign: 'right', color: '#0369a1', paddingVertical: 6 },
   submitBtnText: {
     ...type.bold,
     ...fa,

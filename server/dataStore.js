@@ -8,6 +8,7 @@ const { createOrderStart } = require('./orderStart');
 const { createCommissionPolicy } = require('./commissionPolicy');
 const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
+const { createWorkerWallet } = require('./workerWallet');
 
 const USER_FIELDS = new Set([
   'id',
@@ -988,6 +989,7 @@ function createDataStore(filename) {
       const order = getOrder(orderId);
       if (!order) return { code: 'missing' };
       if (order.status !== 'PENDING') return { code: 'conflict', order };
+      if (!workerWallet.read(cleaner.id).canAcceptNewOrders) return { code: 'wallet-debt' };
       order.status = 'ACCEPTED';
       order.cleanerId = cleaner.id;
       order.cleanerName = cleaner.name || '';
@@ -1644,6 +1646,7 @@ function createDataStore(filename) {
 
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
+  const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
   const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
   // Start-of-work events remain separate from the order's primary status and pricing.
   const orderStart = createOrderStart({
@@ -1652,13 +1655,17 @@ function createDataStore(filename) {
   });
 
   const orderCompletion = createOrderCompletion({database,transaction,getOrder,updateOrder,policy:completionPolicy,appendOrderEvent,addNotification,
-    onCompleted: order => pointsApi.onOrderEvent({name: 'completed',order})});
+    onCompleted: (order,completion) => {
+      workerWallet.chargeCompletion(order,completion);
+      pointsApi.onOrderEvent({name: 'completed',order});
+    }});
 
   return {
     ...orderCompletion,
     completionPolicy,
     ...orderStart,
     commissionPolicy,
+    workerWallet,
     transaction,
     getUser,
     getUserByPhone,

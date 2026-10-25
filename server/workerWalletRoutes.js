@@ -1,0 +1,22 @@
+'use strict';
+function registerWorkerWalletRoutes(app, {store, requireUser}) {
+  function worker(req, res) {
+    res.set('Cache-Control', 'no-store');
+    const user = requireUser(req, res);
+    if (!user) return null;
+    if (user.role !== 'WORKER') { res.status(403).json({success:false,message:'این بخش مخصوص متخصص است.'}); return null; }
+    if (Object.keys(req.query).length) { res.status(400).json({success:false,message:'پارامتر اضافی مجاز نیست.'}); return null; }
+    return user;
+  }
+  app.get('/api/workers/me/wallet', (req,res) => {
+    const user = worker(req,res); if (!user) return;
+    try {
+      return res.json({success:true,wallet:store.workerWallet.read(user.id),message:'شارژ واقعی پس از اتصال معتبر درگاه شرکت فعال می‌شود.'});
+    } catch { return res.status(500).json({success:false,message:'اطلاعات کیف پول دریافت نشد؛ دوباره تلاش کنید.'}); }
+  });
+  app.post('/api/workers/me/wallet/topup', (req,res) => {
+    if (!worker(req,res)) return;
+    return res.status(501).json({success:false,code:'PAYMENT_NOT_CONFIGURED',message:'درگاه شرکت متصل نیست؛ موجودی کیف پول تغییر نکرد.'});
+  });
+}
+module.exports = {registerWorkerWalletRoutes};

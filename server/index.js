@@ -11,6 +11,7 @@ const {
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
 const { registerCommissionRoutes } = require('./commissionRoutes');
 const { registerCompletionRoutes } = require('./completionRoutes');
+const { registerWorkerWalletRoutes } = require('./workerWalletRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -1115,6 +1116,7 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   }
 
   const accepted = store.tryAcceptOrder(orderId, cleaner);
+  if (accepted.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'کیف پول شما بدهکار است؛ پیش از پذیرش سفارش تازه، بدهی کمیسیون را تسویه کنید.'});
   if (accepted.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
   if (accepted.code === 'conflict') {
     return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
@@ -1362,6 +1364,7 @@ app.get('/api/loyalty', (req, res) => {
 
 registerCompletionRoutes(app, {store,requireUser,requireAdmin,customerView:customerOrderView,workerView:workerAssignedOrderView});
 registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, requireAdmin });
+registerWorkerWalletRoutes(app, {store,requireUser});
 
 app.use('/api/admin', requireAdmin);
 
@@ -1674,6 +1677,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     if (isAcceptance) {
       const workerProblem = adminWorkerProblem(store.getUser(order.cleanerId));
       if (workerProblem) return { code: workerProblem };
+      if (!store.workerWallet.read(order.cleanerId).canAcceptNewOrders) return { code: 'wallet-debt' };
     }
     if (savesAsPending) {
       // سفارش PENDING متخصص ندارد: فیلدهای متخصص و acceptedAt از شیء حافظه هم پاک می‌شوند
@@ -1753,6 +1757,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
     return { code: 'ok', order: saved };
   });
 
+  if (updated.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'متخصص بدهی کمیسیون دارد و تا تسویه نمی‌تواند سفارش تازه بپذیرد.'});
   if (updated.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
   if (updated.code === 'bad-cleaner') {
     return res.status(400).json({ success: false, message: 'متخصص معتبر یافت نشد.' });

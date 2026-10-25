@@ -43,6 +43,7 @@ import {
 import { useWorkerOrders, type WorkerOrdersHandle } from './useWorkerOrders';
 import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
 import { workerPriceLine } from './workerHomeModel';
+import { WorkerWalletNativePanel } from './WorkerWalletNativePanel';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -67,7 +68,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   orders,
 }) => {
   const [activeCategory, setActiveCategory] = useState<SpecialistCategory>('all');
-  const [activeTab, setActiveTab] = useState<'available' | 'my_jobs'>(initialTab ?? 'available');
+  const [activeTab, setActiveTab] = useState<'available' | 'my_jobs' | 'wallet'>(initialTab ?? 'available');
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, { hours: string; amount: string }>>({});
   const setCompletionDraft = (id: string, field: 'hours' | 'amount', value: string) => {
     setCompletionDrafts(prev => ({ ...prev, [id]: { ...(prev[id] || { hours: '', amount: '' }), [field]: value } }));
@@ -374,6 +375,12 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             کارهای من ({toPersianDigits(activeJobs.length)})
           </Text>
         </Pressable>
+        <Pressable
+          onPress={() => setActiveTab('wallet')}
+          style={[styles.tabItem, activeTab === 'wallet' && styles.tabItemActive]}
+        >
+          <Text style={[styles.tabText, activeTab === 'wallet' && styles.tabTextActive]}>کیف پول</Text>
+        </Pressable>
       </View>
 
       {activeTab === 'available' && (
@@ -524,6 +531,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               ) : null}
             </>
           )
+        ) : activeTab === 'wallet' ? (
+          <WorkerWalletNativePanel />
         ) : null}
       </ScrollView>
     </View>

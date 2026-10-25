@@ -22,6 +22,7 @@ import { attachStoredAuthToken } from '../../api/authToken';
 import type { ApiOrder } from '../../api/types';
 import { WORKER_TOKEN_KEY } from '../native/workerLoginStorage';
 import { appStorage } from '../../utils/storage';
+import { WorkerWalletPanel } from './WorkerWalletPanel';
 
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -136,7 +137,7 @@ function readStoredUserId(raw: unknown): string {
 export const SpecialistPortalScreen: React.FC = () => {
   const { refreshOrders } = useOrders();
   const [activeRole, setActiveRole] = useState<SpecialistRole>('cleaner');
-  const [portalView, setPortalView] = useState<'orders' | 'cleaners'>('orders');
+  const [portalView, setPortalView] = useState<'orders' | 'cleaners' | 'wallet'>('orders');
   const [availableOrdersRaw, setAvailableOrdersRaw] = useState<ApiOrder[]>([]);
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -301,9 +302,19 @@ export const SpecialistPortalScreen: React.FC = () => {
           <User className="w-3.5 h-3.5" />
           <span>فهرست و بازارگاه متخصصین</span>
         </button>
+        <button
+          onClick={() => setPortalView('wallet')}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            portalView === 'wallet' ? 'bg-sky-600 text-white shadow' : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          <span>کیف پول</span>
+        </button>
       </div>
 
-      {portalView === 'cleaners' ? (
+      {portalView === 'wallet' ? (
+        <WorkerWalletPanel />
+      ) : portalView === 'cleaners' ? (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           <CleanersScreen />
         </div>

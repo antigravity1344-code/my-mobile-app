@@ -86,6 +86,8 @@ if (!isMainThread) {
 }
 
 function seedPair(db) {
+    // Zero-commission fixture isolates start/points/privacy regressions from debt; workerWallet.test.js covers the 25% debt rule.
+    assert.equal(db.commissionPolicy.publish({ratePercent:0,expectedVersion:db.commissionPolicy.read().version}).code,'ok');
     db.createUser(user('USER-C', 'CUSTOMER', '09120001001'));
     db.createUser(user('USER-W', 'WORKER', '09120001002'));
   }
