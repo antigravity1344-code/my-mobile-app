@@ -11,12 +11,16 @@ function registerWorkerWalletRoutes(app, {store, requireUser}) {
   app.get('/api/workers/me/wallet', (req,res) => {
     const user = worker(req,res); if (!user) return;
     try {
-      return res.json({success:true,wallet:store.workerWallet.read(user.id),message:'شارژ واقعی پس از اتصال معتبر درگاه شرکت فعال می‌شود.'});
+      const wallet = store.workerWallet.read(user.id);
+      const topUpAvailable = store.paymentSettings.chargeEnabled();
+      return res.json({
+        success: true,
+        wallet: { ...wallet, topUpAvailable },
+        message: topUpAvailable
+          ? 'پس از تأیید پرداخت در درگاه، اعتبار یک‌بار ثبت می‌شود.'
+          : 'شارژ واقعی پس از اتصال معتبر درگاه شرکت فعال می‌شود.',
+      });
     } catch { return res.status(500).json({success:false,message:'اطلاعات کیف پول دریافت نشد؛ دوباره تلاش کنید.'}); }
-  });
-  app.post('/api/workers/me/wallet/topup', (req,res) => {
-    if (!worker(req,res)) return;
-    return res.status(501).json({success:false,code:'PAYMENT_NOT_CONFIGURED',message:'درگاه شرکت متصل نیست؛ موجودی کیف پول تغییر نکرد.'});
   });
 }
 module.exports = {registerWorkerWalletRoutes};

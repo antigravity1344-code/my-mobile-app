@@ -8,6 +8,7 @@ import {
   loadWorkerCommissionPolicy,
   loadWorkerWallet,
   parseWorkerWalletResponse,
+  startWorkerWalletTopup,
 } from './workerFinance';
 
 const walletResponse = {
@@ -40,6 +41,17 @@ describe('worker finance client contracts', () => {
     expect(result.value).not.toHaveProperty('balance');
     expect(result.value.transactions[0]).toMatchObject({ amount: -1250, commissionAmount: 1250, ratePercent: 25 });
     expect(result.value.canAcceptNewOrders).toBe(false);
+    expect(result.value.topUpAvailable).toBe(false);
+  });
+
+  it('accepts a server-enabled top-up flag without treating it as a credited payment', () => {
+    const enabled = structuredClone(walletResponse);
+    enabled.wallet.topUpAvailable = true;
+    const result = parseWorkerWalletResponse(enabled);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.topUpAvailable).toBe(true);
+    expect(result.value.balances[0].balance).toBe(-1250);
   });
 
   it('rejects malformed financial values instead of rendering them as zero', () => {
@@ -83,5 +95,14 @@ describe('worker finance client contracts', () => {
     let preview = false;
     const result = await loadWorkerWallet(async () => { preview = true; return walletResponse; }, () => preview, async () => undefined);
     expect(result.success).toBe(false);
+  });
+
+  it('does not start a top-up from preview and does not credit from a browser-only response', async () => {
+    const request = vi.fn();
+    const preview = await startWorkerWalletTopup(500, 'تومان', request, () => true, async () => undefined);
+    expect(preview.success).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+    const result = await startWorkerWalletTopup(500, 'تومان', async () => ({ success: false, code: 'PAYMENT_NOT_CONFIGURED', message: 'درگاه شرکت متصل نیست؛ موجودی کیف پول تغییر نکرد.' }), () => false, async () => undefined);
+    expect(result).toEqual({ success: false, message: 'درگاه شرکت متصل نیست؛ موجودی کیف پول تغییر نکرد.' });
   });
 });

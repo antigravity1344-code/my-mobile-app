@@ -6,7 +6,7 @@ const {createCommissionPolicy}=require('./commissionPolicy');
 const {createWorkerWallet}=require('./workerWallet');
 function memory() {
   const db=new DatabaseSync(':memory:');
-  const transaction=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}};
+  let depth=0;const transaction=fn=>{if(depth>0)return fn();db.exec('BEGIN IMMEDIATE');depth+=1;try{const result=fn();depth-=1;db.exec('COMMIT');return result;}catch(error){depth=0;try{db.exec('ROLLBACK');}catch{}throw error;}};
   // chargeCompletion invokes transaction exactly once; policy publishing is separate.
   const commissionPolicy=createCommissionPolicy({database:db,transaction});
   const wallet=createWorkerWallet({database:db,transaction,commissionPolicy});
@@ -33,6 +33,14 @@ test('integer half-up commission, independent currency balances, and frozen poli
   assert.deepEqual(new Map(view.balances.map(x=>[x.currencyUnit,x.balance])),new Map([['تومان',-38],['ریال',60]]));
   assert.equal(view.canAcceptNewOrders,false,'positive credit in a different unit cannot cancel debt');
   assert.equal(view.transactions.length,3);assert.deepEqual(wallet.read('other').balances,[]);
+});
+test('verified topup credits once for the same source key and rejects conflicting reuse',t=>{
+  const {db,wallet}=memory();t.after(()=>db.close());
+  const first=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'});
+  const again=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'});
+  assert.equal(first.id,again.id);assert.equal(wallet.read('worker').balances[0].balance,500);
+  assert.throws(()=>wallet.creditVerifiedTopup({workerId:'other',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'}));
+  assert.equal(wallet.read('worker').balances[0].balance,500);
 });
 test('zero and positive balances allow acceptance; debt is blocked until synthetic verified credit covers it',t=>{
   const {db,wallet}=memory();t.after(()=>db.close());
@@ -89,6 +97,7 @@ test('only final completion charges once; debt blocks new worker/admin acceptanc
   assert.equal((await answer()).status,200);assert.equal((await answer()).status,200);
   const wallet=(await f.request('/api/workers/me/wallet')).json.wallet;
   assert.equal(wallet.balances[0].balance,-250);assert.equal(wallet.transactions.length,1);
+  assert.equal(wallet.topUpAvailable,false);
   assert.equal(wallet.transactions[0].grossAmount,1000);assert.equal(wallet.transactions[0].netAmount,750);
   const next=f.create();const before=h.store.getOrder(next);
   const denied=await f.request('/api/orders/'+next+'/accept',f.worker.token,'PUT',{});

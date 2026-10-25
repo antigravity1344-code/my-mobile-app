@@ -20,7 +20,7 @@ export type WorkerWalletTransaction = {
 export type WorkerWallet = {
   balances: WorkerWalletBalance[];
   canAcceptNewOrders: boolean;
-  topUpAvailable: false;
+  topUpAvailable: boolean;
   transactions: WorkerWalletTransaction[];
 };
 export type WorkerCommissionPolicy = {
@@ -46,7 +46,7 @@ export function parseWorkerWalletResponse(input: unknown): FinanceResult<WorkerW
     return { success: false, message: isRecord(input) && typeof input.message === 'string' ? input.message : 'اطلاعات کیف پول معتبر نیست.' };
   }
   const wallet = input.wallet;
-  if (!Array.isArray(wallet.balances) || !Array.isArray(wallet.transactions) || typeof wallet.canAcceptNewOrders !== 'boolean' || wallet.topUpAvailable !== false) {
+  if (!Array.isArray(wallet.balances) || !Array.isArray(wallet.transactions) || typeof wallet.canAcceptNewOrders !== 'boolean' || typeof wallet.topUpAvailable !== 'boolean') {
     return { success: false, message: 'ساختار اطلاعات کیف پول معتبر نیست.' };
   }
   const balances: WorkerWalletBalance[] = [];
@@ -69,7 +69,23 @@ export function parseWorkerWalletResponse(input: unknown): FinanceResult<WorkerW
       commissionAmount: row.commissionAmount, netAmount: row.netAmount, ratePercent: row.ratePercent,
     });
   }
-  return { success: true, value: { balances, canAcceptNewOrders: wallet.canAcceptNewOrders, topUpAvailable: false, transactions } };
+  return { success: true, value: { balances, canAcceptNewOrders: wallet.canAcceptNewOrders, topUpAvailable: wallet.topUpAvailable, transactions } };
+}
+
+export async function startWorkerWalletTopup(amount: number, currencyUnit: string, request: FinanceRequester = apiFetch, isPreview: () => boolean = previewActive, prepareAuth: WorkerAuthPreparer = prepareWorkerAuth): Promise<FinanceResult<{ id: string }>> {
+  if (isPreview()) return { success: false, message: 'شارژ واقعی در پیش‌نمایش انجام نمی‌شود.' };
+  try {
+    await prepareAuth();
+    if (isPreview()) return { success: false, message: 'شارژ واقعی در پیش‌نمایش انجام نمی‌شود.' };
+    const response = await request('/workers/me/wallet/topup', { method: 'POST', body: JSON.stringify({ amount, currencyUnit }) });
+    if (isPreview()) return { success: false, message: 'شارژ واقعی در پیش‌نمایش انجام نمی‌شود.' };
+    if (!isRecord(response) || response.success !== true || !isRecord(response.intent) || typeof response.intent.id !== 'string' || !response.intent.id) {
+      return { success: false, message: isRecord(response) && typeof response.message === 'string' ? response.message : 'شروع شارژ انجام نشد.' };
+    }
+    return { success: true, value: { id: response.intent.id } };
+  } catch {
+    return { success: false, message: 'ارتباط با سرور برقرار نشد. شارژ انجام نشد.' };
+  }
 }
 
 export function parseWorkerCommissionPolicyResponse(input: unknown): FinanceResult<WorkerCommissionPolicy> {

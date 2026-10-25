@@ -44,6 +44,9 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
   const debit = database.prepare(`INSERT INTO worker_wallet_entries
     (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'COMMISSION',?,?,?,?)`);
+  const credit = database.prepare(`INSERT INTO worker_wallet_entries
+    (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES (?,?,?,'TOPUP',?,?,NULL,?)`);
+  const bySource = database.prepare('SELECT * FROM worker_wallet_entries WHERE sourceKey=?');
 
   function read(workerId) {
     const transactions = rows.all(workerId);
@@ -98,7 +101,25 @@ function createWorkerWallet({ database, transaction, commissionPolicy }) {
       return existing.get(order.id);
     });
   }
-  // No credit API is exposed: only a future verified gateway adapter may add TOPUP entries.
-  return { read, chargeCompletion };
+  function creditVerifiedTopup({ workerId, amount, currencyUnit, sourceKey }) {
+    if (typeof workerId !== 'string' || !workerId) throw new Error('INVALID_TOPUP_WORKER');
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('INVALID_TOPUP_AMOUNT');
+    if (typeof currencyUnit !== 'string' || !currencyUnit.trim() || currencyUnit.trim().length > 64) throw new Error('INVALID_CURRENCY_UNIT');
+    if (typeof sourceKey !== 'string' || !sourceKey.startsWith('topup:') || sourceKey.length > 200) throw new Error('INVALID_TOPUP_KEY');
+    const unit = currencyUnit.trim();
+    return transaction(() => {
+      const existing = bySource.get(sourceKey);
+      if (existing) {
+        if (existing.workerId !== workerId || existing.amount !== amount || existing.currencyUnit !== unit || existing.type !== 'TOPUP') {
+          throw new Error('TOPUP_CONFLICT');
+        }
+        return existing;
+      }
+      credit.run(crypto.randomUUID(), workerId, sourceKey, amount, unit, new Date().toISOString());
+      read(workerId);
+      return bySource.get(sourceKey);
+    });
+  }
+  return { read, chargeCompletion, creditVerifiedTopup };
 }
 module.exports = { createWorkerWallet };
