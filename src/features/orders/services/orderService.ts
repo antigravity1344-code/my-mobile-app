@@ -1,3 +1,5 @@
+import { readCompletion } from './completionInput';
+import { previewActive } from '../../../components/native/previewRuntime';
 import type {
   OrderItem,
   OrderFilterTab,
@@ -141,6 +143,7 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     serviceTitle: o.serviceTitle || 'سرویس نظافت',
     pricingType: 'hourly',
     status: normalizeOrderStatus(o.status),
+    completion: readCompletion(o.completion),
     startPrompt,
     startPromptEventId: startPrompt ? o.startPromptEventId! : null,
     paymentStatus: o.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
@@ -407,6 +410,36 @@ export const orderService = {
       };
     }
     if (!updatedOrder) return { success: false, error: 'ثبت پاسخ شروع کار انجام نشد.' };
+    return { success: true, order: updatedOrder };
+  },
+
+  async respondToCompletion(orderId: string, answer: 'yes' | 'no', requestId: string):
+    Promise<{ success: boolean; error?: string; order?: OrderItem; needsRefresh?: boolean }> {
+    if (previewActive()) return { success: false, error: 'ثبت واقعی در پیش‌نمایش مجاز نیست.' };
+    if (typeof requestId !== 'string' || !requestId.trim()) {
+      return { success: false, error: 'پرسش پایان کار تغییر کرده است. لطفاً دوباره بررسی کنید.', needsRefresh: true };
+    }
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/completion-response', {
+      method: 'PUT',
+      // Keep the reference the customer actually saw, even if a new report arrived meanwhile.
+      body: JSON.stringify({ answer, requestId }),
+    });
+    const updatedOrder = res.order?.id === orderId && (res.success || res.httpStatus === 409)
+      ? mapApiOrderForCustomer(res.order)
+      : undefined;
+    if (updatedOrder) {
+      const index = ordersMemoryStore.findIndex((item) => item.id === orderId);
+      if (index >= 0) ordersMemoryStore[index] = updatedOrder;
+    }
+    if (!res.success || !res.order) {
+      return {
+        success: false,
+        error: res.message || 'ثبت پاسخ پایان کار انجام نشد.',
+        ...(res.httpStatus === 409 ? { order: updatedOrder, needsRefresh: true } : {}),
+      };
+    }
+    if (!updatedOrder) return { success: false, error: 'ثبت پاسخ پایان کار انجام نشد.' };
     return { success: true, order: updatedOrder };
   },
 

@@ -15,6 +15,17 @@ process.env.NODE_ENV = 'test';
 const { installTestSmsCapture } = require('./testAuthHarness');
 const smsCapture = installTestSmsCapture();
 const { app, store } = require('./index.js');
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
 require('node:test').after(() => smsCapture.restore());
 after(() => {
   store.close();
@@ -325,7 +336,7 @@ test('worker order views hide customer contact data until an active accept', asy
     method: 'PUT',
     pathname: '/api/orders/' + done.id + '/complete',
     token: workerA.token,
-    body: {},
+    body: completionPayload(done.id),
   });
   assert.equal(completed.status, 200);
   assert.equal(completed.json.order.status, 'COMPLETED');
@@ -504,7 +515,7 @@ test('customer free-text notes never reach the worker but stay for the customer 
   }
   const backToAccepted = await request(server, { method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'ACCEPTED' } });
   assert.equal(backToAccepted.status, 200);
-  const completed = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: {} });
+  const completed = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: completionPayload(order.id) });
   assert.equal(completed.status, 200);
   assertNoNotes(completed, 'complete response');
   assertNoNotes(await request(server, { pathname: '/api/orders', token: worker.token }), 'worker list COMPLETED');
@@ -554,7 +565,7 @@ test('the customer rating comment and tags never reach the worker (D-32) but sta
 
   const order = await createOrder(server, customer.token);
   assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/accept', token: worker.token, body: {} })).status, 200);
-  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: {} })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: completionPayload(order.id) })).status, 200);
   const rated = await request(server, {
     method: 'PUT',
     pathname: '/api/orders/' + order.id + '/rate',

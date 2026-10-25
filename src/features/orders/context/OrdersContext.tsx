@@ -60,6 +60,8 @@ interface OrdersContextValue {
     message?: string;
     quote?: CancelQuote;
   }>;
+  respondToCompletion: (orderId: string, answer: 'yes' | 'no', requestId: string) =>
+    Promise<{ success: boolean; error?: string }>;
   respondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) =>
     Promise<{ success: boolean; error?: string }>;
   rateOrder: (
@@ -190,6 +192,20 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { success: result.success, error: result.error };
   }, [fetchOrders]);
 
+  const respondToCompletion = useCallback(async (orderId: string, answer: 'yes' | 'no', requestId: string) => {
+    const result = await orderService.respondToCompletion(orderId, answer, requestId);
+    // A conflict can carry a newer question. Show that order, but never resend the old answer.
+    if (result.order) {
+      setAllOrders((prev) => {
+        const next = prev.map((item) => item.id === orderId ? result.order! : item);
+        allOrdersRef.current = next;
+        return next;
+      });
+    }
+    if (result.success || result.needsRefresh) await fetchOrders();
+    return { success: result.success, error: result.error };
+  }, [fetchOrders]);
+
   const rateOrder = useCallback(
     async (orderId: string, rating: number, comment?: string, tags?: string[]) => {
       const result = await orderService.rateOrder(orderId, rating, comment, tags);
@@ -265,6 +281,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         cancelOrder,
         rateOrder,
         respondToStart,
+        respondToCompletion,
         addNewOrder,
         resetOrders,
       }}

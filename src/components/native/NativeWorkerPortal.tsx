@@ -1,3 +1,5 @@
+import { completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { previewActive } from './previewRuntime';
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -8,6 +10,7 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import {
   Briefcase,
@@ -65,6 +68,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<SpecialistCategory>('all');
   const [activeTab, setActiveTab] = useState<'available' | 'my_jobs'>(initialTab ?? 'available');
+  const [completionDrafts, setCompletionDrafts] = useState<Record<string, { hours: string; amount: string }>>({});
+  const setCompletionDraft = (id: string, field: 'hours' | 'amount', value: string) => {
+    setCompletionDrafts(prev => ({ ...prev, [id]: { ...(prev[id] || { hours: '', amount: '' }), [field]: value } }));
+  };
   const [successAlert, setSuccessAlert] = useState<string | null>(null);
   // جلوگیری از ارسال دوباره پذیرش/تکمیل برای همان سفارش تا پاسخ قبلی برسد
   const actionsInFlight = useRef<Set<string>>(new Set());
@@ -150,11 +157,15 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const confirmCompleteOrder = (order: NativeOrder) => {
-    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus)) return;
+    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus) || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey) return;
     if (busyOrderIds.includes(order.id)) return;
+    const draft = completionDrafts[order.id];
+    if (!completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '')) {
+      showActionError('ساعات واقعی را با حداکثر دو رقم اعشار و مبلغ نهایی را به‌صورت عدد صحیح وارد کنید.'); return;
+    }
     Alert.alert(
       'اتمام کار',
-      'آیا کار «' + order.serviceTitle + '» واقعاً تمام شده است؟ پس از ثبت، سفارش به‌عنوان انجام‌شده برای مشتری نمایش داده می‌شود.',
+      'آیا کار «' + order.serviceTitle + '» تمام شده و ساعات و مبلغ واردشده درست است؟ نتیجه طبق روش تأیید شرکت ثبت می‌شود.',
       [
         { text: 'انصراف', style: 'cancel' },
         { text: 'بله، تمام شد', onPress: () => void handleCompleteOrder(order) },
@@ -164,22 +175,27 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   };
 
   const handleCompleteOrder = async (order: NativeOrder) => {
-    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus)) return;
-    if (!beginOrderAction(order.id)) return;
+    if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus) || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey) return;
+    if (previewActive()) { showActionError('ثبت واقعی در پیش‌نمایش مجاز نیست.'); return; }
+    const draft = completionDrafts[order.id];
+    const values = completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '');
+    if (!values || !beginOrderAction(order.id)) return;
     try {
-      const res = await apiFetch('/orders/' + order.id + '/complete', {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+      const res = await apiFetch('/orders/' + encodeURIComponent(order.id) + '/complete', {
         method: 'PUT',
-        body: JSON.stringify({ cleanerId: user.id }),
+        body: JSON.stringify({ acceptanceKey: order.completionAcceptanceKey, ...values }),
       });
-      if (res.success) {
-        setSuccessAlert('سفارش «' + order.serviceTitle + '» تکمیل شد.');
+      const completion = readCompletion(res.order?.completion);
+      if (res.success && completion) {
+        setSuccessAlert(completionStatusText(completion.status));
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
         // حساب مسدود: دیالوگ و خروج را useAccountBlockedLogout نشان می‌دهد؛ دیالوگ دوم لازم نیست.
         if (!isAccountBlockedResponse(res)) showActionError(res.message || 'ثبت اتمام سفارش انجام نشد.');
       }
     } catch {
-      showActionError('اتصال اینترنت را بررسی و دوباره تلاش کنید.');
+      showActionError('نتیجه ثبت مشخص نیست. فهرست سفارش‌ها را بازخوانی کنید؛ مقدار واردشده حفظ شده است.');
     } finally {
       endOrderAction(order.id);
       void fetchOrders('after-action');
@@ -269,7 +285,16 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         ) : active && order.startReported ? (
           <Text style={styles.startStatusText}>شروع کار اعلام شده است.</Text>
         ) : null}
-        {canCompleteWorkerOrder(order.status, order.startStatus) ? (
+        {order.completion ? <Text style={styles.startStatusText}>{completionStatusText(order.completion.status)}</Text> : null}
+        {canCompleteWorkerOrder(order.status, order.startStatus) && (!order.completion || order.completion.status === 'rejected') && order.completionAcceptanceKey ? (
+          <View>
+            {(order.durationHours || 0) > 0 ? (
+              <TextInput accessibilityLabel="ساعات واقعی کار" placeholder="ساعات واقعی کار" keyboardType="decimal-pad" editable={!busy}
+                value={completionDrafts[order.id]?.hours || ''} onChangeText={value => setCompletionDraft(order.id, 'hours', value)} style={styles.completionInput} />
+            ) : null}
+            <Text style={styles.noteText}>مبلغ نهایی کل کار ({order.currencyUnit || 'تومان'})، پیش از کسر کمیسیون</Text>
+            <TextInput accessibilityLabel="مبلغ نهایی کل کار" placeholder="مبلغ نهایی" keyboardType="number-pad" editable={!busy}
+              value={completionDrafts[order.id]?.amount || ''} onChangeText={value => setCompletionDraft(order.id, 'amount', value)} style={styles.completionInput} />
           <Pressable
             onPress={() => confirmCompleteOrder(order)}
             disabled={busy}
@@ -280,6 +305,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           >
             <Text style={styles.completeButtonText}>{busy ? 'در حال ثبت...' : 'اتمام کار'}</Text>
           </Pressable>
+          </View>
         ) : null}
       </View>
     );
@@ -507,6 +533,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 
 const styles = StyleSheet.create({
+  completionInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, marginVertical: 6, textAlign: 'right', color: '#0f172a' },
   container: { flex: 1, backgroundColor: colors.bg
   },
   alertError: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: 'rgba(239, 68, 68, 0.08)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)'

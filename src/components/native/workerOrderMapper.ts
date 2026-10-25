@@ -1,9 +1,13 @@
+import { readCompletion } from '../../features/orders/services/completionInput';
 import type { ApiOrder } from '../../api/types';
 import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
 import { normalizeWorkerOrderStatus, workerOrderArea, type WorkerOrderStatus } from './workerOrderStatus';
 
 /** سفارش آمادهٔ نمایش در پنل متخصص (خانه و پنل سفارش‌ها از همین شکل استفاده می‌کنند). */
 export interface NativeOrder {
+  durationHours?: number;
+  completion?: ApiOrder['completion'];
+  completionAcceptanceKey?: string | null;
   id: string;
   serviceTitle: string;
   category: WorkerServiceCategory | null;
@@ -37,6 +41,9 @@ export function mapWorkerOrder(o: ApiOrder): NativeOrder {
   const classified = classifyWorkerOrder(o);
   return {
     id: o.id,
+    durationHours: typeof o.durationHours === 'number' ? o.durationHours : 0,
+    completion: readCompletion(o.completion),
+    completionAcceptanceKey: typeof o.completionAcceptanceKey === 'string' ? o.completionAcceptanceKey : null,
     serviceTitle: o.serviceTitle || 'نظافت منزل',
     category: classified.category,
     badge: classified.badge,

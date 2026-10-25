@@ -24,6 +24,19 @@ describe('worker FAQ', () => {
     expect(SUPPORT_FAQ.some((f) => f.id.startsWith('worker_faq_'))).toBe(false);
   });
 
+  it('states only the approved D-68 worker facts and does not invent compensation or penalties', () => {
+    const byId = Object.fromEntries(WORKER_SUPPORT_FAQ.map((item) => [item.id, item]));
+    expect(byId.worker_faq_1?.answer).toContain('بررسی مدارک حداکثر یک هفته');
+    expect(byId.worker_faq_3?.answer).toContain('بعد از هر سفارش');
+    expect(byId.worker_faq_5?.answer).toContain('بعد از پذیرفتن سفارش');
+    expect(byId.worker_faq_5?.answer).toContain('جبران خسارت');
+    expect(byId.worker_faq_5?.answer).not.toContain('تومان');
+    expect(byId.worker_faq_5?.answer).not.toContain('ریال');
+    expect(byId.worker_faq_6?.answer).toContain('با پشتیبانی تماس بگیرید');
+    expect(byId.worker_faq_6?.answer).toContain('مدیریت سفارش را بررسی کند');
+    expect(byId.worker_faq_6?.answer).not.toMatch(/دکمه|جریمه/);
+  });
+
   it('the support screen picks the worker list only for the worker appearance', () => {
     const screen = readFileSync(join(__dirname, 'components', 'NativeSupportScreen.tsx'), 'utf8');
     expect(screen).toContain("appearance === 'worker' ? WORKER_SUPPORT_FAQ : SUPPORT_FAQ");

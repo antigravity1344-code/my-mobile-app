@@ -5,6 +5,9 @@ const { DatabaseSync } = require('node:sqlite');
 const fieldCrypto = require('./fieldCrypto');
 const { createPointsService } = require('./pointsService');
 const { createOrderStart } = require('./orderStart');
+const { createCommissionPolicy } = require('./commissionPolicy');
+const { createCompletionPolicy } = require('./completionPolicy');
+const { createOrderCompletion } = require('./orderCompletion');
 
 const USER_FIELDS = new Set([
   'id',
@@ -998,25 +1001,8 @@ function createDataStore(filename) {
     });
   }
 
-  function tryCompleteOrder(orderId, cleaner) {
-    return transaction(() => {
-      const order = getOrder(orderId);
-      if (!order) return { code: 'missing' };
-      if (!['ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'].includes(order.status)) return { code: 'bad-status' };
-      if (order.cleanerId !== cleaner.id) return { code: 'forbidden' };
-      if (order.startStatus === 'disputed') return { code: 'start-disputed' };
-      order.status = 'COMPLETED';
-      order.completedAt = new Date().toISOString();
-      order.cleanerName = cleaner.name || '';
-      order.cleanerAvatar = cleaner.avatar || '';
-      order.cleanerPhone = cleaner.phone || '';
-      updateOrder(order);
-      pointsApi.onOrderEvent({ name: 'completed', order: getOrder(orderId) });
-      addNotification(order.customerId, order.id, 'ORDER_COMPLETED', 'سفارش تکمیل شد', 'سفارش شما تکمیل شد.');
-      addNotification(cleaner.id, order.id, 'ORDER_COMPLETED', 'تکمیل سفارش', 'این سفارش را تکمیل کردید.');
-      return { code: 'ok', order: getOrder(orderId) };
-    });
-  }
+  // Legacy callers must submit a versioned completion request; no bypass remains.
+  function tryCompleteOrder() { return { code: 'invalid' }; }
 
   function requireOrderEvent(result) {
     if (!result || (result.code !== 'ok' && result.code !== 'duplicate')) {
@@ -1656,6 +1642,8 @@ function createDataStore(filename) {
     database.close();
   }
 
+  const completionPolicy = createCompletionPolicy({ database, transaction });
+  const commissionPolicy = createCommissionPolicy({ database, transaction });
   const pointsApi = createPointsService({ database, transaction, getUser, getOrder });
   // Start-of-work events remain separate from the order's primary status and pricing.
   const orderStart = createOrderStart({
@@ -1663,8 +1651,14 @@ function createDataStore(filename) {
     readEventData: readOrderEventData,
   });
 
+  const orderCompletion = createOrderCompletion({database,transaction,getOrder,updateOrder,policy:completionPolicy,appendOrderEvent,addNotification,
+    onCompleted: order => pointsApi.onOrderEvent({name: 'completed',order})});
+
   return {
+    ...orderCompletion,
+    completionPolicy,
     ...orderStart,
+    commissionPolicy,
     transaction,
     getUser,
     getUserByPhone,

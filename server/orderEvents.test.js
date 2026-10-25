@@ -184,6 +184,14 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     });
   }
 
+  async function completeWithWorker(server, workerToken, orderId) {
+    const current = store.completionPolicy.read();
+    if (current.mode !== 'worker_only') store.completionPolicy.publish({mode:'worker_only',expectedVersion:current.version});
+    const order = store.getOrder(orderId);
+    return request(server,{method:'PUT',pathname:'/api/orders/'+orderId+'/complete',token:workerToken,
+      body:{acceptanceKey:store.completionAcceptanceKey(order),actualHours:Number(order.durationHours)>0?Number(order.durationHours):null,finalAmount:order.price}});
+  }
+
   async function startServer(t) {
     const server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -586,14 +594,14 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     const worker = await approvedWorker(server, '09130000325', adminToken);
     const orderId = (await postOrder(server, customer.token)).json.order.id;
     await request(server, { method: 'PUT', pathname: '/api/orders/' + orderId + '/accept', token: worker.token, body: {} });
-    const completed = await request(server, { method: 'PUT', pathname: '/api/orders/' + orderId + '/complete', token: worker.token, body: {} });
+    const completed = await completeWithWorker(server, worker.token, orderId);
     assert.equal(completed.status, 200);
     const rated = await request(server, { method: 'PUT', pathname: '/api/orders/' + orderId + '/rate', token: customer.token, body: { rating: 5 } });
     assert.equal(rated.status, 200);
     const cancelledId = (await postOrder(server, customer.token)).json.order.id;
     const cancelled = await request(server, { method: 'PUT', pathname: '/api/orders/' + cancelledId + '/cancel', token: customer.token, body: {} });
     assert.equal(cancelled.status, 200);
-    assert.deepEqual(store.listOrderEvents(orderId).map((event) => event.kind), ['ORDER_ACCEPTED']);
+    assert.deepEqual(store.listOrderEvents(orderId).map((event) => event.kind), ['ORDER_ACCEPTED','END_REPORTED_BY_WORKER']);
     assert.deepEqual(store.listOrderEvents(cancelledId).map((event) => event.kind), ['ORDER_CANCELLED']);
     assert.equal(store.getOrder(cancelledId).status, 'CANCELLED');
     assert.equal(store.getOrder(cancelledId).cancelFault, 'customer');
@@ -678,7 +686,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.notEqual(eventsAfter[1].idempotencyKey, eventsAfter[0].idempotencyKey);
 
     const completedFromActive = await adminPut(order.id, { status: 'COMPLETED' });
-    assert.equal(completedFromActive.status, 200);
+    assert.equal(completedFromActive.status, 409);
     assert.equal(store.listOrderEvents(order.id).length, 2, 'COMPLETED is not an acceptance');
 
     // PENDING → COMPLETED مستقیم مدیر رد می‌شود و سفارش تغییری نمی‌کند (با یا بدون متخصص در درخواست).
@@ -686,9 +694,9 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     const before = store.getOrder(direct.id);
     for (const body of [{ status: 'COMPLETED' }, { status: 'COMPLETED', cleanerId: worker1.user.id }]) {
       const directCompleted = await adminPut(direct.id, body);
-      assert.equal(directCompleted.status, 400);
+      assert.equal(directCompleted.status, 409);
       assert.equal(directCompleted.json.success, false);
-      assert.equal(directCompleted.json.message, 'این سفارش هنوز توسط متخصصی پذیرفته نشده است و نمی‌توان آن را تکمیل‌شده ثبت کرد.');
+      assert.equal(directCompleted.json.code, 'COMPLETION_DECISION_REQUIRED');
       assert.equal(/[A-Za-z]/.test(directCompleted.json.message), false, 'no technical text');
       assert.deepEqual(store.getOrder(direct.id), before, 'the order is unchanged');
     }
@@ -714,10 +722,11 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     async function assertRejected(orderId, body, message, label) {
       const before = snapshot(orderId);
       const rejected = await adminPut(orderId, body);
-      assert.equal(rejected.status, 400, label);
+      const completionBypass = label === 'COMPLETED → ACCEPTED with a blocked worker';
+      assert.equal(rejected.status, completionBypass ? 409 : 400, label);
       assert.equal(rejected.json.success, false, label);
-      assert.equal(rejected.json.message, message, label);
-      assert.equal(/[A-Za-z]/.test(rejected.json.message), false, label + ': no technical text');
+      if (completionBypass) assert.equal(rejected.json.success, false, label);
+      else { assert.equal(rejected.json.message, message, label); assert.equal(/[A-Za-z]/.test(rejected.json.message), false, label + ': no technical text'); }
       assert.deepEqual(snapshot(orderId), before, label + ': order, events and notifications unchanged');
     }
 
@@ -748,7 +757,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     // COMPLETED → ACCEPTED با متخصص مسدود.
     const completedId = (await postOrder(server, customer.token)).json.order.id;
     assert.equal((await adminPut(completedId, { cleanerId: worker2.user.id })).status, 200);
-    assert.equal((await adminPut(completedId, { status: 'COMPLETED' })).status, 200);
+    assert.equal((await completeWithWorker(server, worker2.token, completedId)).status, 200);
     assert.equal((await setUserStatus(worker2.user.id, 'BLOCKED')).status, 200);
     await assertRejected(completedId, { status: 'ACCEPTED' }, 'متخصص هنوز تایید نشده است.', 'COMPLETED → ACCEPTED with a blocked worker');
 
@@ -759,7 +768,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       [customer.user.id, 'متخصص معتبر یافت نشد.', 'a non-worker user'],
     ];
     for (const [staleId, message, label] of staleCases) {
-      for (const closed of ['CANCELLED', 'COMPLETED']) {
+      for (const closed of ['CANCELLED']) {
         const id = (await postOrder(server, customer.token)).json.order.id;
         store.updateOrder({ ...store.getOrder(id), status: closed, cleanerId: staleId, cleanerName: 'قدیمی' });
         await assertRejected(id, { status: 'ACCEPTED' }, message, closed + ' → ACCEPTED with ' + label);
@@ -845,10 +854,11 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.equal((await adminPut(activeId, { status: 'ASSIGNED' })).status, 400);
 
     // لغوشده یا انجام‌شده → PENDING: متخصص و acceptedAt پاک می‌شوند و متخصص قبلی اعلان می‌گیرد.
-    for (const closed of ['CANCELLED', 'COMPLETED']) {
+    for (const closed of ['CANCELLED']) {
       const id = (await postOrder(server, customer.token)).json.order.id;
       assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + id + '/accept', token: worker1.token, body: {} })).status, 200);
-      assert.equal((await adminPut(id, { status: closed })).status, 200);
+      if (closed === 'COMPLETED') assert.equal((await completeWithWorker(server,worker1.token,id)).status,200);
+      else assert.equal((await adminPut(id, { status: closed })).status, 200);
       const events = store.listOrderEvents(id);
       const back = await adminPut(id, { status: 'PENDING' });
       assert.equal(back.status, 200, closed + ' → PENDING');
@@ -861,6 +871,13 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       assert.equal(later.status, 400, closed + ' → PENDING → ACCEPTED without a worker');
       assertNoWorker(store.getOrder(id), closed + ': rejected activation changes nothing');
     }
+    const completedId = (await postOrder(server, customer.token)).json.order.id;
+    assert.equal((await request(server, { method:'PUT', pathname:'/api/orders/'+completedId+'/accept', token:worker1.token, body:{} })).status,200);
+    assert.equal((await completeWithWorker(server,worker1.token,completedId)).status,200);
+    const completedSnapshot={order:store.getOrder(completedId),events:store.listOrderEvents(completedId),notes:store.listNotifications(worker1.user.id).length};
+    const reopen=await adminPut(completedId,{status:'PENDING'});
+    assert.equal(reopen.status,409,'a finalized order cannot be reopened');
+    assert.deepEqual({order:store.getOrder(completedId),events:store.listOrderEvents(completedId),notes:store.listNotifications(worker1.user.id).length},completedSnapshot);
   });
 
   test('admin cannot swap the worker in the same request that completes or cancels the order', async (t) => {
@@ -880,10 +897,11 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     async function assertSwapRejected(id, body, label) {
       const before = { order: store.getOrder(id), events: store.listOrderEvents(id), notes: store.listNotifications(customer.user.id).length };
       const rejected = await adminPut(id, body);
-      assert.equal(rejected.status, 400, label);
+      const completionBypass = body.status === 'COMPLETED';
+      assert.equal(rejected.status, completionBypass ? 409 : 400, label);
       assert.equal(rejected.json.success, false, label);
-      assert.equal(rejected.json.message, SWAP_MESSAGE, label);
-      assert.equal(/[A-Za-z]/.test(rejected.json.message), false, label + ': no technical text');
+      if (completionBypass) assert.equal(rejected.json.code,'COMPLETION_DECISION_REQUIRED',label);
+      else { assert.equal(rejected.json.message, SWAP_MESSAGE, label); assert.equal(/[A-Za-z]/.test(rejected.json.message), false, label + ': no technical text'); }
       assert.deepEqual(
         { order: store.getOrder(id), events: store.listOrderEvents(id), notes: store.listNotifications(customer.user.id).length },
         before,
@@ -906,7 +924,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     await assertSwapRejected(pendingId, { cleanerId: worker2.user.id, status: 'CANCELLED' }, 'pending + worker + CANCELLED');
 
     // همان متخصص یا بدون cleanerId: تکمیل و لغو مثل قبل کار می‌کند و پذیرش جدیدی ساخته نمی‌شود.
-    for (const [status, withSameWorker] of [['COMPLETED', true], ['CANCELLED', true], ['COMPLETED', false], ['CANCELLED', false]]) {
+    for (const [status, withSameWorker] of [['CANCELLED', true], ['CANCELLED', false]]) {
       const id = await acceptedBy(worker1);
       const events = store.listOrderEvents(id);
       const acceptedAt = store.getOrder(id).acceptedAt;
@@ -939,11 +957,11 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     assert.equal(eventsAfter.length, eventsBefore.length + 1);
     assert.deepEqual(eventsAfter[0], eventsBefore[0]);
     assert.equal(eventsAfter.at(-1).claimedAt, reassigned.acceptedAt);
-    const completed = await adminPut(activeId, { cleanerId: worker2.user.id, status: 'COMPLETED' });
+    const completed = await completeWithWorker(server, worker2.token, activeId);
     assert.equal(completed.status, 200);
     assert.equal(store.getOrder(activeId).cleanerId, worker2.user.id);
     assert.equal(store.getOrder(activeId).acceptedAt, reassigned.acceptedAt);
-    assert.equal(store.listOrderEvents(activeId).length, eventsAfter.length);
+    assert.equal(store.listOrderEvents(activeId).length, eventsAfter.length + 1);
   });
 
   test('admin reassigning an active order notifies both previous and new workers', async (t) => {
@@ -1072,7 +1090,6 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       [{ status: 'CONFIRMED' }, 'تأیید شده'],
       [{ status: 'ASSIGNED' }, 'تخصیص متخصص'],
       [{ status: 'IN_PROGRESS' }, 'در حال انجام'],
-      [{ status: 'COMPLETED' }, 'انجام شده'],
       [{ status: 'CANCELLED' }, 'لغو شده'],
       [{ status: 'PENDING' }, 'در انتظار متخصص'],
     ];
@@ -1184,6 +1201,12 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
     }
     const triggers = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all().map((row) => row.name).sort();
     assert.deepEqual(triggers, [
+      'commission_policy_no_delete',
+      'commission_policy_no_replace',
+      'commission_policy_no_update',
+      'completion_policy_no_delete',
+      'completion_policy_no_replace',
+      'completion_policy_no_update',
       'order_events_no_delete',
       'order_events_no_overwrite',
       'order_events_no_update',
@@ -1211,12 +1234,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       body: { status: 'IN_PROGRESS' },
     });
     assert.equal(moved.status, 200);
-    const completed = await request(server, {
-      method: 'PUT',
-      pathname: '/api/orders/' + orderId + '/complete',
-      token: worker.token,
-      body: {},
-    });
+    const completed = await completeWithWorker(server, worker.token, orderId);
     assert.equal(completed.status, 200);
     assert.equal(store.getOrder(orderId).status, 'COMPLETED');
 
@@ -1227,7 +1245,7 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       token: worker.token,
       body: {},
     });
-    assert.equal(tooEarly.status, 400);
+    assert.equal(tooEarly.status, 409);
     assert.equal(store.getOrder(pendingId).status, 'PENDING');
 
     const missingSchedule = await request(server, {

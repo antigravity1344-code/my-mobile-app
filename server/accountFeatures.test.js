@@ -15,6 +15,17 @@ process.env.NODE_ENV = 'test';
 const { installTestSmsCapture } = require('./testAuthHarness');
 const smsCapture = installTestSmsCapture();
 const { app, store } = require('./index.js');
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
 require('node:test').after(() => smsCapture.restore());
 after(() => {
   store.close();
@@ -118,7 +129,7 @@ test('support, notifications, wallet and loyalty stay on sqlite', async (t) => {
     method: 'PUT',
     pathname: '/api/orders/' + order.json.order.id + '/accept',
     token: worker.token,
-    body: { cleanerId: worker.user.id },
+    body: {},
   });
   assert.equal(accepted.status, 200);
   const customerNotes = await request(server, { pathname: '/api/notifications', token: customer.token });
@@ -137,7 +148,7 @@ test('support, notifications, wallet and loyalty stay on sqlite', async (t) => {
     method: 'PUT',
     pathname: '/api/orders/' + order.json.order.id + '/complete',
     token: worker.token,
-    body: { cleanerId: worker.user.id },
+    body: completionPayload(order.json.order.id),
   });
   const loyalty = await request(server, { pathname: '/api/loyalty', token: customer.token });
   assert.equal(loyalty.json.loyalty.completedOrdersCount, 1);

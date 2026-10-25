@@ -9,6 +9,8 @@ const {
   assignDocument,
 } = require('./workerDocumentStorage');
 const { createDataStore, normalizeIsoTimestamp } = require('./dataStore');
+const { registerCommissionRoutes } = require('./commissionRoutes');
+const { registerCompletionRoutes } = require('./completionRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -952,7 +954,7 @@ app.post('/api/orders', (req, res) => {
 function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  return { ...rest, startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
+  return { ...rest, completion: store.completionFor(order), startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -1015,7 +1017,7 @@ function workerAssignedOrderView(order) {
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
   // سطح و ریز قیمت مشتری، شناسه مشتری و شناسه لغوکننده به متخصص فرستاده نمی‌شود (D-05، D-41، D-06).
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  const workerVisible = { ...rest, ...workerOrderCurrencyView(order) };
+  const workerVisible = { ...rest, ...workerOrderCurrencyView(order), completion: store.completionFor(order), completionAcceptanceKey: store.completionAcceptanceKey(order) };
   if (ratings !== undefined) workerVisible.ratings = workerVisibleRatings(ratings);
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area, startReported: store.workerStartReported(order), startAcceptanceKey: store.startAcceptanceKey(order) };
@@ -1203,39 +1205,6 @@ app.put('/api/orders/:orderId/cancel', (req, res) => {
   res.json({ success: true, order: customerOrderView(cancelled.order) });
 });
 
-// تکمیل سفارش توسط متخصص پذیرنده، از هر وضعیت فعال
-app.put('/api/orders/:orderId/complete', (req, res) => {
-  const authUser = requireUser(req, res);
-  if (!authUser) return;
-  if (authUser.role !== 'WORKER') {
-    return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند خدمت را تکمیل کند.' });
-  }
-  const { orderId } = req.params;
-  const cleanerId = req.body && req.body.cleanerId;
-  if (cleanerId && cleanerId !== authUser.id) {
-    return res.status(403).json({ success: false, message: 'تکمیل سفارش با شناسه متخصص دیگر مجاز نیست.' });
-  }
-
-  const cleaner = authUser;
-  if (!cleaner || (cleaner.status !== 'APPROVED' && cleaner.status !== 'ACTIVE')) {
-    return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
-  }
-
-  const completed = store.tryCompleteOrder(orderId, cleaner);
-  if (completed.code === 'start-disputed') {
-    return res.status(409).json({ success: false, code: 'START_DISPUTED', message: 'اختلاف شروع کار هنوز بررسی نشده است. تا بررسی پشتیبانی امکان اتمام سفارش نیست.' });
-  }
-  if (completed.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
-  if (completed.code === 'bad-status') {
-    return res.status(400).json({ success: false, message: 'این سفارش در وضعیت فعلی قابل تکمیل نیست.' });
-  }
-  if (completed.code === 'forbidden') {
-    return res.status(403).json({ success: false, message: 'فقط متخصص پذیرنده می‌تواند این سفارش را تکمیل کند.' });
-  }
-  // سفارش تمام‌شده: همان نمای GET /orders (بدون تلفن و آدرس دقیق مشتری).
-  res.json({ success: true, order: workerAssignedOrderView(completed.order) });
-});
-
 app.put('/api/orders/:orderId/rate', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
@@ -1390,6 +1359,9 @@ app.get('/api/loyalty', (req, res) => {
   }
   res.json({ success: true, loyalty: store.loyaltyFor(authUser.id) });
 });
+
+registerCompletionRoutes(app, {store,requireUser,requireAdmin,customerView:customerOrderView,workerView:workerAssignedOrderView});
+registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, requireAdmin });
 
 app.use('/api/admin', requireAdmin);
 
@@ -1593,7 +1565,7 @@ app.put('/api/admin/approve-worker/:userId', (req, res) => {
 
 app.get('/api/admin/orders', (req, res) => {
   store.finalizeDueCancelRequests();
-  res.json({ success: true, orders: store.listOrders() });
+  res.json({ success: true, orders: store.listOrders().map(order => ({...order,completion:store.completionFor(order)})) });
 });
 
 // قوانین امتیاز فقط از مسیر مدیر و فقط با نسخه جدید ثبت می‌شوند (D-04). ویرایش و حذف وجود ندارد.
@@ -1623,6 +1595,9 @@ app.post('/api/admin/point-rules', (req, res) => {
 app.put('/api/admin/orders/:orderId', (req, res) => {
   const { orderId } = req.params;
   const { status, cleanerId, cancelFault } = req.body || {};
+  if (status === 'COMPLETED') return res.status(409).json({success:false,code:'COMPLETION_DECISION_REQUIRED',message:'اتمام سفارش فقط از مسیر تأیید پایان کار انجام می‌شود.'});
+  const closed = store.getOrder(orderId);
+  if (closed?.status === 'COMPLETED') return res.status(409).json({success:false,message:'سفارش تمام‌شده قابل بازگشایی نیست.'});
   store.finalizeDueCancelRequests();
 
   const updated = store.transaction(() => {
@@ -1850,6 +1825,11 @@ app.get('/admin/tiers.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminTiers.js'));
 });
 
+app.get('/admin/completion.js', (req,res) => res.type('application/javascript').sendFile(path.join(__dirname,'adminCompletion.js')));
+app.get('/admin/commission.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminCommission.js'));
+});
+
 app.get('/admin/points.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminPoints.js'));
 });
@@ -1918,6 +1898,8 @@ app.get('/admin', (req, res) => {
       <button id="tabTiersBtn" onclick="switchTab('tiers'); loadAdminTiers()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         قانون درجه‌ها
       </button>
+      <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
+      <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         قانون امتیاز
       </button>
@@ -1956,6 +1938,28 @@ app.get('/admin', (req, res) => {
       <div id="tierContent" class="space-y-4"></div>
     </section>
 
+    <section id="tabCompletion" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">سیاست پایان کار</h3>
+      <p>پیش‌فرض: ثبت متخصص و تأیید مشتری؛ اختلاف با مدیر. تغییر سیاست فقط برای درخواست‌های پایان کار جدید است.</p>
+      <label for="completionMode">روش تأیید پایان کار</label>
+      <select id="completionMode" disabled class="bg-slate-900 border rounded p-2">
+        <option value="customer_confirmation">ثبت متخصص و تأیید مشتری</option>
+        <option value="worker_only">فقط تأیید متخصص</option>
+      </select>
+      <p id="completionMessage" role="status" aria-live="polite"></p>
+      <button id="completionRefresh" onclick="loadAdminCompletion()">بازخوانی سیاست جاری</button>
+      <button id="completionSave" disabled onclick="saveAdminCompletion()">ذخیره سیاست</button>
+    </section>
+    <section id="tabCommission" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">کمیسیون شرکت</h3>
+      <p class="text-sm text-slate-300">درصد کمیسیون همه خدمات این شرکت را ثبت کنید. پیش‌فرض ۲۵٪ است. گزارش دستمزد و واریز در این مرحله هنوز فعال نیست.</p>
+      <label for="commissionRate" class="block text-sm">درصد کمیسیون</label>
+      <input id="commissionRate" type="text" inputmode="decimal" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <p id="commissionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
+      <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
+    </section>
+
     <section id="tabPoints" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قانون امتیاز</h3>
       <p class="text-sm text-slate-300">تا وقتی نسخهٔ فعالی ثبت نشده، پیش‌فرض سامانه به کار می‌رود: هر سفارش موفق ۵ امتیاز برای مشتری و ۵ امتیاز برای متخصص، و ۲ امتیاز اضافه برای متخصص وقتی مشتری ۵ ستاره بدهد. هر تغییر نسخهٔ جدید می‌سازد و امتیازهای قبلی عوض نمی‌شوند.</p>
@@ -1975,6 +1979,8 @@ app.get('/admin', (req, res) => {
   <script src="/admin/tariff.js"></script>
   <script src="/admin/tiers.js"></script>
 <script src="/admin/points.js"></script>
+  <script src="/admin/commission.js"></script>
+  <script src="/admin/completion.js"></script>
   <script>
     const sourceIdentity = ${identityJson};
     const identityState = !sourceIdentity.commit || sourceIdentity.dirty == null ? 'منبع نامشخص'
@@ -2152,6 +2158,13 @@ app.get('/admin', (req, res) => {
           details.append(adminElement('p', 'text-xs text-emerald-400 mt-1', 'متخصص پذیرنده: ' + o.cleanerName));
         }
         const actions = adminElement('div', 'flex flex-col items-end gap-2');
+        if (o.completion?.status === 'disputed') {
+          details.append(adminElement('p','text-amber-300','اختلاف پایان کار — ساعات: '+(o.completion.actualHours ?? 'غیرساعتی')+' | مبلغ اعلام‌شده: '+o.completion.finalAmount));
+          for (const approve of [true,false]) {
+            const decision = adminElement('button','bg-sky-700 px-3 py-2 rounded',approve ? 'تأیید پایان کار و مبلغ' : 'رد درخواست پایان کار');
+            decision.addEventListener('click',()=>decideAdminCompletion(o,approve,decision));actions.append(decision);
+          }
+        }
         if (o.status === 'CANCEL_REQUESTED') {
           const button = adminElement('button', 'bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl', 'تأیید لغو');
           button.addEventListener('click', () => confirmCustomerCancel(o.id));
@@ -2217,7 +2230,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'completion']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

@@ -4,6 +4,17 @@ const { createTestHarness } = require('./testAuthHarness');
 
 const harness = createTestHarness('paksho-start-isolated-');
 const { store, request } = harness;
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
 after(() => harness.close());
 
 // This monetary fixture exists only in this process's disposable SQLite database.
@@ -168,7 +179,7 @@ test('API lifecycle create -> accept -> start -> customer yes -> complete preser
   })).status, 409);
   assert.equal(eventCount(orderId, 'START_CONFIRMED_BY_CUSTOMER'), 1);
   const complete = await request(server, {
-    method: 'PUT', pathname: '/api/orders/' + orderId + '/complete', token: worker.token, body: {},
+    method: 'PUT', pathname: '/api/orders/' + orderId + '/complete', token: worker.token, body: completionPayload(orderId),
   });
   assert.equal(complete.status, 200);
   assert.equal(complete.json.order.status, 'COMPLETED');
@@ -263,13 +274,13 @@ test('unresolved start disputes block worker completion without effects; existin
       current.status = status;
       store.updateOrder(current);
       const before = effects(order.id, [customer, worker, otherWorker]);
-      assert.equal(store.tryCompleteOrder(order.id, worker.user).code, 'start-disputed');
+      assert.equal(store.reportCompletion(order.id, worker.user, completionPayload(order.id)).code, 'start-disputed');
       const rejected = await request(server, {
         method: 'PUT', pathname: completePath, token: worker.token,
-        body: { startStatus: 'admin_resolved' },
+        body: completionPayload(order.id),
       });
       assert.equal(rejected.status, 409);
-      assert.equal(rejected.json.code, 'START_DISPUTED');
+      assert.equal(rejected.json.code, 'start-disputed');
       assert.deepEqual(effects(order.id, [customer, worker, otherWorker]), before);
       assert.equal(store.getOrder(order.id).startStatus, 'disputed');
     }
@@ -284,7 +295,7 @@ test('unresolved start disputes block worker completion without effects; existin
     assert.equal(resolved.status, 200);
     assert.equal(resolved.json.order.startStatus, 'admin_resolved');
     const complete = await request(server, {
-      method: 'PUT', pathname: completePath, token: worker.token, body: {},
+      method: 'PUT', pathname: completePath, token: worker.token, body: completionPayload(order.id),
     });
     assert.equal(complete.status, 200);
     assert.equal(complete.json.order.status, 'COMPLETED');
@@ -459,9 +470,10 @@ test('cancel before start, during dispute and closed orders reject start and res
   const locked = effects(order.id, [customer, worker]);
   for (const [suffix, token, body] of [
     ['start', worker.token, startBody], ['start-response', customer.token, { answer: 'no', promptEventId }],
-    ['complete', worker.token, {}],
+    ['complete', worker.token, completionPayload(order.id)],
   ]) {
-    assert.equal((await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/' + suffix, token, body })).status, 400);
+    const response = await request(server, { method: 'PUT', pathname: '/api/orders/' + order.id + '/' + suffix, token, body });
+    assert.equal(response.status, suffix === 'complete' ? 409 : 400);
   }
   assert.deepEqual(effects(order.id, [customer, worker]), locked);
   assert.equal((await request(server, {

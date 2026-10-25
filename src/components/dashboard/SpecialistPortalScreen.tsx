@@ -1,3 +1,5 @@
+import { completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { previewActive } from '../native/previewRuntime';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Briefcase,
@@ -24,6 +26,11 @@ import { appStorage } from '../../utils/storage';
 export type SpecialistRole = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
 interface OpenOrder {
+  durationHours: number;
+  currencyUnit?: string;
+  completion: ApiOrder['completion'];
+  completionAcceptanceKey: string | null;
+  startStatus?: string | null;
   id: string;
   serviceId: string;
   serviceTitle: string;
@@ -83,6 +90,11 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
 
   return {
     id: order.id,
+    durationHours: order.durationHours || 0,
+    currencyUnit: order.currencyUnit,
+    completion: readCompletion(order.completion),
+    completionAcceptanceKey: order.completionAcceptanceKey || null,
+    startStatus: order.startStatus,
     serviceId,
     serviceTitle: order.serviceTitle || 'سفارش',
     roleRequired: roleForService(serviceId),
@@ -129,6 +141,11 @@ export const SpecialistPortalScreen: React.FC = () => {
   const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [completionDrafts, setCompletionDrafts] = useState<Record<string, { hours: string; amount: string }>>({});
+  const [completionMessage, setCompletionMessage] = useState('');
+  const setCompletionDraft = (id: string, field: 'hours' | 'amount', value: string) => {
+    setCompletionDrafts(prev => ({ ...prev, [id]: { ...(prev[id] || { hours: '', amount: '' }), [field]: value } }));
+  };
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [myActiveOrders, setMyActiveOrders] = useState<OpenOrder[]>([]);
   const [workerUserId, setWorkerUserId] = useState<string>('');
@@ -189,7 +206,13 @@ export const SpecialistPortalScreen: React.FC = () => {
       .filter((order): order is OpenOrder => order != null && order.roleRequired === activeRole && order.status === 'OPEN');
   }, [availableOrdersRaw, activeRole]);
 
-  const handleCompleteOrder = async (orderId: string) => {
+  const handleCompleteOrder = async (order: OpenOrder) => {
+    const orderId = order.id;
+    if (previewActive()) { setLoadError('ثبت واقعی در پیش‌نمایش مجاز نیست.'); return; }
+    if (completingId || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey || order.startStatus === 'disputed') return;
+    const draft = completionDrafts[orderId];
+    const values = completionInput(order.durationHours > 0, draft?.hours || '', draft?.amount || '');
+    if (!values) { setLoadError('ساعات واقعی را با حداکثر دو رقم اعشار و مبلغ نهایی را به‌صورت عدد صحیح وارد کنید.'); return; }
     if (!workerUserId) {
       setLoadError('شناسه متخصص واقعی پیدا نشد. با حساب متخصص وارد شوید.');
       return;
@@ -199,9 +222,11 @@ export const SpecialistPortalScreen: React.FC = () => {
     try {
       const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/complete', {
         method: 'PUT',
-        body: JSON.stringify({ cleanerId: workerUserId }),
+        body: JSON.stringify({ acceptanceKey: order.completionAcceptanceKey, ...values }),
       });
-      if (res.success) {
+      const completion = readCompletion(res.order?.completion);
+      if (res.success && completion) {
+        setCompletionMessage(completionStatusText(completion.status));
         await loadAvailable();
         void refreshOrders();
       } else {
@@ -211,6 +236,7 @@ export const SpecialistPortalScreen: React.FC = () => {
       setLoadError('خطا در تکمیل سفارش.');
     } finally {
       setCompletingId(null);
+      void loadAvailable();
     }
   };
 
@@ -342,6 +368,8 @@ export const SpecialistPortalScreen: React.FC = () => {
         </div>
       </div>
 
+      {completionMessage ? <p role="status">{completionMessage}</p> : null}
+      {loadError ? <p role="alert">{loadError}</p> : null}
       {/* لیست سفارشات قابل انتخاب */}
       <div className="space-y-3">
         {myActiveOrders.length > 0 && (
@@ -357,16 +385,21 @@ export const SpecialistPortalScreen: React.FC = () => {
               <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>
               {order.status === 'CANCEL_REQUESTED' ? (
                 <p className="text-[11px] text-amber-800">درخواست لغو این سفارش در حال بررسی است. تا پایان بررسی کار را ادامه ندهید.</p>
-              ) : (
+              ) : order.completion && order.completion.status !== 'rejected' ? <p>{completionStatusText(order.completion.status)}</p> : order.completionAcceptanceKey && order.startStatus !== 'disputed' ? (
+              <div>
+                {order.completion ? <p>{completionStatusText(order.completion.status)}</p> : null}
+                {order.durationHours > 0 ? <label>ساعات واقعی کار<input aria-label="ساعات واقعی کار" inputMode="decimal" disabled={completingId !== null} value={completionDrafts[order.id]?.hours || ''} onChange={e => setCompletionDraft(order.id, 'hours', e.target.value)} /></label> : null}
+                <label>مبلغ نهایی کل کار ({order.currencyUnit || 'تومان'})، پیش از کسر کمیسیون<input aria-label="مبلغ نهایی کل کار" inputMode="numeric" disabled={completingId !== null} value={completionDrafts[order.id]?.amount || ''} onChange={e => setCompletionDraft(order.id, 'amount', e.target.value)} /></label>
               <button
                 type="button"
-                onClick={() => handleCompleteOrder(order.id)}
-                disabled={completingId === order.id || !workerUserId}
+                onClick={() => void handleCompleteOrder(order)}
+                disabled={completingId !== null || !workerUserId}
                 className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-[11px] font-bold py-2 rounded-lg"
               >
-                {completingId === order.id ? 'در حال تکمیل...' : 'اتمام کار'}
+                {completingId === order.id ? 'در حال ثبت...' : 'ثبت پایان کار و مبلغ'}
               </button>
-              )}
+              </div>
+              ) : null}
             </div>
           ))}
         </div>

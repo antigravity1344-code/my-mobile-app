@@ -1,3 +1,5 @@
+import { previewActive } from '../native/previewRuntime';
+import { formatStoredAmount } from '../../features/orders/services/money';
 import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
@@ -29,13 +31,17 @@ function adminOrderStatusLabel(status: string | null | undefined): string {
 }
 
 export const AdminPanelScreen: React.FC = () => {
-  const [adminTab, setAdminTab] = useState<'orders' | 'cleaners' | 'stats'>('orders');
+  const [adminTab, setAdminTab] = useState<'orders' | 'cleaners' | 'policy'>('orders');
+  const [completionPolicy,setCompletionPolicy]=useState<{version:number;mode:'customer_confirmation'|'worker_only'}|null>(null);
+  const [completionMode,setCompletionMode]=useState<'customer_confirmation'|'worker_only'>('customer_confirmation');
+  const [policyMessage,setPolicyMessage]=useState('');
   const [stats, setStats] = useState<ApiAdminStats | null>(null);
   const [workers, setWorkers] = useState<ApiAdminUser[]>([]);
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [adminToken, setAdminToken] = useState('');
   const [password, setPassword] = useState('');
+  const [completionError, setCompletionError] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const adminFetch = (endpoint: string, options: RequestInit = {}) =>
@@ -93,14 +99,36 @@ export const AdminPanelScreen: React.FC = () => {
     setOrders([]);
   };
 
-  const handleCompleteOrder = async (orderId: string) => {
-    setLoading(true);
-    const res = await adminFetch('/admin/orders/' + orderId, {
-      method: 'PUT',
-      body: JSON.stringify({ status: 'COMPLETED' }),
-    });
-    setLoading(false);
-    if (res.success) loadData();
+  const handleCompleteOrder = async (order: ApiOrder, approve: boolean) => {
+    if (previewActive()) { setCompletionError('ثبت واقعی در پیش‌نمایش مجاز نیست.'); return; }
+    if (loading || order.completion?.status !== 'disputed') return;
+    setLoading(true); setCompletionError('');
+    try {
+      const res = await adminFetch('/admin/orders/' + encodeURIComponent(order.id) + '/completion-decision', {
+        method: 'PUT', body: JSON.stringify({ requestId: order.completion.requestId, approve }),
+      });
+      if (!res.success) setCompletionError(res.message || 'تصمیم ثبت نشد؛ سفارش را بازخوانی کنید.');
+    } catch { setCompletionError('نتیجه ثبت مشخص نیست؛ سفارش را بازخوانی کنید.'); }
+    finally { setLoading(false); void loadData(); }
+  };
+
+  const loadCompletionPolicy = async () => {
+    setPolicyMessage('در حال دریافت سیاست…');
+    try {
+      const result=await adminFetch('/admin/completion-policy');
+      if(!result.success || !result.policy || !Number.isSafeInteger(result.policy.version) || !['customer_confirmation','worker_only'].includes(result.policy.mode)) throw new Error('پاسخ معتبر نیست.');
+      setCompletionPolicy(result.policy);setCompletionMode(result.policy.mode);setPolicyMessage('سیاست جاری دریافت شد.');
+    } catch {setCompletionPolicy(null);setPolicyMessage('دریافت نشد؛ اتصال مدیر را بررسی و دوباره تلاش کنید.');}
+  };
+
+  const saveCompletionPolicy = async () => {
+    if(!completionPolicy)return;
+    setPolicyMessage('در حال ذخیره…');
+    try {
+      const result=await adminFetch('/admin/completion-policy',{method:'PUT',body:JSON.stringify({mode:completionMode,expectedVersion:completionPolicy.version})});
+      if(!result.success || !result.policy) throw new Error(result.message || 'ذخیره انجام نشد.');
+      setCompletionPolicy(result.policy);setPolicyMessage('ذخیره شد؛ درخواست‌های جدید از این روش پیروی می‌کنند.');
+    } catch {setCompletionPolicy(null);setPolicyMessage('نتیجه ذخیره مشخص نیست؛ پیش از تلاش دوباره بازخوانی کنید.');}
   };
 
   const handleConfirmCancel = async (orderId: string) => {
@@ -227,6 +255,7 @@ export const AdminPanelScreen: React.FC = () => {
         >
           متخصصین ({workers.length})
         </button>
+        <button onClick={()=>{setAdminTab('policy');void loadCompletionPolicy();}} className={`pb-2 px-1 transition border-b-2 cursor-pointer ${adminTab==='policy'?'border-sky-600 text-sky-600 font-bold':'border-transparent text-slate-500'}`}>سیاست پایان کار</button>
       </div>
 
       {/* تب ۱: مدیریت سفارش‌ها */}
@@ -263,15 +292,20 @@ export const AdminPanelScreen: React.FC = () => {
                     <p><span className="text-slate-400">زمان تکمیل:</span> {ord.completedAt}</p>
                   )}
                 </div>
-                {ord.status === 'ACCEPTED' && (
+                {completionError ? <p role="alert">{completionError}</p> : null}
+                {ord.completion?.status === 'disputed' && (
+                  <div>
+                  <p>مبلغ اعلام‌شده: {formatStoredAmount(ord.completion.finalAmount, ord.currencyUnit || ord.pricing?.currencyUnit)}؛ ساعات واقعی: {ord.completion.actualHours ?? 'غیرساعتی'}</p>
                   <button
                     type="button"
-                    onClick={() => handleCompleteOrder(ord.id)}
+                    onClick={() => void handleCompleteOrder(ord, true)}
                     disabled={loading}
                     className="w-full bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
                   >
-                    اتمام سفارش
+                    تأیید پایان کار و مبلغ
                   </button>
+                  <button type="button" disabled={loading} onClick={() => void handleCompleteOrder(ord, false)}>رد درخواست پایان کار</button>
+                  </div>
                 )}
                 {ord.status === 'CANCEL_REQUESTED' && (
                   <button
@@ -286,6 +320,18 @@ export const AdminPanelScreen: React.FC = () => {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {adminTab==='policy' && (
+        <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-xs">
+          <h4 className="font-bold">روش تأیید پایان کار</h4>
+          <p>پیش‌فرض، ثبت متخصص و تأیید مشتری است؛ اختلاف به مدیر می‌رسد. تغییر روش روی درخواست‌های جدید اعمال می‌شود.</p>
+          <select aria-label="روش تأیید پایان کار" disabled={!completionPolicy || loading} value={completionMode} onChange={e=>setCompletionMode(e.target.value as 'customer_confirmation'|'worker_only')} className="w-full rounded-lg border p-2">
+            <option value="customer_confirmation">ثبت متخصص و تأیید مشتری</option><option value="worker_only">فقط تأیید متخصص</option>
+          </select>
+          <p role="status" aria-live="polite">{policyMessage}</p>
+          <div className="flex gap-2"><button type="button" onClick={()=>void loadCompletionPolicy()} className="rounded-lg bg-slate-600 px-3 py-2 text-white">بازخوانی</button><button type="button" disabled={!completionPolicy || loading} onClick={()=>void saveCompletionPolicy()} className="rounded-lg bg-sky-600 px-3 py-2 text-white">ذخیره سیاست</button></div>
         </div>
       )}
 

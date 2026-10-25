@@ -75,6 +75,18 @@ function orderBody(token, total, extra = {}) {
 test('server quote and confirmed order use the deployment tariff', async (t) => {
   baseTariff();
   const harness = createTestHarness('paksho-d60-stage2-');
+const { store } = harness;
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
   t.after(() => harness.close());
   const server = await harness.serverFor(t);
   const customer = await harness.login(server, '09120000111');
@@ -281,11 +293,11 @@ test('server quote and confirmed order use the deployment tariff', async (t) => 
   assert.notEqual(started.status, 200);
   assert.equal((await orders()).find((order) => order.id === secure.id).price, 2000);
   const completed = await request(server, {
-    method: 'PUT', pathname: '/api/orders/' + secure.id + '/complete', token: workerLogin.token, body: { price: 1 },
+    method: 'PUT', pathname: '/api/orders/' + secure.id + '/complete', token: workerLogin.token, body: { ...completionPayload(secure.id), price: 1 },
   });
-  assert.equal(completed.status, 200);
+  assert.equal(completed.status, 400);
   assert.equal((await orders()).find((order) => order.id === secure.id).price, 2000);
-  assert.equal((await orders()).find((order) => order.id === secure.id).status, 'COMPLETED');
+  assert.equal((await orders()).find((order) => order.id === secure.id).status, 'ACCEPTED');
 
   const cancelQuote = await quote({ serviceId: 'fixed' });
   const cancelOrder = await place(orderBody(cancelQuote.json.quote.quoteToken, 2500, {

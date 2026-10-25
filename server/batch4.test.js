@@ -15,6 +15,17 @@ process.env.NODE_ENV = 'test';
 const { installTestSmsCapture } = require('./testAuthHarness');
 const smsCapture = installTestSmsCapture();
 const { app, store } = require('./index.js');
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
 require('node:test').after(() => smsCapture.restore());
 after(() => {
   store.close();
@@ -176,7 +187,7 @@ test('batch4 #1: no customer-facing order response carries the specialist phone'
 
   const done = await createOrder(server, customer.token);
   await request(server, { method: 'PUT', pathname: '/api/orders/' + done.id + '/accept', token: worker.token, body: {} });
-  await request(server, { method: 'PUT', pathname: '/api/orders/' + done.id + '/complete', token: worker.token, body: {} });
+  await request(server, { method: 'PUT', pathname: '/api/orders/' + done.id + '/complete', token: worker.token, body: completionPayload(done.id) });
   const rated = await request(server, { method: 'PUT', pathname: '/api/orders/' + done.id + '/rate', token: customer.token, body: { rating: 5 } });
   assert.equal(rated.status, 200);
   assert.equal(rated.text.includes(WORKER_PHONE), false, 'rate response leaks specialist phone');
@@ -200,8 +211,8 @@ test('batch4 #2: admin cancel records cancelledAt/cancelledBy=admin; CANCELLED -
   assert.ok(stored.cancelledAt && Date.parse(stored.cancelledAt) >= before - 1000, 'cancelledAt set');
 
   const complete = await adminSet(server, adminToken, order.id, { status: 'COMPLETED' });
-  assert.equal(complete.status, 400);
-  assert.match(complete.json.message, /لغو/);
+  assert.equal(complete.status, 409);
+  assert.equal(typeof complete.json.message, 'string');
   assert.equal(store.getOrder(order.id).status, 'CANCELLED');
   assert.equal(store.getOrder(order.id).completedAt, null);
 

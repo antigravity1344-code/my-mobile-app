@@ -34,7 +34,18 @@ export interface ApiOrderRatings {
 }
 
 /** سفارش همان‌طور که در server/db.json ذخیره و برگردانده می‌شود. */
+export interface ApiCompletion {
+  requestId: string;
+  status: 'pending' | 'disputed' | 'completed' | 'rejected';
+  mode: 'customer_confirmation' | 'worker_only';
+  actualHours: number | null;
+  finalAmount: number;
+  policyVersion: number;
+}
+
 export interface ApiOrder {
+  completion?: ApiCompletion | null;
+  completionAcceptanceKey?: string | null;
   id: string;
   customerId: string;
   customerName: string;

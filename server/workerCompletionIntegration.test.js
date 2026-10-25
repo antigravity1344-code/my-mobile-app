@@ -4,6 +4,17 @@ const { createTestHarness } = require('./testAuthHarness');
 
 const harness = createTestHarness('paksho-complete-isolated-');
 const { store, request } = harness;
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
 after(() => harness.close());
 
 // These values and accounts exist only in this disposable database, never as application defaults.
@@ -83,7 +94,7 @@ test('completion stays available from all four active statuses without requiring
       assert.equal(store.getOrder(order.id).expectedStartAt, null);
       assert.equal(store.getOrder(order.id).startStatus, 'not_recorded');
       const completed = await request(server, {
-        method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: {},
+        method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token, body: completionPayload(order.id),
       });
       assert.equal(completed.status, 200);
       assert.equal(completed.json.order.status, 'COMPLETED');
@@ -116,7 +127,7 @@ test('historical active orders without acceptedAt or expectedStartAt can still b
     assert.equal(store.getOrder(orderId).acceptedAt, null);
     assert.equal(store.getOrder(orderId).expectedStartAt, null);
     const complete = await request(server, {
-      method: 'PUT', pathname: '/api/orders/' + orderId + '/complete', token: worker.token, body: {},
+      method: 'PUT', pathname: '/api/orders/' + orderId + '/complete', token: worker.token, body: completionPayload(orderId),
     });
     assert.equal(complete.status, 200);
     assert.equal(store.getOrder(orderId).acceptedAt, null);
@@ -131,26 +142,27 @@ test('completion rejects wrong role, worker forgery, blocked/unapproved worker a
   await acceptOrder(server, worker, order.id);
   const endpoint = '/api/orders/' + order.id + '/complete';
   const before = snapshot(order.id, customer, worker);
+  const validBody = completionPayload(order.id);
   for (const [token, expected, body] of [
-    [undefined, 401, {}], ['not-a-valid-session', 401, {}],
-    [customer.token, 403, {}], [otherWorker.token, 403, { cleanerId: worker.user.id }],
-    [worker.token, 403, { cleanerId: otherWorker.user.id }],
+    [undefined, 401, validBody], ['not-a-valid-session', 401, validBody],
+    [customer.token, 403, validBody], [otherWorker.token, 403, validBody],
+    [worker.token, 400, { ...validBody, cleanerId: otherWorker.user.id }],
   ]) {
     assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token, body })).status, expected);
     assert.deepEqual(snapshot(order.id, customer, worker), before);
   }
   const unapproved = await harness.login(server, nextPhone(), 'WORKER');
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: unapproved.token, body: {} })).status, 403);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: unapproved.token, body: validBody })).status, 403);
   store.deleteSession(worker.token);
   store.createSession(worker.token, { userId: worker.user.id, role: 'WORKER', expires: Date.now() - 1 });
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 401);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: validBody })).status, 401);
   store.createSession(worker.token, { userId: worker.user.id, role: 'WORKER', expires: Date.now() + 3600000 });
   assert.equal((await request(server, {
     method: 'PUT', pathname: '/api/admin/users/' + worker.user.id + '/status', token: adminToken, body: { status: 'BLOCKED' },
   })).status, 200);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 403);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: validBody })).status, 403);
   assert.equal((await request(server, { method: 'POST', pathname: '/api/auth/logout', token: worker.token })).status, 200);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 401);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: validBody })).status, 401);
   assert.deepEqual(snapshot(order.id, customer, worker), before);
 });
 
@@ -160,16 +172,16 @@ test('completion retry after a lost response or concurrent request never repeats
   const order = await createOrder(server, customer);
   await acceptOrder(server, worker, order.id);
   const endpoint = '/api/orders/' + order.id + '/complete';
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {}, loseResponse: true })).responseLost, true);
+  const body = completionPayload(order.id);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body, loseResponse: true })).responseLost, true);
   const committed = snapshot(order.id, customer, worker);
   assert.equal(committed.order.status, 'COMPLETED');
-  const retries = await Promise.all([1, 2].map(() => request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })));
-  // Preserve the existing API contract for an already completed order: HTTP400.
-  assert.equal(retries.every((response) => response.status === 400), true);
+  const retries = await Promise.all([1, 2].map(() => request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body })));
+  assert.equal(retries.every((response) => response.status === 200), true);
   assert.deepEqual(snapshot(order.id, customer, worker), committed);
   assert.equal((await request(server, {
     method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'COMPLETED' },
-  })).status, 200);
+  })).status, 409);
   assert.equal(store.getOrder(order.id).completedAt, committed.order.completedAt);
   assertCompletedOnce(order.id, customer, worker);
   const recovered = await request(server, { pathname: '/api/orders', token: worker.token });
@@ -182,7 +194,7 @@ test('pending, cancel requested and cancelled orders cannot complete and do not 
   const order = await createOrder(server, customer);
   const endpoint = '/api/orders/' + order.id + '/complete';
   const pending = snapshot(order.id, customer, worker);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 400);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: completionPayload(order.id) })).status, 403);
   assert.deepEqual(snapshot(order.id, customer, worker), pending);
   await acceptOrder(server, worker, order.id);
   const cancelPath = '/api/orders/' + order.id + '/cancel';
@@ -193,13 +205,13 @@ test('pending, cancel requested and cancelled orders cannot complete and do not 
   })).status, 200);
   assert.equal(store.getOrder(order.id).status, 'CANCEL_REQUESTED');
   const requested = snapshot(order.id, customer, worker);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 400);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: completionPayload(order.id) })).status, 409);
   assert.deepEqual(snapshot(order.id, customer, worker), requested);
   assert.equal((await request(server, {
     method: 'PUT', pathname: '/api/admin/orders/' + order.id, token: adminToken, body: { status: 'CANCELLED' },
   })).status, 200);
   const cancelled = snapshot(order.id, customer, worker);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 400);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: completionPayload(order.id) })).status, 409);
   assert.deepEqual(snapshot(order.id, customer, worker), cancelled);
   assert.equal(cancelled.ledger.filter((entry) => entry.reasonCode === 'order_completed').length, 0);
 });
@@ -215,9 +227,9 @@ test('reassigned order completes only for the current worker, preserving previou
   })).status, 200);
   const endpoint = '/api/orders/' + order.id + '/complete';
   const before = snapshot(order.id, customer, otherWorker);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: {} })).status, 403);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: worker.token, body: completionPayload(order.id) })).status, 403);
   assert.deepEqual(snapshot(order.id, customer, otherWorker), before);
-  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: otherWorker.token, body: {} })).status, 200);
+  assert.equal((await request(server, { method: 'PUT', pathname: endpoint, token: otherWorker.token, body: completionPayload(order.id) })).status, 200);
   assertCompletedOnce(order.id, customer, otherWorker);
   assert.equal(store.listLedger(worker.user.id).filter((entry) => entry.orderId === order.id).length, 0);
   assert.deepEqual(store.listOrderEvents(order.id).find((event) => event.id === firstAcceptance.id), firstAcceptance);
@@ -227,7 +239,7 @@ test('missing order returns404 and customer view never discloses the assigned wo
   const server = await harness.serverFor(t);
   const { customer, worker } = await actors(server);
   assert.equal((await request(server, {
-    method: 'PUT', pathname: '/api/orders/no-such-completion-order/complete', token: worker.token, body: {},
+    method: 'PUT', pathname: '/api/orders/no-such-completion-order/complete', token: worker.token, body: { acceptanceKey: 'missing', actualHours: null, finalAmount: 0 },
   })).status, 404);
   const order = await createOrder(server, customer);
   await acceptOrder(server, worker, order.id);

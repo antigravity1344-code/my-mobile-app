@@ -25,6 +25,17 @@ if (!isMainThread) {
   const { installTestSmsCapture } = require('./testAuthHarness');
   const smsCapture = installTestSmsCapture();
   const { app, store } = require('./index.js');
+const activeCompletionPolicy = store.completionPolicy.read();
+assert.equal(store.completionPolicy.publish({ mode: 'worker_only', expectedVersion: activeCompletionPolicy.version }).code, 'ok');
+function completionPayload(orderId) {
+  const order = store.getOrder(orderId);
+  return {
+    acceptanceKey: store.completionAcceptanceKey(order) || 'legacy-invalid-acceptance',
+    actualHours: Number(order && order.durationHours) > 0 ? Number(order.durationHours) : null,
+    finalAmount: Number.isSafeInteger(order && order.price) ? order.price : 0,
+  };
+}
+
   require('node:test').after(() => smsCapture.restore());
   const { after } = require('node:test');
   after(() => {
@@ -213,7 +224,7 @@ if (!isMainThread) {
       method: 'PUT',
       pathname: '/api/orders/' + orderId + '/complete',
       token: workerAgain.token,
-      body: {},
+      body: completionPayload(orderId),
     });
     assert.equal(completed.status, 200);
     assert.equal(completed.json.order.status, 'COMPLETED');

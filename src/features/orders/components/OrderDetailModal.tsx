@@ -1,3 +1,4 @@
+import { completionStatusText } from '../services/completionInput';
 import React, { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -48,6 +49,7 @@ interface OrderDetailModalProps {
     reason?: string,
     confirmQuote?: CancelQuote,
   ) => Promise<{ success: boolean; error?: string; needsConfirmation?: boolean; message?: string; quote?: CancelQuote }>;
+  onRespondToCompletion: (orderId: string, answer: 'yes' | 'no', requestId: string) => Promise<{ success: boolean; error?: string }>;
   onRespondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) => Promise<{ success: boolean; error?: string }>;
   /** Opened from the card's «لغو»: start with the cancel prompt open. */
   openCancelPrompt?: boolean;
@@ -73,11 +75,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onOpenRating,
   onCancelOrder,
   onRespondToStart,
+  onRespondToCompletion,
   openCancelPrompt,
 }) => {
   const [showCancelPrompt, setShowCancelPrompt] = useState(Boolean(openCancelPrompt) && isOrderCancellable(order?.status ?? 'UNKNOWN'));
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRespondingToCompletion, setIsRespondingToCompletion] = useState(false);
   const [isRespondingToStart, setIsRespondingToStart] = useState(false);
   const [cancelPreview, setCancelPreview] = useState('');
   const [pendingQuote, setPendingQuote] = useState<CancelQuote | null>(null);
@@ -151,6 +155,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     } finally {
       setIsRespondingToStart(false);
     }
+  };
+
+  const respondToCompletion = async (answer: 'yes' | 'no') => {
+    if (isRespondingToCompletion || order.completion?.status !== 'pending' || order.status === 'CANCEL_REQUESTED') return;
+    setIsRespondingToCompletion(true);
+    try {
+      const result = await onRespondToCompletion(order.id, answer, order.completion.requestId);
+      if (!result.success) Alert.alert('ثبت پاسخ انجام نشد', result.error || 'لطفاً دوباره تلاش کنید.');
+    } catch {
+      Alert.alert('خطای ارتباط', 'نتیجه ثبت پاسخ مشخص نیست. سفارش را بازخوانی کنید.');
+    } finally { setIsRespondingToCompletion(false); }
   };
 
   const handleConfirmCancel = async () => {
@@ -459,6 +474,24 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 </View>
               </View>
             )}
+            {order.completion ? (
+              <View style={styles.startPromptBox}>
+                <Text style={styles.startPromptTitle}>پایان کار و مبلغ نهایی</Text>
+                {order.completion.actualHours !== null ? <Text style={styles.startPromptDescription}>ساعات واقعی اعلام‌شده: {toPersianDigits(order.completion.actualHours)}</Text> : null}
+                <Text style={styles.startPromptDescription}>مبلغ نهایی اعلام‌شده: {formatStoredAmount(order.completion.finalAmount, order.quoteCurrencyUnit)}</Text>
+                <Text style={styles.startPromptDescription}>{completionStatusText(order.completion.status)}</Text>
+                {order.completion.status === 'pending' && order.status !== 'CANCEL_REQUESTED' ? (
+                  <View style={styles.startPromptActions}>
+                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('yes')} style={styles.startPromptYes}>
+                      <Text style={styles.startPromptYesText}>{isRespondingToCompletion ? 'در حال ثبت...' : 'تأیید پایان کار و مبلغ'}</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('no')} style={styles.startPromptNo}>
+                      <Text style={styles.startPromptNoText}>موافق نیستم؛ بررسی مدیر</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
           </ScrollView>
 
           {/* Customer confirmation is independent of cancellation and completion. */}
