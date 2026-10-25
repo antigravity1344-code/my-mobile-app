@@ -11,7 +11,7 @@ function paymentControls() {
   const ready = Boolean(paymentSettings);
   document.getElementById('paymentRefresh').disabled = paymentBusy;
   document.getElementById('paymentSave').disabled = paymentBusy || !ready;
-  for (const id of ['paymentMerchantId', 'paymentSettlementLabel', 'paymentSettlementReference', 'paymentConnectionSecret', 'paymentClearSecret']) {
+  for (const id of ['paymentMerchantId', 'paymentSettlementLabel', 'paymentSettlementReference', 'paymentConnectionSecret', 'paymentClearSecret', 'paymentIsDefault']) {
     document.getElementById(id).disabled = paymentBusy || !ready;
   }
 }
@@ -30,6 +30,8 @@ function validPaymentSettings(value) {
     && typeof value.hasConnectionSecret === 'boolean'
     && typeof value.connectionReady === 'boolean'
     && typeof value.topupEnabled === 'boolean'
+    && typeof value.isDefault === 'boolean'
+    && (value.defaultVersion === null || (Number.isSafeInteger(value.defaultVersion) && value.defaultVersion >= 1))
     && !Object.hasOwn(value, 'connectionSecret')
     && !Object.hasOwn(value, 'secretCiphertext');
 }
@@ -56,7 +58,10 @@ function paymentStatusText(settings) {
   const charge = settings.topupEnabled
     ? 'تنظیمات اتصال برای بررسی سرور کامل است، ولی شارژ از درخواست مرورگر انجام نمی‌شود.'
     : 'شارژ واقعی غیرفعال است.';
-  return `درگاه‌های قابل انتخاب: ${providers}. ${secret} ${verified} ${charge}`;
+  const fallback = settings.defaultVersion
+    ? `پیش‌فرض سراسری نسخه ${settings.defaultVersion} است.`
+    : 'پیش‌فرض سراسری ثبت نشده است.';
+  return `درگاه‌های قابل انتخاب: ${providers}. ${secret} ${verified} ${charge} ${fallback}`;
 }
 
 async function paymentRequest(method, body) {
@@ -88,6 +93,7 @@ function fillPaymentForm(settings) {
   document.getElementById('paymentSettlementReference').value = settings.settlementAccount.reference || '';
   document.getElementById('paymentConnectionSecret').value = '';
   document.getElementById('paymentClearSecret').checked = false;
+  document.getElementById('paymentIsDefault').checked = settings.isDefault;
   document.getElementById('paymentState').textContent = paymentStatusText(settings);
 }
 
@@ -148,6 +154,7 @@ async function saveAdminPayment() {
     merchantId,
     settlementLabel,
     settlementReference,
+    isDefault: document.getElementById('paymentIsDefault').checked,
   };
   if (clearSecret) body.connectionSecret = null;
   else if (secret) body.connectionSecret = secret;

@@ -1983,6 +1983,7 @@ app.get('/admin', (req, res) => {
       <label for="paymentConnectionSecret" class="block text-sm">اطلاعات محرمانه اتصال</label>
       <input id="paymentConnectionSecret" type="password" dir="ltr" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
       <label for="paymentClearSecret" class="block text-sm"><input id="paymentClearSecret" type="checkbox" disabled /> حذف رمز ذخیره‌شده</label>
+      <label for="paymentIsDefault" class="block text-sm"><input id="paymentIsDefault" type="checkbox" disabled /> پیش‌فرض سراسری این استقرار</label>
       <p id="paymentMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات پرداخت</button>
       <button id="paymentSave" type="button" onclick="saveAdminPayment()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیمات پرداخت</button>
