@@ -8,7 +8,13 @@ function registerPaymentSettingsRoutes(app, { settings, requireAdmin }) {
   }
   app.get('/api/admin/payment-settings', requireAdmin, noQuery, (req, res) => {
     try {
-      return res.json({ success: true, settings: settings.read() });
+      const resolved = settings.resolve();
+      return res.json({
+        success: true,
+        settings: settings.read(),
+        resolved: resolved.code === 'ok' ? resolved.settings : null,
+        resolution: resolved.code,
+      });
     } catch {
       return res.status(500).json({ success: false, message: 'دریافت تنظیمات پرداخت انجام نشد. دوباره تلاش کنید.' });
     }

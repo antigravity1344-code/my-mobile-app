@@ -144,6 +144,47 @@ test('versioned settings keep secrets encrypted, reject an unbuilt gateway, and 
   }
 });
 
+test('one global default is stored; requesters without their own settings fall back to it', () => {
+  const users = new Map([['worker-1', { id: 'worker-1', role: 'WORKER' }]]);
+  const { database, settings } = memory(users);
+  try {
+    assert.equal(settings.resolve('worker-1').code, 'not_configured');
+    assert.equal(settings.resolve().code, 'not_configured');
+    const unpublished = settings.publish({ ...savedBody(0), isDefault: false });
+    assert.equal(unpublished.code, 'ok');
+    assert.equal(unpublished.settings.isDefault, false);
+    assert.equal(unpublished.settings.defaultVersion, null);
+    assert.equal(settings.resolve('worker-1').code, 'not_configured');
+    const promoted = settings.publish({ expectedVersion: 1, defaultVersion: 1 });
+    assert.equal(promoted.code, 'ok');
+    assert.equal(promoted.settings.isDefault, true);
+    assert.equal(promoted.settings.defaultVersion, 1);
+    const fallback = settings.resolve('worker-1');
+    assert.equal(fallback.code, 'ok');
+    assert.equal(fallback.source, 'default');
+    assert.equal(fallback.settings.version, 1);
+    assert.equal(fallback.settings.merchantId, 'merchant-d80');
+    assert.equal(JSON.stringify(fallback.settings).includes(SECRET), false);
+    const second = settings.publish({ ...savedBody(1), settlementLabel: 'نسخه دوم', isDefault: true });
+    assert.equal(second.code, 'ok');
+    assert.equal(second.settings.version, 2);
+    assert.equal(second.settings.isDefault, true);
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM company_payment_settings WHERE is_default = 1').get().n, 1);
+    assert.equal(database.prepare('SELECT version FROM company_payment_settings WHERE is_default = 1').get().version, 2);
+    assert.equal(settings.resolve().settings.version, 2);
+    assert.equal(settings.publish({ expectedVersion: 2, defaultVersion: 1 }).settings.defaultVersion, 1);
+    assert.equal(settings.read().version, 2);
+    assert.equal(settings.read().isDefault, false);
+    assert.equal(settings.resolve('missing-requester').settings.version, 1);
+    assert.equal(JSON.stringify(settings.read()).includes(SECRET), false);
+    assert.throws(() => database.exec("UPDATE company_payment_settings SET is_default = 1 WHERE version = 2"));
+    assert.equal(database.prepare('SELECT COUNT(*) AS n FROM company_payment_settings WHERE is_default = 1').get().n, 1);
+    assert.throws(() => database.exec('UPDATE company_payment_settings SET merchantId = merchantId'));
+  } finally {
+    database.close();
+  }
+});
+
 test('server-verified top-ups credit once, ignore browser claims, and stay tied to the settings version', () => {
   const users = new Map([
     ['worker-1', { id: 'worker-1', role: 'WORKER' }],
@@ -194,6 +235,7 @@ test('server-verified top-ups credit once, ignore browser claims, and stay tied 
       merchantId: 'merchant-d80',
       settlementLabel: 'بعد از پرداخت',
       settlementReference: 'ACCT-DECLARED-2',
+      isDefault: true,
     });
     assert.equal(settings.confirmVerifiedPayment(notice).code, 'not_configured');
     assert.equal(wallet.read('worker-1').balances[0].balance, 250);
@@ -269,6 +311,10 @@ test('admin payment settings are session-protected and cannot activate a browser
     assert.equal(read.body.settings.hasConnectionSecret, false);
     assert.equal(read.body.settings.connectionReady, false);
     assert.equal(read.body.settings.topupEnabled, false);
+    assert.equal(read.body.settings.isDefault, false);
+    assert.equal(read.body.settings.defaultVersion, null);
+    assert.equal(read.body.resolved, null);
+    assert.equal(read.body.resolution, 'not_configured');
     noSecret(read.body);
   });
 
@@ -288,6 +334,8 @@ test('admin payment settings are session-protected and cannot activate a browser
     assert.equal(saved.body.settings.hasConnectionSecret, true);
     assert.equal(saved.body.settings.settlementAccount.verified, false);
     assert.equal(saved.body.settings.topupEnabled, false);
+    assert.equal(saved.body.settings.isDefault, true);
+    assert.equal(saved.body.settings.defaultVersion, 1);
     noSecret(saved.body);
     const stored = db.prepare('SELECT secretCiphertext FROM company_payment_settings WHERE version = 1').get();
     assert.equal(fieldCrypto.isEncrypted(stored.secretCiphertext), true);
@@ -344,6 +392,30 @@ test('admin payment settings are session-protected and cannot activate a browser
     noSecret(cleared.body);
   });
 
+  await t.test('GET falls back to the global default and never returns the connection secret', async () => {
+    const latest = await request(server, adminPath, admin);
+    assert.equal(latest.status, 200);
+    assert.equal(latest.body.settings.version, 3);
+    assert.equal(latest.body.settings.isDefault, false);
+    assert.equal(latest.body.resolution, 'ok');
+    assert.equal(latest.body.resolved.version, 1);
+    assert.equal(latest.body.resolved.isDefault, true);
+    noSecret(latest.body);
+    const moved = await request(server, adminPath, admin, 'PUT', { expectedVersion: 3, defaultVersion: 3 });
+    assert.equal(moved.status, 200);
+    assert.equal(moved.body.settings.version, 3);
+    assert.equal(moved.body.settings.isDefault, true);
+    assert.equal(moved.body.settings.defaultVersion, 3);
+    const restored = await request(server, adminPath, admin, 'PUT', { expectedVersion: 3, defaultVersion: 1 });
+    assert.equal(restored.status, 200);
+    assert.equal(restored.body.settings.defaultVersion, 1);
+    assert.equal(restored.body.settings.isDefault, false);
+    const after = await request(server, adminPath, admin);
+    assert.equal(after.body.resolved.version, 1);
+    noSecret(after.body);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM company_payment_settings WHERE is_default = 1').get().n, 1);
+  });
+
   await t.test('worker and customer browser top-up requests still change nothing', async () => {
     const workerBefore = store.workerWallet.read('pay-worker');
     const customerBefore = db.prepare('SELECT COUNT(*) AS n FROM wallet_transactions').get().n;
@@ -368,6 +440,7 @@ test('admin payment settings are session-protected and cannot activate a browser
     assert.equal(script.status, 200);
     assert.equal(page.text.includes('id="tabPayment"'), true);
     assert.equal(page.text.includes('مقصد تسویه بانکی را عوض نمی‌کند'), true);
+    assert.equal(page.text.includes('id="paymentIsDefault"'), true);
     assert.equal(script.text.includes('loadAdminPayment'), true);
     assert.equal(/IR\d{24}/.test(page.text + script.text), false);
     assert.equal((page.text + script.text).includes(SECRET), false);

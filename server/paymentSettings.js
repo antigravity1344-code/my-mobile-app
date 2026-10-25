@@ -17,7 +17,8 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       settlementReference TEXT,
       secretCiphertext TEXT,
       createdAt TEXT NOT NULL,
-      actor TEXT NOT NULL
+      actor TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1))
     );
     CREATE TABLE IF NOT EXISTS company_payment_verifications (
       settingsVersion INTEGER PRIMARY KEY CHECK (settingsVersion > 0),
@@ -38,6 +39,14 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       UNIQUE (providerId, idempotencyKey)
     );
   `);
+  const settingColumns = new Set(database.prepare('PRAGMA table_info(company_payment_settings)').all().map((column) => column.name));
+  if (!settingColumns.has('is_default')) {
+    database.exec('ALTER TABLE company_payment_settings ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0');
+  }
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS company_payment_one_default
+    ON company_payment_settings(is_default) WHERE is_default = 1;
+  `);
   for (const table of ['company_payment_settings', 'company_payment_verifications', 'worker_topup_receipts']) {
     for (const operation of ['UPDATE', 'DELETE']) {
       database.exec(`
@@ -47,6 +56,22 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       `);
     }
   }
+  // Secrets and settlement fields stay immutable. Only the default pointer may move.
+  database.exec('DROP TRIGGER IF EXISTS company_payment_settings_no_update');
+  database.exec(`
+    CREATE TRIGGER company_payment_settings_no_update
+    BEFORE UPDATE ON company_payment_settings
+    WHEN NEW.version IS NOT OLD.version
+      OR NEW.providerId IS NOT OLD.providerId
+      OR NEW.merchantId IS NOT OLD.merchantId
+      OR NEW.settlementLabel IS NOT OLD.settlementLabel
+      OR NEW.settlementReference IS NOT OLD.settlementReference
+      OR NEW.secretCiphertext IS NOT OLD.secretCiphertext
+      OR NEW.createdAt IS NOT OLD.createdAt
+      OR NEW.actor IS NOT OLD.actor
+      OR NEW.is_default IS OLD.is_default
+    BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END;
+  `);
   database.exec(`
     CREATE TRIGGER IF NOT EXISTS company_payment_settings_no_replace
     BEFORE INSERT ON company_payment_settings
@@ -67,10 +92,15 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
 
   const latest = database.prepare('SELECT * FROM company_payment_settings ORDER BY version DESC LIMIT 1');
   const byVersion = database.prepare('SELECT * FROM company_payment_settings WHERE version = ?');
+  const defaultRow = database.prepare('SELECT * FROM company_payment_settings WHERE is_default = 1');
+  const clearDefault = database.prepare('UPDATE company_payment_settings SET is_default = 0 WHERE is_default = 1');
+  const markDefault = database.prepare('UPDATE company_payment_settings SET is_default = 1 WHERE version = ?');
   const verificationOf = database.prepare('SELECT * FROM company_payment_verifications WHERE settingsVersion = ?');
   const insertSettings = database.prepare(`INSERT INTO company_payment_settings
-    (version, providerId, merchantId, settlementLabel, settlementReference, secretCiphertext, createdAt, actor)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'admin')`);
+    (version, providerId, merchantId, settlementLabel, settlementReference, secretCiphertext, createdAt, actor, is_default)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'admin', ?)`);
+  const current = latest.get();
+  if (current && !defaultRow.get()) markDefault.run(current.version);
   const insertVerification = database.prepare(`INSERT INTO company_payment_verifications
     (settingsVersion, providerId, verifiedAt) VALUES (?, ?, ?)`);
   const receiptByKey = database.prepare('SELECT * FROM worker_topup_receipts WHERE providerId = ? AND idempotencyKey = ?');
@@ -83,6 +113,7 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
   }
 
   function viewOf(row) {
+    const fallback = defaultRow.get();
     const base = {
       version: 0,
       providerId: null,
@@ -92,6 +123,8 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       hasConnectionSecret: false,
       connectionReady: false,
       topupEnabled: false,
+      isDefault: false,
+      defaultVersion: fallback ? fallback.version : null,
     };
     if (!row) return base;
     const verification = verificationOf.get(row.version);
@@ -118,11 +151,33 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       hasConnectionSecret: Boolean(row.secretCiphertext),
       connectionReady: ready,
       topupEnabled: ready,
+      isDefault: row.is_default === 1,
+      defaultVersion: fallback ? fallback.version : null,
     };
   }
 
   function read() {
     return viewOf(latest.get());
+  }
+
+  // D-80 keeps one company per SQLite. There is no per-requester payment row, so a
+  // caller without specific settings falls back to the single is_default record.
+  function resolve(requesterId) {
+    if (requesterId != null && requesterId !== '') {
+      // Reserved: a future owner-approved per-requester map would be read here.
+    }
+    const fallback = defaultRow.get();
+    if (fallback) return { code: 'ok', settings: viewOf(fallback), source: 'default' };
+    return { code: 'not_configured' };
+  }
+
+  function assignDefault(version) {
+    const row = byVersion.get(version);
+    if (!row) return { code: 'invalid' };
+    if (row.is_default === 1) return { code: 'ok', settings: read() };
+    clearDefault.run();
+    markDefault.run(version);
+    return { code: 'ok', settings: read() };
   }
 
   function optionalToken(value, pattern) {
@@ -152,11 +207,17 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
 
   function parsePublish(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return { code: 'invalid' };
-    const allowed = new Set(['expectedVersion', 'providerId', 'merchantId', 'settlementLabel', 'settlementReference', 'connectionSecret']);
-    const required = ['expectedVersion', 'providerId', 'merchantId', 'settlementLabel', 'settlementReference'];
     const keys = Object.keys(input);
+    if (keys.length === 2 && Object.hasOwn(input, 'expectedVersion') && Object.hasOwn(input, 'defaultVersion')) {
+      if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0
+        || !Number.isSafeInteger(input.defaultVersion) || input.defaultVersion < 1) return { code: 'invalid' };
+      return { defaultOnly: true, expectedVersion: input.expectedVersion, defaultVersion: input.defaultVersion };
+    }
+    const allowed = new Set(['expectedVersion', 'providerId', 'merchantId', 'settlementLabel', 'settlementReference', 'connectionSecret', 'isDefault']);
+    const required = ['expectedVersion', 'providerId', 'merchantId', 'settlementLabel', 'settlementReference'];
     if (keys.some((key) => !allowed.has(key)) || required.some((key) => !Object.hasOwn(input, key))) return { code: 'invalid' };
     if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) return { code: 'invalid' };
+    if (Object.hasOwn(input, 'isDefault') && typeof input.isDefault !== 'boolean') return { code: 'invalid' };
     const provider = parseProvider(input.providerId);
     if (!provider.ok) return { code: 'invalid' };
     const merchant = optionalToken(input.merchantId, /^[A-Za-z0-9_-]{1,64}$/);
@@ -170,6 +231,7 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       merchantId: merchant.value,
       settlementLabel: label.value,
       settlementReference: reference.value,
+      isDefault: Object.hasOwn(input, 'isDefault') ? input.isDefault : undefined,
     };
     if (Object.hasOwn(input, 'connectionSecret')) {
       if (input.connectionSecret === null) parsed.connectionSecret = null;
@@ -184,10 +246,14 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
   function publish(input) {
     const parsed = parsePublish(input);
     if (parsed.code) return parsed;
-    const next = parsed.value;
     return transaction(() => {
       const current = latest.get() || null;
       const currentVersion = current ? current.version : 0;
+      if (parsed.defaultOnly) {
+        if (currentVersion !== parsed.expectedVersion) return { code: 'conflict', settings: viewOf(current) };
+        return assignDefault(parsed.defaultVersion);
+      }
+      const next = parsed.value;
       if (currentVersion !== next.expectedVersion) return { code: 'conflict', settings: viewOf(current) };
       if (next.unavailable) return { code: 'provider_unavailable', settings: viewOf(current) };
       const secretCiphertext = Object.hasOwn(next, 'connectionSecret')
@@ -196,6 +262,8 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       if (secretCiphertext && !fieldCrypto.isEncrypted(secretCiphertext)) {
         throw new Error('PLAINTEXT_PAYMENT_SECRET');
       }
+      const makeDefault = next.isDefault === true || (!defaultRow.get() && next.isDefault !== false);
+      if (makeDefault) clearDefault.run();
       insertSettings.run(
         currentVersion + 1,
         next.providerId,
@@ -203,7 +271,8 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
         next.settlementLabel,
         next.settlementReference,
         secretCiphertext,
-        new Date().toISOString()
+        new Date().toISOString(),
+        makeDefault ? 1 : 0
       );
       return { code: 'ok', settings: read() };
     });
@@ -271,7 +340,9 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
 
   // Browser payloads are not payment proof. The active provider adapter must verify the notice.
   function confirmVerifiedPayment(notice) {
-    const currentView = read();
+    const resolved = resolve();
+    if (resolved.code !== 'ok') return { code: 'not_configured' };
+    const currentView = resolved.settings;
     const provider = providerById(catalog, currentView.providerId);
     if (!provider || typeof provider.verifyPayment !== 'function') return { code: 'not_configured' };
     let proof;
@@ -290,7 +361,9 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
       if (existing) return matchingReceipt(existing, parsed, provider.id)
         ? { code: 'duplicate', receipt: publicReceipt(existing) }
         : { code: 'conflict' };
-      const fresh = latest.get();
+      const freshResolved = resolve();
+      if (freshResolved.code !== 'ok') return { code: 'not_configured' };
+      const fresh = byVersion.get(freshResolved.settings.version);
       const freshView = viewOf(fresh);
       if (!freshView.topupEnabled || freshView.providerId !== provider.id) return { code: 'not_configured' };
       const sourceKey = `topup:${provider.id}:${parsed.idempotencyKey}`;
@@ -328,7 +401,7 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     }
   }
 
-  return { read, publish, markSettlementVerified, readConnectionSecret, confirmVerifiedPayment };
+  return { read, resolve, publish, markSettlementVerified, readConnectionSecret, confirmVerifiedPayment };
 }
 
 module.exports = { createPaymentSettings };
