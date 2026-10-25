@@ -6,7 +6,9 @@ vi.mock('../../../components/native/previewRuntime', () => ({ previewActive: () 
 vi.mock('../../../components/native/workerLoginStorage', () => ({ WORKER_TOKEN_KEY: 'isolated-worker-token' }));
 import {
   loadWorkerCommissionPolicy,
+  loadWorkerIncomeReport,
   loadWorkerWallet,
+  parseWorkerIncomeReportResponse,
   parseWorkerWalletResponse,
 } from './workerFinance';
 
@@ -83,5 +85,57 @@ describe('worker finance client contracts', () => {
     let preview = false;
     const result = await loadWorkerWallet(async () => { preview = true; return walletResponse; }, () => preview, async () => undefined);
     expect(result.success).toBe(false);
+  });
+
+  it('keeps monthly income totals separate from wallet top-ups and mixed currencies', () => {
+    const result = parseWorkerIncomeReportResponse({
+      success: true,
+      report: {
+        months: [{
+          calendar: 'jalali', year: 1405, month: 8,
+          totals: [
+            { currencyUnit: 'ریال', jobCount: 1, grossAmount: 400, commissionAmount: 100, netAmount: 300 },
+            { currencyUnit: 'تومان', jobCount: 2, grossAmount: 3000, commissionAmount: 750, netAmount: 2250 },
+          ],
+        }],
+      },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.value.months[0].totals).toHaveLength(2);
+    expect(result.value).not.toHaveProperty('balance');
+    expect(JSON.stringify(result.value).includes('TOPUP')).toBe(false);
+  });
+
+  it('rejects an empty or zeroed monthly total instead of showing it as no work', () => {
+    expect(parseWorkerIncomeReportResponse({
+      success: true,
+      report: { months: [{ calendar: 'jalali', year: 1405, month: 8, totals: [] }] },
+    }).success).toBe(false);
+    expect(parseWorkerIncomeReportResponse({
+      success: true,
+      report: { months: [{ calendar: 'jalali', year: 1405, month: 8, totals: [{ currencyUnit: 'تومان', jobCount: 0, grossAmount: 0, commissionAmount: 0, netAmount: 0 }] }] },
+    }).success).toBe(false);
+  });
+
+  it('does not request a real income report in preview mode', async () => {
+    const request = vi.fn();
+    const prepareAuth = vi.fn(async () => undefined);
+    const result = await loadWorkerIncomeReport(request, () => true, prepareAuth);
+    expect(result.success).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+    expect(prepareAuth).not.toHaveBeenCalled();
+  });
+
+  it('reads only the own income-report endpoint after worker authentication', async () => {
+    const prepareAuth = vi.fn(async () => undefined);
+    const request = vi.fn(async () => ({
+      success: true,
+      report: { months: [{ calendar: 'jalali', year: 1405, month: 8, totals: [{ currencyUnit: 'تومان', jobCount: 1, grossAmount: 1000, commissionAmount: 250, netAmount: 750 }] }] },
+    }));
+    const result = await loadWorkerIncomeReport(request, () => false, prepareAuth);
+    expect(prepareAuth).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledWith('/workers/me/income-report');
+    expect(result.success).toBe(true);
   });
 });
