@@ -4,8 +4,8 @@ import { appStorage } from '../../utils/storage';
 import { WORKER_TOKEN_KEY } from './workerLoginStorage';
 import { previewActive } from './previewRuntime';
 
-export type BankDetails = { bankShebaMasked: string | null; hasPin: boolean; lockedUntil: string | null; version: number };
-export type BankResult = { ok: true; bankDetails: BankDetails; otpRequired: boolean } | { ok: false; message: string; sessionExpired?: boolean };
+export type BankDetails = { bankShebaMasked: string | null; hasPin: boolean; lockedUntil: string | null; version: number; pinTemporary?: boolean; temporaryExpiresAt?: string };
+export type BankResult = { ok: true; bankDetails: BankDetails; otpRequired: boolean; reauthenticationRequired?: boolean } | { ok: false; message: string; sessionExpired?: boolean; lockedUntil?: string };
 export type BankOtpPurpose = 'bank-details' | 'bank-pin';
 export type BankDependencies = {
   request: (path: string, options?: RequestInit) => Promise<unknown>;
@@ -37,16 +37,19 @@ export function parseBankResponse(value: unknown): BankResult {
     ok: false,
     message: record(value) && typeof value.message === 'string' ? value.message : 'اطلاعات بانکی معتبر دریافت نشد.',
     sessionExpired: record(value) && (value.httpStatus === 401 || value.httpStatus === 403),
+    ...(record(value) && typeof value.lockedUntil === 'string' && Number.isFinite(Date.parse(value.lockedUntil)) ? { lockedUntil: value.lockedUntil } : {}),
   };
   const bank = value.bankDetails;
   if (!record(bank) || typeof bank.hasPin !== 'boolean' || !Number.isSafeInteger(bank.version) || (bank.version as number) < 0
     || !(bank.bankShebaMasked === null || (typeof bank.bankShebaMasked === 'string' && /^IR\d{2}\*+\d{4}$/.test(bank.bankShebaMasked)))
     || !(bank.lockedUntil === null || (typeof bank.lockedUntil === 'string' && Number.isFinite(Date.parse(bank.lockedUntil))))
     || typeof value.otpRequired !== 'boolean') return { ok: false, message: 'ساختار اطلاعات بانکی معتبر نیست؛ بازخوانی کنید.' };
+  if (bank.pinTemporary !== undefined && (bank.pinTemporary !== true || typeof bank.temporaryExpiresAt !== 'string' || !Number.isFinite(Date.parse(bank.temporaryExpiresAt)))) return { ok: false, message: 'وضعیت رمز موقت معتبر نیست؛ بازخوانی کنید.' };
   return { ok: true, bankDetails: {
     bankShebaMasked: bank.bankShebaMasked as string | null, hasPin: bank.hasPin,
     lockedUntil: bank.lockedUntil as string | null, version: bank.version as number,
-  }, otpRequired: value.otpRequired };
+    ...(bank.pinTemporary ? { pinTemporary: true, temporaryExpiresAt: bank.temporaryExpiresAt as string } : {}),
+  }, otpRequired: value.otpRequired, ...(value.reauthenticationRequired === true ? { reauthenticationRequired: true } : {}) };
 }
 async function bankRequest(path: string, options: RequestInit, deps: BankDependencies): Promise<unknown> {
   if (deps.preview()) return { success: false, message: PREVIEW_MESSAGE };

@@ -41,6 +41,12 @@ describe('worker bank details contract', () => {
     expect(deps.prepare).toHaveBeenCalledOnce();
     expect(deps.request).toHaveBeenCalledWith('/workers/me/bank-details', { signal: undefined });
   });
+  it('propagates reauthentication and temporary-credential state without copying the credential', () => {
+    const temporaryExpiresAt = new Date(Date.now() + 600000).toISOString();
+    const parsed = parseBankResponse({ ...response, temporaryPin: '987654', reauthenticationRequired: true, bankDetails: { ...bankDetails, pinTemporary: true, temporaryExpiresAt } });
+    expect(parsed).toEqual({ ok: true, bankDetails: { ...bankDetails, pinTemporary: true, temporaryExpiresAt }, otpRequired: false, reauthenticationRequired: true });
+    expect(JSON.stringify(parsed)).not.toContain('987654');
+  });
   it('sends the bank revision, PIN and optional step-up proof without an account selector', async () => {
     const deps = fixture();
     const body = { bankSheba: testSheba(), pin: '123456', expectedVersion: 3, otp: '6543' };
@@ -90,6 +96,11 @@ describe('worker bank details contract', () => {
       const result = await saveBankPin({ newPin: '123456', currentPin: '654321', expectedVersion: 3 }, undefined, deps);
       expect(result).toEqual({ ok: false, message: 'server rejection', sessionExpired: httpStatus === 401 });
     }
+  });
+  it('preserves a server lock timestamp so the form disables immediately after the fifth failure', () => {
+    const lockedUntil = new Date(Date.now() + 900000).toISOString();
+    expect(parseBankResponse({ success: false, httpStatus: 423, message: 'locked', lockedUntil })).toEqual({ ok: false, message: 'locked', sessionExpired: false, lockedUntil });
+    expect(parseBankResponse({ success: false, message: 'locked', lockedUntil: 'invalid' })).not.toHaveProperty('lockedUntil');
   });
   it('requests a purpose-bound OTP without exposing a delivery code', async () => {
     const deps = fixture(); deps.request.mockResolvedValue({ success: true, message: 'sent', otp: 'must not return' });

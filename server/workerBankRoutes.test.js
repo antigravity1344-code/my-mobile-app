@@ -68,9 +68,29 @@ test('real HTTP sessions protect masked bank APIs, reject impersonation and isol
   const missing = await request(server, { pathname: resetPath, token: admin, method: 'POST', body: { reason: 'بررسی مدارک', expectedVersion: 2 } });
   assert.equal(missing.status, 400);
   const reset = await request(server, { pathname: resetPath, token: admin, method: 'POST', body: { reason: 'هویت با مدارک موجود تطبیق داده شد', identityVerified: true, expectedVersion: 2 } });
-  assert.equal(reset.status, 200); assert.equal(reset.json.bankDetails.hasPin, false);
+  assert.equal(reset.status, 200); assert.equal(reset.json.bankDetails.hasPin, true); assert.equal(reset.json.bankDetails.pinTemporary, true);
+  assert.match(reset.json.temporaryPin, /^\d{6}$/);
+  assert.equal((await request(server, { pathname: base, token: worker })).status, 401);
+  assert.equal((await request(server, { pathname: '/api/admin/workers/bank-worker/bank-details', token: admin })).json.temporaryPin, undefined);
   assert.equal(store.getUser('bank-worker').bankSheba, OTHER);
   assert.equal(store.getUser('bank-worker').status, 'APPROVED');
+});
+
+test('concurrent bad PIN requests share the account lock and a PIN change revokes all its sessions', async () => {
+  const token = account('concurrent-bank');
+  store.createSession('parallel-session', { userId: 'concurrent-bank', role: 'WORKER', expires: Date.now() + 60000 });
+  assert.equal((await put('/api/workers/me/bank-pin', token, { newPin: '123456', expectedVersion: 0 })).status, 200);
+  const results = await Promise.all(Array.from({ length: 8 }, () => put('/api/workers/me/bank-details', token, { bankSheba: OTHER, pin: '999999', expectedVersion: 1 })));
+  assert.equal(results.filter(result => result.status === 400).length, 4);
+  assert.equal(results.filter(result => result.status === 423).length, 4);
+  assert.equal((await put('/api/workers/me/bank-pin', 'parallel-session', { newPin: '222222', currentPin: '123456', expectedVersion: 1 })).status, 423);
+  const changedToken = account('session-change-bank');
+  store.createSession('second-change-session', { userId: 'session-change-bank', role: 'WORKER', expires: Date.now() + 60000 });
+  assert.equal((await put('/api/workers/me/bank-pin', changedToken, { newPin: '123456', expectedVersion: 0 })).status, 200);
+  const changed = await put('/api/workers/me/bank-pin', changedToken, { newPin: '222222', currentPin: '123456', expectedVersion: 1 });
+  assert.equal(changed.status, 200); assert.equal(changed.json.reauthenticationRequired, true);
+  for (const revoked of [changedToken, 'second-change-session']) assert.equal((await request(server, { pathname: '/api/workers/me/bank-details', token: revoked })).status, 401);
+  assert.equal((await request(server, { pathname: '/api/workers/me/bank-details', token })).status, 200);
 });
 
 test('onboarding cannot change an existing bank account; first registration and identical bank remain compatible', async () => {

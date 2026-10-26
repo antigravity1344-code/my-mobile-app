@@ -19,6 +19,14 @@ function openWorkerBankReset(worker, card) {
   const close = document.createElement('button'); close.type = 'button'; close.textContent = 'بستن';
   for (const button of [reload, submit, close]) button.className = 'bg-sky-700 px-3 py-2 rounded-xl m-1';
   panel.append(title, status, reasonLabel, identityLabel, reload, submit, close); card.append(panel);
+  const temporaryLabel = document.createElement('label'); temporaryLabel.textContent = 'رمز موقت؛ فقط این بار نمایش داده می‌شود';
+  const temporary = document.createElement('input'); temporary.type = 'password'; temporary.readOnly = true; temporary.autocomplete = 'off';
+  temporaryLabel.append(temporary);
+  const reveal = document.createElement('button'); reveal.type = 'button'; reveal.textContent = 'نمایش رمز موقت'; reveal.disabled = true;
+  panel.append(temporaryLabel, reveal);
+  let expiryTimer;
+  function clearTemporary() { clearTimeout(expiryTimer); temporary.value = ''; temporary.type = 'password'; reveal.disabled = true; }
+  reveal.addEventListener('click', () => { temporary.type = temporary.type === 'password' ? 'text' : 'password'; });
   let version = null, busy = false, retired = false;
   function controls() { submit.disabled = busy || version === null; reload.disabled = busy; reason.disabled = busy; identity.disabled = busy; }
   async function request(suffix, method, body) {
@@ -36,6 +44,7 @@ function openWorkerBankReset(worker, card) {
   }
   async function load() {
     if (busy || retired) return; busy = true; version = null; controls(); status.textContent = 'در حال دریافت…';
+    clearTemporary();
     try {
       const result = await request('/bank-details', 'GET');
       if (retired) return;
@@ -54,14 +63,19 @@ function openWorkerBankReset(worker, card) {
     const expectedVersion = version;
     busy = true; controls(); status.textContent = 'در حال بازنشانی…';
     try {
-      await request('/bank-pin/reset', 'POST', { reason: reason.value.trim(), identityVerified: true, expectedVersion });
+      clearTemporary();
+      const result = await request('/bank-pin/reset', 'POST', { reason: reason.value.trim(), identityVerified: true, expectedVersion });
       if (retired) return;
+      if (!/^\d{6}$/.test(result.temporaryPin) || !Number.isFinite(Date.parse(result.bankDetails?.temporaryExpiresAt))) throw new Error('رمز موقت دریافت نشد؛ پیش از تکرار وضعیت را بازخوانی کنید.');
+      temporary.value = result.temporaryPin; reveal.disabled = false;
+      expiryTimer = setTimeout(clearTemporary, Math.max(0, Date.parse(result.bankDetails.temporaryExpiresAt) - Date.now()));
+      expiryTimer?.unref?.();
       reason.value = ''; identity.checked = false;
-      status.textContent = 'رمز بازنشانی و اعلان ثبت شد. متخصص باید رمز تازه را خودش تعیین کند.';
+      status.textContent = 'رمز بازنشانی و اعلان ثبت شد. رمز موقت را فقط به صاحب هویت تأییدشده تحویل دهید؛ ده دقیقه معتبر است و متخصص باید آن را به رمز شخصی تغییر دهد.';
     } catch (error) { if (!retired) status.textContent = error.message; }
     finally { version = null; busy = false; if (!retired) controls(); }
   }
   reload.addEventListener('click', load); submit.addEventListener('click', reset);
-  close.addEventListener('click', () => { retired = true; panel.remove(); });
+  close.addEventListener('click', () => { retired = true; clearTemporary(); panel.remove(); });
   void load();
 }

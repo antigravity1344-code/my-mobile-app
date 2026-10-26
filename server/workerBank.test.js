@@ -8,13 +8,15 @@ const { createWorkerBank, validSheba, smsStepUpRequired } = require('./workerBan
 const fields = require('./fieldCrypto');
 const SHEBA = 'IR820540102680020817909002';
 const OTHER = 'IR062960000000100324200001';
+const ACTOR = 'deployment-admin:11111111-1111-4111-8111-111111111111';
 
 function fixture(t, options = {}) {
   const db = new DatabaseSync(options.filename || ':memory:');
   t.after(() => db.close());
   db.exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,role TEXT,status TEXT,bankSheba TEXT,
     phone TEXT,nationalId TEXT,idDoc TEXT,name TEXT,isProfileComplete INTEGER);
-    CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY,userId TEXT,kind TEXT,title TEXT,body TEXT);`);
+    CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY,userId TEXT,kind TEXT,title TEXT,body TEXT);
+    CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,userId TEXT);`);
   const insert = db.prepare('INSERT OR IGNORE INTO users VALUES (?,?,?,?,?,?,?,?,?)');
   for (const [id, role, status] of [['w', 'WORKER', 'APPROVED'], ['other', 'WORKER', 'APPROVED'], ['c', 'CUSTOMER', 'ACTIVE'], ['blocked', 'WORKER', 'BLOCKED']]) {
     insert.run(id, role, status, fields.encryptString(SHEBA), '09120000001', fields.encryptString('1234567890'), 'existing-document', 'fixture', 1);
@@ -30,11 +32,11 @@ function fixture(t, options = {}) {
   const smsGateway = { normalizeIranMobile: value => /^09\d{9}$/.test(value) ? value : null,
     devFixedOtp: () => null, useFakeSms: () => false, writeFakeSmsOutbox: () => {},
     sendOtp: async (phone, code) => { sentPhone = phone; sentCode = code; return { ok: deliveryOk }; } };
-  const create = () => createWorkerBank({ database: db, transaction, getUser, now: () => time,
+  const create = () => { const service = createWorkerBank({ database: db, transaction, getUser, now: () => time,
     otpRequired: () => requireOtp, smsGateway, addNotification: (id, _order, kind, title, body) => {
       if (failNotification) throw new Error('fixture notification failure');
       db.prepare('INSERT INTO notifications(userId,kind,title,body) VALUES (?,?,?,?)').run(id, kind, title, body);
-    } });
+    } }); return { ...service, resetPin: (id, input, actor = ACTOR) => service.resetPin(id, input, actor) }; };
   return { db, bank: create(), create, getUser, advance: milliseconds => { time += milliseconds; },
     requireOtp: value => { requireOtp = value; }, failNotification: value => { failNotification = value; },
     failSms: value => { deliveryOk = !value; }, sentCode: () => sentCode, sentPhone: () => sentPhone };
@@ -87,7 +89,7 @@ test('five wrong PIN attempts lock bank and PIN edits for fifteen minutes across
   assert.equal(f.bank.read('w').bankDetails.lockedUntil, null);
 });
 
-test('PIN change needs current PIN; admin reset requires existing identity, reason, version and clears PIN only', t => {
+test('PIN change needs current PIN; admin reset issues a short-lived credential after identity, reason and actor checks', t => {
   const { bank, db, getUser } = fixture(t);
   bank.savePin('w', pin());
   assert.equal(bank.savePin('w', pin(1)).code, 'pin_required');
@@ -101,12 +103,32 @@ test('PIN change needs current PIN; admin reset requires existing identity, reas
   db.prepare("UPDATE users SET idDoc='' WHERE id='other'").run();
   assert.equal(bank.resetPin('other', { reason: 'بررسی مدرک موجود', identityVerified: true, expectedVersion: 0 }).code, 'identity_missing');
   const result = bank.resetPin('w', { reason: 'بررسی مدرک موجود', identityVerified: true, expectedVersion: 2 });
-  assert.equal(result.bankDetails.hasPin, false); assert.equal(result.bankDetails.version, 3);
+  assert.equal(result.bankDetails.hasPin, true); assert.equal(result.bankDetails.pinTemporary, true); assert.equal(result.bankDetails.version, 3);
+  assert.match(result.temporaryPin, /^\d{6}$/);
   assert.deepEqual(getUser('w'), before);
-  assert.equal(bank.saveBank('w', change(3, { pin: '112233' })).code, 'pin_required');
-  assert.equal(bank.savePin('w', pin(3, { newPin: '222222' })).code, 'ok');
+  assert.equal(bank.saveBank('w', change(3, { pin: result.temporaryPin })).code, 'pin_change_required');
+  assert.equal(bank.savePin('w', pin(3, { newPin: '222222', currentPin: result.temporaryPin })).code, 'ok');
   const audit = db.prepare("SELECT * FROM worker_bank_audit WHERE kind='PIN_RESET'").get();
-  assert.equal(audit.actor, 'admin'); assert.equal(audit.reason, 'بررسی مدرک موجود');
+  assert.equal(audit.actor, ACTOR); assert.equal(audit.reason, 'بررسی مدرک موجود');
+  assert.equal(JSON.stringify(audit).includes(result.temporaryPin), false);
+  assert.equal(JSON.stringify(bank.read('w')).includes(result.temporaryPin), false);
+});
+
+test('PIN changes and resets revoke only that worker sessions; temporary PIN expires and is unusable for bank edits', t => {
+  const f = fixture(t); f.bank.savePin('w', pin());
+  f.db.exec("INSERT INTO sessions VALUES ('first','w'),('second','w'),('other','other')");
+  const changed = f.bank.savePin('w', pin(1, { currentPin: '123456', newPin: '222222' }));
+  assert.equal(changed.reauthenticationRequired, true);
+  assert.deepEqual(f.db.prepare('SELECT token FROM sessions').all().map(row => row.token), ['other']);
+  f.db.exec("INSERT INTO sessions VALUES ('new-session','w')");
+  const reset = f.bank.resetPin('w', { reason: 'هویت تطبیق داده شد', identityVerified: true, expectedVersion: 2 });
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM sessions WHERE userId='w'").get().n, 0);
+  assert.equal(f.bank.resetPin('w', { reason: 'هویت تطبیق داده شد', identityVerified: true, expectedVersion: 3 }, 'client-controlled').code, 'invalid');
+  assert.equal(f.bank.saveBank('w', change(3, { pin: reset.temporaryPin })).code, 'pin_change_required');
+  f.advance(10 * 60 * 1000);
+  assert.equal(f.bank.savePin('w', pin(3, { currentPin: reset.temporaryPin })).code, 'temporary_expired');
+  const durableText = JSON.stringify(f.db.prepare('SELECT * FROM worker_bank_security').all()) + JSON.stringify(f.db.prepare('SELECT * FROM worker_bank_audit').all()) + JSON.stringify(f.db.prepare('SELECT * FROM notifications').all());
+  assert.equal(durableText.includes(reset.temporaryPin), false);
 });
 
 test('failure of audit or notification rolls back encrypted bank, PIN, version and audit together', t => {

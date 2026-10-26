@@ -5,6 +5,8 @@ const fieldCrypto = require('./fieldCrypto');
 const sms = require('./kavenegarSms');
 const LOCK_MS = 15 * 60 * 1000;
 const OTP_TTL_MS = 5 * 60 * 1000;
+const TEMP_PIN_TTL_MS = 10 * 60 * 1000;
+const SCRYPT_OPTIONS = Object.freeze({ N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
 
 function maskedSheba(value) { return typeof value === 'string' && /^IR\d{24}$/.test(value) ? value.slice(0, 4) + '****' + value.slice(-4) : null; }
 function validSheba(value) {
@@ -16,14 +18,14 @@ function validSheba(value) {
 function validPin(value) { return typeof value === 'string' && /^\d{6}$/.test(value); }
 function hashPin(pin) {
   const salt = crypto.randomBytes(16).toString('hex');
-  return 'scrypt:v1:' + salt + ':' + crypto.scryptSync(pin, salt, 32).toString('hex');
+  return 'scrypt:v1:' + salt + ':' + crypto.scryptSync(pin, salt, 32, SCRYPT_OPTIONS).toString('hex');
 }
 function pinMatches(pin, stored) {
   if (!validPin(pin) || typeof stored !== 'string') return false;
   const parts = stored.split(':');
   if (parts.length !== 4 || parts[0] !== 'scrypt' || parts[1] !== 'v1'
     || !/^[a-f0-9]{32}$/.test(parts[2]) || !/^[a-f0-9]{64}$/.test(parts[3])) return false;
-  return crypto.timingSafeEqual(crypto.scryptSync(pin, parts[2], 32), Buffer.from(parts[3], 'hex'));
+  return crypto.timingSafeEqual(crypto.scryptSync(pin, parts[2], 32, SCRYPT_OPTIONS), Buffer.from(parts[3], 'hex'));
 }
 function strict(input, required, optional = []) {
   return input && typeof input === 'object' && !Array.isArray(input)
@@ -44,6 +46,9 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
       workerId TEXT PRIMARY KEY REFERENCES users(id), pinHash TEXT,
       version INTEGER NOT NULL DEFAULT 0, failedAttempts INTEGER NOT NULL DEFAULT 0,
       lockedUntil INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS worker_bank_recovery (
+      workerId TEXT PRIMARY KEY REFERENCES users(id), expiresAt INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS worker_bank_audit (
       id TEXT PRIMARY KEY, workerId TEXT NOT NULL, kind TEXT NOT NULL, actor TEXT NOT NULL,
@@ -77,6 +82,10 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
     lastSent=excluded.lastSent,expires=excluded.expires,windowStarted=excluded.windowStarted,sendCount=excluded.sendCount`);
   const consume = database.prepare('DELETE FROM worker_bank_otp WHERE workerId=? AND purpose=?');
   const consumeAll = database.prepare('DELETE FROM worker_bank_otp WHERE workerId=?');
+  const recovery = database.prepare('SELECT expiresAt FROM worker_bank_recovery WHERE workerId=?');
+  const setRecovery = database.prepare('INSERT INTO worker_bank_recovery VALUES (?,?) ON CONFLICT(workerId) DO UPDATE SET expiresAt=excluded.expiresAt');
+  const clearRecovery = database.prepare('DELETE FROM worker_bank_recovery WHERE workerId=?');
+  const revokeSessions = database.prepare('DELETE FROM sessions WHERE userId=?');
   const otpFailure = database.prepare('UPDATE worker_bank_otp SET attempts=attempts+1 WHERE workerId=? AND purpose=?');
   const readyOtp = database.prepare('UPDATE worker_bank_otp SET expires=? WHERE workerId=? AND purpose=? AND codeHash=?');
 
@@ -90,7 +99,7 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
     const state = security.get(workerId);
     return { code: 'ok', bankDetails: { bankShebaMasked: maskedSheba(user.bankSheba), hasPin: Boolean(state?.pinHash),
       lockedUntil: state?.lockedUntil > now() ? new Date(state.lockedUntil).toISOString() : null,
-      version: state?.version || 0 }, otpRequired: Boolean(otpRequired()) };
+      version: state?.version || 0, ...(recovery.get(workerId) ? { pinTemporary: true, temporaryExpiresAt: new Date(recovery.get(workerId).expiresAt).toISOString() } : {}) }, otpRequired: Boolean(otpRequired()) };
   }
   function current(workerId, expectedVersion) {
     const user = worker(workerId);
@@ -105,6 +114,7 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
   }
   function checkPin(workerId, state, pin) {
     if (!state.pinHash) return { code: 'pin_required' };
+    if (recovery.get(workerId)?.expiresAt <= now()) return { code: 'temporary_expired' };
     if (pinMatches(pin, state.pinHash)) {
       // The policy counts consecutive wrong PINs, independently of SMS mistakes.
       if (state.failedAttempts) failures.run(0, 0, workerId);
@@ -129,13 +139,14 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
     audit.run(crypto.randomUUID(), workerId, kind, actor, maskedSheba(before), maskedSheba(after), reason, version, new Date(now()).toISOString());
     const title = kind === 'SHEBA_CHANGED' ? 'شماره شبا تغییر کرد' : kind === 'PIN_RESET' ? 'رمز شبا بازنشانی شد' : 'رمز شبا تعیین یا تغییر کرد';
     addNotification(workerId, '', kind, title,
-      kind === 'PIN_RESET' ? 'مدیریت پس از بررسی هویت، رمز شما را بازنشانی کرد. رمز تازه تعیین کنید.' : 'این تغییر در حساب شما ثبت شد. اگر درخواست شما نبوده، با پشتیبانی تماس بگیرید.');
+      kind === 'PIN_RESET' ? 'مدیریت پس از بررسی هویت، رمز موقت صادر کرد. آن را از پشتیبانی دریافت و به رمز شخصی تغییر دهید.' : 'این تغییر در حساب شما ثبت شد. اگر درخواست شما نبوده، با پشتیبانی تماس بگیرید.');
   }
   function saveBank(workerId, input) {
     if (!strict(input, ['bankSheba', 'pin', 'expectedVersion'], ['otp']) || !validSheba(input.bankSheba) || !validPin(input.pin)
       || (Object.hasOwn(input, 'otp') && (typeof input.otp !== 'string' || !/^\d{4}$/.test(input.otp)))) return { code: 'invalid' };
     return transaction(() => {
       const state = current(workerId, input.expectedVersion); if (state.code) return state;
+      if (recovery.get(workerId)) return { code: 'pin_change_required' };
       const pinError = checkPin(workerId, state.state, input.pin); if (pinError) return pinError;
       const otpError = checkOtp(workerId, 'bank-details', input.otp); if (otpError) return otpError;
       bank.run(fieldCrypto.encryptString(input.bankSheba), workerId);
@@ -157,24 +168,32 @@ function createWorkerBank({ database, transaction, getUser, addNotification,
       } else if (Object.hasOwn(input, 'currentPin')) return { code: 'invalid' };
       const otpError = checkOtp(workerId, 'bank-pin', input.otp); if (otpError) return otpError;
       setPin.run(hashPin(input.newPin), workerId);
+      clearRecovery.run(workerId);
       consumeAll.run(workerId);
+      if (state.state.pinHash) revokeSessions.run(workerId);
       record(workerId, state.state.pinHash ? 'PIN_CHANGED' : 'PIN_CREATED', 'worker', state.user.bankSheba, state.user.bankSheba);
-      return read(workerId);
+      return { ...read(workerId), ...(state.state.pinHash ? { reauthenticationRequired: true } : {}) };
     });
   }
-  function resetPin(workerId, input) {
+  function resetPin(workerId, input, actor) {
     if (!strict(input, ['reason', 'identityVerified', 'expectedVersion']) || input.identityVerified !== true
       || typeof input.reason !== 'string' || input.reason.trim().length < 5 || input.reason.length > 500
-      || /[\u0000-\u001f\u007f]/.test(input.reason) || !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) return { code: 'invalid' };
+      || /[\u0000-\u001f\u007f]/.test(input.reason) || !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0
+      || typeof actor !== 'string' || !/^deployment-admin:[a-f0-9-]{36}$/.test(actor)) return { code: 'invalid' };
     return transaction(() => {
       const user = worker(workerId); if (!user) return { code: 'forbidden' };
       if (!user.nationalId || !user.idDoc) return { code: 'identity_missing' };
       ensure.run(workerId);
       if (security.get(workerId).version !== input.expectedVersion) return { code: 'conflict' };
-      setPin.run(null, workerId);
+      const temporaryPin = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+      setPin.run(hashPin(temporaryPin), workerId);
+      setRecovery.run(workerId, now() + TEMP_PIN_TTL_MS);
       consumeAll.run(workerId);
-      record(workerId, 'PIN_RESET', 'admin', user.bankSheba, user.bankSheba, input.reason.trim());
-      return read(workerId);
+      revokeSessions.run(workerId);
+      record(workerId, 'PIN_RESET', actor, user.bankSheba, user.bankSheba, input.reason.trim());
+      // The credential is returned once to the authenticated administrator only.
+      // It is never stored in plaintext, included in notifications or logged.
+      return { ...read(workerId), temporaryPin };
     });
   }
   async function sendOtp(workerId, input) {

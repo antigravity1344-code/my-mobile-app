@@ -4,7 +4,7 @@ import { colors, type } from '../../theme/customerHome';
 import { previewActive } from './previewRuntime';
 import { bankDigits, loadBankDetails, normalizeSheba, requestBankOtp, saveBankDetails, saveBankPin, validBankPin, validBankSheba, type BankResult, type BankOtpPurpose } from './workerBankDetails';
 
-export function WorkerBankDetailsScreen({ onBack }: { onBack: () => void }) {
+export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => void; onLogout: () => void }) {
   const [bank, setBank] = useState<Extract<BankResult, { ok: true }> | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -49,8 +49,8 @@ export function WorkerBankDetailsScreen({ onBack }: { onBack: () => void }) {
       : await saveBankPin({ newPin, expectedVersion, ...(bank.bankDetails.hasPin ? { currentPin } : {}), ...(bank.otpRequired ? { otp: pinOtp } : {}) }, controller.signal);
     if (request.current !== controller || controller.signal.aborted) return;
     clearSecrets(); request.current = null; setBusy(false);
-    if (result.ok) { setBank(result); if (kind === 'bank') setBankSheba(''); setMessage(kind === 'bank' ? 'شماره شبا ذخیره شد.' : 'رمز تغییر شبا ذخیره شد.'); }
-    else { setMessage(result.message); setError(true); setSessionExpired(!!result.sessionExpired); }
+    if (result.ok) { setBank(result); if (kind === 'bank') setBankSheba(''); setSessionExpired(!!result.reauthenticationRequired); setMessage(result.reauthenticationRequired ? 'رمز تغییر کرد و نشست‌ها بسته شدند؛ دوباره وارد حساب شوید.' : kind === 'bank' ? 'شماره شبا ذخیره شد.' : 'رمز تغییر شبا ذخیره شد.'); }
+    else { setMessage(result.message); setError(true); setSessionExpired(!!result.sessionExpired); if (result.lockedUntil) setBank(current => current ? { ...current, bankDetails: { ...current.bankDetails, lockedUntil: result.lockedUntil! } } : current); }
   };
   const sendOtp = async (purpose: BankOtpPurpose) => {
     if (!enabled || request.current) return;
@@ -71,7 +71,7 @@ export function WorkerBankDetailsScreen({ onBack }: { onBack: () => void }) {
         {busy && <ActivityIndicator accessibilityLabel="در حال ارتباط با سرور" color={colors.teal} />}
         {!!message && <Text accessibilityLiveRegion="polite" style={[styles.description, error && styles.error]}>{message}</Text>}
         {button('بازخوانی اطلاعات بانکی', () => void load(), busy)}
-        {sessionExpired && <Text style={styles.error}>برای ادامه از حساب خارج شوید و دوباره وارد شوید.</Text>}
+        {sessionExpired && <>{button('خروج و ورود دوباره', onLogout, busy)}<Text style={styles.error}>برای ادامه از حساب خارج شوید و دوباره وارد شوید.</Text></>}
         {bank && <>
           <View style={styles.card}>
             <Text style={styles.heading}>شبای ثبت‌شده</Text>
@@ -80,6 +80,7 @@ export function WorkerBankDetailsScreen({ onBack }: { onBack: () => void }) {
           </View>
           <View style={styles.card}>
             <Text style={styles.heading}>{bank.bankDetails.hasPin ? 'تغییر رمز' : 'تعیین رمز اولیه'}</Text>
+            {bank.bankDetails.pinTemporary && <Text style={styles.description}>رمز موقت را در «رمز فعلی» وارد و رمز شخصی تازه تعیین کنید. تا این تغییر، ویرایش شبا غیرفعال است. اعتبار رمز موقت تا ساعت {new Date(bank.bankDetails.temporaryExpiresAt!).toLocaleTimeString('fa-IR')} است.</Text>}
             <Text style={styles.description}>رمز شش‌رقمی مخصوص تغییر شباست. پس از پنج تلاش اشتباه، تغییرات برای پانزده دقیقه قفل می‌شود.</Text>
             {bank.bankDetails.hasPin && secretInput('رمز فعلی', currentPin, setCurrentPin)}
             {secretInput('رمز شش‌رقمی جدید', newPin, setNewPin)}
@@ -94,7 +95,7 @@ export function WorkerBankDetailsScreen({ onBack }: { onBack: () => void }) {
             <TextInput accessibilityLabel="شماره شبای جدید" placeholder="IR و ۲۴ رقم" placeholderTextColor={colors.muted} value={bankSheba} onChangeText={value => setBankSheba(normalizeSheba(value))} editable={enabled && bank.bankDetails.hasPin} autoCapitalize="characters" autoCorrect={false} maxLength={26} style={styles.input} />
             {secretInput('رمز تغییر شبا', pin, setPin)}
             {bank.otpRequired && <>{button('ارسال کد تأیید تغییر شبا', () => void sendOtp('bank-details'), !enabled || !bank.bankDetails.hasPin)}{secretInput('کد پیامکی تغییر شبا', bankOtp, setBankOtp, 4)}</>}
-            {button('ذخیره شبا', () => void runSave('bank'), !enabled || !bank.bankDetails.hasPin || !validBankSheba(normalizeSheba(bankSheba)) || !validBankPin(pin) || (bank.otpRequired && !/^\d{4}$/.test(bankOtp)))}
+            {button('ذخیره شبا', () => void runSave('bank'), !enabled || !!bank.bankDetails.pinTemporary || !bank.bankDetails.hasPin || !validBankSheba(normalizeSheba(bankSheba)) || !validBankPin(pin) || (bank.otpRequired && !/^\d{4}$/.test(bankOtp)))}
           </View>
         </>}
       </>}

@@ -175,7 +175,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
         ) : mainView === 'work_area' ? (
           <WorkerServiceAreaScreen key={user.id} onBack={() => onChangeView('profile')} />
         ) : mainView === 'bank_details' ? (
-          <WorkerBankDetailsScreen key={user.id} onBack={() => onChangeView('profile')} />
+          <WorkerBankDetailsScreen key={user.id} onBack={() => onChangeView('profile')} onLogout={onLogout} />
         ) : mainView === 'alerts' ? (
           <NativeNotificationsScreen appearance="worker" />
         ) : (

@@ -28,7 +28,7 @@ test('admin reset panel requires identity checkbox and reason, reads version via
   const ui = panel(async (url, options) => {
     calls.push({ url, options });
     assert.equal(options.headers.Authorization, 'Bearer admin-fixture');
-    return reply({ success: true, bankDetails: { version: 7, bankShebaMasked: 'IR82****9002', hasPin: true } });
+    return reply({ success: true, temporaryPin: '987654', bankDetails: { version: 7, bankShebaMasked: 'IR82****9002', hasPin: true, temporaryExpiresAt: new Date(Date.now() + 600000).toISOString() } });
   });
   await settle();
   assert.equal(calls[0].url, '/api/admin/workers/worker%2Fid/bank-details');
@@ -39,7 +39,7 @@ test('admin reset panel requires identity checkbox and reason, reads version via
   assert.equal(calls[1].url, '/api/admin/workers/worker%2Fid/bank-pin/reset');
   assert.deepEqual(JSON.parse(calls[1].options.body), { reason: ui.reason.value || 'مدارک ثبت‌شده تطبیق داده شد', identityVerified: true, expectedVersion: 7 });
   assert.equal(ui.reason.value, ''); assert.equal(ui.identity.checked, false); assert.equal(ui.submit.disabled, true);
-  assert.match(ui.status.textContent, /متخصص باید رمز تازه/);
+  assert.match(ui.status.textContent, /متخصص باید آن را به رمز شخصی تغییر دهد/);
 });
 
 test('lost reset response preserves reason and blocks retry until admin state is reread', async () => {

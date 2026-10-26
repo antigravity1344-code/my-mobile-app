@@ -1319,6 +1319,8 @@ function requireAdmin(req, res, next) {
     if (token && adminSessions.has(token)) adminSessions.delete(token);
     return res.status(401).json({ success: false, message: 'دسترسی مدیر لازم است.' });
   }
+  if (!session.auditId) session.auditId = crypto.randomUUID();
+  res.locals.adminAuditActor = 'deployment-admin:' + session.auditId;
   next();
 }
 
@@ -1344,7 +1346,7 @@ app.post('/api/admin/login', (req, res) => {
   }
   adminLoginAttempts.delete(key);
   const token = crypto.randomBytes(24).toString('hex');
-  adminSessions.set(token, { expires: Date.now() + ADMIN_SESSION_MS });
+  adminSessions.set(token, { expires: Date.now() + ADMIN_SESSION_MS, auditId: crypto.randomUUID() });
   res.json({ success: true, token });
 });
 

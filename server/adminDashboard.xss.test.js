@@ -237,7 +237,10 @@ test('admin resets a worker bank PIN through the real panel only after identity 
     await panel.getByRole('button', { name: 'بازنشانی رمز و ارسال اعلان' }).click();
     assert.equal((await saved).status(), 200);
     await page.waitForFunction(() => document.querySelector('[data-bank-reset] [role="status"]').textContent.includes('رمز بازنشانی و اعلان ثبت شد'));
-    assert.equal(store.workerBank.read(w.id).bankDetails.hasPin, false);
+    assert.equal(store.workerBank.read(w.id).bankDetails.hasPin, true);
+    assert.equal(store.workerBank.read(w.id).bankDetails.pinTemporary, true);
+    await panel.getByRole('button', { name: 'نمایش رمز موقت', exact: true }).click();
+    assert.match(await panel.getByLabel('رمز موقت؛ فقط این بار نمایش داده می‌شود').inputValue(), /^\d{6}$/);
     assert.equal(store.getUser(w.id).bankSheba, w.bankSheba);
     assert.equal(store.getUser(w.id).status, 'APPROVED');
   });
