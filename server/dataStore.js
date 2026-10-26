@@ -10,6 +10,7 @@ const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
 const { createPaymentSettings } = require('./paymentSettings');
+const { createPaymentCharges } = require('./paymentCharges');
 const { createServiceAreas } = require('./serviceAreas');
 const { createWorkerServiceArea } = require('./workerServiceArea');
 const { IMPLEMENTED_PAYMENT_PROVIDERS } = require('./paymentProviders');
@@ -1676,6 +1677,7 @@ function createDataStore(filename) {
     readEventData: readOrderEventData,
   });
 
+  const paymentCharges = createPaymentCharges({ database, paymentSettings, workerWallet });
   const orderCompletion = createOrderCompletion({database,transaction,getOrder,updateOrder,policy:completionPolicy,appendOrderEvent,addNotification,
     onCompleted: (order,completion) => {
       workerWallet.chargeCompletion(order,completion);
@@ -1689,6 +1691,7 @@ function createDataStore(filename) {
     commissionPolicy,
     workerWallet,
     paymentSettings,
+    paymentCharges,
     serviceAreas,
     workerServiceArea,
     transaction,

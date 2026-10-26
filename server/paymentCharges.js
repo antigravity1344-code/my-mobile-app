@@ -1,113 +1,81 @@
 'use strict';
-const crypto = require('node:crypto');
-const { implementedProviders } = require('./paymentProviders');
+const { IMPLEMENTED_PAYMENT_PROVIDERS, providerById } = require('./paymentProviders');
 
-const START_KEYS = new Set(['amount', 'currencyUnit']);
-const CONFIRM_KEYS = new Set(['intentId']);
-
-function createPaymentCharges({ database, transaction, paymentSettings, workerWallet, providers = implementedProviders() }) {
-  const catalog = new Map((providers || []).filter(item => item && item.id).map(item => [item.id, item]));
+// HTTP orchestration only. Settings, verification, receipts and wallet credit
+// are owned by paymentSettings; this module never writes a wallet entry.
+function createPaymentCharges({ database, paymentSettings, workerWallet, providers = IMPLEMENTED_PAYMENT_PROVIDERS }) {
+  // Keep the legacy dispatch table without guessing/migrating old payments.
+  // An old row without a matching canonical intent cannot be confirmed.
   database.exec(`
     CREATE TABLE IF NOT EXISTS worker_wallet_topup_intents (
-      id TEXT PRIMARY KEY,
-      workerId TEXT NOT NULL,
-      amount INTEGER NOT NULL CHECK(amount > 0),
-      currencyUnit TEXT NOT NULL,
-      providerId TEXT NOT NULL,
-      settingsVersion INTEGER NOT NULL,
-      providerRef TEXT NOT NULL UNIQUE,
-      status TEXT NOT NULL CHECK(status IN ('PENDING','CREDITED')),
-      createdAt TEXT NOT NULL,
-      creditedAt TEXT
+      id TEXT PRIMARY KEY, workerId TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount > 0),
+      currencyUnit TEXT NOT NULL, providerId TEXT NOT NULL, settingsVersion INTEGER NOT NULL,
+      providerRef TEXT NOT NULL UNIQUE, status TEXT NOT NULL CHECK(status IN ('PENDING','CREDITED')),
+      createdAt TEXT NOT NULL, creditedAt TEXT
     );
-    CREATE INDEX IF NOT EXISTS worker_topup_intents_by_worker ON worker_wallet_topup_intents(workerId);
   `);
-  const insertIntent = database.prepare(`INSERT INTO worker_wallet_topup_intents
+  const dispatch = database.prepare('SELECT * FROM worker_wallet_topup_intents WHERE id=?');
+  const intent = database.prepare('SELECT * FROM worker_topup_intents WHERE id=?');
+  const settings = database.prepare('SELECT * FROM company_payment_settings WHERE version=?');
+  const receipt = database.prepare('SELECT id FROM worker_topup_receipts WHERE providerId=? AND idempotencyKey=?');
+  const insert = database.prepare(`INSERT INTO worker_wallet_topup_intents
     (id,workerId,amount,currencyUnit,providerId,settingsVersion,providerRef,status,createdAt,creditedAt)
     VALUES (?,?,?,?,?,?,?,'PENDING',?,NULL)`);
-  const getIntent = database.prepare('SELECT * FROM worker_wallet_topup_intents WHERE id=?');
-  const markCredited = database.prepare("UPDATE worker_wallet_topup_intents SET status='CREDITED', creditedAt=? WHERE id=? AND status='PENDING'");
 
+  function available() {
+    const resolved = paymentSettings.resolve();
+    return resolved.code === 'ok' && resolved.settings.topupEnabled
+      && typeof providerById(providers, resolved.settings.providerId)?.startPayment === 'function';
+  }
+  function validBody(input, keys) {
+    return input && typeof input === 'object' && !Array.isArray(input)
+      && Object.keys(input).length === keys.length && keys.every(key => Object.hasOwn(input, key));
+  }
   function publicIntent(row) {
-    return {
-      id: row.id, amount: row.amount, currencyUnit: row.currencyUnit,
-      providerId: row.providerId, providerRef: row.providerRef, status: row.status,
-    };
+    return { id: row.id, amount: row.amount, currencyUnit: row.currencyUnit,
+      providerId: row.providerId, settingsVersion: row.settingsVersion,
+      status: receipt.get(row.providerId, row.id) ? 'CREDITED' : 'PENDING' };
   }
   async function startTopup(workerId, input) {
-    if (!workerId || typeof workerId !== 'string') return { code: 'invalid' };
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return { code: 'invalid' };
-    const keys = Object.keys(input);
-    if (keys.length !== 2 || keys.some(key => !START_KEYS.has(key))) return { code: 'invalid' };
-    if (!Number.isSafeInteger(input.amount) || input.amount <= 0) return { code: 'invalid' };
-    if (typeof input.currencyUnit !== 'string' || !input.currencyUnit.trim() || input.currencyUnit.trim().length > 64) return { code: 'invalid' };
-    const settings = paymentSettings.read();
-    if (!settings.chargeEnabled) return { code: 'not_configured' };
-    const snapshot = paymentSettings.connection(settings.version);
-    if (!snapshot || !snapshot.secret || !snapshot.merchantId) return { code: 'not_configured' };
-    const provider = catalog.get(snapshot.providerId) || snapshot.provider;
-    if (!provider || typeof provider.start !== 'function') return { code: 'not_configured' };
-    let started;
+    if (!available()) return { code: 'not_configured' };
+    if (!validBody(input, ['amount', 'currencyUnit'])) return { code: 'invalid' };
+    const started = paymentSettings.startVerifiedPayment({ workerId, amount: input.amount, currencyUnit: input.currencyUnit });
+    if (started.code !== 'ok') return started;
+    const payment = started.payment;
+    const bound = settings.get(payment.settingsVersion);
+    const provider = providerById(providers, payment.providerId);
+    let checkout;
     try {
-      started = await provider.start({
-        amount: input.amount,
-        currencyUnit: input.currencyUnit.trim(),
-        merchantId: snapshot.merchantId,
-        secret: snapshot.secret,
+      checkout = await provider.startPayment(payment, {
+        settingsVersion: bound.version, providerId: bound.providerId, merchantId: bound.merchantId,
+        settlementReference: bound.settlementReference,
+        connectionSecret: paymentSettings.readConnectionSecret(bound.version),
       });
-    } catch {
-      return { code: 'provider_error' };
-    }
-    if (!started || typeof started.providerRef !== 'string' || !started.providerRef || started.providerRef.length > 128) {
-      return { code: 'provider_error' };
-    }
-    const id = crypto.randomUUID();
-    try {
-      insertIntent.run(id, workerId, input.amount, input.currencyUnit.trim(), snapshot.providerId, snapshot.version,
-        started.providerRef, new Date().toISOString());
-    } catch {
-      return { code: 'provider_error' };
-    }
-    return { code: 'ok', intent: publicIntent(getIntent.get(id)) };
+    } catch { return { code: 'provider_error' }; }
+    if (!checkout || typeof checkout.providerReference !== 'string'
+      || !/^[A-Za-z0-9._:-]{1,128}$/.test(checkout.providerReference)) return { code: 'provider_error' };
+    let redirect;
+    try { redirect = new URL(checkout.redirectUrl); } catch { return { code: 'provider_error' }; }
+    if (redirect.protocol !== 'https:' || redirect.username || redirect.password) return { code: 'provider_error' };
+    insert.run(payment.id, payment.workerId, payment.amount, payment.currencyUnit, payment.providerId,
+      payment.settingsVersion, checkout.providerReference, payment.createdAt);
+    return { code: 'ok', intent: publicIntent(payment), redirectUrl: redirect.href };
   }
   async function confirmTopup(workerId, input) {
-    if (!workerId || typeof workerId !== 'string') return { code: 'invalid' };
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return { code: 'invalid' };
-    const keys = Object.keys(input);
-    if (keys.length !== 1 || keys.some(key => !CONFIRM_KEYS.has(key)) || typeof input.intentId !== 'string' || !input.intentId) {
-      return { code: 'invalid' };
-    }
-    const intent = getIntent.get(input.intentId);
-    if (!intent || intent.workerId !== workerId) return { code: 'not_found' };
-    const snapshot = paymentSettings.connection(intent.settingsVersion);
-    if (!snapshot || snapshot.providerId !== intent.providerId) return { code: 'unverified' };
-    const provider = catalog.get(intent.providerId) || snapshot.provider;
-    if (!provider || typeof provider.verify !== 'function') return { code: 'unverified' };
-    let verified;
-    try {
-      verified = await provider.verify({
-        providerRef: intent.providerRef,
-        amount: intent.amount,
-        currencyUnit: intent.currencyUnit,
-        merchantId: snapshot.merchantId,
-        secret: snapshot.secret,
-      });
-    } catch {
-      return { code: 'provider_error' };
-    }
-    if (!verified || verified.ok !== true || verified.amount !== intent.amount || verified.currencyUnit !== intent.currencyUnit) {
-      return { code: 'unverified' };
-    }
-    return transaction(() => {
-      const current = getIntent.get(intent.id);
-      if (!current || current.workerId !== workerId) return { code: 'not_found' };
-      workerWallet.creditVerifiedTopup({
-        workerId, amount: current.amount, currencyUnit: current.currencyUnit, sourceKey: 'topup:' + current.id,
-      });
-      if (current.status === 'PENDING') markCredited.run(new Date().toISOString(), current.id);
-      return { code: 'ok', intent: publicIntent(getIntent.get(current.id)), wallet: workerWallet.read(workerId) };
+    if (!validBody(input, ['intentId']) || typeof input.intentId !== 'string'
+      || !/^[A-Za-z0-9._:-]{1,128}$/.test(input.intentId)) return { code: 'invalid' };
+    const payment = intent.get(input.intentId);
+    const link = dispatch.get(input.intentId);
+    if (!payment || payment.workerId !== workerId || !link || link.workerId !== workerId) return { code: 'not_found' };
+    if (link.providerId !== payment.providerId || link.settingsVersion !== payment.settingsVersion
+      || link.amount !== payment.amount || link.currencyUnit !== payment.currencyUnit) return { code: 'conflict' };
+    // No browser-supplied amount, owner, settings, status or proof reaches verification.
+    const result = await paymentSettings.confirmVerifiedPayment({
+      paymentId: payment.id, providerReference: link.providerRef,
     });
+    if (result.code !== 'ok' && result.code !== 'duplicate') return result;
+    return { code: 'ok', intent: publicIntent(payment), wallet: workerWallet.read(workerId) };
   }
-  return { startTopup, confirmTopup };
+  return { available, startTopup, confirmTopup };
 }
 module.exports = { createPaymentCharges };

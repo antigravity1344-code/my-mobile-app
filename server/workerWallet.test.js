@@ -36,10 +36,12 @@ test('integer half-up commission, independent currency balances, and frozen poli
 });
 test('verified topup credits once for the same source key and rejects conflicting reuse',t=>{
   const {db,wallet}=memory();t.after(()=>db.close());
-  const first=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'});
-  const again=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'});
-  assert.equal(first.id,again.id);assert.equal(wallet.read('worker').balances[0].balance,500);
-  assert.throws(()=>wallet.creditVerifiedTopup({workerId:'other',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'}));
+  assert.equal(wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:intent-1'}).code,'invalid');
+  assert.deepEqual(wallet.read('worker').balances,[]);
+  const first=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:fixture:intent-1'});
+  const again=wallet.creditVerifiedTopup({workerId:'worker',amount:500,currencyUnit:'تومان',sourceKey:'topup:fixture:intent-1'});
+  assert.equal(first.code,'ok');assert.equal(again.code,'duplicate');assert.equal(wallet.read('worker').balances[0].balance,500);
+  assert.equal(wallet.creditVerifiedTopup({workerId:'other',amount:500,currencyUnit:'تومان',sourceKey:'topup:fixture:intent-1'}).code,'conflict');
   assert.equal(wallet.read('worker').balances[0].balance,500);
 });
 test('zero and positive balances allow acceptance; debt is blocked until synthetic verified credit covers it',t=>{

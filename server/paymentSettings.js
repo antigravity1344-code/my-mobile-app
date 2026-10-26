@@ -478,55 +478,64 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     } catch {
       return { code: 'unverified' };
     }
-    const parsed = parseProof(proof);
-    if (!parsed || !proofMatchesIntent(parsed, intent)) return { code: parsed ? 'conflict' : 'unverified' };
-    if (existingReceipt) {
-      return matchingReceipt(existingReceipt, intent, parsed.providerReference)
-        ? { code: 'duplicate', receipt: publicReceipt(existingReceipt) }
-        : { code: 'conflict' };
+    // Real gateway verification may be asynchronous; never hold a SQLite
+    // transaction open while waiting on the provider.
+    if (proof && typeof proof.then === 'function') {
+      return Promise.resolve(proof).then(finalizeProof, () => ({ code: 'unverified' }));
     }
-    const user = typeof getUser === 'function' ? getUser(intent.workerId) : null;
-    if (!user || user.role !== 'WORKER') return { code: 'unverified' };
-    try {
-      return transaction(() => {
-        const freshIntent = intentById.get(paymentId);
-        const freshSettings = freshIntent ? byVersion.get(freshIntent.settingsVersion) : null;
-        if (!freshIntent || !freshSettings || freshSettings.providerId !== freshIntent.providerId) return { code: 'unverified' };
-        const existing = receiptByKey.get(freshIntent.providerId, freshIntent.id);
-        if (existing) return matchingReceipt(existing, freshIntent, parsed.providerReference)
-          ? { code: 'duplicate', receipt: publicReceipt(existing) }
+    return finalizeProof(proof);
+
+    function finalizeProof(proof) {
+      const parsed = parseProof(proof);
+      if (!parsed || !proofMatchesIntent(parsed, intent)) return { code: parsed ? 'conflict' : 'unverified' };
+      if (existingReceipt) {
+        return matchingReceipt(existingReceipt, intent, parsed.providerReference)
+          ? { code: 'duplicate', receipt: publicReceipt(existingReceipt) }
           : { code: 'conflict' };
-        const sourceKey = `topup:${freshIntent.providerId}:${freshIntent.id}`;
-        const credit = wallet.creditVerifiedTopup({
-          workerId: freshIntent.workerId,
-          amount: freshIntent.amount,
-          currencyUnit: freshIntent.currencyUnit,
-          sourceKey,
+      }
+      const user = typeof getUser === 'function' ? getUser(intent.workerId) : null;
+      if (!user || user.role !== 'WORKER') return { code: 'unverified' };
+      try {
+        return transaction(() => {
+          const freshIntent = intentById.get(paymentId);
+          const freshSettings = freshIntent ? byVersion.get(freshIntent.settingsVersion) : null;
+          if (!freshIntent || !freshSettings || freshSettings.providerId !== freshIntent.providerId) return { code: 'unverified' };
+          const existing = receiptByKey.get(freshIntent.providerId, freshIntent.id);
+          if (existing) return matchingReceipt(existing, freshIntent, parsed.providerReference)
+            ? { code: 'duplicate', receipt: publicReceipt(existing) }
+            : { code: 'conflict' };
+          const sourceKey = `topup:${freshIntent.providerId}:${freshIntent.id}`;
+          const credit = wallet.creditVerifiedTopup({
+            workerId: freshIntent.workerId,
+            amount: freshIntent.amount,
+            currencyUnit: freshIntent.currencyUnit,
+            sourceKey,
+          });
+          if (credit.code !== 'ok' && credit.code !== 'duplicate') return { code: credit.code };
+          insertReceipt.run(
+            crypto.randomUUID(),
+            freshIntent.workerId,
+            freshIntent.providerId,
+            freshIntent.settingsVersion,
+            freshIntent.id,
+            parsed.providerReference,
+            freshIntent.amount,
+            freshIntent.currencyUnit,
+            sourceKey,
+            new Date().toISOString()
+          );
+          return {
+            code: credit.code === 'duplicate' ? 'duplicate' : 'ok',
+            receipt: publicReceipt(receiptByKey.get(freshIntent.providerId, freshIntent.id)),
+          };
         });
-        if (credit.code !== 'ok' && credit.code !== 'duplicate') return { code: credit.code };
-        insertReceipt.run(
-          crypto.randomUUID(),
-          freshIntent.workerId,
-          freshIntent.providerId,
-          freshIntent.settingsVersion,
-          freshIntent.id,
-          parsed.providerReference,
-          freshIntent.amount,
-          freshIntent.currencyUnit,
-          sourceKey,
-          new Date().toISOString()
-        );
-        return {
-          code: credit.code === 'duplicate' ? 'duplicate' : 'ok',
-          receipt: publicReceipt(receiptByKey.get(freshIntent.providerId, freshIntent.id)),
-        };
-      });
-    } catch (error) {
-      const message = String(error && error.message);
-      if (!/UNIQUE|immutable/i.test(message)) throw error;
-      const existing = receiptByKey.get(intent.providerId, intent.id);
-      if (existing && matchingReceipt(existing, intent)) return { code: 'duplicate', receipt: publicReceipt(existing) };
-      return { code: 'conflict' };
+      } catch (error) {
+        const message = String(error && error.message);
+        if (!/UNIQUE|immutable/i.test(message)) throw error;
+        const existing = receiptByKey.get(intent.providerId, intent.id);
+        if (existing && matchingReceipt(existing, intent)) return { code: 'duplicate', receipt: publicReceipt(existing) };
+        return { code: 'conflict' };
+      }
     }
   }
 
