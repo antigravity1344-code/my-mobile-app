@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, StatusBar, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerHomeScreen } from './WorkerHomeScreen';
 import { WorkerHomeCardScreen } from './WorkerHomeCardScreens';
@@ -25,6 +25,7 @@ import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { WORKER_TOKEN_KEY, type WorkerSessionUser } from './workerLoginStorage';
 import { colors } from '../../theme/customerHome';
+import { installWorkerBackNavigation } from './workerBackNavigation';
 
 export type WorkerMainView = WorkerTab | 'alerts' | 'work_area' | 'bank_details' | WorkerHomeCardKey;
 
@@ -44,6 +45,7 @@ type Props = {
  * تا خانه، نشان نوار پایین و پنل سفارش‌ها یک منبع داشته باشند.
  */
 export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Props) {
+  useEffect(() => installWorkerBackNavigation(BackHandler, mainView, onChangeView), [mainView, onChangeView]);
   const orders = useWorkerOrders<NativeOrder>(user.id, mapWorkerOrder);
   const { ordersState, hasLoaded, fetchOrders } = orders;
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
