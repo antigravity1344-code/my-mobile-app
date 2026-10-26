@@ -30,6 +30,40 @@ function worker(overrides = {}) {
   };
 }
 
+test('manual topup admin form persists receipt, handles lost response and rejects duplicate without double credit', async () => {
+  const w = worker({id:'WORKER-MANUAL',phone:'09120000986',status:'APPROVED'});
+  store.createUser(w);
+  await withPage(async (page) => {
+    await page.evaluate(row => renderWorkers([row]),w);
+    await page.locator('#tabWorkersBtn').click();
+    await page.getByRole('button',{name:'ثبت شارژ دستی',exact:true}).click();
+    const panel=page.locator('[data-manual-topup]');
+    await panel.locator('[name=amount]').fill('150000');
+    await panel.locator('[name=paidOn]').fill('2026-10-25');
+    await panel.locator('[name=trackingNumber]').fill('987654321');
+    await panel.locator('[name=note]').fill('تطبیق واریز آزمایشی');
+    // Server commits but client loses the response: retain form and safely retry same reference.
+    await page.route('**/wallet/manual-topups',async route=>{
+      if(route.request().method()!=='POST') return route.continue();
+      await route.fetch(); await route.abort('failed');
+    },{times:1});
+    await panel.getByRole('button',{name:'تأیید و ثبت شارژ',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-manual-topup] [role=status]').textContent.includes('اطلاعات فرم محفوظ'));
+    assert.equal(await panel.locator('[name=trackingNumber]').inputValue(),'987654321');
+    await panel.getByRole('button',{name:'بازخوانی رسیدهای ثبت‌شده'}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-manual-topup] pre').textContent.includes('987654321'));
+    await panel.getByRole('button',{name:'تأیید و ثبت شارژ',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-manual-topup] [role=status]').textContent.includes('قبلاً ثبت'));
+    assert.equal(store.workerWallet.read(w.id).balances[0].balance,150000);
+    assert.equal(store.paymentSettings.listManualTopups(w.id).length,1);
+    await panel.locator('[name=trackingNumber]').fill('987654322');
+    await panel.getByRole('button',{name:'تأیید و ثبت شارژ',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-manual-topup] [role=status]').textContent.startsWith('شارژ ثبت شد'));
+    assert.equal(await panel.locator('[name=amount]').inputValue(),'');
+    assert.equal(store.workerWallet.read(w.id).balances[0].balance,300000);
+  });
+});
+
 function order(overrides = {}) {
   return {
     id: 'ORDER-TEST', customerId: 'CUSTOMER-TEST', customerName: 'مشتری آزمایشی',

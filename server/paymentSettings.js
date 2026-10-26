@@ -7,6 +7,55 @@ const { providerById } = require('./paymentProviders');
 // One company per deployment. Versions are immutable. Connection secrets are encrypted
 // with the deployment data key and are never part of the public settings view.
 function createPaymentSettings({ database, transaction, providers, wallet, getUser }) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS worker_manual_topups (
+      id TEXT PRIMARY KEY, workerId TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount > 0),
+      currencyUnit TEXT NOT NULL, paidOn TEXT NOT NULL, trackingNumber TEXT NOT NULL UNIQUE,
+      note TEXT NOT NULL, actor TEXT NOT NULL, createdAt TEXT NOT NULL, sourceKey TEXT NOT NULL UNIQUE
+    );
+  `);
+  for (const operation of ['UPDATE','DELETE']) database.exec(`
+    CREATE TRIGGER IF NOT EXISTS worker_manual_topups_no_${operation.toLowerCase()}
+    BEFORE ${operation} ON worker_manual_topups
+    BEGIN SELECT RAISE(ABORT, 'manual receipt is immutable'); END;
+  `);
+  database.exec(`CREATE TRIGGER IF NOT EXISTS worker_manual_topups_no_replace
+    BEFORE INSERT ON worker_manual_topups WHEN EXISTS (
+      SELECT 1 FROM worker_manual_topups WHERE id=NEW.id OR trackingNumber=NEW.trackingNumber OR sourceKey=NEW.sourceKey)
+    BEGIN SELECT RAISE(ABORT, 'manual receipt is immutable'); END;`);
+  function listManualTopups(workerId) {
+    return database.prepare('SELECT * FROM worker_manual_topups WHERE workerId=? ORDER BY createdAt DESC').all(workerId);
+  }
+  // Trusted admin confirmation of a bank transfer, never a public/provider proof.
+  // Reuse D-80's verified wallet credit primitive in the same SQLite transaction.
+  function recordManualTopup(workerId, input, actor) {
+    const fields=['amount','currencyUnit','paidOn','trackingNumber','note'];
+    if (!input || typeof input!=='object' || Array.isArray(input)
+      || Object.keys(input).length!==fields.length || Object.keys(input).some(k=>!fields.includes(k))
+      || !Number.isSafeInteger(input.amount) || input.amount<1
+      || !['تومان','ریال'].includes(input.currencyUnit)
+      || typeof input.paidOn!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.paidOn)
+      || !Number.isFinite(Date.parse(input.paidOn)) || new Date(input.paidOn).toISOString().slice(0,10)!==input.paidOn
+      || input.paidOn>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Tehran'})
+      || typeof input.trackingNumber!=='string' || typeof input.note!=='string'
+      || !input.note.trim() || input.note.trim().length>300
+      || typeof actor!=='string' || !actor.startsWith('deployment-admin:')) return {code:'invalid'};
+    const trackingNumber=input.trackingNumber.trim().replace(/[۰-۹٠-٩]/g,c=>String(c.charCodeAt(0) >= 1776 ? c.charCodeAt(0)-1776 : c.charCodeAt(0)-1632));
+    if (!/^[0-9]{1,64}$/.test(trackingNumber)) return {code:'invalid'};
+    return transaction(()=>{
+      if (getUser(workerId)?.role!=='WORKER') return {code:'invalid'};
+      if (database.prepare('SELECT 1 FROM worker_manual_topups WHERE trackingNumber=?').get(trackingNumber)) return {code:'conflict'};
+      const id=crypto.randomUUID(), sourceKey='topup:manual-bank:'+id;
+      const receipt={id,workerId,amount:input.amount,currencyUnit:input.currencyUnit,paidOn:input.paidOn,
+        trackingNumber,note:input.note.trim(),actor,createdAt:new Date().toISOString(),sourceKey};
+      const result=wallet.creditVerifiedTopup({workerId,amount:receipt.amount,currencyUnit:receipt.currencyUnit,sourceKey});
+      if(result.code!=='ok') throw new Error('MANUAL_TOPUP_CREDIT_FAILED');
+      database.prepare(`INSERT INTO worker_manual_topups
+        (id,workerId,amount,currencyUnit,paidOn,trackingNumber,note,actor,createdAt,sourceKey)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(receipt));
+      return {code:'ok',receipt};
+    });
+  }
   const catalog = Array.isArray(providers) ? providers : [];
   database.exec(`
     CREATE TABLE IF NOT EXISTS company_payment_settings (
@@ -539,7 +588,7 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     }
   }
 
-  return { read, resolve, publish, markSettlementVerified, readConnectionSecret, startVerifiedPayment, confirmVerifiedPayment };
+  return { read, resolve, publish, markSettlementVerified, readConnectionSecret, startVerifiedPayment, confirmVerifiedPayment, recordManualTopup, listManualTopups };
 }
 
 module.exports = { createPaymentSettings };

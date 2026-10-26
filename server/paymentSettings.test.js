@@ -106,6 +106,55 @@ function savedBody(expectedVersion, extra = {}) {
   };
 }
 
+const manualBody = (extra = {}) => ({ amount: 50000, currencyUnit: 'تومان', paidOn: '2026-10-25', trackingNumber: '123456789', note: 'تطبیق با واریز بانکی', ...extra });
+const manualActor = 'deployment-admin:fixture-session';
+
+test('manual bank receipt credits verified ledger atomically, is audited, excludes work income and rejects duplicate across workers', () => {
+  const m = memory(new Map([['one', {role:'WORKER'}], ['two', {role:'WORKER'}]]));
+  try {
+    m.wallet.creditVerifiedTopup({workerId:'one',amount:1,currencyUnit:'تومان',sourceKey:'topup:fixture:initial'});
+    // Debt fixture uses the real immutable ledger; no production database is opened.
+    m.database.prepare("INSERT INTO worker_wallet_entries (id,workerId,sourceKey,type,amount,currencyUnit,orderId,createdAt) VALUES ('debt','one','commission:fixture','COMMISSION',-50001,'تومان','order-fixture',?)").run(new Date().toISOString());
+    assert.equal(m.wallet.read('one').canAcceptNewOrders,false);
+    const income = m.wallet.readMonthlyIncome('one');
+    const result = m.settings.recordManualTopup('one', manualBody({trackingNumber:'۱۲۳۴۵۶۷۸۹'}), manualActor);
+    assert.equal(result.code,'ok'); assert.equal(result.receipt.actor,manualActor);
+    assert.equal(result.receipt.trackingNumber,'123456789'); assert.ok(Date.parse(result.receipt.createdAt));
+    assert.equal(m.wallet.read('one').balances[0].balance,0);
+    assert.equal(m.wallet.read('one').canAcceptNewOrders,true);
+    assert.deepEqual(m.wallet.readMonthlyIncome('one'),income);
+    for(const worker of ['one','two']) assert.equal(m.settings.recordManualTopup(worker,manualBody(),manualActor).code,'conflict');
+    assert.equal(m.settings.listManualTopups('one').length,1);
+    for(const sql of ["UPDATE worker_manual_topups SET amount=1", "DELETE FROM worker_manual_topups", "INSERT OR REPLACE INTO worker_manual_topups SELECT * FROM worker_manual_topups"]) assert.throws(()=>m.database.exec(sql),/immutable/);
+    assert.equal(m.settings.read().topupEnabled,false);
+  } finally {m.database.close();}
+});
+
+test('manual topup validates fields, role, server audit actor, safe amount, unit, date and reference', () => {
+  const m=memory(new Map([['one',{role:'WORKER'}],['customer',{role:'CUSTOMER'}]]));
+  try {
+    for(const change of [{amount:0},{amount:1.5},{amount:Number.MAX_SAFE_INTEGER+1},{currencyUnit:'USD'},{paidOn:'2026-02-30'},{paidOn:'2099-01-01'},{trackingNumber:'bad'},{note:''},{actor:'forged'},{workerId:'two'}]) {
+      assert.equal(m.settings.recordManualTopup('one',manualBody(change),manualActor).code,'invalid');
+    }
+    for(const id of ['customer','missing']) assert.equal(m.settings.recordManualTopup(id,manualBody(),manualActor).code,'invalid');
+    assert.equal(m.settings.recordManualTopup('one',manualBody(),'browser').code,'invalid');
+    assert.equal(m.wallet.read('one').transactions.length,0);
+  } finally {m.database.close();}
+});
+
+test('failed manual receipt insertion and wallet overflow roll back credit and audit together', () => {
+  const m=memory(new Map([['one',{role:'WORKER'}]]));
+  try {
+    m.database.exec("CREATE TRIGGER fail_manual BEFORE INSERT ON worker_manual_topups BEGIN SELECT RAISE(ABORT,'fixture receipt failure'); END;");
+    assert.throws(()=>m.settings.recordManualTopup('one',manualBody(),manualActor),/fixture receipt failure/);
+    assert.equal(m.wallet.read('one').transactions.length,0); assert.equal(m.settings.listManualTopups('one').length,0);
+    m.database.exec('DROP TRIGGER fail_manual');
+    m.wallet.creditVerifiedTopup({workerId:'one',amount:Number.MAX_SAFE_INTEGER,currencyUnit:'تومان',sourceKey:'topup:fixture:max'});
+    assert.throws(()=>m.settings.recordManualTopup('one',manualBody(),manualActor),/OVERFLOW/);
+    assert.equal(m.wallet.read('one').transactions.length,1); assert.equal(m.settings.listManualTopups('one').length,0);
+  } finally {m.database.close();}
+});
+
 test('versioned settings keep secrets encrypted, reject an unbuilt gateway, and do not rewrite history', () => {
   const users = new Map([['worker-1', { id: 'worker-1', role: 'WORKER' }]]);
   const { database, wallet, settings } = memory(users);
@@ -455,6 +504,21 @@ test('admin payment settings are session-protected and cannot activate a browser
   assert.equal(login.status, 200);
   const admin = login.body.token;
   const adminPath = '/api/admin/payment-settings';
+  await t.test('manual transfer route requires real admin, audits actor, rejects duplicate and foreign fields', async () => {
+    const route = '/api/admin/workers/pay-worker/wallet/manual-topups';
+    for (const token of [worker, customer, 'fake', null]) {
+      assert.equal((await request(server,route,token,'POST',manualBody())).status,401);
+      assert.equal((await request(server,route,token)).status,401);
+    }
+    assert.equal((await request(server,route,admin,'POST',manualBody({actor:'fake'}))).status,400);
+    const saved=await request(server,route,admin,'POST',manualBody());
+    assert.equal(saved.status,201); assert.match(saved.body.receipt.actor,/^deployment-admin:/);
+    assert.equal(saved.body.receipt.workerId,'pay-worker');
+    assert.equal((await request(server,route,admin,'POST',manualBody())).status,409);
+    assert.equal((await request(server,route,admin)).body.receipts.length,1);
+    assert.equal((await request(server,route+'?workerId=other',admin,'POST',manualBody())).status,400);
+    assert.equal((await request(server,'/api/admin/workers/pay-customer/wallet/manual-topups',admin,'POST',manualBody({trackingNumber:'999'}))).status,400);
+  });
   const noSecret = (payload) => assert.equal(JSON.stringify(payload).includes(SECRET), false);
 
   await t.test('only an admin session can read or save settings', async () => {

@@ -2251,6 +2251,10 @@ app.get('/admin', (req, res) => {
         bankReset.type = 'button';
         bankReset.addEventListener('click', () => openWorkerBankReset(w, card));
         actions.append(bankReset);
+        const manualTopup = adminElement('button', 'bg-sky-700 text-white text-xs px-3 py-2 rounded-xl', 'ثبت شارژ دستی');
+        manualTopup.type = 'button';
+        manualTopup.addEventListener('click', () => openWorkerManualTopup(w, card));
+        actions.append(manualTopup);
         card.append(identity, actions);
         rows.append(card);
       }

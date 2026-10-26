@@ -6,6 +6,18 @@ function registerPaymentSettingsRoutes(app, { settings, requireAdmin }) {
     if (Object.keys(req.query).length) return res.status(400).json({ success: false, message: 'پارامتر اضافی مجاز نیست.' });
     next();
   }
+  app.get('/api/admin/workers/:workerId/wallet/manual-topups', requireAdmin, noQuery, (req,res)=>{
+    try { return res.json({success:true,receipts:settings.listManualTopups(req.params.workerId)}); }
+    catch { return res.status(500).json({success:false,message:'بازخوانی رسیدها انجام نشد.'}); }
+  });
+  app.post('/api/admin/workers/:workerId/wallet/manual-topups', requireAdmin, noQuery, (req,res)=>{
+    try {
+      const result=settings.recordManualTopup(req.params.workerId,req.body,res.locals.adminAuditActor);
+      if(result.code==='invalid') return res.status(400).json({success:false,message:'اطلاعات واریز یا حساب متخصص معتبر نیست.'});
+      if(result.code==='conflict') return res.status(409).json({success:false,message:'این شماره پیگیری قبلاً ثبت شده است.'});
+      return res.status(201).json({success:true,receipt:result.receipt});
+    } catch { return res.status(500).json({success:false,message:'ثبت شارژ انجام نشد؛ رسیدها را بازخوانی کنید.'}); }
+  });
   app.get('/api/admin/payment-settings', requireAdmin, noQuery, (req, res) => {
     try {
       const resolved = settings.resolve();
