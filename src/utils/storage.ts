@@ -1,5 +1,17 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { AsyncStorageStatic } from '@react-native-async-storage/async-storage';
 import { previewActive, previewRead, previewWrite, previewRemove } from '../components/native/previewRuntime';
+
+// Native package evaluation itself throws if an installed APK omits the module.
+let storageBackend: Promise<AsyncStorageStatic | null> | undefined;
+function loadStorage(): Promise<AsyncStorageStatic | null> {
+  storageBackend ??= import('@react-native-async-storage/async-storage')
+    .then(module => module.default)
+    .catch(() => {
+      console.warn('[PAKSHO_STORAGE] Persistent storage unavailable; using session memory. Rebuild the APK with AsyncStorage linked.');
+      return null;
+    });
+  return storageBackend;
+}
 
 class StorageService {
   private memoryFallback: Map<string, string> = new Map();
@@ -9,7 +21,8 @@ class StorageService {
     const cached = this.memoryFallback.get(key);
     if (cached !== undefined) return cached;
 
-    const stored = await AsyncStorage.getItem(key);
+    const storage = await loadStorage();
+    const stored = storage ? await storage.getItem(key) : null;
     if (stored !== null) this.memoryFallback.set(key, stored);
     return stored;
   }
@@ -29,7 +42,8 @@ class StorageService {
     try {
       const serialized = JSON.stringify(value);
       this.memoryFallback.set(key, serialized);
-      await AsyncStorage.setItem(key, serialized);
+      const storage = await loadStorage();
+      await storage?.setItem(key, serialized);
     } catch {
       // چشم‌پوشی از خطاهای احتمالی ذخیره‌سازی
     }
@@ -39,7 +53,8 @@ class StorageService {
     if (previewActive()) { previewRemove(key); return; }
     try {
       this.memoryFallback.delete(key);
-      await AsyncStorage.removeItem(key);
+      const storage = await loadStorage();
+      await storage?.removeItem(key);
     } catch {
       // خطا نادیده گرفته می‌شود
     }

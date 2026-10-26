@@ -35,6 +35,7 @@ export function AddressCityPicker({ value, onSelectCity, onSelectDistrict }: Pro
     {!!error && <><Text style={styles.note}>{error}</Text><Pressable accessibilityRole="button" onPress={retry}><Text style={styles.link}>تلاش دوباره</Text></Pressable></>}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.row}>
       {catalog?.cities.map(city => <Pressable key={city.id} accessibilityRole="button" accessibilityState={{ selected: city.id === value.cityId }}
+        aria-pressed={city.id === value.cityId}
         onPress={() => { if (city.id !== value.cityId || city.name !== value.city) onSelectCity(city); }} style={[styles.chip, city.id === value.cityId && styles.selected]}><Text style={styles.text}>{city.name}</Text></Pressable>)}
     </ScrollView>
     {!!selected && !selected.neighborhoods.length && <Text style={styles.note}>محله‌ای برای این شهر ثبت نشده است؛ نام محله را در فرم وارد کنید.</Text>}

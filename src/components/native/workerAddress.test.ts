@@ -100,6 +100,9 @@ describe('worker residence address client', () => {
       options.signal?.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
     }));
     const pending = address.saveWorkerAddress('جدید');
+    // The storage backend is loaded lazily before the network timeout starts.
+    await vi.dynamicImportSettled();
+    expect(spy.network).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(60_000);
     const result = await pending;
     expect(result.ok).toBe(false);

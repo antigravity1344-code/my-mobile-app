@@ -54,6 +54,7 @@ export function WorkerServiceAreaScreen({ onBack }: { onBack: () => void }) {
       <Text style={styles.label}>شهر</Text>
       <ScrollView horizontal contentContainerStyle={styles.row}>
         {catalog.cities.map(value => <Pressable key={value.id} accessibilityRole="button" disabled={!editable}
+          aria-pressed={value.id === cityId}
           accessibilityState={{ selected: value.id === cityId, disabled: !editable }}
           onPress={() => { if (value.id !== cityId) { setCityId(value.id); setNeighborhoods([]); setMessage(null); } }}
           style={[styles.chip, value.id === cityId && styles.selected]}><Text style={styles.text}>{value.name}</Text></Pressable>)}
@@ -63,6 +64,7 @@ export function WorkerServiceAreaScreen({ onBack }: { onBack: () => void }) {
       {outdated && <Text style={styles.note}>فهرست محله‌ها تغییر کرده است. محدوده قبلی حفظ شده؛ محله‌های جاری را دوباره انتخاب کنید.</Text>}
       {outdated && <Pressable accessibilityRole="button" disabled={!editable} onPress={() => setNeighborhoods([])}><Text style={styles.link}>انتخاب دوباره محله‌ها</Text></Pressable>}
       <View style={styles.wrap}>{city?.neighborhoods.map(name => <Pressable key={name} accessibilityRole="checkbox" disabled={!editable}
+        aria-checked={neighborhoods.includes(name)}
         accessibilityState={{ checked: neighborhoods.includes(name), disabled: !editable }}
         onPress={() => { setNeighborhoods(current => current.includes(name) ? current.filter(value => value !== name) : [...current, name]); setMessage(null); }}
         style={[styles.chip, neighborhoods.includes(name) && styles.selected]}><Text style={styles.text}>{name}</Text></Pressable>)}</View>
