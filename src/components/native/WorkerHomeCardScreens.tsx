@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } 
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { loadWorkerWallet, type WorkerWallet } from '../../features/worker/services/workerFinance';
+import { WORKER_MANUAL_TOPUP_HELP, WORKER_ONLINE_TOPUP_HELP } from '../../features/worker/services/workerFinanceCopy';
 import { colors, radius, shadowSm, space, type } from '../../theme/customerHome';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import {
@@ -264,6 +265,13 @@ export function WorkerTransactionsScreen({ onBack }: { onBack: () => void }) {
   return (
     <CardScreen title={WORKER_HOME_CARD_LABEL.transactions} onBack={onBack}>
       <Text style={styles.note}>{WORKER_TRANSACTIONS_NOTE}</Text>
+      <Text style={styles.note}>{WORKER_MANUAL_TOPUP_HELP}</Text>
+      <Text style={styles.note}>{WORKER_ONLINE_TOPUP_HELP}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="بازخوانی کیف پول"
+        accessibilityState={{ disabled: loading }} disabled={loading}
+        onPress={() => void refresh()} style={styles.secondaryBtn}>
+        <Text style={styles.secondaryBtnText}>{loading ? 'در حال بارگیری…' : 'بازخوانی کیف پول'}</Text>
+      </Pressable>
       {loading ? (
         <View style={styles.stateCard}>
           <ActivityIndicator color={colors.teal} />
