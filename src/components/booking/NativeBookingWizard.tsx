@@ -497,8 +497,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           {SERVICES_CATALOG.filter((service) => service.isVisible).map((service) => (
             <Pressable key={service.id} onPress={() => selectService(service)} style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}>
               <View style={styles.cardIcon}><Sparkles size={20} color={colors.teal} /></View>
-              <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text></View>
-              <Text style={styles.price}>قیمت را سرور اعلام می‌کند</Text>
+              <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text><Text style={styles.price}>قیمت را سرور اعلام می‌کند</Text></View>
             </Pressable>
           ))}
           <PricingTable visible={pricingVisible} onClose={() => setPricingVisible(false)} onSelect={selectService} />
