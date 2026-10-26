@@ -27,6 +27,8 @@ export interface AddressCoordinates {
 }
 
 export interface AddressDetails {
+  cityId?: string;
+  city?: string;
   district: string;
   fullAddress: string;
   plaque: string;

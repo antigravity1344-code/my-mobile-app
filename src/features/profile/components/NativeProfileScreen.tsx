@@ -131,7 +131,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
                     <Text style={styles.secondaryBtnText}>ویرایش</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.addressLine}>{mainAddress.district} · {mainAddress.fullAddress}</Text>
+                <Text style={styles.addressLine}>{mainAddress.city ? `${mainAddress.city} · ` : ''}{mainAddress.district} · {mainAddress.fullAddress}</Text>
                 <Text style={styles.addressLine}>پلاک {mainAddress.plaque}{mainAddress.unit ? ` · واحد ${mainAddress.unit}` : ''}</Text>
                 <Text style={styles.addressLine}>{mainAddress.recipientName} · {toPersianDigits(mainAddress.contactPhone || '')}</Text>
               </View>
@@ -161,7 +161,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
             otherAddresses.map((addr) => (
               <View key={addr.id} style={styles.addressCard}>
                 <Text style={styles.addressTitle}>{addr.title}</Text>
-                <Text style={styles.addressLine}>{addr.district} · {addr.fullAddress}</Text>
+                <Text style={styles.addressLine}>{addr.city ? `${addr.city} · ` : ''}{addr.district} · {addr.fullAddress}</Text>
                 <Text style={styles.addressLine}>پلاک {addr.plaque}{addr.unit ? ` · واحد ${addr.unit}` : ''}</Text>
                 <View style={styles.addressActions}>
                   <Pressable onPress={() => setDefaultAddress(addr.id)} style={styles.secondaryBtn}>

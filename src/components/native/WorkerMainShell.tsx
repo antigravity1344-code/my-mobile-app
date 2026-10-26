@@ -18,13 +18,14 @@ import { NativeSupportScreen } from '../../features/support';
 import { NativeNotificationsScreen } from '../../features/notifications/NativeNotificationsScreen';
 import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
 import { WorkerAddressScreen } from './WorkerAddressScreen';
+import { WorkerServiceAreaScreen } from './WorkerServiceAreaScreen';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { WORKER_TOKEN_KEY, type WorkerSessionUser } from './workerLoginStorage';
 import { colors } from '../../theme/customerHome';
 
-export type WorkerMainView = WorkerTab | 'alerts' | WorkerHomeCardKey;
+export type WorkerMainView = WorkerTab | 'alerts' | 'work_area' | WorkerHomeCardKey;
 
 function isWorkerHomeCard(view: WorkerMainView): view is WorkerHomeCardKey {
   return (WORKER_HOME_CARD_KEYS as readonly string[]).includes(view);
@@ -127,7 +128,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
     void fetchOrders('after-action');
   };
 
-  const activeTab: WorkerTab = mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
+  const activeTab: WorkerTab = mainView === 'work_area' ? 'profile' : mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
   const cardKnown = hasLoaded && !ordersState.sessionExpired && !(!!ordersState.error && ordersState.available.length === 0 && ordersState.mine.length === 0);
   const newOrdersBadge = hasLoaded && !ordersState.sessionExpired ? workerTabBadge(ordersState.available.length) : null;
 
@@ -169,7 +170,9 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
         ) : mainView === 'my_jobs' ? (
           <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} />
         ) : mainView === 'profile' ? (
-          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} />
+          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} />
+        ) : mainView === 'work_area' ? (
+          <WorkerServiceAreaScreen key={user.id} onBack={() => onChangeView('profile')} />
         ) : mainView === 'alerts' ? (
           <NativeNotificationsScreen appearance="worker" />
         ) : (

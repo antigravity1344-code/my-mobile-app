@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 import styles from './AddressManagerModal.module.css';
+import { AddressCityPicker } from '../../../components/booking/AddressCityPicker';
+import { addressCityFields, type CityAddress } from '../../../api/serviceAreas';
 
 interface Props {
   isOpen: boolean;
@@ -14,6 +16,7 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
   // فیلدهای فرم افزودن آدرس
   const [title, setTitle] = useState('');
   const [district, setDistrict] = useState('');
+  const [cityFields, setCityFields] = useState<CityAddress>({});
   const [fullAddress, setFullAddress] = useState('');
   const [plaque, setPlaque] = useState('');
   const [unit, setUnit] = useState('');
@@ -31,6 +34,7 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
     }
 
     addSavedAddress({
+      ...addressCityFields(cityFields),
       title,
       district,
       fullAddress,
@@ -68,6 +72,9 @@ export const AddressManagerModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </div>
 
             <div className={styles.formGroup}>
+              <AddressCityPicker value={{ ...cityFields, district, fullAddress }} onSelectCity={city => {
+                setCityFields({ cityId: city.id, city: city.name }); if (cityFields.cityId !== city.id) setDistrict('');
+              }} onSelectDistrict={setDistrict} />
               <label className={styles.label}>نام محله</label>
               <input
                 type="text"

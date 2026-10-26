@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { Check, Clock, MapPin, Sparkles, X } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
+import { AddressCityPicker } from './AddressCityPicker';
+import { addressCityFields } from '../../api/serviceAreas';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
@@ -101,23 +103,16 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     }
     : null;
   const { view: quoteView, confirmable, refreshQuote } = useCustomerPriceQuote(quoteSelection);
-  const [districtSearch, setDistrictSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const dateStripRef = useRef<ScrollView>(null);
   const savedAddressStripRef = useRef<ScrollView>(null);
-  const districtStripRef = useRef<ScrollView>(null);
   const [dateStripScroll] = useState(() => createScrollToEndOnce(() => dateStripRef.current));
   const [savedAddressStripScroll] = useState(() => createScrollToEndOnce(() => savedAddressStripRef.current));
-  const [districtStripScroll] = useState(() => createScrollToEndOnce(() => districtStripRef.current));
   // Strips remount when the step changes; let each open at its right edge (first item) again.
   useEffect(() => {
     dateStripScroll.reset();
     savedAddressStripScroll.reset();
-    districtStripScroll.reset();
-  }, [booking.step, dateStripScroll, savedAddressStripScroll, districtStripScroll]);
-  useEffect(() => {
-    districtStripScroll.reset();
-  }, [districtSearch, districtStripScroll]);
+  }, [booking.step, dateStripScroll, savedAddressStripScroll]);
   // Keep the focused address field (plak/unit/name/phone…) above the Android keyboard.
   // RN's built-in scroll-to-keyboard helper (ScrollView responder) assumes a full-screen ScrollView and, before
   // keyboardDidShow arrives, uses the window height as keyboard top — so fields in the middle of the
@@ -183,6 +178,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const applySavedAddressToWizard = (address: SavedAddress) => {
     booking.setAddressDetails((prev) => ({
       ...prev,
+      cityId: address.cityId,
+      city: address.city,
       district: address.district,
       fullAddress: address.fullAddress,
       plaque: address.plaque,
@@ -191,7 +188,6 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       contactPhone: address.contactPhone,
       isSaved: true,
     }));
-    setDistrictSearch('');
     setSelectedSavedAddressId(address.id);
   };
 
@@ -246,6 +242,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     const title = details.district.trim();
     addSavedAddress({
       title,
+      ...addressCityFields(details),
       district: details.district.trim(),
       fullAddress: details.fullAddress.trim(),
       plaque: details.plaque.trim(),
@@ -264,8 +261,6 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     }
   }, [submissionState]);
-  const districts = ['سعادت‌آباد', 'شهرک غرب', 'پونک', 'نیاوران', 'ونک', 'تهران‌پارس', 'صادقیه'];
-  const filteredDistricts = districts.filter((district) => district.includes(districtSearch.trim()));
 
   const selectService = (service: CleaningService, options: Record<string, string | number | boolean> = {}) => {
     booking.setSelectedService(service);
@@ -305,6 +300,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       date: booking.selectedDate.dateString,
       time: booking.selectedTimeSlot.id,
       address: {
+        ...addressCityFields(booking.addressDetails),
         district: booking.addressDetails.district,
         fullAddress: booking.addressDetails.fullAddress,
         plaque: normalizePersianDigits(booking.addressDetails.plaque),
@@ -584,7 +580,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
                         {address.isDefault ? ' · پیش‌فرض' : ''}
                       </Text>
                       <Text style={styles.savedAddressMeta} numberOfLines={2}>
-                        {address.district}، {address.fullAddress}
+                        {address.city ? `${address.city}، ` : ''}{address.district}، {address.fullAddress}
                       </Text>
                     </Pressable>
                   );
@@ -598,7 +594,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           )}
           <Pressable onPress={useGps} style={styles.gpsButton}><MapPin size={18} color={colors.teal} /><Text style={styles.gpsText}>{gpsLoading ? 'در حال دریافت موقعیت...' : 'استفاده از موقعیت فعلی'}</Text>{gpsLoading && <ActivityIndicator color={colors.teal} />}</Pressable>
           {gpsError ? <Text style={styles.errorMessage}>{gpsError}</Text> : null}
-          <TextInput value={districtSearch} onChangeText={setDistrictSearch} onFocus={scrollFocusedFieldIntoView} placeholder="جستجوی محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} /><ScrollView ref={districtStripRef} horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} onContentSizeChange={districtStripScroll.onContentSizeChange} contentContainerStyle={[{ paddingHorizontal: 16 }, styles.rtlStrip]}>{rtlOrder(filteredDistricts).map((district) => <Pressable key={district} onPress={() => { setSelectedSavedAddressId(null); setDistrictSearch(district); booking.updateAddressField('district', district); }} style={[styles.chip, booking.addressDetails.district === district && styles.chipSelected]}><Text style={[styles.chipText, booking.addressDetails.district === district && styles.choiceTextSelected]}>{district}</Text></Pressable>)}</ScrollView>
+          <AddressCityPicker value={booking.addressDetails} onSelectCity={city => {
+            setSelectedSavedAddressId(null);
+            booking.setAddressDetails(prev => ({ ...prev, cityId: city.id, city: city.name,
+              ...(prev.cityId !== city.id ? { district: '', coordinates: { latitude: 0, longitude: 0 } } : {}) }));
+          }} onSelectDistrict={district => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} />
+          <TextInput value={booking.addressDetails.district} onChangeText={district => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} onFocus={scrollFocusedFieldIntoView} placeholder="نام محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} />
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
           <View style={styles.choiceRow}>
             <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput {...RTL_SINGLE_LINE_INPUT} value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
@@ -636,7 +637,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
             <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedTimeSlot?.label}</Text>
-            <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
+            <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.city ? `${booking.addressDetails.city}، ` : ''}{booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
             {review.kind === 'none' && (quoteView.status === 'loading' || quoteView.status === 'idle') ? <Text style={styles.summaryLine}>در حال دریافت قیمت از سرور...</Text> : null}
             {review.kind === 'recovery' ? (

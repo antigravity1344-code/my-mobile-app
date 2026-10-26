@@ -113,7 +113,7 @@ export const ProfileScreen: React.FC<Props> = ({ onOpenLoginModal }) => {
                   {addr.isDefault && <span className={styles.defaultBadge}>پیش‌فرض</span>}
                 </div>
                 <p className={styles.addressText}>
-                  {addr.district}، {addr.fullAddress}، پلاک {addr.plaque}
+                  {addr.city ? `${addr.city}، ` : ''}{addr.district}، {addr.fullAddress}، پلاک {addr.plaque}
                   {addr.unit ? `، واحد ${addr.unit}` : ''}
                 </p>
               </div>

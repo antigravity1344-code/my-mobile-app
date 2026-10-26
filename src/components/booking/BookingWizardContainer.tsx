@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useBooking } from '../../context/BookingContext';
+import { addressCityFields } from '../../api/serviceAreas';
 import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
 import { DateTimeSelector } from './DateTimeSelector';
@@ -88,6 +89,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       date: selectedDate.dateString,
       time: selectedTimeSlot.id,
       address: {
+        ...addressCityFields(addressDetails),
         district: addressDetails.district,
         fullAddress: addressDetails.fullAddress,
         plaque: normalizePersianDigits(addressDetails.plaque),
@@ -373,7 +375,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   <span className="text-xs font-bold text-slate-700">آدرس:</span>
                 </div>
                 <div className="text-left text-xs font-medium text-slate-800 max-w-xs leading-relaxed">
-                  {addressDetails.district}، {addressDetails.fullAddress}، پلاک {addressDetails.plaque}
+                  {addressDetails.city ? `${addressDetails.city}، ` : ''}{addressDetails.district}، {addressDetails.fullAddress}، پلاک {addressDetails.plaque}
                   {addressDetails.unit ? `، واحد ${addressDetails.unit}` : ''}
                   {addressDetails.floor ? `، طبقه ${addressDetails.floor}` : ''}
                   <div className="text-[11px] text-slate-500 mt-0.5">

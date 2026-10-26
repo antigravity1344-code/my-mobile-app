@@ -13,6 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
+import { loadServiceAreaCatalog } from '../../api/serviceAreas';
 import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
 import { type } from '../../theme';
 import { loadWorkerCommissionPolicy, type WorkerCommissionPolicy } from '../../features/worker/services/workerFinance';
@@ -38,7 +39,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   const [nationalId, setNationalId] = useState('');
   const [birthDate, setBirthDate] = useState(user.birthDate || '');
   const [address, setAddress] = useState(user.address || '');
-  const [city, setCity] = useState(user.city || 'تهران');
+  const [city, setCity] = useState(user.city || '');
   const [bankSheba, setBankSheba] = useState('');
   const [idDocFile, setIdDocFile] = useState<SelectedIdDoc | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,6 +61,16 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   };
 
   useEffect(() => { void refreshCommissionPolicy(); }, []);
+  useEffect(() => {
+    if (user.city) return;
+    const controller = new AbortController();
+    void loadServiceAreaCatalog(controller.signal).then(result => {
+      if (controller.signal.aborted || !result.catalog) return;
+      const initial = result.catalog.cities.find(value => value.id === result.catalog!.defaultCityId);
+      if (initial) setCity(current => current || initial.name);
+    });
+    return () => controller.abort();
+  }, [user.city]);
 
   const scrollFieldIntoView = (key: string) => {
     const y = fieldY.current[key];

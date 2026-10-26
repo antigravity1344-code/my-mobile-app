@@ -18,6 +18,8 @@ export function formatSubmittedAddress(address?: Partial<AddressDetails> | null)
   const district = typeof address.district === 'string' ? address.district.trim() : '';
   const fullAddress = typeof address.fullAddress === 'string' ? address.fullAddress.trim() : '';
   if (district) parts.push(district);
+  const city = typeof address.city === 'string' ? address.city.trim() : '';
+  if (city && city !== district) parts.push(city);
   if (fullAddress && fullAddress !== district) parts.push(fullAddress);
   const plaque = typeof address.plaque === 'string' ? address.plaque.trim() : '';
   const unit = typeof address.unit === 'string' ? address.unit.trim() : '';

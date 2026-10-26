@@ -11,6 +11,7 @@ const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
 const { createPaymentSettings } = require('./paymentSettings');
 const { createServiceAreas } = require('./serviceAreas');
+const { createWorkerServiceArea } = require('./workerServiceArea');
 const { IMPLEMENTED_PAYMENT_PROVIDERS } = require('./paymentProviders');
 
 const USER_FIELDS = new Set([
@@ -1657,6 +1658,7 @@ function createDataStore(filename) {
   }
 
   const serviceAreas = createServiceAreas({ database, transaction });
+  const workerServiceArea = createWorkerServiceArea({ database, transaction, areas: serviceAreas, getUser });
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
@@ -1688,6 +1690,7 @@ function createDataStore(filename) {
     workerWallet,
     paymentSettings,
     serviceAreas,
+    workerServiceArea,
     transaction,
     getUser,
     getUserByPhone,

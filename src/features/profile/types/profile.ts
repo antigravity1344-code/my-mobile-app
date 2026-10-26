@@ -16,6 +16,8 @@ export interface LoyaltyInfo {
 
 // ساختار آدرس ذخیره‌شده کاربر
 export interface SavedAddress {
+  cityId?: string;
+  city?: string;
   id: string; // شناسه یکتای آدرس
   title: string; // عنوان آدرس (مثلا: خانه، محل کار)
   district: string; // نام محله

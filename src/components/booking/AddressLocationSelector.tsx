@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { AddressDetails } from '../../types/booking';
 import { getCurrentPosition } from '../../services/location';
 import { getAddressValidationErrors, isValidAddress } from '../../utils/bookingValidation';
+import { AddressCityPicker } from './AddressCityPicker';
 import {
   MapPin,
   Phone,
@@ -16,19 +17,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-const POPULAR_DISTRICTS = [
-  'سعادت‌آباد',
-  'شهرک غرب',
-  'پونک',
-  'نیاوران',
-  'ونک',
-  'تهران‌پارس',
-  'صادقیه',
-  'گیشا',
-  'پاسداران',
-  'مرزداران',
-];
-
 interface AddressLocationSelectorProps {
   addressDetails: AddressDetails;
   onUpdateField: <K extends keyof AddressDetails>(field: K, value: AddressDetails[K]) => void;
@@ -42,7 +30,6 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
   onNext,
   onPrev,
 }) => {
-  const [districtSearch, setDistrictSearch] = useState('');
   const [, setTouched] = useState({
     fullAddress: false,
     plaque: false,
@@ -75,10 +62,6 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
 
   const isFormValid = isValidAddress(addressDetails);
 
-  const filteredDistricts = POPULAR_DISTRICTS.filter((d) =>
-    d.includes(districtSearch.trim())
-  );
-
   return (
     <div className="space-y-6 text-right" dir="rtl">
       <div>
@@ -108,7 +91,7 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
               <div className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs flex items-center gap-2">
                 <Navigation className="w-3.5 h-3.5 text-sky-600 animate-pulse" />
                 <span className="text-[11px] font-bold text-slate-800">
-                  {addressDetails.district}، تهران
+                  {addressDetails.district}، {addressDetails.city || 'شهر انتخاب‌نشده'}
                 </span>
               </div>
 
@@ -168,34 +151,22 @@ export const AddressLocationSelector: React.FC<AddressLocationSelectorProps> = (
 
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-700 block">
-          انتخاب یا جستجوی محله:
+          نام محله:
         </label>
         <input
           type="search"
-          value={districtSearch}
-          onChange={(e) => setDistrictSearch(e.target.value)}
-          placeholder="جستجوی محله"
+          value={addressDetails.district}
+          onChange={(e) => onUpdateField('district', e.target.value)}
+          placeholder="نام محله"
           className={`w-full rounded-xl border bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 ${validationErrors.district ? 'border-red-300' : 'border-slate-200'}`}
         />
         {validationErrors.district && (
           <p className="text-[11px] text-red-600 font-medium">{validationErrors.district}</p>
         )}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
-          {filteredDistricts.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => onUpdateField('district', d)}
-              className={`py-1.5 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition border cursor-pointer ${
-                addressDetails.district === d
-                  ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
+        <AddressCityPicker value={addressDetails} onSelectCity={city => {
+          onUpdateField('cityId', city.id); onUpdateField('city', city.name);
+          if (addressDetails.cityId !== city.id) { onUpdateField('district', ''); onUpdateField('coordinates', { latitude: 0, longitude: 0 }); }
+        }} onSelectDistrict={name => onUpdateField('district', name)} />
       </div>
 
       <div className="space-y-4">

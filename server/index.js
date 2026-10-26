@@ -14,6 +14,7 @@ const { registerCompletionRoutes } = require('./completionRoutes');
 const { registerWorkerWalletRoutes } = require('./workerWalletRoutes');
 const { registerPaymentSettingsRoutes } = require('./paymentSettingsRoutes');
 const { registerServiceAreaRoutes } = require('./serviceAreaRoutes');
+const { registerWorkerServiceAreaRoutes } = require('./workerServiceAreaRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -444,6 +445,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
     store.deleteOtp(phone);
     let nextUser = store.getUserByPhone(phone, requestedRole);
     if (!nextUser) {
+      const cityCatalog = store.serviceAreas.read();
       nextUser = store.createUser({
         id: 'USER-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
         phone,
@@ -456,7 +458,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
         avatar: '',
         idDoc: '',
         address: '',
-        city: 'تهران',
+        city: cityCatalog.cities.find(city => city.id === cityCatalog.defaultCityId).name,
         skills: [],
         bankSheba: '',
         addresses: [],
@@ -653,6 +655,8 @@ function sanitizeSavedAddress(raw) {
     id: text(raw.id, 80) || ('addr-' + crypto.randomBytes(6).toString('hex')),
     title,
     district: text(raw.district, 80),
+    ...(typeof raw.city === 'string' && raw.city.trim() ? { city: text(raw.city, 80) } : {}),
+    ...(typeof raw.cityId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(raw.cityId) ? { cityId: raw.cityId } : {}),
     fullAddress,
     plaque: text(raw.plaque, 20),
     unit: text(raw.unit, 20),
@@ -1422,6 +1426,7 @@ registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, req
 registerWorkerWalletRoutes(app, {store,requireUser});
 registerPaymentSettingsRoutes(app, { settings: store.paymentSettings, requireAdmin });
 registerServiceAreaRoutes(app, { areas: store.serviceAreas, requireAdmin });
+registerWorkerServiceAreaRoutes(app, { store, requireUser });
 
 app.use('/api/admin', requireAdmin);
 
@@ -2031,7 +2036,7 @@ app.get('/admin', (req, res) => {
     </section>
     <section id="tabAreas" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
-      <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. این فهرست فعلاً مستقل از انتخاب‌های اپ ذخیره می‌شود؛ نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
+      <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. فهرست در فرم نشانی مشتری و محدوده فعالیت متخصص نمایش داده می‌شود. تغییر شهر پیش‌فرض، نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
       <p id="areasMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="areasRefresh" type="button" onclick="loadAdminAreas()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی فهرست</button>
       <label class="block">شهر <select id="areasCity" onchange="selectAdminArea()" disabled class="bg-slate-800 border p-2 rounded-xl"></select></label>

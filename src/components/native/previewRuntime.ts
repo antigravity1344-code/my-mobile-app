@@ -110,6 +110,10 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
   if (path === '/workers/me/address' && role === 'worker') {
     return { success: true, address: 'تهران، خیابان نمونه، پلاک آزمایشی' };
   }
+  if (path === '/service-areas' || (path === '/workers/me/service-area' && role === 'worker')) {
+    return { success: true, area: null, catalog: { version: 0, defaultCityId: 'preview-city',
+      cities: [{ id: 'preview-city', name: 'شهر نمونه', neighborhoods: ['محله نمونه'] }] } };
+  }
   if (path === '/workers/me/skills' && role === 'worker') {
     return { success: true, skills: ['home_unit_cleaning'] };
   }

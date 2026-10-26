@@ -17,6 +17,8 @@ import { extraAddressIsDefault } from '../mainAddress';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
 import { type } from '../../../theme';
 import type { SavedAddress } from '../types/profile';
+import { AddressCityPicker } from '../../../components/booking/AddressCityPicker';
+import { addressCityFields, type CityAddress } from '../../../api/serviceAreas';
 
 interface Props {
   visible: boolean;
@@ -31,6 +33,7 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
   const { addSavedAddress, saveMainAddress, profile } = useProfile();
   const [title, setTitle] = useState('');
   const [district, setDistrict] = useState('');
+  const [cityFields, setCityFields] = useState<CityAddress>({});
   const [fullAddress, setFullAddress] = useState('');
   const [plaque, setPlaque] = useState('');
   const [unit, setUnit] = useState('');
@@ -44,6 +47,7 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
     if (editAddress) {
       setTitle(editAddress.title || '');
       setDistrict(editAddress.district || '');
+      setCityFields({ cityId: editAddress.cityId, city: editAddress.city });
       setFullAddress(editAddress.fullAddress || '');
       setPlaque(editAddress.plaque || '');
       setUnit(editAddress.unit || '');
@@ -56,6 +60,7 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
   const resetAndClose = () => {
     setTitle('');
     setDistrict('');
+    setCityFields({});
     setFullAddress('');
     setPlaque('');
     setUnit('');
@@ -70,7 +75,7 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
       setError('لطفا تمامی فیلدهای ضروری را پر کنید.');
       return;
     }
-    const fields = { title, district, fullAddress, plaque, unit, recipientName, contactPhone };
+    const fields = { title, district, fullAddress, plaque, unit, recipientName, contactPhone, ...addressCityFields(cityFields) };
     if (mode === 'main') {
       saveMainAddress(fields, editAddress?.id);
     } else {
@@ -110,6 +115,9 @@ export const NativeAddressManagerModal: React.FC<Props> = ({ visible, onClose, m
               <Text style={styles.label}>عنوان آدرس</Text>
               <TextInput {...RTL_SINGLE_LINE_INPUT} value={title} onChangeText={setTitle} placeholder="مثلاً خانه" placeholderTextColor="#94a3b8" style={styles.input} />
             </View>
+            {visible && <AddressCityPicker value={{ ...cityFields, district, fullAddress }} onSelectCity={city => {
+              setCityFields({ cityId: city.id, city: city.name }); if (cityFields.cityId !== city.id) setDistrict('');
+            }} onSelectDistrict={setDistrict} />}
             <View style={styles.field}>
               <Text style={styles.label}>محله</Text>
               <TextInput {...RTL_SINGLE_LINE_INPUT} value={district} onChangeText={setDistrict} placeholder="مثلاً سعادت‌آباد" placeholderTextColor="#94a3b8" style={styles.input} />
