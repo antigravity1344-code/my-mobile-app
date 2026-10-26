@@ -15,6 +15,7 @@ const { registerWorkerWalletRoutes } = require('./workerWalletRoutes');
 const { registerPaymentSettingsRoutes } = require('./paymentSettingsRoutes');
 const { registerServiceAreaRoutes } = require('./serviceAreaRoutes');
 const { registerWorkerServiceAreaRoutes } = require('./workerServiceAreaRoutes');
+const { registerWorkerBankRoutes } = require('./workerBankRoutes');
 const kavenegarSms = require('./kavenegarSms');
 const { assertKeyConfigured, secretsMatch } = require('./fieldCrypto');
 const { resolvePricingMode } = require('./pricing/pricingMode');
@@ -712,6 +713,10 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   const nextName = typeof name === 'string' ? name.trim().slice(0, 80) : '';
   const nextNationalId = typeof nationalId === 'string' ? nationalId.trim() : '';
   const nextBankSheba = typeof bankSheba === 'string' ? bankSheba.trim().toUpperCase() : '';
+  // D-64: registration must not bypass the independent PIN-protected edit path.
+  if ((user.bankSheba || store.workerBank.read(user.id).bankDetails?.hasPin) && nextBankSheba !== user.bankSheba) {
+    return res.status(409).json({ success: false, code: 'BANK_EDIT_REQUIRES_PIN', message: 'برای تغییر شبا از بخش مستقل حساب متخصص و رمز شبا استفاده کنید.' });
+  }
   const nextAvatar = typeof avatar === 'string' ? avatar.trim() : '';
   const uploadedIdDoc = parseIdDocFile(idDocFile);
 
@@ -1427,6 +1432,7 @@ registerWorkerWalletRoutes(app, {store,requireUser});
 registerPaymentSettingsRoutes(app, { settings: store.paymentSettings, requireAdmin });
 registerServiceAreaRoutes(app, { areas: store.serviceAreas, requireAdmin });
 registerWorkerServiceAreaRoutes(app, { store, requireUser });
+registerWorkerBankRoutes(app, { store, requireUser, requireAdmin });
 
 app.use('/api/admin', requireAdmin);
 
@@ -1902,6 +1908,9 @@ app.get('/admin/payment.js', (req, res) => {
 app.get('/admin/service-areas.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminServiceAreas.js'));
 });
+app.get('/admin/worker-bank.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminWorkerBank.js'));
+});
 
 app.get('/admin/points.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminPoints.js'));
@@ -2088,6 +2097,7 @@ app.get('/admin', (req, res) => {
   <script src="/admin/commission.js"></script>
   <script src="/admin/payment.js"></script>
   <script src="/admin/service-areas.js"></script>
+  <script src="/admin/worker-bank.js"></script>
   <script src="/admin/completion.js"></script>
   <script>
     const sourceIdentity = ${identityJson};
@@ -2233,7 +2243,12 @@ app.get('/admin', (req, res) => {
           ' text-white text-xs font-bold px-3 py-2 rounded-xl transition',
           approve ? '✅ تایید مدارک و فعال‌سازی' : '⛔ غیرفعال‌سازی');
         button.addEventListener('click', () => updateWorkerStatus(w.id, approve ? 'APPROVED' : 'BLOCKED'));
+        button.setAttribute('data-action', 'worker-status');
         actions.append(button);
+        const bankReset = adminElement('button', 'bg-sky-700 text-white text-xs px-3 py-2 rounded-xl', 'بازنشانی رمز شبا');
+        bankReset.type = 'button';
+        bankReset.addEventListener('click', () => openWorkerBankReset(w, card));
+        actions.append(bankReset);
         card.append(identity, actions);
         rows.append(card);
       }

@@ -195,7 +195,7 @@ test('untrusted worker and order IDs are inert and use encoded API paths when cl
       await page.evaluate(({ kind, w, o }) => kind === 'worker' ? renderWorkers([w]) : renderOrders([o]), {
         kind, w: worker({ id }), o: order({ id, status: 'CANCEL_REQUESTED' }),
       });
-      const button = page.locator('#' + listId + ' button');
+      const button = page.locator('#' + listId + (kind === 'worker' ? ' button[data-action="worker-status"]' : ' button'));
       assert.equal(await button.getAttribute('onclick'), null, 'untrusted IDs must not enter inline JavaScript attributes');
       if (kind === 'order') await page.locator('#tabOrdersBtn').click();
       await button.click();
@@ -218,12 +218,46 @@ test('real API data with injected worker and order text renders inertly', async 
   });
 });
 
+test('admin resets a worker bank PIN through the real panel only after identity confirmation and a reason', async () => {
+  const w = worker({ id: 'WORKER-BANK-RESET', phone: '09120000105', status: 'APPROVED', idDoc: 'existing-identity-document', bankSheba: 'IR820540102680020817909002' });
+  store.createUser(w);
+  assert.equal(store.workerBank.savePin(w.id, { newPin: '123456', expectedVersion: 0 }).code, 'ok');
+  await withPage(async page => {
+    await page.evaluate(row => renderWorkers([row]), w);
+    await page.getByRole('button', { name: 'بازنشانی رمز شبا', exact: true }).click();
+    const panel = page.locator('[data-bank-reset="WORKER-BANK-RESET"]');
+    await page.waitForFunction(() => document.querySelector('[data-bank-reset] [role="status"]').textContent.includes('رمز دارد'));
+    assert.ok((await panel.textContent()).includes('IR82****9002'));
+    assert.equal((await panel.textContent()).includes(w.bankSheba), false);
+    await panel.getByRole('button', { name: 'بازنشانی رمز و ارسال اعلان' }).click();
+    assert.equal(store.workerBank.read(w.id).bankDetails.hasPin, true);
+    await panel.getByRole('checkbox').check();
+    await panel.getByLabel('دلیل بازنشانی (الزامی)').fill('هویت با مدرک ثبت‌شده تطبیق داده شد');
+    const saved = page.waitForResponse(response => response.url() === origin + '/api/admin/workers/' + w.id + '/bank-pin/reset' && response.request().method() === 'POST');
+    await panel.getByRole('button', { name: 'بازنشانی رمز و ارسال اعلان' }).click();
+    assert.equal((await saved).status(), 200);
+    await page.waitForFunction(() => document.querySelector('[data-bank-reset] [role="status"]').textContent.includes('رمز بازنشانی و اعلان ثبت شد'));
+    assert.equal(store.workerBank.read(w.id).bankDetails.hasPin, false);
+    assert.equal(store.getUser(w.id).bankSheba, w.bankSheba);
+    assert.equal(store.getUser(w.id).status, 'APPROVED');
+  });
+});
+
 test('ordinary content, dashboard classes, empty states and existing button operations are preserved', async () => {
   const w = worker({ id: 'WORKER-NORMAL', phone: '09120000104', name: 'متخصص & «آزمایشی»' });
   store.createUser(w);
   const o = order({ id: 'ORDER-NORMAL', status: 'CANCEL_REQUESTED', cancelRequestedAt: new Date().toISOString() });
   store.createOrder(o);
   await withPage(async (page) => {
+    await page.evaluate(() => {
+      const originalLoad = loadAllData;
+      window.__operationLoads = [];
+      loadAllData = () => {
+        const pending = originalLoad();
+        window.__operationLoads.push(pending);
+        return pending;
+      };
+    });
     await page.evaluate(({ w, o }) => { renderWorkers([w]); renderOrders([o]); }, { w, o });
     assert.equal(await page.locator('#workersList > div').getAttribute('class'), 'bg-slate-800 border border-amber-500/50 bg-amber-950/10 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
     assert.equal(await page.locator('#workersList img').getAttribute('class'), 'w-12 h-12 rounded-full border-2 border-emerald-500 object-cover');
@@ -231,13 +265,13 @@ test('ordinary content, dashboard classes, empty states and existing button oper
     assert.match(await page.locator('#workersList').textContent(), /متخصص & «آزمایشی»/);
     assert.match(await page.locator('#ordersList').textContent(), /۸۰۰٬۰۰۰ تومان/);
     const approved = page.waitForResponse((response) => response.url() === origin + '/api/admin/users/WORKER-NORMAL/status' && response.request().method() === 'PUT');
-    await page.locator('#workersList button').click();
+    await page.locator('#workersList button[data-action="worker-status"]').click();
     assert.equal((await approved).status(), 200);
     assert.equal(store.getUser(w.id).status, 'APPROVED');
     await page.waitForFunction(() => document.getElementById('workersList').textContent.includes('غیرفعال‌سازی'));
     await page.evaluate((row) => renderWorkers([row]), worker({ ...w, status: 'APPROVED' }));
     const blocked = page.waitForResponse((response) => response.url() === origin + '/api/admin/users/WORKER-NORMAL/status' && response.request().method() === 'PUT');
-    await page.locator('#workersList button').click();
+    await page.locator('#workersList button[data-action="worker-status"]').click();
     assert.equal((await blocked).status(), 200);
     assert.equal(store.getUser(w.id).status, 'BLOCKED');
     await page.evaluate((row) => renderOrders([row]), o);
@@ -246,6 +280,10 @@ test('ordinary content, dashboard classes, empty states and existing button oper
     await page.locator('#ordersList button').click();
     assert.equal((await cancelled).status(), 200);
     assert.equal(store.getOrder(o.id).status, 'CANCELLED');
+    // Each mutation starts an asynchronous refresh. Finish those refreshes
+    // before checking an explicitly rendered empty-state fixture.
+    await page.waitForFunction(() => window.__operationLoads.length === 3);
+    await page.evaluate(() => Promise.all(window.__operationLoads));
     await page.evaluate(() => { renderWorkers([]); renderOrders([]); });
     assert.equal(await page.locator('#workersList').textContent(), 'هیچ متخصصی ثبت‌نام نکرده است.');
     assert.equal(await page.locator('#ordersList').textContent(), 'هیچ سفارشی وجود ندارد.');

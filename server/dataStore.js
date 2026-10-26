@@ -13,6 +13,7 @@ const { createPaymentSettings } = require('./paymentSettings');
 const { createPaymentCharges } = require('./paymentCharges');
 const { createServiceAreas } = require('./serviceAreas');
 const { createWorkerServiceArea } = require('./workerServiceArea');
+const { createWorkerBank } = require('./workerBank');
 const { IMPLEMENTED_PAYMENT_PROVIDERS } = require('./paymentProviders');
 
 const USER_FIELDS = new Set([
@@ -1660,6 +1661,7 @@ function createDataStore(filename) {
 
   const serviceAreas = createServiceAreas({ database, transaction });
   const workerServiceArea = createWorkerServiceArea({ database, transaction, areas: serviceAreas, getUser });
+  const workerBank = createWorkerBank({ database, transaction, getUser, addNotification });
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
@@ -1694,6 +1696,7 @@ function createDataStore(filename) {
     paymentCharges,
     serviceAreas,
     workerServiceArea,
+    workerBank,
     transaction,
     getUser,
     getUserByPhone,

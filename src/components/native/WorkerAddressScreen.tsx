@@ -6,10 +6,10 @@ import {
   initialAddressState, loadWorkerAddress, saveWorkerAddress, workerAddressReducer,
 } from './workerAddress';
 
-type Props = { name?: string; onLogout: () => void; onOpenArea: () => void };
+type Props = { name?: string; onLogout: () => void; onOpenArea: () => void; onOpenBank: () => void };
 
 /** Specialist-only profile entry. Customer profile and onboarding are separate. */
-export function WorkerAddressScreen({ name, onLogout, onOpenArea }: Props) {
+export function WorkerAddressScreen({ name, onLogout, onOpenArea, onOpenBank }: Props) {
   const [state, dispatch] = useReducer(workerAddressReducer, initialAddressState);
   const request = useRef<AbortController | null>(null);
   const preview = previewActive();
@@ -49,6 +49,10 @@ export function WorkerAddressScreen({ name, onLogout, onOpenArea }: Props) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>حساب متخصص</Text>
         {!!name && <Text style={styles.name}>{name}</Text>}
+        <Pressable accessibilityRole="button" onPress={onOpenBank} style={styles.card}>
+          <Text style={styles.heading}>شبا و رمز تغییر شبا</Text>
+          <Text style={styles.description}>ثبت شبا و مدیریت رمز مخصوص آن</Text>
+        </Pressable>
         <Pressable accessibilityRole="button" onPress={onOpenArea} style={styles.card}>
           <Text style={styles.heading}>محدوده فعالیت</Text>
           <Text style={styles.description}>انتخاب شهر و محله‌های کاری</Text>
