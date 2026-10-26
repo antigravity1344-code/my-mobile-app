@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { loadWorkerWallet, type WorkerWallet } from '../../features/worker/services/workerFinance';
 import { previewActive } from './previewRuntime';
+import { WORKER_MANUAL_TOPUP_HELP, WORKER_ONLINE_TOPUP_HELP, WORKER_ONLINE_TOPUP_LABEL, WORKER_WALLET_EXPLANATION } from '../../features/worker/services/workerFinanceCopy';
 
 export const WorkerWalletNativePanel: React.FC = () => {
   const [wallet, setWallet] = useState<WorkerWallet | null>(null);
@@ -27,9 +28,10 @@ export const WorkerWalletNativePanel: React.FC = () => {
 
   return <View style={styles.container}>
     <Text style={styles.title}>کیف پول متخصص</Text>
-    <Text style={styles.note}>مشتری هزینه کار را مستقیم به شما می‌پردازد. کمیسیون شرکت از اعتبار کیف پول کسر می‌شود. اگر مانده هر واحد پولی منفی باشد، پذیرش سفارش جدید ممکن نیست.</Text>
-    <Pressable onPress={onTopUp} disabled style={styles.disabledButton} accessibilityRole="button" accessibilityState={{ disabled: true }}><Text style={styles.disabledText}>شارژ کیف پول (غیرفعال)</Text></Pressable>
-    <Text style={styles.note}>{wallet?.topUpAvailable ? 'شارژ پس از تأیید درگاه ثبت می‌شود؛ تا تکمیل پرداخت موجودی عوض نمی‌شود.' : 'درگاه پرداخت هنوز متصل نیست.'}</Text>
+    <Text style={styles.note}>{WORKER_WALLET_EXPLANATION}</Text>
+    <Text style={styles.note}>{WORKER_MANUAL_TOPUP_HELP}</Text>
+    <Pressable onPress={onTopUp} disabled style={styles.disabledButton} accessibilityRole="button" accessibilityState={{ disabled: true }}><Text style={styles.disabledText}>{WORKER_ONLINE_TOPUP_LABEL}</Text></Pressable>
+    <Text style={styles.note}>{WORKER_ONLINE_TOPUP_HELP}</Text>
     {notice ? <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text> : null}
     <Pressable onPress={() => void refresh()} disabled={loading} style={styles.refresh} accessibilityRole="button"><Text style={styles.refreshText}>{loading ? 'در حال بارگیری…' : 'بازخوانی کیف پول'}</Text></Pressable>
     {loading ? <ActivityIndicator accessibilityLabel="در حال بارگیری کیف پول" /> : null}

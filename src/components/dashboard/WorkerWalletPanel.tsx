@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { loadWorkerWallet, type WorkerWallet } from '../../features/worker/services/workerFinance';
 import { previewActive } from '../native/previewRuntime';
+import { WORKER_MANUAL_TOPUP_HELP, WORKER_ONLINE_TOPUP_HELP, WORKER_ONLINE_TOPUP_LABEL, WORKER_WALLET_EXPLANATION } from '../../features/worker/services/workerFinanceCopy';
 
 export const WorkerWalletPanel: React.FC = () => {
   const [wallet, setWallet] = useState<WorkerWallet | null>(null);
@@ -26,8 +27,9 @@ export const WorkerWalletPanel: React.FC = () => {
 
   return <section className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4" dir="rtl">
     <h2 className="text-lg font-bold text-slate-900">کیف پول متخصص</h2>
-    <p className="text-sm text-slate-600 leading-6">مشتری هزینه کار را مستقیم به شما می‌پردازد. کمیسیون شرکت از اعتبار کیف پول کسر می‌شود. اگر مانده هر واحد پولی منفی باشد، پذیرش سفارش جدید ممکن نیست.</p>
-    <div><button type="button" disabled onClick={onTopUp} className="rounded-xl bg-slate-300 px-4 py-2 text-sm font-bold text-slate-600 cursor-not-allowed">شارژ کیف پول (غیرفعال)</button><p className="mt-1 text-xs text-slate-500">{wallet?.topUpAvailable ? 'شارژ پس از تأیید درگاه ثبت می‌شود؛ تا تکمیل پرداخت موجودی عوض نمی‌شود.' : 'درگاه پرداخت هنوز متصل نیست.'}</p></div>
+    <p className="text-sm text-slate-600 leading-6">{WORKER_WALLET_EXPLANATION}</p>
+    <p className="text-sm text-slate-600 leading-6">{WORKER_MANUAL_TOPUP_HELP}</p>
+    <div><button type="button" disabled onClick={onTopUp} className="rounded-xl bg-slate-300 px-4 py-2 text-sm font-bold text-slate-600 cursor-not-allowed">{WORKER_ONLINE_TOPUP_LABEL}</button><p className="mt-1 text-xs text-slate-500">{WORKER_ONLINE_TOPUP_HELP}</p></div>
     {notice ? <p role="status" className="text-sm text-amber-800">{notice}</p> : null}
     <button type="button" onClick={() => void refresh()} disabled={loading} className="rounded-lg px-3 py-2 text-sm font-bold text-sky-700 disabled:opacity-50">{loading ? 'در حال بارگیری…' : 'بازخوانی کیف پول'}</button>
     {loading ? <p role="status" className="text-sm text-slate-500">در حال دریافت مانده و گردش…</p> : null}

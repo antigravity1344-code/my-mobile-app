@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, type } from '../../theme/customerHome';
 import { previewActive } from './previewRuntime';
+import { WORKER_BANK_FUTURE_NOTE } from '../../features/worker/services/workerFinanceCopy';
 import { bankDigits, loadBankDetails, normalizeSheba, requestBankOtp, saveBankDetails, saveBankPin, validBankPin, validBankSheba, type BankResult, type BankOtpPurpose } from './workerBankDetails';
 
 export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => void; onLogout: () => void }) {
@@ -66,7 +67,7 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {button('بازگشت به حساب متخصص', onBack, false)}
       <Text style={styles.title}>شبا و رمز تغییر شبا</Text>
-      <Text style={styles.description}>شبا برای استفاده احتمالی آینده نگهداری می‌شود. در مدل فعلی مشتری مستقیماً دستمزد را به شما می‌پردازد؛ این بخش برداشت از کیف پول نیست.</Text>
+      <Text style={styles.description}>{WORKER_BANK_FUTURE_NOTE}</Text>
       {preview ? <Text style={styles.description}>مشاهده و ذخیره اطلاعات بانکی واقعی در پیش‌نمایش غیرفعال است.</Text> : <>
         {busy && <ActivityIndicator accessibilityLabel="در حال ارتباط با سرور" color={colors.teal} />}
         {!!message && <Text accessibilityLiveRegion="polite" style={[styles.description, error && styles.error]}>{message}</Text>}

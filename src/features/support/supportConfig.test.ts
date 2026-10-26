@@ -19,15 +19,25 @@ describe('support contact', () => {
 });
 
 describe('worker FAQ', () => {
-  it('has its own 8 items, separate from the customer list', () => {
-    expect(WORKER_SUPPORT_FAQ.map((f) => f.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => `worker_faq_${n}`));
+  it('has its own items, separate from the customer list', () => {
+    expect(WORKER_SUPPORT_FAQ.map((f) => f.id)).toEqual(Array.from({ length: 11 }, (_, i) => `worker_faq_${i + 1}`));
     expect(SUPPORT_FAQ.some((f) => f.id.startsWith('worker_faq_'))).toBe(false);
   });
 
-  it('states only the approved D-68 worker facts and does not invent compensation or penalties', () => {
+  it('keeps D-68 support facts while explaining D-79 payment and D-80 manual credit without invented penalties', () => {
     const byId = Object.fromEntries(WORKER_SUPPORT_FAQ.map((item) => [item.id, item]));
     expect(byId.worker_faq_1?.answer).toContain('بررسی مدارک حداکثر یک هفته');
-    expect(byId.worker_faq_3?.answer).toContain('بعد از هر سفارش');
+    expect(byId.worker_faq_1?.answer).toContain('مانده هر واحد پولی کیف پول منفی');
+    expect(byId.worker_faq_1?.answer).toContain('قبلاً پذیرفته‌شده متوقف نمی‌شوند');
+    expect(byId.worker_faq_3?.answer).toContain('مشتری دستمزد را مستقیم');
+    expect(byId.worker_faq_3?.answer).toContain('پس از قطعی‌شدن پایان کار');
+    expect(byId.worker_faq_3?.answer).not.toContain('به شماره شبای');
+    expect(byId.worker_faq_9?.answer).toContain('پس از بررسی و ثبت مدیر');
+    expect(byId.worker_faq_9?.answer).toContain('شماره پیگیری');
+    expect(byId.worker_faq_9?.answer).toContain('شارژ کیف پول درآمد کاری نیست');
+    expect(byId.worker_faq_10?.answer).toContain('هفتگی و ماهانه');
+    expect(byId.worker_faq_11?.answer).toContain('استفاده احتمالی آینده');
+    expect(byId.worker_faq_11?.answer).toContain('برداشت از کیف پول نیست');
     expect(byId.worker_faq_5?.answer).toContain('بعد از پذیرفتن سفارش');
     expect(byId.worker_faq_5?.answer).toContain('جبران خسارت');
     expect(byId.worker_faq_5?.answer).not.toContain('تومان');

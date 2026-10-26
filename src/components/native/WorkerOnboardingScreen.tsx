@@ -374,7 +374,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
           </View>
 
           {/* اطلاعات بانکی / شبا */}
-          <Text style={styles.label}>شماره شبا (جهت تسویه حساب):</Text>
+          <Text style={styles.label}>شماره شبا (برای استفاده احتمالی آینده):</Text>
           <View
             style={styles.inputWrapper}
             onLayout={(e) => {
