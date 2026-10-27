@@ -133,3 +133,17 @@ describe('admin data loading feedback', () => {
     expect(text(render())).toContain('هیچ سفارشی ثبت نشده');
   });
 });
+
+
+describe('admin worker status labels', () => {
+  it.each([
+    ['APPROVED', 'تایید شده'], ['ACTIVE', 'فعال'], ['BLOCKED', 'مسدود'],
+    ['PENDING_VERIFICATION', 'در انتظار بررسی مدارک'], ['REGISTERED', 'ثبت‌نام اولیه'], ['FUTURE', 'وضعیت نامشخص'],
+  ])('shows %s as %s without changing the available action', async (status, label) => {
+    fixture({ '/admin/users?role=WORKER': { success: true, users: [{ id: 'W1', name: 'متخصص تست', status }] } });
+    await login(); button('متخصصین (1)').props.onClick();
+    expect(nodes(render()).some(node => node.type === 'span' && text(node) === label)).toBe(true);
+    expect(button(status === 'APPROVED' ? 'غیرفعال‌سازی متخصص' : 'تایید مدارک و فعال‌سازی حساب متخصص')).toBeDefined();
+    expect(harness.api.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false);
+  });
+});

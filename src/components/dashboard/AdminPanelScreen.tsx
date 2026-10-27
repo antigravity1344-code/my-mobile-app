@@ -375,7 +375,7 @@ export const AdminPanelScreen: React.FC = () => {
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${
                     cleaner.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}>
-                    {cleaner.status === 'APPROVED' ? 'تایید شده' : 'در انتظار بررسی'}
+                    {{ APPROVED: 'تایید شده', ACTIVE: 'فعال', BLOCKED: 'مسدود', PENDING_VERIFICATION: 'در انتظار بررسی مدارک', REGISTERED: 'ثبت‌نام اولیه' }[cleaner.status] || 'وضعیت نامشخص'}
                   </span>
                 </div>
 
