@@ -1,6 +1,6 @@
 import { previewActive } from '../native/previewRuntime';
 import { formatStoredAmount } from '../../features/orders/services/money';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldAlert,
   DollarSign,
@@ -39,6 +39,9 @@ export const AdminPanelScreen: React.FC = () => {
   const [workers, setWorkers] = useState<ApiAdminUser[]>([]);
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loadRequest = useRef(0);
   const [adminToken, setAdminToken] = useState('');
   const [password, setPassword] = useState('');
   const [completionError, setCompletionError] = useState('');
@@ -55,24 +58,35 @@ export const AdminPanelScreen: React.FC = () => {
 
   const loadData = async () => {
     if (!adminToken) return;
+    const request = ++loadRequest.current;
     setLoading(true);
-    try {
-      const statsRes = await adminFetch('/admin/stats');
-      if (statsRes.success) setStats(statsRes.stats);
-
-      const workersRes = await adminFetch('/admin/users?role=WORKER');
-      if (workersRes.success) setWorkers(workersRes.users);
-
-      const ordersRes = await adminFetch('/admin/orders');
-      if (ordersRes.success) setOrders(ordersRes.orders);
-    } catch (e) {
-      console.error(e);
-    }
+    setLoadError('');
+    const results = await Promise.allSettled([
+      adminFetch('/admin/stats'),
+      adminFetch('/admin/users?role=WORKER'),
+      adminFetch('/admin/orders'),
+    ]);
+    if (request !== loadRequest.current) return;
+    const errors: string[] = [];
+    const labels = ['آمار', 'متخصصین', 'سفارش‌ها'];
+    results.forEach((result, index) => {
+      const data = result.status === 'fulfilled' ? result.value : null;
+      const valid = data?.success && (index === 0 ? data.stats && typeof data.stats === 'object'
+        : Array.isArray(index === 1 ? data.users : data.orders));
+      if (!valid) {
+        errors.push(labels[index] + ': ' + (data?.message || 'دریافت اطلاعات انجام نشد.'));
+      } else if (index === 0) setStats(data.stats);
+      else if (index === 1) setWorkers(data.users);
+      else setOrders(data.orders);
+    });
+    setLoadError(errors.length ? errors.join(' ') + ' برای تلاش دوباره «بروزرسانی» را بزنید.' : '');
+    setHasLoaded(true);
     setLoading(false);
   };
 
   useEffect(() => {
     if (adminToken) void loadData();
+    return () => { loadRequest.current += 1; };
   }, [adminToken]);
 
   const handleAdminLogin = async () => {
@@ -93,7 +107,11 @@ export const AdminPanelScreen: React.FC = () => {
     if (adminToken) {
       await adminFetch('/admin/logout', { method: 'POST' });
     }
+    loadRequest.current += 1;
     setAdminToken('');
+    setLoadError('');
+    setHasLoaded(false);
+    setLoading(false);
     setStats(null);
     setWorkers([]);
     setOrders([]);
@@ -206,6 +224,9 @@ export const AdminPanelScreen: React.FC = () => {
         <p className="text-xs text-slate-300">مدیریت سفارش‌ها، تایید مدارک متخصصین و نظارت مالی واقعی</p>
       </div>
 
+      {loading ? <p role="status" className="text-sm text-slate-600">در حال دریافت اطلاعات…</p> : null}
+      {loadError ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{loadError}</p> : null}
+
       {/* کارت‌های خلاصه آمار متصل به بکند */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-right space-y-1">
@@ -262,7 +283,7 @@ export const AdminPanelScreen: React.FC = () => {
       {adminTab === 'orders' && (
         <div className="space-y-3">
           {orders.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-4">هیچ سفارشی ثبت نشده است.</p>
+            !loading && hasLoaded && !loadError ? <p className="text-xs text-slate-500 text-center py-4">هیچ سفارشی ثبت نشده است.</p> : null
           ) : (
             orders.map((ord) => (
               <div key={ord.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-sm">
@@ -339,7 +360,7 @@ export const AdminPanelScreen: React.FC = () => {
       {adminTab === 'cleaners' && (
         <div className="space-y-2.5">
           {workers.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-4">هیچ متخصصی ثبت نام نکرده است.</p>
+            !loading && hasLoaded && !loadError ? <p className="text-xs text-slate-500 text-center py-4">هیچ متخصصی ثبت نام نکرده است.</p> : null
           ) : (
             workers.map((cleaner) => (
               <div key={cleaner.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
