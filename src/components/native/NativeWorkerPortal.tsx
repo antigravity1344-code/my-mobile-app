@@ -330,7 +330,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               <Text style={styles.workerName}>{user?.name || ''}</Text>
               <View style={styles.onlineBadge}>
                 <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>آمادهٔ کار</Text>
+                <Text style={styles.onlineText} numberOfLines={1}>آمادهٔ کار</Text>
               </View>
             </View>
             <Text style={styles.workerSub}>مشاهده و پذیرش سفارشات</Text>
