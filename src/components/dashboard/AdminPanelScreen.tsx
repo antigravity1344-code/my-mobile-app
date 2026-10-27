@@ -35,6 +35,8 @@ export const AdminPanelScreen: React.FC = () => {
   const [completionPolicy,setCompletionPolicy]=useState<{version:number;mode:'customer_confirmation'|'worker_only'}|null>(null);
   const [completionMode,setCompletionMode]=useState<'customer_confirmation'|'worker_only'>('customer_confirmation');
   const [policyMessage,setPolicyMessage]=useState('');
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const policyInFlight = useRef(false);
   const [stats, setStats] = useState<ApiAdminStats | null>(null);
   const [workers, setWorkers] = useState<ApiAdminUser[]>([]);
   const [orders, setOrders] = useState<ApiOrder[]>([]);
@@ -115,6 +117,8 @@ export const AdminPanelScreen: React.FC = () => {
     setLoadError('');
     setActionError('');
     setCompletionError('');
+    setCompletionPolicy(null);
+    setPolicyMessage('');
     setHasLoaded(false);
     setLoading(false);
     setStats(null);
@@ -136,22 +140,27 @@ export const AdminPanelScreen: React.FC = () => {
   };
 
   const loadCompletionPolicy = async () => {
+    if (policyInFlight.current) return;
+    policyInFlight.current = true; setPolicyBusy(true); setCompletionPolicy(null);
     setPolicyMessage('در حال دریافت سیاست…');
     try {
       const result=await adminFetch('/admin/completion-policy');
       if(!result.success || !result.policy || !Number.isSafeInteger(result.policy.version) || !['customer_confirmation','worker_only'].includes(result.policy.mode)) throw new Error('پاسخ معتبر نیست.');
       setCompletionPolicy(result.policy);setCompletionMode(result.policy.mode);setPolicyMessage('سیاست جاری دریافت شد.');
     } catch {setCompletionPolicy(null);setPolicyMessage('دریافت نشد؛ اتصال مدیر را بررسی و دوباره تلاش کنید.');}
+    finally { policyInFlight.current = false; setPolicyBusy(false); }
   };
 
   const saveCompletionPolicy = async () => {
-    if(!completionPolicy)return;
+    if(!completionPolicy || policyInFlight.current)return;
+    policyInFlight.current = true; setPolicyBusy(true);
     setPolicyMessage('در حال ذخیره…');
     try {
       const result=await adminFetch('/admin/completion-policy',{method:'PUT',body:JSON.stringify({mode:completionMode,expectedVersion:completionPolicy.version})});
       if(!result.success || !result.policy) throw new Error(result.message || 'ذخیره انجام نشد.');
       setCompletionPolicy(result.policy);setPolicyMessage('ذخیره شد؛ درخواست‌های جدید از این روش پیروی می‌کنند.');
     } catch {setCompletionPolicy(null);setPolicyMessage('نتیجه ذخیره مشخص نیست؛ پیش از تلاش دوباره بازخوانی کنید.');}
+    finally { policyInFlight.current = false; setPolicyBusy(false); }
   };
 
   const runStatusAction = async (endpoint: string, body: object) => {
@@ -221,7 +230,7 @@ export const AdminPanelScreen: React.FC = () => {
             <button
               type="button"
               onClick={() => void handleAdminLogout()}
-              disabled={actionPending}
+              disabled={actionPending || policyBusy}
               className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-full font-bold cursor-pointer"
             >
               خروج
@@ -358,11 +367,11 @@ export const AdminPanelScreen: React.FC = () => {
         <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-xs">
           <h4 className="font-bold">روش تأیید پایان کار</h4>
           <p>پیش‌فرض، ثبت متخصص و تأیید مشتری است؛ اختلاف به مدیر می‌رسد. تغییر روش روی درخواست‌های جدید اعمال می‌شود.</p>
-          <select aria-label="روش تأیید پایان کار" disabled={!completionPolicy || loading} value={completionMode} onChange={e=>setCompletionMode(e.target.value as 'customer_confirmation'|'worker_only')} className="w-full rounded-lg border p-2">
+          <select aria-label="روش تأیید پایان کار" disabled={!completionPolicy || loading || policyBusy} value={completionMode} onChange={e=>setCompletionMode(e.target.value as 'customer_confirmation'|'worker_only')} className="w-full rounded-lg border p-2">
             <option value="customer_confirmation">ثبت متخصص و تأیید مشتری</option><option value="worker_only">فقط تأیید متخصص</option>
           </select>
           <p role="status" aria-live="polite">{policyMessage}</p>
-          <div className="flex gap-2"><button type="button" onClick={()=>void loadCompletionPolicy()} className="rounded-lg bg-slate-600 px-3 py-2 text-white">بازخوانی</button><button type="button" disabled={!completionPolicy || loading} onClick={()=>void saveCompletionPolicy()} className="rounded-lg bg-sky-600 px-3 py-2 text-white">ذخیره سیاست</button></div>
+          <div className="flex gap-2"><button type="button" disabled={policyBusy} onClick={()=>void loadCompletionPolicy()} className="rounded-lg bg-slate-600 px-3 py-2 text-white">بازخوانی</button><button type="button" disabled={!completionPolicy || loading || policyBusy} onClick={()=>void saveCompletionPolicy()} className="rounded-lg bg-sky-600 px-3 py-2 text-white">ذخیره سیاست</button></div>
         </div>
       )}
 

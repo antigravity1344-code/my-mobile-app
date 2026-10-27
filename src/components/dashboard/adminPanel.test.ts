@@ -182,3 +182,37 @@ describe('admin status action feedback', () => {
     expect(nodes(render()).filter(node => node.props.role === 'alert')).toHaveLength(0);
   });
 });
+
+
+describe('admin completion policy form request ordering', () => {
+  it('blocks saving and editing during reload, and ignores duplicate reload clicks', async () => {
+    fixture({ '/admin/completion-policy': { success: true, policy: { version: 1, mode: 'customer_confirmation' } } });
+    await login(); button('سیاست پایان کار').props.onClick(); await flush();
+    const pending = deferred();
+    fixture({ '/admin/completion-policy': pending.promise });
+    const reload = button('بازخوانی').props.onClick; reload(); reload();
+    expect(button('ذخیره سیاست').props.disabled).toBe(true);
+    expect(button('بازخوانی').props.disabled).toBe(true);
+    expect(nodes(render()).find(node => node.type === 'select')!.props.disabled).toBe(true);
+    pending.resolve({ success: true, policy: { version: 2, mode: 'worker_only' } }); await flush();
+    expect(button('ذخیره سیاست').props.disabled).toBe(false);
+    expect(nodes(render()).find(node => node.type === 'select')!.props.value).toBe('worker_only');
+    expect(harness.api.mock.calls.filter(([path]) => path === '/admin/completion-policy')).toHaveLength(2);
+  });
+  it('sends one save with the existing mode/version contract and requires reload on failure', async () => {
+    fixture({ '/admin/completion-policy': { success: true, policy: { version: 3, mode: 'customer_confirmation' } } });
+    await login(); button('سیاست پایان کار').props.onClick(); await flush();
+    const pending = deferred(); fixture({ '/admin/completion-policy': pending.promise });
+    const save = button('ذخیره سیاست').props.onClick; save(); save();
+    expect(button('ذخیره سیاست').props.disabled).toBe(true);
+    expect(button('بازخوانی').props.disabled).toBe(true);
+    expect(button('خروج').props.disabled).toBe(true);
+    expect(harness.api.mock.calls.filter(([, options]) => options?.method === 'PUT')).toEqual([
+      ['/admin/completion-policy', expect.objectContaining({ body: JSON.stringify({ mode: 'customer_confirmation', expectedVersion: 3 }) })],
+    ]);
+    pending.resolve({ success: false }); await flush();
+    expect(text(render())).toContain('پیش از تلاش دوباره بازخوانی کنید');
+    expect(button('ذخیره سیاست').props.disabled).toBe(true);
+    expect(button('بازخوانی').props.disabled).toBe(false);
+  });
+});
