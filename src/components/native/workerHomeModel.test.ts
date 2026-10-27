@@ -59,9 +59,9 @@ describe('worker home model', () => {
     expect(workerPriceLine('unknown_service', 450000, f)).toBe(WORKER_PRICE_UNKNOWN);
   });
 
-  it('the orders screen uses the same D-70 price rule for available orders and my jobs', () => {
+  it('my jobs keeps the same D-70 price rule after extracting the available-order views', () => {
     const src = read('NativeWorkerPortal.tsx');
-    expect(src.match(/workerPriceLine\(order\.serviceId, order\.rawPrice,/g)?.length).toBe(2);
+    expect(src.match(/workerPriceLine\(order\.serviceId, order\.rawPrice,/g)?.length).toBe(1);
     expect(src).not.toContain('formatStoredAmount(order.grossOrderAmount');
   });
 

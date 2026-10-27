@@ -45,7 +45,8 @@ type Props = {
  * تا خانه، نشان نوار پایین و پنل سفارش‌ها یک منبع داشته باشند.
  */
 export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Props) {
-  useEffect(() => installWorkerBackNavigation(BackHandler, mainView, onChangeView), [mainView, onChangeView]);
+  const contentBackRef = useRef<(() => boolean) | null>(null);
+  useEffect(() => installWorkerBackNavigation(BackHandler, mainView, onChangeView, () => contentBackRef.current?.() ?? false), [mainView, onChangeView]);
   const orders = useWorkerOrders<NativeOrder>(user.id, mapWorkerOrder);
   const { ordersState, hasLoaded, fetchOrders } = orders;
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -169,9 +170,9 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
             onBack={() => onChangeView('home')}
           />
         ) : mainView === 'new_orders' ? (
-          <NativeWorkerPortal key="new_orders" initialTab="available" orders={orders} user={user} onSessionExpired={onLogout} />
+          <NativeWorkerPortal key="new_orders" initialTab="available" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'my_jobs' ? (
-          <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} />
+          <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'profile' ? (
           <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} onOpenBank={() => onChangeView('bank_details')} />
         ) : mainView === 'work_area' ? (

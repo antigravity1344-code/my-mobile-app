@@ -1,6 +1,6 @@
 import { completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
 import { previewActive } from './previewRuntime';
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Linking,
   ActivityIndicator,
+  BackHandler,
   Alert,
   TextInput,
 } from 'react-native';
@@ -45,6 +46,8 @@ import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
 import { workerPriceLine } from './workerHomeModel';
 import { WorkerIncomeReportNativePanel } from './WorkerIncomeReportNativePanel';
 import { WorkerWalletNativePanel } from './WorkerWalletNativePanel';
+import { WorkerAvailableOrderCard, WorkerAvailableOrderDetails } from './WorkerAvailableOrder';
+import { installWorkerContentBackNavigation, type WorkerContentBackRef } from './workerBackNavigation';
 
 export type SpecialistCategory = 'all' | 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
@@ -58,6 +61,7 @@ interface NativeWorkerPortalProps {
   initialTab?: 'available' | 'my_jobs';
   /** منبع مشترک سفارش‌ها از پوستهٔ اپ متخصص (خانه، نشان نوار پایین و این پنل). */
   orders: WorkerOrdersHandle<NativeOrder>;
+  contentBackRef?: WorkerContentBackRef;
 }
 
 export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
@@ -67,7 +71,14 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   onSessionExpired,
   initialTab,
   orders,
+  contentBackRef,
 }) => {
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  useEffect(() => installWorkerContentBackNavigation(BackHandler, () => {
+    if (selectedOrderId === null) return false;
+    setSelectedOrderId(null);
+    return true;
+  }, contentBackRef), [selectedOrderId, contentBackRef]);
   const [activeCategory, setActiveCategory] = useState<SpecialistCategory>('all');
   const [activeTab, setActiveTab] = useState<'available' | 'my_jobs' | 'wallet'>(initialTab ?? 'available');
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, { hours: string; amount: string }>>({});
@@ -108,6 +119,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         body: JSON.stringify({ cleanerId: user.id }),
       });
       if (res.success) {
+        setSelectedOrderId((current) => current === order.id ? null : current);
         setSuccessAlert('سفارش «' + order.serviceTitle + '» با موفقیت پذیرفته شد.');
         setTimeout(() => setSuccessAlert(null), 5000);
       } else {
@@ -318,8 +330,32 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     return order.category === activeCategory;
   });
 
+  const selectedOrder = availableOrders.find((order) => order.id === selectedOrderId);
+  const ordersError = ordersState.error ? (
+        <View style={styles.alertError}>
+          <Text style={styles.alertErrorText}>{ordersState.error}</Text>
+          {ordersState.sessionExpired ? (
+            onSessionExpired ? (
+              <Pressable onPress={onSessionExpired} style={styles.retryButton} accessibilityRole="button">
+                <Text style={styles.retryButtonText}>ورود دوباره</Text>
+              </Pressable>
+            ) : null
+          ) : (
+            <Pressable
+              onPress={() => void fetchOrders('manual')}
+              disabled={loading}
+              style={[styles.retryButton, loading && styles.buttonDisabled]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryButtonText}>تلاش دوباره</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null;
+
   return (
     <View style={styles.container}>
+      <View style={[styles.container, selectedOrderId !== null && styles.hidden]}>
       <View style={styles.headerBar}>
         <View style={styles.workerProfile}>
           <View style={styles.avatarBox}>
@@ -417,31 +453,11 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         </ScrollView>
       )}
 
-      {ordersState.error ? (
-        <View style={styles.alertError}>
-          <Text style={styles.alertErrorText}>{ordersState.error}</Text>
-          {ordersState.sessionExpired ? (
-            onSessionExpired ? (
-              <Pressable onPress={onSessionExpired} style={styles.retryButton} accessibilityRole="button">
-                <Text style={styles.retryButtonText}>ورود دوباره</Text>
-              </Pressable>
-            ) : null
-          ) : (
-            <Pressable
-              onPress={() => void fetchOrders('manual')}
-              disabled={loading}
-              style={[styles.retryButton, loading && styles.buttonDisabled]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.retryButtonText}>تلاش دوباره</Text>
-            </Pressable>
-          )}
-        </View>
-      ) : null}
+      {ordersError}
 
       {loading && <ActivityIndicator size="large" color={colors.teal} style={{marginTop: 20}} />}
 
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.listContent, activeTab === 'available' && styles.availableListContent]} showsVerticalScrollIndicator={false}>
         {!loading && activeTab === 'available' ? (
           filteredOrders.length === 0 ? (
             ordersState.error ? null : <View style={styles.emptyBox}>
@@ -450,61 +466,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
             </View>
           ) : (
             filteredOrders.map(order => (
-              <View key={order.id} style={styles.orderCard}>
-                <View style={styles.cardTop}>
-                  {order.badge ? (
-                    <View style={styles.badgeBox}>
-                      <Text style={styles.badgeText}>{order.badge}</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.titleArea}>
-                    <Text style={styles.serviceTitle}>{order.serviceTitle}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <MapPin size={16} color="#0284c7" />
-                  <Text style={styles.infoText}>
-                    <Text style={styles.boldText}>{order.district || 'محدوده نامشخص'}</Text>
-                    {' — آدرس دقیق و تماس پس از پذیرش نمایش داده می‌شود'}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Clock size={16} color="#0284c7" />
-                  <Text style={styles.infoText}>{order.date} | {order.timeSlot}</Text>
-                </View>
-
-                {order.detailsNote ? (
-                  <View style={styles.noteBox}>
-                    <Text style={styles.noteText}>توضیحات: {order.detailsNote}</Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.cardFooter}>
-                  <View style={styles.wageBox}>
-                    <Text style={styles.wageValue}>
-                      {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit))}
-                    </Text>
-                  </View>
-
-                  {canAcceptWorkerOrder(order.status) ? (
-                    <Pressable
-                      onPress={() => handleAcceptOrder(order)}
-                      disabled={busyOrderIds.includes(order.id)}
-                      style={[styles.acceptButton, busyOrderIds.includes(order.id) && styles.buttonDisabled]}
-                      accessibilityState={{ disabled: busyOrderIds.includes(order.id) }}
-                    >
-                      <CheckCircle size={16} color="#fff" />
-                      <Text style={styles.acceptButtonText}>
-                        {busyOrderIds.includes(order.id) ? 'در حال پذیرش...' : 'پذیرش سفارش'}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={styles.wageLabel}>{workerStatusLabel(order.status)}</Text>
-                  )}
-                </View>
-              </View>
+              <WorkerAvailableOrderCard key={order.id} order={order} onOpen={setSelectedOrderId} />
             ))
           )
         ) : !loading && activeTab === 'my_jobs' ? (
@@ -539,6 +501,17 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           </>
         ) : null}
       </ScrollView>
+      </View>
+      {selectedOrderId !== null ? (
+        <WorkerAvailableOrderDetails
+          order={selectedOrder}
+          busy={busyOrderIds.includes(selectedOrderId)}
+          loading={loading}
+          notice={ordersError}
+          onBack={() => setSelectedOrderId(null)}
+          onAccept={(order) => void handleAcceptOrder(order)}
+        />
+      ) : null}
     </View>
   );
 };
@@ -546,6 +519,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
 const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
+  availableListContent: { gap: 8, paddingTop: 12 },
   completionInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, marginVertical: 6, textAlign: 'right', color: '#0f172a' },
   container: { flex: 1, backgroundColor: colors.bg
   },
