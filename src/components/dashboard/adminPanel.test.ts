@@ -244,3 +244,26 @@ describe('admin narrow layout structure', () => {
     expect((render() as Node).props.className).toContain('[&_input]:min-h-11');
   });
 });
+
+
+describe('admin login pending state', () => {
+  it('shows progress and sends only one login for repeated clicks', async () => {
+    const pending = deferred(); fixture({ '/admin/login': pending.promise });
+    const loginClick = button('ورود').props.onClick;
+    loginClick(); loginClick();
+    expect(button('در حال ورود…').props.disabled).toBe(true);
+    expect(nodes(render()).find(node => node.type === 'input')!.props.disabled).toBe(true);
+    expect(harness.api.mock.calls.filter(([path]) => path === '/admin/login')).toHaveLength(1);
+    pending.resolve({ success: false, message: 'رمز نادرست است' }); await flush();
+    expect(text(render())).toContain('رمز نادرست است');
+    expect(button('ورود').props.disabled).toBe(false);
+  });
+  it('recovers from a transport rejection with an explained retry', async () => {
+    fixture(); harness.api.mockRejectedValueOnce(new Error('offline'));
+    button('ورود').props.onClick(); await flush();
+    expect(text(render())).toContain('اتصال برقرار نشد؛ دوباره تلاش کنید');
+    expect(button('ورود').props.disabled).toBe(false);
+    await login();
+    expect(text(render())).toContain('داشبورد مدیریت');
+  });
+});

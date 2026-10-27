@@ -51,6 +51,8 @@ export const AdminPanelScreen: React.FC = () => {
   const [actionPending, setActionPending] = useState(false);
   const actionInFlight = useRef(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginPending, setLoginPending] = useState(false);
+  const loginInFlight = useRef(false);
 
   const adminFetch = (endpoint: string, options: RequestInit = {}) =>
     apiFetch(endpoint, {
@@ -95,16 +97,26 @@ export const AdminPanelScreen: React.FC = () => {
   }, [adminToken]);
 
   const handleAdminLogin = async () => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
+    setLoginPending(true);
     setLoginError(null);
-    const res = await apiFetch('/admin/login', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    });
-    if (res.success && res.token) {
-      setAdminToken(res.token);
-      setPassword('');
-    } else {
-      setLoginError(res.message || 'ورود مدیر ناموفق بود.');
+    try {
+      const res = await apiFetch('/admin/login', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      });
+      if (res.success && res.token) {
+        setAdminToken(res.token);
+        setPassword('');
+      } else {
+        setLoginError(res.message || 'ورود مدیر ناموفق بود.');
+      }
+    } catch {
+      setLoginError('اتصال برقرار نشد؛ دوباره تلاش کنید.');
+    } finally {
+      loginInFlight.current = false;
+      setLoginPending(false);
     }
   };
 
@@ -192,18 +204,21 @@ export const AdminPanelScreen: React.FC = () => {
         <h3 className="text-base font-bold">ورود مدیر</h3>
         <input
           type="password"
+          aria-label="رمز مدیر"
+          disabled={loginPending}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-sm"
           placeholder="رمز مدیر"
         />
-        {loginError ? <p className="text-xs text-rose-300">{loginError}</p> : null}
+        {loginError ? <p role="alert" className="text-xs text-rose-300">{loginError}</p> : null}
         <button
           type="button"
           onClick={() => void handleAdminLogin()}
+          disabled={loginPending}
           className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold"
         >
-          ورود
+          {loginPending ? 'در حال ورود…' : 'ورود'}
         </button>
       </div>
     );
