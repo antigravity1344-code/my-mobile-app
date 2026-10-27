@@ -216,3 +216,31 @@ describe('admin completion policy form request ordering', () => {
     expect(button('بازخوانی').props.disabled).toBe(false);
   });
 });
+
+
+describe('admin narrow layout structure', () => {
+  it('keeps long order IDs and worker names without truncation and allows headers/tabs to wrap', async () => {
+    const id = 'ORDER-' + '1'.repeat(100), name = 'متخصص'.repeat(30);
+    fixture({
+      '/admin/orders': { success: true, orders: [{ id, serviceTitle: 'نظافت واحد', status: 'PENDING' }] },
+      '/admin/users?role=WORKER': { success: true, users: [{ id: 'W1', name, status: 'BLOCKED' }] },
+    });
+    await login();
+    const tree = render(), all = nodes(tree);
+    expect((tree as Node).props.className).toContain('[overflow-wrap:anywhere]');
+    expect((tree as Node).props.className).toContain('[&_button]:min-h-11');
+    const orderId = all.find(node => node.type === 'span' && text(node) === id)!;
+    expect(orderId.props.className).toContain('break-all');
+    expect(all.some(node => node.props.className?.includes('flex-col gap-3 sm:flex-row'))).toBe(true);
+    const tabs = all.find(node => node.type === 'div' && node.props.className?.includes('border-b border-slate-200'))!;
+    expect(tabs.props.className).toContain('flex-wrap');
+    button('متخصصین (1)').props.onClick();
+    expect(text(render())).toContain(name);
+    expect(nodes(render()).some(node => node.props.className?.includes('flex-wrap justify-between items-start'))).toBe(true);
+  });
+  it('keeps the login controls at the same minimum touch height', () => {
+    fixture();
+    expect((render() as Node).props.className).toContain('[&_button]:min-h-11');
+    expect((render() as Node).props.className).toContain('[&_input]:min-h-11');
+  });
+});

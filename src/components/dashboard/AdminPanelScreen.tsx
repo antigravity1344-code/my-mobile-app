@@ -188,7 +188,7 @@ export const AdminPanelScreen: React.FC = () => {
 
   if (!adminToken) {
     return (
-      <div className="mx-auto max-w-sm space-y-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-right text-white">
+      <div className="mx-auto min-w-0 max-w-sm space-y-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-right text-white [&_button]:min-h-11 [&_input]:min-h-11">
         <h3 className="text-base font-bold">ورود مدیر</h3>
         <input
           type="password"
@@ -210,10 +210,10 @@ export const AdminPanelScreen: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 text-right pb-6 font-sans">
+    <div className="min-w-0 space-y-4 text-right pb-6 font-sans [overflow-wrap:anywhere] [&_button]:min-h-11 [&_select]:min-h-11">
       {/* هدر پنل مدیریت */}
       <div className="bg-slate-800 text-white rounded-2xl p-4 shadow-md border border-slate-700 space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-sky-400" />
             <h3 className="text-base font-bold">داشبورد مدیریت پاکشو (Real Admin)</h3>
@@ -279,7 +279,7 @@ export const AdminPanelScreen: React.FC = () => {
       </div>
 
       {/* منوی تب‌های پنل مدیریت */}
-      <div className="flex border-b border-slate-200 text-xs font-medium gap-2">
+      <div className="flex flex-wrap border-b border-slate-200 text-xs font-medium gap-2">
         <button
           onClick={() => setAdminTab('orders')}
           className={`pb-2 px-1 transition border-b-2 cursor-pointer ${
@@ -307,8 +307,8 @@ export const AdminPanelScreen: React.FC = () => {
           ) : (
             orders.map((ord) => (
               <div key={ord.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-sm">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-mono text-slate-500 font-bold">{ord.id}</span>
+                <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
+                  <span className="min-w-0 break-all font-mono text-slate-500 font-bold">{ord.id}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                     ord.status === 'COMPLETED'
                       ? 'bg-sky-100 text-sky-800'
@@ -322,7 +322,7 @@ export const AdminPanelScreen: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="text-xs space-y-1 text-slate-700 border-t border-slate-100 pt-2">
+                <div className="min-w-0 break-words text-xs space-y-1 text-slate-700 border-t border-slate-100 pt-2">
                   <p><span className="text-slate-400">خدمت:</span> {ord.serviceTitle}</p>
                   <p><span className="text-slate-400">مشتری:</span> {ord.customerName} ({ord.customerPhone})</p>
                   <p><span className="text-slate-400">آدرس:</span> {ord.address}</p>
@@ -383,7 +383,7 @@ export const AdminPanelScreen: React.FC = () => {
           ) : (
             workers.map((cleaner) => (
               <div key={cleaner.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 text-xs">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-wrap justify-between items-start gap-2">
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-sky-600" />
                     <div>
