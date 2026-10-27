@@ -45,6 +45,9 @@ export const AdminPanelScreen: React.FC = () => {
   const [adminToken, setAdminToken] = useState('');
   const [password, setPassword] = useState('');
   const [completionError, setCompletionError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const actionInFlight = useRef(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const adminFetch = (endpoint: string, options: RequestInit = {}) =>
@@ -110,6 +113,8 @@ export const AdminPanelScreen: React.FC = () => {
     loadRequest.current += 1;
     setAdminToken('');
     setLoadError('');
+    setActionError('');
+    setCompletionError('');
     setHasLoaded(false);
     setLoading(false);
     setStats(null);
@@ -149,27 +154,28 @@ export const AdminPanelScreen: React.FC = () => {
     } catch {setCompletionPolicy(null);setPolicyMessage('نتیجه ذخیره مشخص نیست؛ پیش از تلاش دوباره بازخوانی کنید.');}
   };
 
-  const handleConfirmCancel = async (orderId: string) => {
-    setLoading(true);
-    const res = await adminFetch('/admin/orders/' + orderId, {
-      method: 'PUT',
-      body: JSON.stringify({ status: 'CANCELLED' }),
-    });
-    setLoading(false);
-    if (res.success) loadData();
-  };
-
-  const handleUpdateWorkerStatus = async (userId: string, status: string) => {
-    setLoading(true);
-    const res = await adminFetch(`/admin/users/${userId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
-    });
-    setLoading(false);
-    if (res.success) {
-      loadData();
+  const runStatusAction = async (endpoint: string, body: object) => {
+    if (loading || actionInFlight.current) return;
+    actionInFlight.current = true;
+    setActionPending(true);
+    setActionError('');
+    try {
+      const res = await adminFetch(endpoint, { method: 'PUT', body: JSON.stringify(body) });
+      if (!res.success) setActionError(res.message || 'تغییر ثبت نشد؛ اطلاعات را بازخوانی کنید.');
+    } catch {
+      setActionError('نتیجه ثبت مشخص نیست؛ پیش از تلاش دوباره اطلاعات را بازخوانی کنید.');
+    } finally {
+      await loadData();
+      actionInFlight.current = false;
+      setActionPending(false);
     }
   };
+
+  const handleConfirmCancel = (orderId: string) =>
+    runStatusAction('/admin/orders/' + encodeURIComponent(orderId), { status: 'CANCELLED' });
+
+  const handleUpdateWorkerStatus = (userId: string, status: string) =>
+    runStatusAction('/admin/users/' + encodeURIComponent(userId) + '/status', { status });
 
   if (!adminToken) {
     return (
@@ -215,6 +221,7 @@ export const AdminPanelScreen: React.FC = () => {
             <button
               type="button"
               onClick={() => void handleAdminLogout()}
+              disabled={actionPending}
               className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-full font-bold cursor-pointer"
             >
               خروج
@@ -226,6 +233,10 @@ export const AdminPanelScreen: React.FC = () => {
 
       {loading ? <p role="status" className="text-sm text-slate-600">در حال دریافت اطلاعات…</p> : null}
       {loadError ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{loadError}</p> : null}
+
+      {actionError ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{actionError}</p> : null}
+      {actionPending ? <p role="status" className="text-sm text-slate-600">در حال ثبت تغییر…</p> : null}
+      {completionError ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{completionError}</p> : null}
 
       {/* کارت‌های خلاصه آمار متصل به بکند */}
       <div className="grid grid-cols-3 gap-2">
@@ -313,7 +324,6 @@ export const AdminPanelScreen: React.FC = () => {
                     <p><span className="text-slate-400">زمان تکمیل:</span> {ord.completedAt}</p>
                   )}
                 </div>
-                {completionError ? <p role="alert">{completionError}</p> : null}
                 {ord.completion?.status === 'disputed' && (
                   <div>
                   <p>مبلغ اعلام‌شده: {formatStoredAmount(ord.completion.finalAmount, ord.currencyUnit || ord.pricing?.currencyUnit)}؛ ساعات واقعی: {ord.completion.actualHours ?? 'غیرساعتی'}</p>
@@ -332,7 +342,7 @@ export const AdminPanelScreen: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleConfirmCancel(ord.id)}
-                    disabled={loading}
+                    disabled={loading || actionPending}
                     className="w-full bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold py-1.5 rounded-lg cursor-pointer disabled:opacity-50"
                   >
                     تأیید لغو
@@ -382,6 +392,7 @@ export const AdminPanelScreen: React.FC = () => {
                 {cleaner.status !== 'APPROVED' ? (
                   <button
                     onClick={() => handleUpdateWorkerStatus(cleaner.id, 'APPROVED')}
+                    disabled={loading || actionPending}
                     className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
@@ -390,6 +401,7 @@ export const AdminPanelScreen: React.FC = () => {
                 ) : (
                   <button
                     onClick={() => handleUpdateWorkerStatus(cleaner.id, 'BLOCKED')}
+                    disabled={loading || actionPending}
                     className="w-full mt-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <XCircle className="w-3.5 h-3.5" />

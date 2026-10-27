@@ -147,3 +147,38 @@ describe('admin worker status labels', () => {
     expect(harness.api.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false);
   });
 });
+
+
+describe('admin status action feedback', () => {
+  const order = { id: 'O1', serviceTitle: 'سفارش آزمایشی', status: 'CANCEL_REQUESTED' };
+  it('shows a rejected cancellation and preserves the request contract', async () => {
+    fixture({ '/admin/orders': { success: true, orders: [order] }, '/admin/orders/O1': { success: false, message: 'لغو مجاز نیست' } });
+    await login(); await button('تأیید لغو').props.onClick();
+    expect(text(render())).toContain('لغو مجاز نیست');
+    expect(harness.api).toHaveBeenCalledWith('/admin/orders/O1', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ status: 'CANCELLED' }) }));
+    expect(button('تأیید لغو').props.disabled).toBe(false);
+  });
+  it('explains a failed worker update and allows retry after refresh', async () => {
+    fixture({ '/admin/users?role=WORKER': { success: true, users: [{ id: 'W1', status: 'APPROVED' }] } });
+    await login(); button('متخصصین (1)').props.onClick();
+    // An unexpected transport rejection must not leave the UI busy forever.
+    await button('غیرفعال‌سازی متخصص').props.onClick();
+    expect(text(render())).toContain('نتیجه ثبت مشخص نیست');
+    expect(button('غیرفعال‌سازی متخصص').props.disabled).toBe(false);
+  });
+  it('blocks duplicate events until the action and refresh finish, then shows the refreshed state', async () => {
+    const pending = deferred();
+    fixture({ '/admin/orders': { success: true, orders: [order] }, '/admin/orders/O1': pending.promise });
+    await login(); const action = button('تأیید لغو').props.onClick;
+    const first = action(); action();
+    expect(button('تأیید لغو').props.disabled).toBe(true);
+    expect(button('خروج').props.disabled).toBe(true);
+    expect(text(render())).toContain('در حال ثبت تغییر');
+    fixture({ '/admin/orders': { success: true, orders: [{ ...order, status: 'CANCELLED' }] } });
+    pending.resolve({ success: true }); await first;
+    expect(harness.api.mock.calls.filter(([path]) => path === '/admin/orders/O1')).toHaveLength(1);
+    expect(text(render())).toContain('لغو شده');
+    expect(text(render())).not.toContain('در حال ثبت تغییر');
+    expect(nodes(render()).filter(node => node.props.role === 'alert')).toHaveLength(0);
+  });
+});
