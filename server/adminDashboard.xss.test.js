@@ -209,6 +209,20 @@ test('status actions report rejected and lost responses and prevent duplicate re
   }));
 });
 
+test('worker status labels distinguish blocked, rejected, registered and unknown accounts', () => withPage(async page => {
+  await page.evaluate(() => loadAllData());
+  for (const [status, label] of Object.entries({
+    BLOCKED: 'مسدود شده', REJECTED: 'رد شده', REGISTERED: 'ثبت‌نام اولیه',
+    PENDING_VERIFICATION: 'در انتظار بررسی مدارک', APPROVED: 'تایید شده و فعال', ACTIVE: 'تایید شده و فعال',
+    UNRECOGNIZED: 'وضعیت نامشخص',
+  })) {
+    await page.evaluate(row => renderWorkers([row]), worker({ status }));
+    assert.ok((await page.locator('#workersList').textContent()).includes(label));
+    assert.equal(await page.locator('#workersList [data-action=worker-status]').textContent(),
+      status === 'APPROVED' ? '⛔ غیرفعال‌سازی' : '✅ تایید مدارک و فعال‌سازی');
+  }
+}));
+
 test('worker text fields are literal text, not executable HTML', async (t) => {
   for (const field of ['name', 'phone', 'nationalId', 'bankSheba', 'address']) {
     await t.test(field, () => withPage(async (page) => {
@@ -277,7 +291,7 @@ test('unknown status values cannot create classes, attributes or executable cont
     });
     await assertSafeMarkup(page, 'workersList');
     await assertSafeMarkup(page, 'ordersList');
-    assert.match(await page.locator('#workersList').textContent(), /ثبت‌نام اولیه/);
+    assert.match(await page.locator('#workersList').textContent(), /وضعیت نامشخص/);
     assert.match(await page.locator('#ordersList').textContent(), /وضعیت نامشخص/);
     assert.equal(await page.locator('#ordersList button').count(), 0);
   });

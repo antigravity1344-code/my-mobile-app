@@ -2393,13 +2393,17 @@ app.get('/admin', (req, res) => {
     function getStatusBadge(status) {
       if (status === 'APPROVED' || status === 'ACTIVE') return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
       if (status === 'PENDING_VERIFICATION') return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+      if (status === 'BLOCKED' || status === 'REJECTED') return 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
       return 'bg-slate-700 text-slate-400';
     }
 
     function getStatusTitle(status) {
       if (status === 'APPROVED' || status === 'ACTIVE') return 'تایید شده و فعال';
       if (status === 'PENDING_VERIFICATION') return 'در انتظار بررسی مدارک';
-      return 'ثبت‌نام اولیه';
+      if (status === 'BLOCKED') return 'مسدود شده';
+      if (status === 'REJECTED') return 'رد شده';
+      if (status === 'REGISTERED') return 'ثبت‌نام اولیه';
+      return 'وضعیت نامشخص';
     }
 
     function getOrderStatusBadge(status) {
