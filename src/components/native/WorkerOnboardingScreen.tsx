@@ -15,7 +15,7 @@ import { ShieldCheck, Clock, CheckCircle2, CreditCard, MapPin, AlertTriangle } f
 import { apiFetch } from '../../api/apiClient';
 import { loadServiceAreaCatalog } from '../../api/serviceAreas';
 import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
-import { type } from '../../theme';
+import { colors, type } from '../../theme';
 import { loadWorkerCommissionPolicy, type WorkerCommissionPolicy } from '../../features/worker/services/workerFinance';
 import { UserData } from '../../types/user';
 import {
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 220,
     alignItems: 'center',
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
 
   },
   formCard: {
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
 
   },
   statusCard: {
