@@ -842,7 +842,7 @@ function workerOfferView(offer) {
     adjustmentBasisPoints: offer.adjustmentBasisPoints,
     status: offer.status,
     createdAt: offer.createdAt,
-    ...(preview ? { currencyUnit: preview.currencyUnit, tariffTotal: preview.tariffTotal, total: preview.total } : {}),
+    ...(preview ? { currencyUnit: preview.currencyUnit, quantity: preview.quantity, tariffTotal: preview.tariffTotal, total: preview.total } : {}),
   };
 }
 

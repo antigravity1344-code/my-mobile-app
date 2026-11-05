@@ -5,6 +5,10 @@ import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context
 import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
+import { CustomerOffersScreen } from '../../features/offers/CustomerOffersScreen';
+import { offerDurationChoices, setOfferBookingDraft } from '../../features/offers/offerBookingDraft';
+import { offerStartSelection, type CustomerOffer } from '../../features/offers/customerOffersModel';
+import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
 import { OrdersScreen, useOrders } from '../../features/orders';
 import { useProfile, NativeProfileScreen } from '../../features/profile';
 import { NativeSupportScreen } from '../../features/support';
@@ -38,7 +42,7 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<CustomerTab | 'alerts'>('home');
+  const [mainView, setMainView] = useState<CustomerTab | 'alerts' | 'offers'>('home');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -154,7 +158,27 @@ export const NativeCustomerApp: React.FC = () => {
     setMainView('wizard');
   };
 
-  const activeTab: CustomerTab = mainView === 'alerts' ? 'home' : mainView;
+  const bookOffer = (offer: CustomerOffer) => {
+    const service = SERVICES_CATALOG.find((item) => item.id === offer.serviceId && item.isVisible);
+    const start = offerStartSelection(offer.startAt);
+    const end = offerStartSelection(offer.endAt);
+    const minHours = offer.quantity ?? 1;
+    const choices = offerDurationChoices(offer.startAt, offer.endAt, minHours);
+    if (!service || !start || !end || !choices.length) return;
+    booking.resetBooking();
+    booking.setSelectedService(service);
+    const day = buildJalaliDateOptions(new Date(), 100).find((item) => item.dateString === start.dateString);
+    booking.setSelectedDate(day ?? { dateString: start.dateString, dayOfWeek: '', dayOfMonth: start.dayOfMonth, monthName: '' });
+    booking.setSelectedTimeSlot({ id: `offer-${offer.id}`, startTime: start.startTime, endTime: end.startTime, label: 'ساعت پیشنهادی متخصص', period: 'MORNING', isAvailable: true });
+    booking.setDurationHours(choices[0]);
+    booking.setServiceOption('offerId', offer.id);
+    setOfferBookingDraft({ offerId: offer.id, startAt: offer.startAt, endAt: offer.endAt, workerName: offer.worker.name, minHours });
+    booking.setStep(2);
+    setFocusOrderId(null);
+    setMainView('wizard');
+  };
+
+  const activeTab: CustomerTab = mainView === 'alerts' || mainView === 'offers' ? 'home' : mainView;
 
   return (
     <EdgeSafeAreaView style={styles.homeShell} edges={['top', 'left', 'right']}>
@@ -179,7 +203,10 @@ export const NativeCustomerApp: React.FC = () => {
             }}
             onOpenNotifications={() => setMainView('alerts')}
             onOpenSupport={() => setMainView('support')}
+            onOpenOffers={() => setMainView('offers')}
           />
+        ) : mainView === 'offers' ? (
+          <CustomerOffersScreen onBack={() => setMainView('home')} onBook={bookOffer} />
         ) : mainView === 'orders' ? (
           <OrdersScreen
             initialOrderId={focusOrderId}

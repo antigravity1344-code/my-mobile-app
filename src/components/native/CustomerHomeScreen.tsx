@@ -67,6 +67,7 @@ type Props = {
   onOpenOrders: (orderId?: string) => void;
   onOpenNotifications: () => void;
   onOpenSupport: () => void;
+  onOpenOffers?: () => void;
 };
 
 function profileInitial(name?: string): string {
@@ -123,6 +124,7 @@ export function CustomerHomeScreen({
   onOpenOrders,
   onOpenNotifications,
   onOpenSupport,
+  onOpenOffers,
 }: Props) {
   const avatarUri = (userAvatar || '').trim();
   const initial = profileInitial(userName);
@@ -237,6 +239,13 @@ export function CustomerHomeScreen({
         <ReorderHero order={hero.order} onReorder={() => onStartBooking(hero.preselectServiceId)} />
       ) : null}
       {hero.kind === 'none' ? <WelcomeHero /> : null}
+
+      {onOpenOffers ? (
+        <Pressable accessibilityRole="button" onPress={onOpenOffers} style={({ pressed }) => [styles.offersCard, pressed && styles.pressed]}>
+          <Text style={styles.offersTitle}>ساعت‌های پیشنهادی متخصصان</Text>
+          <Text style={styles.offersText}>ساعت‌های آزاد متخصصان با قیمت مشخص؛ هر کدام را مستقیم رزرو کنید</Text>
+        </Pressable>
+      ) : null}
 
       <View style={[styles.section, styles.servicesSection]}>
         <View style={styles.sectionHead}>
@@ -792,6 +801,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'right',
   },
+  offersCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 14,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+  },
+  offersTitle: { ...type.semibold, fontSize: 15, textAlign: 'right', color: colors.text },
+  offersText: { ...type.regular, fontSize: 13, textAlign: 'right', color: colors.muted, lineHeight: 20 },
   trustRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

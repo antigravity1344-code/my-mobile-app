@@ -50,6 +50,7 @@ import {
   serverQuoteAsFinalPrice,
 } from '../../features/orders/services/serverQuote';
 import { useCustomerPriceQuote } from '../../features/orders/services/useCustomerPriceQuote';
+import { getOfferBookingDraft, offerDurationChoices } from '../../features/offers/offerBookingDraft';
 import { colors, fontFamily, radius, ui, TOUCH_MIN } from '../../theme';
 
 const TIME_SLOTS: TimeSlot[] = [
@@ -85,6 +86,8 @@ interface NativeBookingWizardProps {
 
 export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWizardProps) => {
   const booking = useBooking();
+  const offerDraft = getOfferBookingDraft();
+  const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
   const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -507,13 +510,21 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         {booking.step === 2 && <View style={styles.section}>
           <Text style={styles.heading}>تاریخ و ساعت</Text>
           <Text style={styles.earlyBirdHint}>مبلغ نهایی را سرور از تعرفه شرکت محاسبه می‌کند و قبل از ثبت نشان می‌دهد.</Text>
+          {offerMode && offerDraft && <View style={styles.optionBlock}>
+            <Text style={styles.label}>ساعت پیشنهادی {offerDraft.workerName}</Text>
+            <Text style={styles.muted}>{booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedDate?.monthName} · از ساعت {toPersianDigits(booking.selectedTimeSlot?.startTime ?? '')}</Text>
+            <Text style={styles.muted}>زمان و تکرار سفارش در این حالت ثابت است. برای زمان دیگر، سفارش عادی ثبت کنید.</Text>
+          </View>}
+          {!offerMode && <>
           <Text style={styles.label}>تاریخ اعزام</Text>
           <ScrollView ref={dateStripRef} horizontal showsHorizontalScrollIndicator={false} onContentSizeChange={dateStripScroll.onContentSizeChange} contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}>
             {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{toPersianDigits(date.dayOfMonth)}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
           <Text style={styles.label}>بازه زمانی</Text>
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color={colors.teal} /><Text style={[styles.flex, styles.slotText]}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color={colors.teal} />}</Pressable>)}
-          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{[4, 5, 6, 8].map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          </>}
+          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{(offerMode && offerDraft ? offerDurationChoices(offerDraft.startAt, offerDraft.endAt, offerDraft.minHours) : [4, 5, 6, 8]).map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          {!offerMode && <>
           <Text style={styles.label}>تکرار سفارش</Text>
           <View style={styles.choiceRow}>
             {[
@@ -536,6 +547,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
               تکرار سفارش همراه درخواست فرستاده می‌شود. مبلغ همین سفارش را فقط سرور محاسبه می‌کند.
             </Text>
           )}
+          </>}
           <Text style={styles.label}>یادداشت سفارش (اختیاری)</Text>
           <TextInput
             multiline

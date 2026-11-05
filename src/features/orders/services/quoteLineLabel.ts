@@ -14,6 +14,7 @@ function inputLabels(): Map<string, string> {
 
 /** شناسهٔ فنی ردیف تعرفه را به برچسبی قابل‌فهم برای مشتری تبدیل می‌کند. */
 export function quoteLineLabel(id: string, kind: 'surcharge' | 'discount'): string {
+  if (id === 'worker-offer') return 'قیمت پیشنهادی متخصص';
   if (PERSIAN.test(id)) return id;
   const known = inputLabels().get(id);
   if (known) return known;
