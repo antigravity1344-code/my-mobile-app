@@ -40,17 +40,17 @@ function openWorkerManualTopup(worker, card) {
   }
   reload.addEventListener('click', async () => {
     if (busy) return;
-    busy = true; reload.disabled = submit.disabled = true;
+    busy = true; reload.disabled = submit.disabled = close.disabled = true;
     try {
       const data = await request('GET');
       history.textContent = data.receipts.map(r => r.trackingNumber + ' | ' + r.amount + ' ' + r.currencyUnit + ' | ' + r.paidOn).join('\n') || 'رسیدی ثبت نشده است.';
       status.textContent = 'رسیدها بازخوانی شدند؛ پیش از ثبت دوباره شماره پیگیری را بررسی کنید.';
     } catch (error) { status.textContent = error.message; }
-    finally { busy = false; reload.disabled = submit.disabled = false; }
+    finally { busy = false; reload.disabled = submit.disabled = close.disabled = false; }
   });
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (busy) return;
-    busy = true; reload.disabled = submit.disabled = true;
+    busy = true; reload.disabled = submit.disabled = close.disabled = true;
     for (const input of [amount, unit, paidOn, tracking, note]) input.disabled = true;
     status.textContent = 'در حال ثبت…';
     try {
@@ -58,7 +58,7 @@ function openWorkerManualTopup(worker, card) {
       status.textContent = 'شارژ ثبت شد؛ شماره پیگیری: ' + data.receipt.trackingNumber;
       form.reset();
     } catch (error) { status.textContent = error.message + ' اطلاعات فرم محفوظ است؛ رسیدها را بازخوانی کنید. شماره پیگیری را برای تکرار درخواست تغییر ندهید.'; }
-    finally { busy = false; reload.disabled = submit.disabled = false; for (const input of [amount, unit, paidOn, tracking, note]) input.disabled = false; }
+    finally { busy = false; reload.disabled = submit.disabled = close.disabled = false; for (const input of [amount, unit, paidOn, tracking, note]) input.disabled = false; }
   });
   close.addEventListener('click', () => { if (!busy) panel.remove(); });
 }
