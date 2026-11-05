@@ -175,6 +175,9 @@ function isOptionValue(value) {
     || (typeof value === 'string' && value.trim() !== '' && value.length <= 80);
 }
 
+// انتخاب‌هایی که صرفاً ترجیح سفارش‌اند و هرگز قیمت را تغییر نمی‌دهند؛ نبودن آن‌ها در تعرفه نباید رزرو را رد کند.
+const NON_PRICING_OPTION_IDS = new Set(['gender']);
+
 function allowedOptionIds(service) {
   const ids = new Set();
   for (const item of [...service.surcharges, ...service.factors, ...service.discounts]) {
@@ -207,7 +210,7 @@ function quote(policy, input) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) fail('INPUT_INVALID', 'گزینه‌ها معتبر نیستند.');
   const allowed = allowedOptionIds(service);
   for (const [key, value] of Object.entries(options)) {
-    if (!allowed.has(key)) fail('INPUT_INVALID', 'گزینه در تعرفه این خدمت نیست.');
+    if (!allowed.has(key) && !NON_PRICING_OPTION_IDS.has(key)) fail('INPUT_INVALID', 'گزینه در تعرفه این خدمت نیست.');
     if (!isOptionValue(value)) fail('INPUT_INVALID', 'مقدار گزینه معتبر نیست.');
   }
   let quantity = 1;

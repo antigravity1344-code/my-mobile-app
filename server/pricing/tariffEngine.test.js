@@ -98,6 +98,8 @@ test('invalid input, unknown service and client authority are rejected', () => {
   assert.throws(() => quote(loaded, { at, serviceId: 'hour', quantity: 2, companyId: 'other' }), (error) => error.code === 'INPUT_INVALID');
   assert.throws(() => quote(loaded, { at, serviceId: 'hour', quantity: 2, price: 1 }), (error) => error.code === 'INPUT_INVALID');
   assert.throws(() => quote(loaded, { at, serviceId: 'hour', quantity: 2, options: { unknown: true } }), (error) => error.code === 'INPUT_INVALID');
+  // ترجیح جنسیت متخصص قیمت را عوض نمی‌کند و نباید رزرو را رد کند.
+  assert.equal(quote(loaded, { at, serviceId: 'hour', quantity: 2, options: { gender: 'خانم' } }).total, quote(loaded, { at, serviceId: 'hour', quantity: 2 }).total);
   assert.throws(() => quote(loaded, { at, serviceId: 'flat', quantity: 4 }), (error) => error.code === 'INPUT_INVALID');
 });
 
