@@ -2309,7 +2309,7 @@ app.get('/admin', (req, res) => {
         );
         details.append(
           heading,
-          adminElement('p', 'text-xs text-slate-400 mt-1', 'تلفن: ' + w.phone + ' | کد ملی: ' + (w.nationalId || 'ثبت نشده') + ' | شبا: ' + (w.bankSheba || 'ثبت نشده')),
+          adminElement('p', 'text-xs text-slate-400 mt-1', 'تلفن: ' + w.phone + ' | کد ملی: ' + (w.nationalIdMasked || w.nationalId || 'ثبت نشده') + ' | شبا: ' + (w.bankShebaMasked || w.bankSheba || 'ثبت نشده')),
           adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + (w.address || 'ثبت نشده'))
         );
         identity.append(avatar, details);
