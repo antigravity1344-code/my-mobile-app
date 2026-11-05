@@ -1996,6 +1996,7 @@ app.get('/admin', (req, res) => {
     <div id="tabWorkers" class="space-y-4">
       <h3 class="text-lg font-bold text-white">لیست متخصصین و درخواست‌های احراز هویت</h3>
       <p id="workersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <p id="workersActionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <div id="workersList" class="space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
@@ -2005,6 +2006,7 @@ app.get('/admin', (req, res) => {
     <div id="tabOrders" class="space-y-4 hidden">
       <h3 class="text-lg font-bold text-white">لیست تمامی سفارش‌ها</h3>
       <p id="ordersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <p id="ordersActionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <div id="ordersList" class="space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
@@ -2246,6 +2248,44 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    const adminActions = new Set();
+
+    function adminActionControls() {
+      document.querySelectorAll('[data-admin-action]').forEach((button) => {
+        button.disabled = adminActions.has(button.dataset.adminAction);
+      });
+    }
+
+    async function runAdminStatusAction(section, key, url, status) {
+      if (adminActions.has(key)) return;
+      adminActions.add(key);
+      adminActionControls();
+      const message = document.getElementById(section + 'ActionMessage');
+      message.textContent = 'در حال انجام عملیات…';
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(url, {
+          method: 'PUT', headers: adminHeaders(), body: JSON.stringify({ status }), signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          message.textContent = data.message || 'عملیات انجام نشد. اطلاعات را بازخوانی و دوباره بررسی کنید.';
+          return;
+        }
+        message.textContent = 'عملیات انجام شد. وضعیت فهرست در حال بازخوانی است.';
+        if (dashboardLoad) await dashboardLoad;
+        await loadAllData();
+        message.textContent = 'عملیات انجام شد.';
+      } catch {
+        message.textContent = 'پاسخ دریافت نشد؛ نتیجه عملیات مشخص نیست. پیش از تلاش دوباره، اطلاعات را بازخوانی کنید.';
+      } finally {
+        clearTimeout(timer);
+        adminActions.delete(key);
+        adminActionControls();
+      }
+    }
+
     function renderWorkers(workers) {
       const container = document.getElementById('workersList');
       if (!workers || workers.length === 0) {
@@ -2281,6 +2321,8 @@ app.get('/admin', (req, res) => {
           approve ? '✅ تایید مدارک و فعال‌سازی' : '⛔ غیرفعال‌سازی');
         button.addEventListener('click', () => updateWorkerStatus(w.id, approve ? 'APPROVED' : 'BLOCKED'));
         button.setAttribute('data-action', 'worker-status');
+        button.dataset.adminAction = 'worker:' + w.id;
+        button.disabled = adminActions.has(button.dataset.adminAction);
         actions.append(button);
         const bankReset = adminElement('button', 'bg-sky-700 text-white text-xs px-3 py-2 rounded-xl', 'بازنشانی رمز شبا');
         bankReset.type = 'button';
@@ -2332,6 +2374,8 @@ app.get('/admin', (req, res) => {
         if (o.status === 'CANCEL_REQUESTED') {
           const button = adminElement('button', 'bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-2 rounded-xl', 'تأیید لغو');
           button.addEventListener('click', () => confirmCustomerCancel(o.id));
+          button.dataset.adminAction = 'order:' + o.id;
+          button.disabled = adminActions.has(button.dataset.adminAction);
           actions.append(button);
         }
         actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' تومان'));
@@ -2341,14 +2385,9 @@ app.get('/admin', (req, res) => {
       container.replaceChildren(rows);
     }
 
-    async function confirmCustomerCancel(orderId) {
-      const res = await fetch('/api/admin/orders/' + encodeURIComponent(orderId), {
-        method: 'PUT',
-        headers: adminHeaders(),
-        body: JSON.stringify({ status: 'CANCELLED' })
-      });
-      const data = await res.json();
-      if (data.success) loadAllData();
+    function confirmCustomerCancel(orderId) {
+      return runAdminStatusAction('orders', 'order:' + orderId,
+        '/api/admin/orders/' + encodeURIComponent(orderId), 'CANCELLED');
     }
 
     function getStatusBadge(status) {
@@ -2381,16 +2420,9 @@ app.get('/admin', (req, res) => {
       return 'وضعیت نامشخص';
     }
 
-    async function updateWorkerStatus(userId, status) {
-      const res = await fetch('/api/admin/users/' + encodeURIComponent(userId) + '/status', {
-        method: 'PUT',
-        headers: adminHeaders(),
-        body: JSON.stringify({ status })
-      });
-      const data = await res.json();
-      if (data.success) {
-        loadAllData();
-      }
+    function updateWorkerStatus(userId, status) {
+      return runAdminStatusAction('workers', 'worker:' + userId,
+        '/api/admin/users/' + encodeURIComponent(userId) + '/status', status);
     }
 
     function switchTab(tab) {

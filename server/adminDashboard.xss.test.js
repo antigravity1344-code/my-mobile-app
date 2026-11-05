@@ -170,6 +170,45 @@ test('initial load failures end loading without claiming an empty list', () => w
   }
 }));
 
+test('status actions report rejected and lost responses and prevent duplicate requests', async t => {
+  for (const kind of ['worker', 'order']) await t.test(kind, () => withPage(async page => {
+    await page.evaluate(() => loadAllData());
+    const section = kind === 'worker' ? 'workers' : 'orders';
+    const id = 'QA-STATUS-' + kind;
+    const url = origin + (kind === 'worker' ? '/api/admin/users/' + id + '/status' : '/api/admin/orders/' + id);
+    await page.evaluate(({ kind, w, o }) => kind === 'worker' ? renderWorkers([w]) : renderOrders([o]), {
+      kind, w: worker({ id }), o: order({ id, status: 'CANCEL_REQUESTED' }),
+    });
+    await page.locator('#tab' + (kind === 'worker' ? 'Workers' : 'Orders') + 'Btn').click();
+    let release;
+    const delayed = new Promise(resolve => { release = resolve; });
+    const calls = [];
+    await page.route(url, async route => {
+      calls.push({ method: route.request().method(), body: route.request().postDataJSON() });
+      await delayed;
+      await route.fulfill({ json: { success: false } });
+    });
+    await page.evaluate(({ kind, id }) => {
+      const action = () => kind === 'worker' ? updateWorkerStatus(id, 'APPROVED') : confirmCustomerCancel(id);
+      window.__statusAttempt = action();
+      action();
+    }, { kind, id });
+    const button = page.locator('#' + section + 'List [data-admin-action]');
+    assert.equal(await button.isDisabled(), true);
+    await page.waitForFunction(section => document.getElementById(section + 'ActionMessage').textContent.includes('در حال'), section);
+    release();
+    await page.evaluate(() => window.__statusAttempt);
+    assert.deepEqual(calls, [{ method: 'PUT', body: { status: kind === 'worker' ? 'APPROVED' : 'CANCELLED' } }]);
+    assert.match(await page.locator('#' + section + 'ActionMessage').textContent(), /عملیات انجام نشد/);
+    assert.equal(await button.isDisabled(), false);
+    await page.unroute(url);
+    await page.route(url, route => route.abort('failed'));
+    await button.click();
+    await page.waitForFunction(section => document.getElementById(section + 'ActionMessage').textContent.includes('نتیجه عملیات مشخص نیست'), section);
+    assert.equal(await button.isDisabled(), false);
+  }));
+});
+
 test('worker text fields are literal text, not executable HTML', async (t) => {
   for (const field of ['name', 'phone', 'nationalId', 'bankSheba', 'address']) {
     await t.test(field, () => withPage(async (page) => {
