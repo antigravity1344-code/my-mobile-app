@@ -30,6 +30,7 @@ const {
   QuoteError,
 } = require('./pricing/orderQuote');
 const { OfferError, validateOfferInput } = require('./workerOffers');
+const { buildOfferReport } = require('./offerReport');
 const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
 const { readSourceIdentity, sourceIdentityScriptJson } = require('../tools/sourceIdentity.cjs');
 const SOURCE_IDENTITY = readSourceIdentity();
@@ -821,7 +822,7 @@ setOfferResolver(({ offerId, serviceId, now }) => {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
   }
   const worker = store.getUser(offer.workerId);
-  if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) {
+  if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE') || !store.featureSwitches.isWorkerEnabled('offers', worker.id)) {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
   }
   return { basisPoints: offer.adjustmentBasisPoints };
@@ -875,8 +876,11 @@ app.get('/api/workers/me/offers', (req, res) => {
   const tierKey = workerTierKey(worker.id);
   const { maxBasisPointsForTier } = require('./workerOffers');
   const policy = store.offerPolicy.bounds();
+  const enabled = store.featureSwitches.isWorkerEnabled('offers', worker.id);
   res.json({
     success: true,
+    enabled,
+    ...(enabled ? {} : { disabledMessage: 'ثبت قیمت پیشنهاد برای حساب شما توسط مدیریت غیرفعال شده است. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.' }),
     minBasisPoints: policy.minBps,
     maxBasisPoints: maxBasisPointsForTier(tierKey, policy),
     offers: store.workerOffers.listForWorker(worker.id).map(workerOfferView),
@@ -888,6 +892,9 @@ app.post('/api/workers/me/offers', (req, res) => {
   if (!worker) return;
   if (resolvePricingMode() !== 'server') {
     return res.status(409).json({ success: false, code: 'PRICING_UNAVAILABLE', message: 'ثبت پیشنهاد قیمتی در این حالت فعال نیست.' });
+  }
+  if (!store.featureSwitches.isWorkerEnabled('offers', worker.id)) {
+    return res.status(403).json({ success: false, code: 'FEATURE_DISABLED', message: 'ثبت قیمت پیشنهاد برای حساب شما توسط مدیریت غیرفعال شده است.' });
   }
   try {
     const now = new Date();
@@ -919,12 +926,13 @@ app.get('/api/offers', (req, res) => {
     return res.status(403).json({ success: false, message: 'فقط مشتری پیشنهادها را می‌بیند.', offers: [] });
   }
   res.set('Cache-Control', 'no-store');
-  if (resolvePricingMode() !== 'server') return res.json({ success: true, offers: [] });
+  if (resolvePricingMode() !== 'server' || !store.featureSwitches.isGlobalEnabled('offers')) return res.json({ success: true, offers: [] });
   const now = new Date();
   const offers = [];
   for (const offer of store.workerOffers.listOpen(now)) {
     const worker = store.getUser(offer.workerId);
     if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) continue;
+    if (!store.featureSwitches.isWorkerEnabled('offers', worker.id)) continue;
     const view = workerOfferView(offer);
     if (view.total == null) continue;
     const rating = store.workerRatingStats(worker.id);
@@ -1618,6 +1626,33 @@ app.get('/api/admin/offer-policy', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ success: true, policy: store.offerPolicy.read() });
 });
+app.get('/api/admin/feature-switches', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, ...store.featureSwitches.snapshot() });
+});
+app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  if (body.scope === 'WORKER') {
+    const target = typeof body.workerId === 'string' ? store.getUser(body.workerId) : null;
+    if (!target || target.role !== 'WORKER') return res.status(404).json({ success: false, message: 'متخصص یافت نشد.' });
+  }
+  const result = store.featureSwitches.set({
+    scope: body.scope, workerId: body.workerId, feature: body.feature, enabled: body.enabled, actor: res.locals.adminAuditActor,
+  });
+  if (result.code !== 'ok') return res.status(400).json({ success: false, message: 'درخواست کلید قابلیت معتبر نیست.' });
+  res.json({ success: true, ...store.featureSwitches.snapshot(), workerFeatures: body.scope === 'WORKER' ? store.featureSwitches.forWorker(body.workerId) : undefined });
+});
+app.get('/api/admin/offer-report', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const rows = buildOfferReport({
+    offers: store.workerOffers.listBooked(),
+    getOrder: (id) => store.getOrder(id),
+    getUser: (id) => store.getUser(id),
+    minBps: store.offerPolicy.bounds().minBps,
+  });
+  res.json({ success: true, rows });
+});
 app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const result = store.offerPolicy.publish(req.body);
@@ -1747,7 +1782,13 @@ app.get('/api/admin/stats', (req, res) => {
 app.get('/api/admin/users', (req, res) => {
   const { role } = req.query;
   const result = store.listUsers(typeof role === 'string' && role ? role : undefined);
-  res.json({ success: true, users: result.map(adminUserView) });
+  res.json({
+    success: true,
+    users: result.map((user) => {
+      const view = adminUserView(user);
+      return view && user.role === 'WORKER' ? { ...view, features: store.featureSwitches.forWorker(user.id) } : view;
+    }),
+  });
 });
 
 app.put('/api/admin/users/:userId/status', (req, res) => {
@@ -2197,7 +2238,7 @@ app.get('/admin', (req, res) => {
       </button>
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
-      <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
+      <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
@@ -2275,6 +2316,15 @@ app.get('/admin', (req, res) => {
       <p id="offerPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
       <button id="offerPolicySave" type="button" onclick="saveAdminOfferPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+      <h4 class="text-base font-bold pt-4">کلید کلی قابلیت</h4>
+      <p class="text-sm text-slate-300">با خاموش‌کردن این کلید، فهرست پیشنهادها برای مشتریان خالی می‌شود و هیچ پیشنهاد تازه‌ای رزرو نمی‌شود. سفارش‌های ثبت‌شده تغییر نمی‌کنند. برای یک متخصص مشخص، دکمهٔ «غیرفعال‌سازی قیمت پیشنهاد» را در کارت او در تب متخصصان بزنید.</p>
+      <p id="offerGlobalState" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="offerGlobalToggle" type="button" onclick="toggleGlobalOffers()" disabled class="bg-amber-700 px-4 py-2 rounded-xl">…</button>
+      <h4 class="text-base font-bold pt-4">گزارش متخصص‌های مشکوک (فقط نمایشی)</h4>
+      <p class="text-sm text-slate-300">این گزارش هیچ محدودیتی اعمال نمی‌کند و فقط برای بررسی مدیر است. پرچم «قیمت نزدیک حداقل»: دست‌کم ۳ رزرو با قیمتی تا ۱۰٪ بالاتر از حداقل. پرچم «مشتری تکراری با قیمت پایین»: دست‌کم ۳ رزرو یک مشتری با قیمت ≤ ۸۵٪ تعرفه. مشتری تکراری به‌خودیِ‌خود خلاف نیست.</p>
+      <p id="offerReportMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <ul id="offerReportList" class="space-y-2"></ul>
+      <button id="offerReportRefresh" type="button" onclick="loadAdminOfferReport()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی گزارش</button>
     </section>
     <section id="tabAreas" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
@@ -2563,6 +2613,15 @@ app.get('/admin', (req, res) => {
         bankReset.type = 'button';
         bankReset.addEventListener('click', () => openWorkerBankReset(w, card));
         actions.append(bankReset);
+        if (w.features && Object.prototype.hasOwnProperty.call(w.features, 'offers')) {
+          const offersOn = w.features.offers !== false;
+          const offersButton = adminElement('button', (offersOn ? 'bg-amber-700' : 'bg-emerald-700') + ' text-white text-xs px-3 py-2 rounded-xl',
+            offersOn ? 'غیرفعال‌سازی قیمت پیشنهاد' : 'فعال‌سازی قیمت پیشنهاد');
+          offersButton.type = 'button';
+          offersButton.setAttribute('data-action', 'worker-offers-feature');
+          offersButton.addEventListener('click', () => toggleWorkerFeature(w.id, 'offers', !offersOn));
+          actions.append(offersButton);
+        }
         const manualTopup = adminElement('button', 'bg-sky-700 text-white text-xs px-3 py-2 rounded-xl', 'ثبت شارژ دستی');
         manualTopup.type = 'button';
         manualTopup.addEventListener('click', () => openWorkerManualTopup(w, card));

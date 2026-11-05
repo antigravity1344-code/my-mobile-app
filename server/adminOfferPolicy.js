@@ -87,3 +87,91 @@ async function saveAdminOfferPolicy() {
     offerPolicyMessage('نتیجه ذخیره مشخص نشد. مقدارهای واردشده حفظ شد؛ برای بررسی نتیجه، بازخوانی کنید.');
   } finally { offerPolicyBusy = false; offerPolicyControls(); }
 }
+
+const OFFER_REPORT_FLAG_LABEL = {
+  NEAR_MINIMUM_PRICE: 'قیمت نزدیک حداقل',
+  REPEAT_CUSTOMER_LOW_PRICE: 'مشتری تکراری با قیمت پایین',
+};
+async function loadAdminOfferReport() {
+  const list = document.getElementById('offerReportList');
+  const message = document.getElementById('offerReportMessage');
+  list.textContent = '';
+  if (!adminToken) { message.textContent = 'ابتدا وارد حساب مدیر شوید.'; return; }
+  message.textContent = 'در حال دریافت گزارش…';
+  try {
+    const response = await fetch('/api/admin/offer-report', { headers: adminHeaders(), cache: 'no-store' });
+    if (response.status === 401) { message.textContent = 'نشست مدیر پایان یافته است. صفحه را بازخوانی کنید.'; return; }
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.rows)) throw new Error('bad report');
+    if (!data.rows.length) { message.textContent = 'موردی با این الگو پیدا نشد.'; return; }
+    message.textContent = data.rows.length + ' متخصص پرچم‌دار.';
+    for (const row of data.rows) {
+      const item = document.createElement('li');
+      item.className = 'bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm';
+      const flags = (Array.isArray(row.flags) ? row.flags : []).map((flag) => OFFER_REPORT_FLAG_LABEL[flag] || 'پرچم ناشناخته').join('، ');
+      item.textContent = [
+        String(row.workerName || 'بدون نام') + ' (' + String(row.workerPhone || '') + ')',
+        'رزرو: ' + Number(row.bookings) + ' · میانگین: ' + Number(row.averagePercent) + '٪ تعرفه',
+        'نزدیک حداقل: ' + Number(row.nearMinimumBookings) + ' · بیشترین رزرو یک مشتری: ' + Number(row.maxRepeatSameCustomer),
+        flags,
+      ].join(' — ');
+      list.appendChild(item);
+    }
+  } catch {
+    message.textContent = 'گزارش دریافت نشد. دوباره بازخوانی کنید.';
+  }
+}
+
+let offerGlobalEnabled = null;
+function showOfferGlobal() {
+  const button = document.getElementById('offerGlobalToggle');
+  document.getElementById('offerGlobalState').textContent = offerGlobalEnabled === null ? '' : (offerGlobalEnabled ? 'قابلیت برای کل شرکت روشن است.' : 'قابلیت برای کل شرکت خاموش است.');
+  button.textContent = offerGlobalEnabled ? 'خاموش‌کردن برای کل شرکت' : 'روشن‌کردن برای کل شرکت';
+  button.disabled = offerGlobalEnabled === null;
+}
+async function featureSwitchRequest(method, body) {
+  const response = await fetch('/api/admin/feature-switches', {
+    method, headers: adminHeaders(), cache: 'no-store', ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (response.status === 401) { adminToken = ''; sessionStorage.removeItem('paksho_admin_token'); return { expired: true }; }
+  return { response, data: await response.json() };
+}
+async function loadAdminFeatureSwitches() {
+  offerGlobalEnabled = null; showOfferGlobal();
+  if (!adminToken) return;
+  try {
+    const result = await featureSwitchRequest('GET');
+    if (result.expired || !result.response.ok || !result.data.success) return;
+    offerGlobalEnabled = result.data.global.offers !== false;
+    showOfferGlobal();
+  } catch { /* وضعیت نامشخص می‌ماند؛ دکمه غیرفعال است */ }
+}
+async function toggleGlobalOffers() {
+  if (offerGlobalEnabled === null) return;
+  const wanted = !offerGlobalEnabled;
+  document.getElementById('offerGlobalToggle').disabled = true;
+  try {
+    const result = await featureSwitchRequest('PUT', { scope: 'GLOBAL', feature: 'offers', enabled: wanted });
+    if (result.expired || !result.response.ok || !result.data.success) throw new Error('failed');
+    offerGlobalEnabled = result.data.global.offers !== false;
+    showOfferGlobal();
+  } catch {
+    document.getElementById('offerGlobalState').textContent = 'تغییر انجام نشد یا نتیجه نامشخص است؛ بازخوانی کنید.';
+    await loadAdminFeatureSwitches();
+  }
+}
+async function toggleWorkerFeature(workerId, feature, enabled) {
+  const key = 'feature:' + workerId + ':' + feature;
+  if (adminActions.has(key)) return;
+  adminActions.add(key);
+  const message = document.getElementById('workersActionMessage');
+  if (message) message.textContent = 'در حال انجام عملیات…';
+  try {
+    const result = await featureSwitchRequest('PUT', { scope: 'WORKER', workerId, feature, enabled });
+    if (result.expired || !result.response.ok || !result.data.success) throw new Error('failed');
+    if (message) message.textContent = enabled ? 'قابلیت برای این متخصص فعال شد.' : 'قابلیت برای این متخصص غیرفعال شد.';
+    await loadAllData();
+  } catch {
+    if (message) message.textContent = 'نتیجه عملیات مشخص نیست؛ اطلاعات را بازخوانی و دوباره بررسی کنید.';
+  } finally { adminActions.delete(key); }
+}

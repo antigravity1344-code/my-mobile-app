@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 
 // حدود قیمت پیشنهادی متخصص نسبت به تعرفهٔ شرکت (بر حسب basis points؛ ۱۰۰۰۰ = خود تعرفه).
 // متخصص عادی فقط می‌تواند ارزان‌تر بگذارد؛ طلایی تا ۱۳۰٪ تعرفه. این حدود پیش‌فرض‌اند و در یک جا قابل تغییرند.
-const MIN_BASIS_POINTS = 5000;
+const MIN_BASIS_POINTS = 7000;
 const DEFAULT_MAX_BASIS_POINTS = 10000;
 const GOLD_MAX_BASIS_POINTS = 13000;
 const STEP_BASIS_POINTS = 100;
@@ -109,6 +109,8 @@ function createWorkerOffers({ database, transaction }) {
     create,
     get: (id) => byId.get(String(id)) || null,
     listForWorker: (workerId) => byWorker.all(workerId),
+    /** همهٔ پیشنهادهای رزروشده برای گزارش مدیر. */
+    listBooked: () => database.prepare("SELECT * FROM worker_offers WHERE status = 'BOOKED' ORDER BY startAt DESC LIMIT 5000").all(),
     listOpen: (now) => openFuture.all(now.toISOString()),
     cancel: (id, workerId) => cancel.run(id, workerId).changes === 1,
     /** رزرو اتمی: فقط یک سفارش می‌تواند پیشنهاد باز را بگیرد. */

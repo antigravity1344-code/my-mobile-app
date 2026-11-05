@@ -37,7 +37,11 @@ test('admin offer policy panel: Persian digits, validation, persistence and conf
   const waitMessage = text => page.waitForFunction(value => document.getElementById('offerPolicyMessage').textContent.includes(value), text);
   await page.locator('#tabOfferPolicyBtn').click();
   await waitMessage('تنظیم جاری دریافت شد');
-  assert.deepEqual([await min.inputValue(), await max.inputValue(), await gold.inputValue()], ['50', '100', '130']);
+  await page.waitForFunction(() => document.getElementById('offerReportMessage').textContent.includes('موردی با این الگو پیدا نشد'));
+  const report = await request(server, { method: 'GET', pathname: '/api/admin/offer-report', token });
+  assert.equal(report.status, 200); assert.deepEqual(report.json.rows, []);
+  assert.equal((await request(server, { method: 'GET', pathname: '/api/admin/offer-report' })).status, 401);
+  assert.deepEqual([await min.inputValue(), await max.inputValue(), await gold.inputValue()], ['70', '100', '130']);
   await min.fill('۶۰'); await max.fill('۱۰۵'); await gold.fill('۱۴۰'); await save.click(); await waitMessage('ذخیره شد');
   assert.deepEqual(harness.store.offerPolicy.bounds(), { minBps: 6000, maxBps: 10500, goldMaxBps: 14000 });
   await page.reload(); await page.locator('#tabOfferPolicyBtn').click(); await waitMessage('تنظیم جاری دریافت شد');
@@ -50,5 +54,14 @@ test('admin offer policy panel: Persian digits, validation, persistence and conf
   await min.fill('60'); await save.click(); await waitMessage('مدیر دیگری');
   assert.equal(await save.isDisabled(), true);
   assert.equal(harness.store.offerPolicy.read().minPercent, 55);
+  const toggle = page.locator('#offerGlobalToggle');
+  await page.waitForFunction(() => !document.getElementById('offerGlobalToggle').disabled);
+  assert.match(await page.locator('#offerGlobalState').textContent(), /روشن/);
+  await toggle.click();
+  await page.waitForFunction(() => document.getElementById('offerGlobalState').textContent.includes('خاموش'));
+  assert.equal(harness.store.featureSwitches.isGlobalEnabled('offers'), false);
+  await toggle.click();
+  await page.waitForFunction(() => document.getElementById('offerGlobalState').textContent.includes('روشن'));
+  assert.equal(harness.store.featureSwitches.isGlobalEnabled('offers'), true);
   assert.deepEqual(errors, []);
 });

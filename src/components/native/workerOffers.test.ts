@@ -32,5 +32,9 @@ describe('workerOffers helpers', () => {
       offers: [{ id: 'a', serviceId: 's', startAt: 'x', endAt: 'y', adjustmentBasisPoints: 7000, status: 'OPEN' }, { id: 1 }],
     });
     expect(parsed?.offers).toHaveLength(1);
+    expect(parsed?.enabled).toBe(true);
+    const off = parseOffersResponse({ success: true, enabled: false, disabledMessage: 'x', minBasisPoints: 7000, maxBasisPoints: 10000, offers: [] });
+    expect(off?.enabled).toBe(false);
+    expect(off?.disabledMessage).toBe('x');
   });
 });

@@ -12,7 +12,7 @@ export type WorkerOffer = {
   tariffTotal?: number;
   total?: number;
 };
-export type OffersData = { offers: WorkerOffer[]; minBasisPoints: number; maxBasisPoints: number };
+export type OffersData = { offers: WorkerOffer[]; minBasisPoints: number; maxBasisPoints: number; enabled: boolean; disabledMessage: string };
 export type OffersResult = { ok: true; data: OffersData } | { ok: false; message: string };
 export type OfferActionResult = { ok: true } | { ok: false; message: string };
 
@@ -60,7 +60,11 @@ export function parseOffersResponse(result: unknown): OffersData | null {
   const min = Number(data.minBasisPoints);
   const max = Number(data.maxBasisPoints);
   if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min <= 0 || max < min) return null;
-  return { offers: data.offers.filter(validOffer), minBasisPoints: min, maxBasisPoints: max };
+  return {
+    offers: data.offers.filter(validOffer), minBasisPoints: min, maxBasisPoints: max,
+    enabled: data.enabled !== false,
+    disabledMessage: typeof data.disabledMessage === 'string' ? data.disabledMessage : '',
+  };
 }
 
 export function errorMessage(result: unknown, fallback: string): string {

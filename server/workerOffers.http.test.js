@@ -139,7 +139,7 @@ test('worker offers: create, list, book through signed quote, tamper resistance'
 
   // لغو پیشنهاد باز
   const second = await wreq('POST', '/api/workers/me/offers', {
-    serviceId: 'hourly', startAt: new Date(Date.now() + 72 * HOUR).toISOString(), endAt: new Date(Date.now() + 75 * HOUR).toISOString(), adjustmentBasisPoints: 5000,
+    serviceId: 'hourly', startAt: new Date(Date.now() + 72 * HOUR).toISOString(), endAt: new Date(Date.now() + 75 * HOUR).toISOString(), adjustmentBasisPoints: 7000,
   });
   assert.equal(second.status, 201);
   assert.equal((await wreq('DELETE', `/api/workers/me/offers/${second.json.offer.id}`)).status, 200);

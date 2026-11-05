@@ -104,7 +104,7 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
     };
   }
   if (path === '/offers' && role === 'customer') return { success: true, offers: [] };
-  if (path === '/workers/me/offers' && role === 'worker') return { success: true, minBasisPoints: 5000, maxBasisPoints: 10000, offers: [] };
+  if (path === '/workers/me/offers' && role === 'worker') return { success: true, minBasisPoints: 7000, maxBasisPoints: 10000, offers: [] };
   if (path === '/workers/me/rating') return { success: true, average: null, count: 0 };
   if (path === '/workers/me/weekly-income') {
     return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };

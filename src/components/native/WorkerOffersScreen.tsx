@@ -47,7 +47,7 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => { void load(); return () => { request.current?.abort(); request.current = null; }; }, [load]);
 
   const range = offerRangeFromSelection(dateString, startHour, duration);
-  const canSave = phase === 'ready' && !preview && !!serviceId && !!range && !!data;
+  const canSave = phase === 'ready' && !preview && !!serviceId && !!range && !!data && data.enabled;
   const save = async () => {
     if (!canSave || !range || request.current) return;
     const controller = new AbortController(); request.current = controller;
@@ -71,8 +71,9 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
     setMessage('پیشنهاد لغو شد.');
   };
 
-  const editable = phase === 'ready' && !preview;
-  const min = data?.minBasisPoints ?? 5000;
+  const featureOn = data?.enabled !== false;
+  const editable = phase === 'ready' && !preview && featureOn;
+  const min = data?.minBasisPoints ?? 7000;
   const max = data?.maxBasisPoints ?? 10000;
   const titleOf = (id: string) => services.find(row => row.id === id)?.title || id;
   return <ScrollView contentContainerStyle={styles.content}>
@@ -80,6 +81,7 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
     <Text style={styles.title}>ساعت‌های پیشنهادی من</Text>
     <Text style={styles.note}>بازهٔ آزاد خود را با قیمت پایین‌تر از تعرفه ثبت کنید تا مشتری ببیند و رزرو کند. {max > 10000 ? 'درجهٔ شما اجازهٔ قیمت بالاتر از تعرفه را هم می‌دهد.' : 'قیمت نمی‌تواند از تعرفهٔ شرکت بالاتر باشد.'}</Text>
     {preview && <Text style={styles.note}>این بخش در پیش‌نمایش فقط نمایشی است؛ ثبت غیرفعال است.</Text>}
+    {!!data && !data.enabled && <Text accessibilityLiveRegion="polite" style={styles.note}>{data.disabledMessage || 'ثبت قیمت پیشنهاد برای حساب شما غیرفعال است.'}</Text>}
     {phase === 'loading' && <ActivityIndicator color={colors.teal} />}
     {!!data && <>
       <Text style={styles.label}>خدمت</Text>

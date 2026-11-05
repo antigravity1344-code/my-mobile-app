@@ -11,6 +11,7 @@ const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
 const { createWorkerOffers } = require('./workerOffers');
 const { createOfferPolicy } = require('./offerPolicy');
+const { createFeatureSwitches } = require('./featureSwitches');
 const { createPaymentSettings } = require('./paymentSettings');
 const { createPaymentCharges } = require('./paymentCharges');
 const { createServiceAreas } = require('./serviceAreas');
@@ -1669,6 +1670,7 @@ function createDataStore(filename) {
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
   const workerOffers = createWorkerOffers({ database, transaction });
   const offerPolicy = createOfferPolicy({ database, transaction });
+  const featureSwitches = createFeatureSwitches({ database, transaction });
   const paymentSettings = createPaymentSettings({
     database,
     transaction,
@@ -1698,6 +1700,7 @@ function createDataStore(filename) {
     workerWallet,
     workerOffers,
     offerPolicy,
+    featureSwitches,
     paymentSettings,
     paymentCharges,
     serviceAreas,

@@ -36,7 +36,7 @@ test('admin offer policy: defaults, validation, versioning and effect on new off
 
   assert.equal((await areq('GET', undefined, workerLogin.token)).status, 401);
   const initial = await areq('GET');
-  assert.deepEqual(initial.json.policy, { version: 0, minPercent: 50, maxPercent: 100, goldMaxPercent: 130, effectiveAt: null });
+  assert.deepEqual(initial.json.policy, { version: 0, minPercent: 70, maxPercent: 100, goldMaxPercent: 130, effectiveAt: null });
 
   for (const bad of [
     { minPercent: 80, maxPercent: 70, goldMaxPercent: 130, expectedVersion: 0 },
