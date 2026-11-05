@@ -417,7 +417,9 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');
-      setSubmissionMessage(`درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
+      setSubmissionMessage(offerMode
+        ? `درخواست «${newOrder.serviceTitle}» برای ${offerDraft?.workerName || 'متخصص'} ثبت و رزرو شد.`
+        : `درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
     } else if (isQuoteRefreshCode(result.code)) {
       refreshQuote();
       setSubmissionState('error');
