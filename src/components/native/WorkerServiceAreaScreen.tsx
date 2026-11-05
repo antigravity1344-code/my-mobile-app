@@ -80,7 +80,7 @@ export function WorkerServiceAreaScreen({ onBack }: { onBack: () => void }) {
 const styles = StyleSheet.create({
   content: { padding: 20, gap: 16 }, title: { ...type.bold, fontSize: 22, textAlign: 'right', color: colors.text },
   label: { ...type.semibold, textAlign: 'right', color: colors.text }, note: { ...type.regular, textAlign: 'right', color: colors.muted, lineHeight: 24 },
-  link: { ...type.medium, textAlign: 'right', color: colors.teal }, row: { flexDirection: 'row-reverse', gap: 8 },
+  link: { ...type.medium, textAlign: 'right', color: colors.teal }, row: { flexDirection: 'row-reverse', gap: 8, flexGrow: 1 },
   wrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }, chip: { padding: 12, borderWidth: 1, borderColor: colors.mutedLight, borderRadius: 12 },
   selected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, text: { ...type.medium, color: colors.text },
   button: { backgroundColor: colors.teal, padding: 14, alignItems: 'center', borderRadius: 12 }, buttonText: { ...type.semibold, color: colors.white }, disabled: { opacity: 0.5 },

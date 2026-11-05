@@ -65,7 +65,7 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
 
   return <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {button('بازگشت به حساب متخصص', onBack, false)}
+      <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت به حساب متخصص</Text></Pressable>
       <Text style={styles.title}>شبا و رمز تغییر شبا</Text>
       <Text style={styles.description}>{WORKER_BANK_FUTURE_NOTE}</Text>
       {preview ? <Text style={styles.description}>مشاهده و ذخیره اطلاعات بانکی واقعی در پیش‌نمایش غیرفعال است.</Text> : <>
@@ -105,6 +105,7 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
 }
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { padding: 20, gap: 16 },
+  link: { ...type.medium, color: colors.teal, textAlign: 'right' },
   title: { ...type.bold, color: colors.text, fontSize: 22, textAlign: 'right' },
   heading: { ...type.bold, color: colors.text, fontSize: 18, textAlign: 'right' },
   description: { ...type.regular, color: colors.muted, textAlign: 'right', lineHeight: 24 },
