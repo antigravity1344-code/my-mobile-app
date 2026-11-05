@@ -1,6 +1,9 @@
 name: Paksho UI safe integration
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
