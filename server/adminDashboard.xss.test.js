@@ -223,6 +223,21 @@ test('worker status labels distinguish blocked, rejected, registered and unknown
   }
 }));
 
+test('order amount uses the order currency unit and falls back to toman for legacy orders', async () => {
+  await withPage(async (page) => {
+    await page.evaluate((rows) => renderOrders(rows), [
+      order({ id: 'ORDER-RIAL', pricing: { currencyUnit: 'ریال' } }),
+      order({ id: 'ORDER-LEGACY' }),
+      order({ id: 'ORDER-EVIL', pricing: { currencyUnit: TEXT_ATTACK } }),
+    ]);
+    await assertSafeMarkup(page, 'ordersList');
+    const text = await page.locator('#ordersList').textContent();
+    assert.equal(text.includes('۸۰۰٬۰۰۰ ریال'), true);
+    assert.equal(text.includes('۸۰۰٬۰۰۰ تومان'), true);
+    assert.equal(text.includes(TEXT_ATTACK), true, 'hostile unit is shown as literal text');
+  });
+});
+
 test('worker text fields are literal text, not executable HTML', async (t) => {
   for (const field of ['name', 'phone', 'nationalId', 'bankSheba', 'address']) {
     await t.test(field, () => withPage(async (page) => {

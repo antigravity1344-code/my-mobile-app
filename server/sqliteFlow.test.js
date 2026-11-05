@@ -282,6 +282,8 @@ function completionPayload(orderId) {
     const stats = await request(server, { pathname: '/api/admin/stats', token: admin.json.token });
     assert.equal(stats.status, 200);
     assert.equal(stats.json.stats.totalCustomers >= 1, true);
+    assert.equal(stats.json.stats.revenueUnit, 'تومان', 'legacy orders without a tariff unit count as toman');
+    assert.equal(typeof stats.json.stats.revenueByUnit, 'object');
     const hidden = await request(server, { pathname: '/data/paksho.sqlite' });
     assert.equal(hidden.status, 404);
     assert.equal(hidden.buf.includes(Buffer.from('SQLite format')), false);

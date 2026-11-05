@@ -1531,6 +1531,13 @@ app.get('/api/admin/stats', (req, res) => {
   const pendingWorkers = workers.filter(u => u.status === 'PENDING_VERIFICATION');
   const completedOrders = orders.filter(o => o.status === 'COMPLETED');
   const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.price || 0), 0);
+  // واحد پول هر سفارش همان است که هنگام ثبت از تعرفه آمده؛ سفارش‌های قدیمی بدون آن «تومان» حساب می‌شوند.
+  const revenueByUnit = {};
+  for (const o of completedOrders) {
+    const unit = (o.pricing && typeof o.pricing.currencyUnit === 'string' && o.pricing.currencyUnit.trim()) || 'تومان';
+    revenueByUnit[unit] = (revenueByUnit[unit] || 0) + (o.price || 0);
+  }
+  const revenueUnits = Object.keys(revenueByUnit);
 
   res.json({
     success: true,
@@ -1542,7 +1549,9 @@ app.get('/api/admin/stats', (req, res) => {
       pendingOrdersCount: orders.filter(o => o.status === 'PENDING').length,
       acceptedOrdersCount: orders.filter(o => o.status === 'ACCEPTED').length,
       completedOrdersCount: completedOrders.length,
-      totalRevenue
+      totalRevenue,
+      revenueByUnit,
+      revenueUnit: revenueUnits.length === 1 ? revenueUnits[0] : (revenueUnits.length === 0 ? 'تومان' : null)
     }
   });
 });
@@ -1976,7 +1985,7 @@ app.get('/admin', (req, res) => {
         <h2 id="totalWorkers" class="text-2xl font-black text-emerald-400 mt-1">-</h2>
       </div>
       <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
-        <span class="text-xs text-slate-400">درآمد کل (تومان)</span>
+        <span id="revenueLabel" class="text-xs text-slate-400">درآمد کل (تومان)</span>
         <h2 id="totalRevenue" class="text-xl font-black text-purple-400 mt-1">-</h2>
       </div>
     </div>
@@ -2208,7 +2217,14 @@ app.get('/admin', (req, res) => {
               document.getElementById('totalOrders').innerText = s.totalOrders;
               document.getElementById('pendingWorkers').innerText = s.pendingWorkersCount;
               document.getElementById('totalWorkers').innerText = s.totalWorkers;
-              document.getElementById('totalRevenue').innerText = s.totalRevenue.toLocaleString('fa-IR');
+              if (s.revenueUnit) {
+                document.getElementById('revenueLabel').innerText = 'درآمد کل (' + s.revenueUnit + ')';
+                document.getElementById('totalRevenue').innerText = s.totalRevenue.toLocaleString('fa-IR');
+              } else {
+                document.getElementById('revenueLabel').innerText = 'درآمد کل (به تفکیک واحد)';
+                document.getElementById('totalRevenue').innerText = Object.entries(s.revenueByUnit || {})
+                  .map(([unit, amount]) => Number(amount).toLocaleString('fa-IR') + ' ' + unit).join(' + ');
+              }
             }),
             loadDashboardSection('workers', '/api/admin/users?role=WORKER', (data) => renderWorkers(data.users)),
             loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
@@ -2391,7 +2407,7 @@ app.get('/admin', (req, res) => {
           button.disabled = adminActions.has(button.dataset.adminAction);
           actions.append(button);
         }
-        actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' تومان'));
+        actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' ' + ((o.pricing && typeof o.pricing.currencyUnit === 'string' && o.pricing.currencyUnit.trim()) || 'تومان')));
         card.append(details, actions);
         rows.append(card);
       }
