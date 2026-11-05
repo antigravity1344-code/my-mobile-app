@@ -264,7 +264,8 @@ test('avatar attributes and unsafe image URL schemes are rejected', async (t) =>
       assert.equal(await page.locator('#workersList img').count(), 1);
       const src = await page.locator('#workersList img').getAttribute('src');
       assert.notEqual(src, avatar, 'unsafe input must not become the image URL');
-      assert.equal(new URL(src, origin).protocol, 'https:', 'rejected avatars use the established HTTPS placeholder');
+      assert.equal(src.startsWith('data:image/svg+xml;utf8,'), true, 'rejected avatars use the local inert placeholder');
+      assert.equal(src.includes('__xssHits') || src.includes('script'), false);
     }));
   }
 });

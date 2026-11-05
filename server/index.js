@@ -1942,6 +1942,7 @@ app.get('/admin', (req, res) => {
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
     body { font-family: Vazirmatn, sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .admin-tabs button { white-space: nowrap; flex-shrink: 0; }
   </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -1981,7 +1982,7 @@ app.get('/admin', (req, res) => {
     </div>
 
     <!-- تب‌ها -->
-    <div class="flex border-b border-slate-700 gap-4 text-sm font-bold">
+    <div class="admin-tabs flex border-b border-slate-700 gap-4 text-sm font-bold overflow-x-auto">
       <button id="tabWorkersBtn" onclick="switchTab('workers')" class="pb-3 border-b-2 border-sky-400 text-sky-400">
         👨‍🔧 مدیریت متخصصین و تایید مدارک
       </button>
@@ -2234,7 +2235,8 @@ app.get('/admin', (req, res) => {
     }
 
     function safeWorkerAvatar(value) {
-      const fallback = 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150';
+      // جایگزین محلی: وابستگی به سرویس بیرونی نداریم و بدون اینترنت هم نمایش داده می‌شود.
+      const fallback = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23334155'/%3E%3Ccircle cx='24' cy='19' r='8' fill='%2394a3b8'/%3E%3Cpath d='M8 44c2-10 9-15 16-15s14 5 16 15z' fill='%2394a3b8'/%3E%3C/svg%3E";
       if (typeof value !== 'string' || !value.trim()) return fallback;
       const source = value.trim();
       // Do not reinterpret markup, control characters or backslashes as a URL.
