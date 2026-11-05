@@ -83,7 +83,10 @@ test('fake delivery stays outside the API and verify remains one-time', async (t
   });
   assert.equal(verified.status, 200);
   assert.equal(typeof verified.json.token, 'string');
-  assert.equal(verified.text.includes(code), false);
+  // The signed token and user fields can contain the 4 digits by chance, so check the fields, not the raw text.
+  assert.equal(JSON.stringify({ ...verified.json, token: undefined, user: undefined }).includes(code), false);
+  assert.equal(verified.json.code, undefined);
+  assert.equal(verified.json.otp, undefined);
   const reused = await request('/api/auth/verify-otp', {
     phone: '09120000111',
     code,
