@@ -1943,11 +1943,12 @@ app.get('/admin', (req, res) => {
         <p class="text-xs text-slate-400 mt-1">مدیریت سفارش‌ها، تایید مدارک متخصصین و آمار کل سامانه</p>
       </div>
       <button onclick="logoutAdmin()" class="bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow">خروج مدیر</button>
-      <button onclick="loadAllData()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow">
+      <button id="dashboardRefresh" onclick="loadAllData()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow">
         🔄 بروزرسانی اطلاعات
       </button>
     </header>
 
+    <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
     <!-- کارت‌های آمار -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsGrid">
       <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
@@ -1994,6 +1995,7 @@ app.get('/admin', (req, res) => {
     <!-- محتوای متخصصین -->
     <div id="tabWorkers" class="space-y-4">
       <h3 class="text-lg font-bold text-white">لیست متخصصین و درخواست‌های احراز هویت</h3>
+      <p id="workersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <div id="workersList" class="space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
@@ -2002,6 +2004,7 @@ app.get('/admin', (req, res) => {
     <!-- محتوای سفارش‌ها -->
     <div id="tabOrders" class="space-y-4 hidden">
       <h3 class="text-lg font-bold text-white">لیست تمامی سفارش‌ها</h3>
+      <p id="ordersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <div id="ordersList" class="space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
@@ -2149,32 +2152,64 @@ app.get('/admin', (req, res) => {
       };
     }
 
-    async function loadAllData() {
-      try {
-        if (!(await ensureAdmin())) return;
-        const statsRes = await fetch('/api/admin/stats', { headers: adminHeaders() });
-        const statsData = await statsRes.json();
-        if (statsData.success) {
-          const s = statsData.stats;
-          document.getElementById('totalOrders').innerText = s.totalOrders;
-          document.getElementById('pendingWorkers').innerText = s.pendingWorkersCount;
-          document.getElementById('totalWorkers').innerText = s.totalWorkers;
-          document.getElementById('totalRevenue').innerText = s.totalRevenue.toLocaleString('fa-IR');
-        }
+    let dashboardLoad = null;
+    const dashboardLoaded = { stats: false, workers: false, orders: false };
 
-        const workersRes = await fetch('/api/admin/users?role=WORKER', { headers: adminHeaders() });
-        const workersData = await workersRes.json();
-        if (workersData.success) renderWorkers(workersData.users);
-
-        const ordersRes = await fetch('/api/admin/orders', { headers: adminHeaders() });
-        const ordersData = await ordersRes.json();
-        if (ordersData.success) renderOrders(ordersData.orders);
-
-        await loadAdminTariff();
-
-      } catch (e) {
-        console.error(e);
+    function dashboardLoadError(section, message) {
+      document.getElementById(section + 'Message').textContent = message;
+      if (section !== 'stats' && !dashboardLoaded[section]) {
+        document.getElementById(section + 'List').replaceChildren();
       }
+    }
+
+    async function loadDashboardSection(section, url, render) {
+      document.getElementById(section + 'Message').textContent = 'در حال بارگذاری…';
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(url, { headers: adminHeaders(), cache: 'no-store', signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error('load-failed');
+        render(data);
+        dashboardLoaded[section] = true;
+        document.getElementById(section + 'Message').textContent = '';
+      } catch {
+        dashboardLoadError(section, 'دریافت اطلاعات انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.' +
+          (dashboardLoaded[section] ? ' اطلاعات قبلی نمایش داده می‌شود.' : ''));
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function loadAllData() {
+      if (dashboardLoad) return dashboardLoad;
+      const refresh = document.getElementById('dashboardRefresh');
+      refresh.disabled = true;
+      dashboardLoad = (async () => {
+        try {
+          if (!(await ensureAdmin())) throw new Error('login-required');
+          await Promise.all([
+            loadDashboardSection('stats', '/api/admin/stats', (data) => {
+              const s = data.stats;
+              document.getElementById('totalOrders').innerText = s.totalOrders;
+              document.getElementById('pendingWorkers').innerText = s.pendingWorkersCount;
+              document.getElementById('totalWorkers').innerText = s.totalWorkers;
+              document.getElementById('totalRevenue').innerText = s.totalRevenue.toLocaleString('fa-IR');
+            }),
+            loadDashboardSection('workers', '/api/admin/users?role=WORKER', (data) => renderWorkers(data.users)),
+            loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
+          ]);
+          void loadAdminTariff();
+        } catch {
+          for (const section of ['stats', 'workers', 'orders']) {
+            dashboardLoadError(section, 'ورود مدیر انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
+          }
+        } finally {
+          refresh.disabled = false;
+          dashboardLoad = null;
+        }
+      })();
+      return dashboardLoad;
     }
 
     // All API values remain data: text nodes, validated image URLs and event closures.

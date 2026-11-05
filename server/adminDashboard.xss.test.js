@@ -139,6 +139,37 @@ async function assertSafeMarkup(page, listId) {
   assert.equal(await page.locator('#' + listId + ' svg, #' + listId + ' script, #' + listId + ' iframe').count(), 0);
 }
 
+test('dashboard load failures preserve prior data, release refresh and allow retry', () => withPage(async page => {
+  await page.evaluate(() => loadAllData());
+  const previous = await page.locator('#workersList').textContent();
+  await page.route('**/api/admin/users?role=WORKER', route => route.fulfill({ json: { success: false } }));
+  await page.route('**/api/admin/orders', route => route.abort('failed'));
+  await page.locator('#dashboardRefresh').click();
+  await page.waitForFunction(() => !document.getElementById('dashboardRefresh').disabled);
+  assert.match(await page.locator('#workersMessage').textContent(), /دریافت اطلاعات انجام نشد/);
+  assert.match(await page.locator('#ordersMessage').textContent(), /دریافت اطلاعات انجام نشد/);
+  assert.match(await page.locator('#workersMessage').textContent(), /اطلاعات قبلی/);
+  assert.equal(await page.locator('#workersList').textContent(), previous);
+  assert.equal(await page.locator('#statsMessage').textContent(), '');
+  await page.unroute('**/api/admin/users?role=WORKER');
+  await page.unroute('**/api/admin/orders');
+  await page.locator('#dashboardRefresh').click();
+  await page.waitForFunction(() => !document.getElementById('dashboardRefresh').disabled);
+  assert.equal(await page.locator('#workersMessage').textContent(), '');
+  assert.equal(await page.locator('#ordersMessage').textContent(), '');
+}));
+
+test('initial load failures end loading without claiming an empty list', () => withPage(async page => {
+  await page.route('**/api/admin/users?role=WORKER', route => route.fulfill({ status: 503, json: { success: false } }));
+  await page.route('**/api/admin/orders', route => route.fulfill({ json: { success: false } }));
+  await page.reload();
+  await page.waitForFunction(() => !document.getElementById('dashboardRefresh').disabled);
+  for (const section of ['workers', 'orders']) {
+    assert.match(await page.locator('#' + section + 'Message').textContent(), /دریافت اطلاعات انجام نشد/);
+    assert.equal(await page.locator('#' + section + 'List').textContent(), '');
+  }
+}));
+
 test('worker text fields are literal text, not executable HTML', async (t) => {
   for (const field of ['name', 'phone', 'nationalId', 'bankSheba', 'address']) {
     await t.test(field, () => withPage(async (page) => {
