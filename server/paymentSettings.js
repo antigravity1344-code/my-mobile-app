@@ -115,21 +115,26 @@ function createPaymentSettings({ database, transaction, providers, wallet, getUs
     }
   }
   // Secrets and settlement fields stay immutable. Only the default pointer may move.
-  database.exec('DROP TRIGGER IF EXISTS company_payment_settings_no_update');
-  database.exec(`
-    CREATE TRIGGER company_payment_settings_no_update
-    BEFORE UPDATE ON company_payment_settings
-    WHEN NEW.version IS NOT OLD.version
-      OR NEW.providerId IS NOT OLD.providerId
-      OR NEW.merchantId IS NOT OLD.merchantId
-      OR NEW.settlementLabel IS NOT OLD.settlementLabel
-      OR NEW.settlementReference IS NOT OLD.settlementReference
-      OR NEW.secretCiphertext IS NOT OLD.secretCiphertext
-      OR NEW.createdAt IS NOT OLD.createdAt
-      OR NEW.actor IS NOT OLD.actor
-      OR NEW.is_default IS OLD.is_default
-    BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END;
-  `);
+  // DROP and CREATE run in one BEGIN IMMEDIATE transaction. Without it, two
+  // connections opening the same file could both drop, then both create, and the
+  // second CREATE failed with "trigger ... already exists".
+  transaction(() => {
+    database.exec('DROP TRIGGER IF EXISTS company_payment_settings_no_update');
+    database.exec(`
+      CREATE TRIGGER company_payment_settings_no_update
+      BEFORE UPDATE ON company_payment_settings
+      WHEN NEW.version IS NOT OLD.version
+        OR NEW.providerId IS NOT OLD.providerId
+        OR NEW.merchantId IS NOT OLD.merchantId
+        OR NEW.settlementLabel IS NOT OLD.settlementLabel
+        OR NEW.settlementReference IS NOT OLD.settlementReference
+        OR NEW.secretCiphertext IS NOT OLD.secretCiphertext
+        OR NEW.createdAt IS NOT OLD.createdAt
+        OR NEW.actor IS NOT OLD.actor
+        OR NEW.is_default IS OLD.is_default
+      BEGIN SELECT RAISE(ABORT, 'payment settings history is immutable'); END;
+    `);
+  });
   database.exec(`
     CREATE TRIGGER IF NOT EXISTS company_payment_settings_no_replace
     BEFORE INSERT ON company_payment_settings
