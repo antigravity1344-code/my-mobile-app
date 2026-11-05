@@ -237,7 +237,24 @@ function quote(policy, input) {
     breakdown.push({ kind: 'surcharge', id: surcharge.id, amount: surcharge.amount });
     subtotal += surcharge.amount;
   }
+  // تعدیل قیمت پیشنهاد متخصص: درصدی از جمع پیش از تخفیف‌های تعرفه (بیش از ۱۰۰٪ هزینهٔ افزوده، کمتر از آن تخفیف).
   let discountTotal = 0;
+  const adjustment = input.priceAdjustment;
+  if (adjustment != null) {
+    if (typeof adjustment !== 'object' || Array.isArray(adjustment) || typeof adjustment.id !== 'string' || adjustment.id === '') {
+      fail('INPUT_INVALID', 'تعدیل قیمت معتبر نیست.');
+    }
+    assertSafeInteger(adjustment.basisPoints, 'INPUT_INVALID', 'درصد تعدیل قیمت باید عدد صحیح باشد.');
+    if (adjustment.basisPoints < 1 || adjustment.basisPoints > 100000) fail('INPUT_INVALID', 'درصد تعدیل قیمت معتبر نیست.');
+    const adjusted = mulDivHalfUp(subtotal, adjustment.basisPoints, 10000);
+    if (adjusted < subtotal) {
+      discountTotal += subtotal - adjusted;
+      breakdown.push({ kind: 'discount', id: adjustment.id, amount: adjusted - subtotal });
+    } else if (adjusted > subtotal) {
+      breakdown.push({ kind: 'surcharge', id: adjustment.id, amount: adjusted - subtotal });
+      subtotal = adjusted;
+    }
+  }
   for (const discount of service.discounts) {
     if (discount.optionId && (!Object.hasOwn(options, discount.optionId) || options[discount.optionId] !== true)) continue;
     const amount = mulDivHalfUp(subtotal, discount.basisPoints, 10000);

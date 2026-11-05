@@ -25,7 +25,11 @@ const {
   matchExistingServerOrder,
   mapPricingError,
   serverRequestConflicts,
+  setOfferResolver,
+  previewOfferPrice,
+  QuoteError,
 } = require('./pricing/orderQuote');
+const { OfferError, validateOfferInput } = require('./workerOffers');
 const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
 const { readSourceIdentity, sourceIdentityScriptJson } = require('../tools/sourceIdentity.cjs');
 const SOURCE_IDENTITY = readSourceIdentity();
@@ -808,6 +812,135 @@ app.put('/api/users/worker-onboarding', (req, res) => {
   });
 });
 
+// ------------------- پیشنهاد کاری متخصص -------------------
+// متخصص بازهٔ آزاد و درصدی از تعرفه را ثبت می‌کند؛ مشتری می‌بیند و با مسیر عادی سفارش (نقل‌قول امضاشده) رزرو می‌کند.
+// درصد هرگز از مشتری گرفته نمی‌شود و فقط از رکورد پیشنهاد در سرور خوانده می‌شود.
+setOfferResolver(({ offerId, serviceId, now }) => {
+  const offer = store.workerOffers.get(offerId);
+  if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId) {
+    throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
+  }
+  const worker = store.getUser(offer.workerId);
+  if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) {
+    throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
+  }
+  return { basisPoints: offer.adjustmentBasisPoints };
+});
+
+function workerTierKey(workerId) {
+  const account = store.getUserPoints(workerId);
+  return account && account.tierKey ? account.tierKey : 'gray';
+}
+
+function workerOfferView(offer) {
+  const preview = previewOfferPrice(offer.serviceId, offer.adjustmentBasisPoints, new Date());
+  return {
+    id: offer.id,
+    serviceId: offer.serviceId,
+    startAt: offer.startAt,
+    endAt: offer.endAt,
+    adjustmentBasisPoints: offer.adjustmentBasisPoints,
+    status: offer.status,
+    createdAt: offer.createdAt,
+    ...(preview ? { currencyUnit: preview.currencyUnit, tariffTotal: preview.tariffTotal, total: preview.total } : {}),
+  };
+}
+
+function sendOfferError(res, error) {
+  if (error instanceof OfferError) {
+    const status = error.code === 'INPUT_INVALID' || error.code === 'PRICE_OUT_OF_RANGE' ? 400 : 409;
+    return res.status(status).json({ success: false, code: error.code, message: error.message });
+  }
+  throw error;
+}
+
+function requireApprovedWorker(req, res) {
+  const authUser = requireUser(req, res);
+  if (!authUser) return null;
+  if (authUser.role !== 'WORKER') {
+    res.status(403).json({ success: false, message: 'این بخش فقط برای متخصص است.' });
+    return null;
+  }
+  if (authUser.status !== 'APPROVED' && authUser.status !== 'ACTIVE') {
+    res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
+    return null;
+  }
+  return authUser;
+}
+
+app.get('/api/workers/me/offers', (req, res) => {
+  const worker = requireApprovedWorker(req, res);
+  if (!worker) return;
+  res.set('Cache-Control', 'no-store');
+  const tierKey = workerTierKey(worker.id);
+  const { maxBasisPointsForTier } = require('./workerOffers');
+  res.json({
+    success: true,
+    minBasisPoints: require('./workerOffers').MIN_BASIS_POINTS,
+    maxBasisPoints: maxBasisPointsForTier(tierKey),
+    offers: store.workerOffers.listForWorker(worker.id).map(workerOfferView),
+  });
+});
+
+app.post('/api/workers/me/offers', (req, res) => {
+  const worker = requireApprovedWorker(req, res);
+  if (!worker) return;
+  if (resolvePricingMode() !== 'server') {
+    return res.status(409).json({ success: false, code: 'PRICING_UNAVAILABLE', message: 'ثبت پیشنهاد قیمتی در این حالت فعال نیست.' });
+  }
+  try {
+    const now = new Date();
+    const input = validateOfferInput(req.body, { tierKey: workerTierKey(worker.id), now });
+    if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
+      return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
+    }
+    const offer = store.workerOffers.create(worker.id, input, now);
+    return res.status(201).json({ success: true, offer: workerOfferView(offer) });
+  } catch (error) {
+    return sendOfferError(res, error);
+  }
+});
+
+app.delete('/api/workers/me/offers/:offerId', (req, res) => {
+  const worker = requireApprovedWorker(req, res);
+  if (!worker) return;
+  if (!store.workerOffers.cancel(req.params.offerId, worker.id)) {
+    return res.status(409).json({ success: false, code: 'OFFER_NOT_OPEN', message: 'این پیشنهاد دیگر قابل لغو نیست.' });
+  }
+  res.json({ success: true });
+});
+
+// فهرست پیشنهادهای باز برای مشتری: بدون تلفن و اطلاعات تماس متخصص.
+app.get('/api/offers', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'CUSTOMER') {
+    return res.status(403).json({ success: false, message: 'فقط مشتری پیشنهادها را می‌بیند.', offers: [] });
+  }
+  res.set('Cache-Control', 'no-store');
+  if (resolvePricingMode() !== 'server') return res.json({ success: true, offers: [] });
+  const now = new Date();
+  const offers = [];
+  for (const offer of store.workerOffers.listOpen(now)) {
+    const worker = store.getUser(offer.workerId);
+    if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) continue;
+    const view = workerOfferView(offer);
+    if (view.total == null) continue;
+    const rating = store.workerRatingStats(worker.id);
+    offers.push({
+      ...view,
+      worker: {
+        name: worker.name || 'متخصص',
+        avatar: worker.avatar || '',
+        tierKey: workerTierKey(worker.id),
+        ratingAverage: rating.average,
+        ratingCount: rating.count,
+      },
+    });
+  }
+  res.json({ success: true, offers });
+});
+
 // پیش‌نمایش قیمت. مبلغ فقط از تعرفه همین استقرار محاسبه می‌شود.
 app.post('/api/pricing/quote', (req, res) => {
   const authUser = requireUser(req, res);
@@ -997,7 +1130,30 @@ app.post('/api/orders', (req, res) => {
     createdAt: new Date().toISOString()
   };
 
-  const savedOrder = store.transaction(() => {
+  // رزرو پیشنهاد متخصص: پنجرهٔ زمانی باید کاملاً داخل بازهٔ پیشنهاد باشد.
+  const offerId = serverPriced && serverPriced.pricing && serverPriced.pricing.options
+    ? serverPriced.pricing.options.offerId
+    : undefined;
+  let offerWorker = null;
+  if (offerId !== undefined) {
+    const offer = store.workerOffers.get(offerId);
+    const startMs = storedExpectedStartAt ? Date.parse(storedExpectedStartAt) : Number.NaN;
+    const hours = storedDuration || 1;
+    if (!offer || !Number.isFinite(startMs)
+      || startMs < Date.parse(offer.startAt) || startMs + hours * 3600000 > Date.parse(offer.endAt)) {
+      return res.status(409).json({
+        success: false,
+        code: 'OFFER_WINDOW_MISMATCH',
+        message: 'زمان کار باید کاملاً داخل بازهٔ پیشنهاد متخصص باشد.',
+      });
+    }
+    offerWorker = store.getUser(offer.workerId);
+  }
+
+  class OfferBookingFailed extends Error {}
+  let savedOrder;
+  try {
+  savedOrder = store.transaction(() => {
     // بررسی دوباره داخل تراکنش: دو درخواست هم‌زمان با یک کلید فقط یک سفارش می‌سازند.
     const repeated = store.findOrderByClientRequest(user.id, storedClientRequestId);
     if (repeated) {
@@ -1005,6 +1161,12 @@ app.post('/api/orders', (req, res) => {
       return repeated;
     }
     const order = store.createOrder(newOrder);
+    if (offerId !== undefined) {
+      if (!offerWorker || !store.workerOffers.book(offerId, order.id)) throw new OfferBookingFailed('OFFER_UNAVAILABLE');
+      const accepted = store.tryAcceptOrder(order.id, offerWorker);
+      if (accepted.code !== 'ok') throw new OfferBookingFailed(accepted.code === 'wallet-debt' ? 'WORKER_WALLET_DEBT' : 'OFFER_UNAVAILABLE');
+      return accepted.order;
+    }
     store.addNotification(
       user.id,
       order.id,
@@ -1014,6 +1176,16 @@ app.post('/api/orders', (req, res) => {
     );
     return order;
   });
+  } catch (error) {
+    if (error instanceof OfferBookingFailed) {
+      return res.status(409).json({
+        success: false,
+        code: 'OFFER_UNAVAILABLE',
+        message: 'این پیشنهاد دیگر در دسترس نیست. لطفاً پیشنهاد دیگری انتخاب کنید.',
+      });
+    }
+    throw error;
+  }
 
   if (savedOrder && savedOrder.requestConflict) {
     return res.status(409).json({

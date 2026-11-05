@@ -85,6 +85,44 @@ function selectionFromBody(body) {
   };
 }
 
+// پیشنهاد متخصص: شناسهٔ پیشنهاد فقط یک گزینهٔ امضاشده است؛ درصد قیمت را هرگز از مشتری نمی‌گیریم.
+// فراخوان‌دهنده (index.js) تابع تصمیم‌گیر را می‌دهد تا این ماژول به پایگاه‌داده وابسته نشود.
+let offerResolver = null;
+function setOfferResolver(resolver) {
+  offerResolver = typeof resolver === 'function' ? resolver : null;
+}
+
+function splitOfferOption(selection, now) {
+  const source = selection.options;
+  if (!source || typeof source !== 'object' || !Object.hasOwn(source, 'offerId')) {
+    return { options: source, adjustment: null };
+  }
+  const options = { ...source };
+  const offerId = options.offerId;
+  delete options.offerId;
+  if (typeof offerId !== 'string' || offerId === '' || !offerResolver) {
+    throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
+  }
+  const resolved = offerResolver({ offerId, serviceId: selection.serviceId, now });
+  return { options, adjustment: { id: 'worker-offer', basisPoints: resolved.basisPoints } };
+}
+
+/** قیمت نمایشی یک پیشنهاد برای فهرست مشتری؛ فقط اطلاعات است و هیچ سفارشی را تثبیت نمی‌کند. */
+function previewOfferPrice(serviceId, basisPoints, now = new Date()) {
+  try {
+    const policy = loadCommittedTariff();
+    const version = require('./tariffEngine').selectVersion(policy, now);
+    const service = version.services[serviceId];
+    if (!service) return null;
+    const quantity = service.model === 'fixed' ? undefined : (service.minQuantity || 1);
+    const base = quote(policy, { serviceId, quantity, options: {}, at: now });
+    const offered = quote(policy, { serviceId, quantity, options: {}, at: now, priceAdjustment: { id: 'worker-offer', basisPoints } });
+    return { currencyUnit: base.currencyUnit, quantity: quantity == null ? 1 : quantity, tariffTotal: base.total, total: offered.total };
+  } catch (error) {
+    return null;
+  }
+}
+
 function trustedQuote(selection, now) {
   const secret = quoteSecret();
   if (!secret) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
@@ -95,11 +133,13 @@ function trustedQuote(selection, now) {
     if (error instanceof TariffError) throw error;
     throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
   }
+  const split = splitOfferOption(selection, now);
   const priced = quote(policy, {
     serviceId: selection.serviceId,
     quantity: selection.quantity,
-    options: selection.options,
+    options: split.options,
     at: now,
+    ...(split.adjustment ? { priceAdjustment: split.adjustment } : {}),
   });
   return { priced, secret };
 }
@@ -278,6 +318,8 @@ function serverRequestConflicts(existing, priced) {
 }
 
 module.exports = {
+  setOfferResolver,
+  previewOfferPrice,
   QUOTE_TTL_MS,
   NO_TARIFF_MESSAGE,
   QuoteError,

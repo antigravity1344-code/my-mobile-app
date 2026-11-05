@@ -178,3 +178,15 @@ test('a published policy loaded from the deployment file is frozen and quoted', 
     fs.rmSync(file, { force: true });
   }
 });
+
+test('priceAdjustment lowers or raises the subtotal and is itemised', () => {
+  const loaded = policy({ h: line('hourly', { rate: 1000 }) });
+  const run = (bp, id = 'worker-offer') => quote(loaded, { serviceId: 'h', quantity: 2, options: {}, at, priceAdjustment: { id, basisPoints: bp } });
+  const lower = run(7000);
+  assert.equal(lower.total, 1400);
+  assert.deepEqual(lower.breakdown.find((l) => l.id === 'worker-offer'), { kind: 'discount', id: 'worker-offer', amount: -600 });
+  const higher = run(13000);
+  assert.equal(higher.total, 2600);
+  assert.equal(higher.breakdown.find((l) => l.id === 'worker-offer').kind, 'surcharge');
+  assert.throws(() => run(0), TariffError);
+});

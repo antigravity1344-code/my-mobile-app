@@ -9,6 +9,7 @@ const { createCommissionPolicy } = require('./commissionPolicy');
 const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
 const { createWorkerWallet } = require('./workerWallet');
+const { createWorkerOffers } = require('./workerOffers');
 const { createPaymentSettings } = require('./paymentSettings');
 const { createPaymentCharges } = require('./paymentCharges');
 const { createServiceAreas } = require('./serviceAreas');
@@ -1665,6 +1666,7 @@ function createDataStore(filename) {
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
+  const workerOffers = createWorkerOffers({ database, transaction });
   const paymentSettings = createPaymentSettings({
     database,
     transaction,
@@ -1692,6 +1694,7 @@ function createDataStore(filename) {
     ...orderStart,
     commissionPolicy,
     workerWallet,
+    workerOffers,
     paymentSettings,
     paymentCharges,
     serviceAreas,
