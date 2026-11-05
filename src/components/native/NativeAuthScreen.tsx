@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { User, Briefcase, Phone, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
+import { colors } from '../../theme';
 
 export type UserRole = 'CUSTOMER' | 'WORKER';
 
@@ -96,7 +97,7 @@ export const NativeAuthScreen: React.FC<NativeAuthScreenProps> = ({ onLogin }) =
 
         <View style={styles.card}>
           <View style={styles.header}>
-            <ShieldCheck size={24} color="#0284c7" />
+            <ShieldCheck size={24} color={colors.teal} />
             <Text style={styles.title}>{step === 1 ? 'ورود / ثبت‌نام' : 'تایید کد'}</Text>
           </View>
 
@@ -184,7 +185,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  roleChipActive: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
+  roleChipActive: { backgroundColor: colors.teal, borderColor: colors.teal },
   roleChipText: { color: '#94a3b8', fontWeight: '700', fontSize: 12 },
   roleChipTextActive: { color: '#fff' },
   inputWrapper: {
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   submitButton: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',

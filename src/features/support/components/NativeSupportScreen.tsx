@@ -139,7 +139,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
     <View style={[styles.root, workerAppearance && workerStyles.root]}>
       <ScrollView ref={pageScrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.hero, workerAppearance && workerStyles.hero]}>
-          <HelpCircle size={22} color={workerAppearance ? wc.teal : '#0284c7'} />
+          <HelpCircle size={22} color={workerAppearance ? wc.teal : wc.teal} />
           <Text style={[styles.heroTitle, workerAppearance && workerStyles.heroTitle]}>پشتیبانی پاکشو</Text>
           <Text style={[styles.heroSub, workerAppearance && workerStyles.heroSub]}>{SUPPORT_GREETING}</Text>
           <Text style={[styles.meta, workerAppearance && workerStyles.meta]}>ساعات پاسخگویی: {SUPPORT_HOURS}</Text>
@@ -151,7 +151,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
             <Text style={styles.primaryBtnText}>تماس با پشتیبانی</Text>
           </Pressable>
           <Pressable onPress={() => setComposeOpen(true)} style={[styles.secondaryBtn, workerAppearance && workerStyles.secondaryBtn]}>
-            <MessageCircle size={16} color={workerAppearance ? wc.teal : '#0369a1'} />
+            <MessageCircle size={16} color={workerAppearance ? wc.teal : wc.tealDark} />
             <Text style={[styles.secondaryBtnText, workerAppearance && workerStyles.secondaryBtnText]}>ارسال پیام</Text>
           </Pressable>
         </View>
@@ -168,7 +168,7 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
             >
               <View style={styles.faqHeader}>
                 <Text style={[styles.faqQ, workerAppearance && workerStyles.textMain]}>{item.question}</Text>
-                {open ? <ChevronUp size={16} color={workerAppearance ? wc.teal : '#0284c7'} /> : <ChevronDown size={16} color="#64748b" />}
+                {open ? <ChevronUp size={16} color={workerAppearance ? wc.teal : wc.teal} /> : <ChevronDown size={16} color="#64748b" />}
               </View>
               {open ? <Text style={[styles.faqA, workerAppearance && workerStyles.textMuted]}>{item.answer}</Text> : null}
             </Pressable>
@@ -294,15 +294,15 @@ const styles = StyleSheet.create({
   heroSub: { ...type.regular, ...fa, fontWeight: '400', color: '#475569', fontSize: 13, textAlign: 'right', lineHeight: 20 },
   meta: { ...type.regular, ...fa, fontWeight: '400', color: '#94a3b8', fontSize: 11, textAlign: 'right' },
   actions: { flexDirection: 'row-reverse', gap: 8 },
-  primaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 13 },
+  primaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: wc.teal, borderRadius: 13, paddingVertical: 13 },
   primaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
   submitBtn: { flex: 0, minHeight: 48 },
-  secondaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e0f2fe', borderRadius: 13, paddingVertical: 13 },
-  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1' },
+  secondaryBtn: { flex: 1, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: wc.tealSoft, borderRadius: 13, paddingVertical: 13 },
+  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: wc.tealDark },
   phoneHint: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b', fontSize: 12 },
   sectionTitle: { ...type.bold, ...fa, fontWeight: '400', marginTop: 8, textAlign: 'right', color: '#0f172a', fontSize: 15 },
   faqCard: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', gap: 8 },
-  faqOpen: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
+  faqOpen: { borderColor: wc.teal, backgroundColor: wc.tealSoft },
   faqHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   faqQ: { ...type.bold, ...fa, fontWeight: '400', flex: 1, textAlign: 'right', color: '#0f172a', fontSize: 13 },
   faqA: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 12, lineHeight: 20 },

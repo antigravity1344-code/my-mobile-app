@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
-import { type } from '../../../theme';
+import { type, colors } from '../../../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
@@ -87,7 +87,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <UserRound size={16} color="#0284c7" />
+            <UserRound size={16} color={colors.teal} />
             <Text style={styles.sectionTitle}>ویرایش اطلاعات هویتی</Text>
           </View>
           <TextInput
@@ -120,7 +120,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
           <View style={styles.mainAddressBlock}>
             <View style={styles.sectionHeader}>
-              <MapPin size={16} color="#0284c7" />
+              <MapPin size={16} color={colors.teal} />
               <Text style={styles.sectionTitle}>آدرس اصلی</Text>
             </View>
             {mainAddress ? (
@@ -179,7 +179,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Crown size={16} color="#0284c7" />
+            <Crown size={16} color={colors.teal} />
             <Text style={styles.sectionTitle}>باشگاه مشتریان</Text>
           </View>
           <Text style={styles.loyaltyTitle}>{profile.loyalty.title}</Text>
@@ -190,7 +190,7 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Wallet size={16} color="#0284c7" />
+            <Wallet size={16} color={colors.teal} />
             <Text style={styles.sectionTitle}>کیف پول</Text>
           </View>
           <Text style={styles.wallet}>{formatCurrency(profile.walletBalance || 0)}</Text>
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f8fafc' },
   content: { padding: 16, gap: 14 },
   profileCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#0284c7', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
   avatarText: { ...type.bold, fontWeight: '400', color: '#fff', fontSize: 20 },
   userMeta: { flex: 1, alignItems: 'flex-end', gap: 2 },
   name: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 16, textAlign: 'right' },
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   saveBtn: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     borderRadius: 12,
     minHeight: 48,
     paddingVertical: 12,
@@ -251,21 +251,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
-  addBtn: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#0284c7', paddingHorizontal: 12, borderRadius: 10 },
+  addBtn: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: colors.teal, paddingHorizontal: 12, borderRadius: 10 },
   addBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff', fontSize: 12 },
   mainAddressBlock: { marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 8 },
-  mainAddressBtn: { alignSelf: 'stretch', minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#e0f2fe', borderWidth: 1, borderColor: '#7dd3fc', paddingVertical: 13, borderRadius: 12 },
-  mainAddressBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', fontSize: 14 },
+  mainAddressBtn: { alignSelf: 'stretch', minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tealSoft, borderWidth: 1, borderColor: '#7dd3fc', paddingVertical: 13, borderRadius: 12 },
+  mainAddressBtnText: { ...type.bold, ...fa, fontWeight: '400', color: colors.tealDark, fontSize: 14 },
   subSectionTitle: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#334155', fontSize: 13 },
   addressCard: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#e2e8f0' },
-  addressDefault: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
+  addressDefault: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   addressTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   addressTitle: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', textAlign: 'right' },
-  defaultBadge: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', backgroundColor: '#e0f2fe', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10 },
+  defaultBadge: { ...type.bold, ...fa, fontWeight: '400', color: colors.tealDark, backgroundColor: colors.tealSoft, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontSize: 10 },
   addressLine: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 12 },
   addressActions: { flexDirection: 'row-reverse', gap: 8, marginTop: 8 },
-  secondaryBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#e0f2fe' },
-  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#0369a1', fontSize: 12 },
+  secondaryBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.tealSoft },
+  secondaryBtnText: { ...type.bold, ...fa, fontWeight: '400', color: colors.tealDark, fontSize: 12 },
   dangerBtn: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#fee2e2' },
   dangerBtnText: { ...type.bold, ...fa, fontWeight: '400', color: '#b91c1c', fontSize: 12 },
   logoutBtn: { minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca', marginTop: 4 },

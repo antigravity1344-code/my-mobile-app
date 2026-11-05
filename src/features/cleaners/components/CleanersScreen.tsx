@@ -15,6 +15,7 @@ import { CleanerCard } from './CleanerCard';
 import { EmptyCleanersState } from './EmptyCleanersState';
 import { CleanerDetailModal } from './CleanerDetailModal';
 import { CleanerSignupModal } from './CleanerSignupModal';
+import { colors } from '../../../theme';
 
 export const CleanersScreen: React.FC = () => {
   const {
@@ -46,7 +47,7 @@ export const CleanersScreen: React.FC = () => {
         </View>
         <View style={styles.headerActions}>
           <Pressable onPress={openSignup} style={styles.signupBtn}>
-            <UserPlus size={16} color="#0284c7" />
+            <UserPlus size={16} color={colors.teal} />
           </Pressable>
           <Pressable
             onPress={() => void refreshCleaners()}
@@ -54,9 +55,9 @@ export const CleanersScreen: React.FC = () => {
             disabled={refreshing}
           >
             {refreshing ? (
-              <ActivityIndicator size="small" color="#0284c7" />
+              <ActivityIndicator size="small" color={colors.teal} />
             ) : (
-              <RotateCw size={17} color="#0284c7" />
+              <RotateCw size={17} color={colors.teal} />
             )}
           </Pressable>
         </View>
@@ -72,8 +73,8 @@ export const CleanersScreen: React.FC = () => {
             <Text style={styles.statNumber}>{stats.totalCount.toLocaleString('fa-IR')}</Text>
             <Text style={styles.statTitle}>کل متخصص‌ها</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }]}>
-            <Text style={[styles.statNumber, { color: '#0369a1' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.tealSoft, borderColor: '#B9DCD9' }]}>
+            <Text style={[styles.statNumber, { color: colors.tealDark }]}>
               {stats.midCount.toLocaleString('fa-IR')}
             </Text>
             <Text style={styles.statTitle}>متوسط</Text>
@@ -108,7 +109,7 @@ export const CleanersScreen: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0284c7" />
+            <ActivityIndicator size="large" color={colors.teal} />
             <Text style={styles.loadingText}>در حال بارگذاری بازارگاه...</Text>
           </View>
         ) : cleaners.length === 0 ? (
@@ -179,9 +180,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
+    borderColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -192,9 +193,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
+    borderColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#0284c7',
+    color: colors.teal,
     marginBottom: 2,
   },
   statTitle: {

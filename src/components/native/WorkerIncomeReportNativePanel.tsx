@@ -4,6 +4,7 @@ import { formatStoredAmount } from '../../features/orders/services/money';
 import { loadWorkerIncomeReport, type WorkerIncomeReport } from '../../features/worker/services/workerFinance';
 import { JALALI_MONTH_NAMES, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { previewActive } from './previewRuntime';
+import { colors } from '../../theme';
 
 function monthTitle(year: number, month: number): string {
   return `${JALALI_MONTH_NAMES[month - 1]} ${toPersianDigits(year)}`;
@@ -48,7 +49,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', textAlign: 'right', color: '#0f172a' },
   note: { textAlign: 'right', color: '#475569', lineHeight: 22 },
   refresh: { padding: 10, alignItems: 'center' },
-  refreshText: { color: '#0369a1', fontWeight: '700' },
+  refreshText: { color: colors.tealDark, fontWeight: '700' },
   error: { color: '#b91c1c', textAlign: 'right' },
   month: { gap: 8 },
   section: { fontSize: 16, fontWeight: '700', textAlign: 'right', marginTop: 6, color: '#0f172a' },

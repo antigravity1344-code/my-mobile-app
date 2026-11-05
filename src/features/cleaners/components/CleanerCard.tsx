@@ -5,6 +5,7 @@ import type { CleanerProfile } from '../types/cleaner';
 import { CLEANER_TIER_LABELS } from '../types/cleaner';
 import { calculateTieredPrice } from '../services/cleanerPricing';
 import { CLEANER_SPECIALTY_LABELS, MARKETPLACE_BASE_PRICE } from '../utils';
+import { colors } from '../../../theme';
 
 interface CleanerCardProps {
   cleaner: CleanerProfile;
@@ -13,7 +14,7 @@ interface CleanerCardProps {
 
 const TIER_COLORS: Record<CleanerProfile['tier'], { bg: string; border: string; text: string }> = {
   STANDARD: { bg: '#f8fafc', border: '#cbd5e1', text: '#475569' },
-  MID: { bg: '#f0f9ff', border: '#bae6fd', text: '#0369a1' },
+  MID: { bg: colors.tealSoft, border: '#B9DCD9', text: colors.tealDark },
   VIP: { bg: '#fef3c7', border: '#fde68a', text: '#b45309' },
 };
 
@@ -178,6 +179,6 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0284c7',
+    color: colors.teal,
   },
 });

@@ -11,6 +11,7 @@ import {
 import { useProfile } from '../context/ProfileContext';
 import { AddressManagerModal } from './AddressManagerModal';
 import styles from './ProfileScreen.module.css';
+import { colors } from '../../../theme';
 
 interface Props {
   onOpenLoginModal?: () => void;
@@ -91,7 +92,7 @@ export const ProfileScreen: React.FC<Props> = ({ onOpenLoginModal }) => {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>
-            <MapPin size={18} color="#0284c7" />
+            <MapPin size={18} color={colors.teal} />
             <span>آدرس‌های ذخیره‌شده</span>
           </h3>
           <button onClick={() => setIsAddressModalOpen(true)} className={styles.addButton}>

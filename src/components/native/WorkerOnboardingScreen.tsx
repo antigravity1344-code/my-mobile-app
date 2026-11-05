@@ -236,7 +236,7 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
       >
         <View style={styles.formCard}>
           <View style={styles.header}>
-            <ShieldCheck size={26} color="#0284c7" />
+            <ShieldCheck size={26} color={colors.teal} />
             <Text style={styles.title}>ثبت‌نام و احراز هویت متخصصین</Text>
           </View>
           <Text style={styles.subtitle}>
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   submitBtn: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
@@ -584,11 +584,11 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   submitDisabled: { opacity: 0.55 },
-  financeDisclosure: { borderWidth: 1, borderColor: '#bae6fd', borderRadius: 12, backgroundColor: '#f0f9ff', padding: 12, gap: 6 },
+  financeDisclosure: { borderWidth: 1, borderColor: '#B9DCD9', borderRadius: 12, backgroundColor: colors.tealSoft, padding: 12, gap: 6 },
   financeDisclosureTitle: { ...type.bold, textAlign: 'right', color: '#0c4a6e' },
   financeDisclosureText: { ...type.regular, textAlign: 'right', color: '#334155', lineHeight: 22 },
   financeDisclosureError: { ...type.regular, textAlign: 'right', color: '#b91c1c' },
-  financeRetry: { ...type.bold, textAlign: 'right', color: '#0369a1', paddingVertical: 6 },
+  financeRetry: { ...type.bold, textAlign: 'right', color: colors.tealDark, paddingVertical: 6 },
   submitBtnText: {
     ...type.bold,
     ...fa,

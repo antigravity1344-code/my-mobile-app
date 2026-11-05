@@ -376,7 +376,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         <View style={styles.headerActions}>
           {onSwitchToCustomer && (
             <Pressable onPress={onSwitchToCustomer} style={styles.switchButton}>
-              <User size={14} color="#0284c7" />
+              <User size={14} color={colors.teal} />
               <Text style={styles.switchButtonText}>رفتن به پنل مشتری</Text>
             </Pressable>
           )}
@@ -461,7 +461,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         {!loading && activeTab === 'available' ? (
           filteredOrders.length === 0 ? (
             ordersState.error ? null : <View style={styles.emptyBox}>
-              <CheckCircle size={40} color="#0284c7" />
+              <CheckCircle size={40} color={colors.teal} />
               <Text style={styles.emptyTitle}>سفارشی برای پذیرش موجود نیست</Text>
             </View>
           ) : (
@@ -472,7 +472,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         ) : !loading && activeTab === 'my_jobs' ? (
           myAcceptedOrders.length === 0 ? (
             ordersState.error ? null : <View style={styles.emptyBox}>
-              <Briefcase size={40} color="#0284c7" />
+              <Briefcase size={40} color={colors.teal} />
               <Text style={styles.emptyTitle}>هنوز سفارشی نپذیرفته‌اید</Text>
             </View>
           ) : (
@@ -480,7 +480,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
               {reviewJobs.map(renderJobCard)}
               {activeJobs.length === 0 && reviewJobs.length === 0 ? (
                 <View style={styles.emptyBox}>
-                  <Briefcase size={40} color="#0284c7" />
+                  <Briefcase size={40} color={colors.teal} />
                   <Text style={styles.emptyTitle}>کار فعالی ندارید</Text>
                 </View>
               ) : (

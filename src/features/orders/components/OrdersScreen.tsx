@@ -29,7 +29,7 @@ import { OrderDetailModal } from './OrderDetailModal';
 import { OrderRatingModal } from './OrderRatingModal';
 import { formatStoredAmount } from '../services/money';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
-import { type } from '../../../theme';
+import { type, colors } from '../../../theme';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
@@ -123,9 +123,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
           disabled={refreshing}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#0284c7" />
+            <ActivityIndicator size="small" color={colors.teal} />
           ) : (
-            <RotateCw size={17} color="#0284c7" />
+            <RotateCw size={17} color={colors.teal} />
           )}
         </Pressable>
       </View>
@@ -137,9 +137,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
       >
         {/* Quick Stats Cards */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.tealSoft, borderColor: '#B9DCD9' }]}>
             <View style={styles.statIconWrap}>
-              <PackageCheck size={16} color="#0284c7" />
+              <PackageCheck size={16} color={colors.teal} />
             </View>
             <Text style={styles.statNumber}>{formatOrderAmount(stats.totalCount)}</Text>
             <Text style={styles.statTitle}>کل سفارش‌ها</Text>
@@ -204,7 +204,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
             onPress={() => setShowSortMenu(!showSortMenu)}
             style={[styles.sortBtn, showSortMenu && styles.sortBtnActive]}
           >
-            <SlidersHorizontal size={16} color={showSortMenu ? '#0284c7' : '#475569'} />
+            <SlidersHorizontal size={16} color={showSortMenu ? colors.teal : '#475569'} />
           </Pressable>
         </View>
 
@@ -246,7 +246,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
         {/* Orders List or Empty State */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0284c7" />
+            <ActivityIndicator size="large" color={colors.teal} />
             <Text style={styles.loadingText}>در حال بارگذاری سفارش‌ها...</Text>
           </View>
         ) : loadError && orders.length === 0 ? (
@@ -357,9 +357,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
+    borderColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     fontWeight: '400',
     fontSize: 15,
-    color: '#0284c7',
+    color: colors.teal,
     marginBottom: 2,
     textAlign: 'center',
   },
@@ -448,8 +448,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sortBtnActive: {
-    borderColor: '#0284c7',
-    backgroundColor: '#e0f2fe',
+    borderColor: colors.teal,
+    backgroundColor: colors.tealSoft,
   },
   sortChipsWrap: {
     flexDirection: 'row-reverse',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
   },
   sortChipActive: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   sortChipText: {
     ...type.regular,

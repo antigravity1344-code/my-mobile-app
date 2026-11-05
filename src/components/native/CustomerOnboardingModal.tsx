@@ -15,7 +15,7 @@ import {
 import { UserCheck, MapPin } from 'lucide-react-native';
 import { BottomSheetModal } from './BottomSheetModal';
 import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
-import { type } from '../../theme';
+import { type, colors } from '../../theme';
 import { apiFetch } from '../../api/apiClient';
 import type { ApiUser } from '../../api/types';
 
@@ -168,7 +168,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
               showsVerticalScrollIndicator
             >
               <View style={styles.header}>
-                <UserCheck size={28} color="#0284c7" />
+                <UserCheck size={28} color={colors.teal} />
                 <Text style={styles.title}>تکمیل اطلاعات هویتی مشتری</Text>
               </View>
 
@@ -358,6 +358,8 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
     borderRadius: 12,
     paddingHorizontal: 12,
+    paddingVertical: 12,
+    textAlignVertical: 'center',
     minHeight: 48,
     color: '#0f172a',
     textAlign: 'right',
@@ -382,12 +384,14 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     flex: 1,
     minHeight: 44,
+    paddingVertical: 10,
+    textAlignVertical: 'center',
     color: '#0f172a',
     textAlign: 'right',
     fontSize: 14,
   },
   submitBtn: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     minHeight: 48,
     paddingVertical: 14,
     borderRadius: 14,

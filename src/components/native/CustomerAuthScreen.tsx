@@ -13,7 +13,7 @@ import {
 import { Phone, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { apiFetch } from '../../api/apiClient';
 import { RTL_SINGLE_LINE_INPUT } from './rtlInput';
-import { type } from '../../theme';
+import { type, colors } from '../../theme';
 
 interface UserData {
   id: string;
@@ -107,7 +107,7 @@ export const CustomerAuthScreen: React.FC<CustomerAuthScreenProps> = ({ onLogin 
         {/* کارت ورود */}
         <View style={styles.card}>
           <View style={styles.header}>
-            <ShieldCheck size={24} color="#0284c7" />
+            <ShieldCheck size={24} color={colors.teal} />
             <Text style={styles.title}>
               {step === 1 ? 'ورود به حساب مشتری' : 'تایید شماره همراه'}
             </Text>
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   brandTitle: {
     ...type.bold,
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     backgroundColor: '#f8fafc',
     borderWidth: 2,
-    borderColor: '#0284c7',
+    borderColor: colors.teal,
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 52,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   submitButtonText: {
     ...type.bold,

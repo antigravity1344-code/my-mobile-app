@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiFetch } from '../../api/apiClient';
-import { type } from '../../theme';
+import { type, colors } from '../../theme';
 import { formatJalaliDateTime } from '../../utils/jalaliDisplay';
 import { CUSTOMER_ORDER_STATUS_LABELS } from '../orders/orderStatusLabels';
 import { notificationOrderTarget } from './notificationsUnread';
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   retryText: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#0f766e' },
   empty: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#64748b' },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
-  unread: { borderColor: '#38bdf8', backgroundColor: '#f0f9ff' },
+  unread: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
   cardTitle: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#0f172a' },
   body: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#475569', fontSize: 13, lineHeight: 20 },
   meta: { ...type.regular, ...fa, fontWeight: '400', textAlign: 'right', color: '#94a3b8', fontSize: 11 },

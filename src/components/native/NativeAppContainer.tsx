@@ -17,6 +17,7 @@ import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { clearCustomerSession, CUSTOMER_TOKEN_KEY, saveCustomerSession } from './customerLoginStorage';
 import { clearWorkerSession, saveWorkerSession, WORKER_TOKEN_KEY } from './workerLoginStorage';
+import { colors } from '../../theme';
 
 const STORAGE_ROLE_KEY = 'PAKSHO_ACTIVE_ROLE';
 const STORAGE_LOGGED_IN_KEY = 'PAKSHO_IS_LOGGED_IN';
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   roleBadgeCustomer: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
   },
   roleBadgeWorker: {
     backgroundColor: '#059669',

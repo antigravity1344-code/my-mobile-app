@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors } from '../../../theme';
 
 interface EmptyCleanersStateProps {
   isSearching: boolean;
@@ -48,7 +49,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,

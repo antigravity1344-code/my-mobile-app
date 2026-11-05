@@ -14,7 +14,7 @@ import { BottomSheetModal } from '../../../components/native/BottomSheetModal';
 import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { SUPPORT_TEL_URL } from '../../support';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
-import { type } from '../../../theme';
+import { type, colors } from '../../../theme';
 import {
   X,
   Phone,
@@ -225,7 +225,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             {/* Service Title Box */}
             <View style={styles.serviceBox}>
               <View style={styles.serviceIconWrap}>
-                <Sparkles size={20} color="#0284c7" />
+                <Sparkles size={20} color={colors.teal} />
               </View>
               <View style={styles.serviceTextWrap}>
                 <Text style={styles.serviceTitle}>{displayServiceTitle(order.serviceTitle)}</Text>
@@ -247,7 +247,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <Text style={styles.cardHeading}>اطلاعات متخصص نظافت</Text>
                 <View style={styles.cleanerRow}>
                   <View style={styles.cleanerAvatar}>
-                    <User size={26} color="#0284c7" />
+                    <User size={26} color={colors.teal} />
                   </View>
                   <View style={styles.cleanerInfo}>
                     <Text style={styles.cleanerName}>
@@ -279,12 +279,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             <View style={styles.card}>
               <Text style={styles.cardHeading}>اطلاعات زمان و آدرس</Text>
               <View style={styles.infoRow}>
-                <Calendar size={15} color="#0284c7" />
+                <Calendar size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>تاریخ رزرو:</Text>
                 <Text style={styles.infoValue}>{dateLabel}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Clock size={15} color="#0284c7" />
+                <Clock size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>ساعت و مدت:</Text>
                 <Text style={styles.infoValue}>
                   {timeLabel}
@@ -292,7 +292,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <User size={15} color="#0284c7" />
+                <User size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>جنسیت متخصص:</Text>
                 <Text style={styles.infoValue}>
                   {GENDER_TITLES[order.genderPreference] || 'بدون ترجیح'}
@@ -300,25 +300,25 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               </View>
               {describeServiceOptions(order.serviceId, order.serviceOptions).map((option) => (
                   <View key={option.key} style={styles.infoRow}>
-                    <Sparkles size={15} color="#0284c7" />
+                    <Sparkles size={15} color={colors.teal} />
                     <Text style={styles.infoLabel}>{option.label}:</Text>
                     <Text style={styles.infoValue}>{option.value}</Text>
                   </View>
                 ))}
               <View style={styles.infoRow}>
-                <Sparkles size={15} color="#0284c7" />
+                <Sparkles size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>تناوب سفارش:</Text>
                 <Text style={styles.infoValue}>
                   {RECURRING_TITLES[order.recurringFrequency] || 'عادی'}
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <MapPin size={15} color="#0284c7" />
+                <MapPin size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>محله و نشانی:</Text>
                 <Text style={styles.infoValue}>{addressLine}</Text>
               </View>
               <View style={styles.infoRow}>
-                <User size={15} color="#0284c7" />
+                <User size={15} color={colors.teal} />
                 <Text style={styles.infoLabel}>مشتری:</Text>
                 <Text style={styles.infoValue}>{recipientLabel}</Text>
               </View>
@@ -553,7 +553,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
             )}
 
             <Pressable onPress={handleCallSupport} style={styles.footerSupportBtn}>
-              <Phone size={16} color="#0369a1" />
+              <Phone size={16} color={colors.tealDark} />
               <Text style={styles.footerSupportText}>تماس با پشتیبانی</Text>
             </Pressable>
           </View>
@@ -670,9 +670,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#e0f2fe',
+    borderColor: colors.tealSoft,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: '#bae6fd',
+    backgroundColor: '#B9DCD9',
     alignItems: 'center',
     justifyContent: 'center',
 
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     fontSize: 15,
-    color: '#0369a1',
+    color: colors.tealDark,
     textAlign: 'right',
 
   },
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     fontSize: 11,
-    color: '#0284c7',
+    color: colors.teal,
     textAlign: 'right',
     marginTop: 2,
 
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
     alignItems: 'center',
     justifyContent: 'center',
 
@@ -865,8 +865,8 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     fontSize: 11,
-    color: '#0369a1',
-    backgroundColor: '#f0f9ff',
+    color: colors.tealDark,
+    backgroundColor: colors.tealSoft,
     padding: 8,
     borderRadius: 8,
     textAlign: 'right',
@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
 
   },
   tagBadge: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -966,7 +966,7 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     fontSize: 10,
-    color: '#0369a1',
+    color: colors.tealDark,
 
   },
   cancelBox: {
@@ -1113,9 +1113,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: colors.tealSoft,
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: '#B9DCD9',
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1126,7 +1126,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: '#0369a1',
+    color: colors.tealDark,
     fontSize: 12,
 
   }});

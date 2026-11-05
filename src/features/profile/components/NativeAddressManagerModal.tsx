@@ -15,7 +15,7 @@ import { useSheetKeyboard } from '../../../components/native/useSheetKeyboard';
 import { useProfile } from '../context/ProfileContext';
 import { extraAddressIsDefault } from '../mainAddress';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
-import { type } from '../../../theme';
+import { type, colors } from '../../../theme';
 import type { SavedAddress } from '../types/profile';
 import { AddressCityPicker } from '../../../components/booking/AddressCityPicker';
 import { addressCityFields, type CityAddress } from '../../../api/serviceAreas';
@@ -169,6 +169,6 @@ const styles = StyleSheet.create({
   input: { ...type.regular, ...fa, fontWeight: '400', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, color: '#0f172a', textAlign: 'right' },
   textArea: { minHeight: 88, textAlignVertical: 'top' },
   error: { ...type.regular, ...fa, fontWeight: '400', color: '#b91c1c', textAlign: 'right', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 },
-  submit: { marginTop: 8, minHeight: 48, backgroundColor: '#0284c7', borderRadius: 13, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  submit: { marginTop: 8, minHeight: 48, backgroundColor: colors.teal, borderRadius: 13, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   submitText: { ...type.bold, ...fa, fontWeight: '400', color: '#fff' },
 });

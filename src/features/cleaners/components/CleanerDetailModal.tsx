@@ -7,6 +7,7 @@ import { CLEANER_TIER_LABELS } from '../types/cleaner';
 import { calculateTieredPrice } from '../services/cleanerPricing';
 import { isCleanerCancellationAllowed } from '../services/cancellationRules';
 import { CLEANER_SPECIALTY_LABELS, MARKETPLACE_BASE_PRICE } from '../utils';
+import { colors } from '../../../theme';
 
 interface CleanerDetailModalProps {
   cleaner: CleanerProfile | undefined;
@@ -80,7 +81,7 @@ export const CleanerDetailModal: React.FC<CleanerDetailModalProps> = ({
             </View>
 
             <View style={styles.ruleCard}>
-              <Wallet size={16} color="#0284c7" />
+              <Wallet size={16} color={colors.teal} />
               <Text style={styles.ruleText}>
                 جبران خسارت زمان از دست‌رفته از صندوق مدیریت پرداخت می‌شود، نه از مشتری مستقیم.
               </Text>
@@ -192,8 +193,8 @@ const styles = StyleSheet.create({
   },
   priceCard: {
     width: '100%',
-    backgroundColor: '#f0f9ff',
-    borderColor: '#bae6fd',
+    backgroundColor: colors.tealSoft,
+    borderColor: '#B9DCD9',
     borderWidth: 1,
     borderRadius: 14,
     padding: 14,
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 11,
-    color: '#0369a1',
+    color: colors.tealDark,
     textAlign: 'right',
     fontWeight: '700',
   },
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
   },
   priceHint: {
     fontSize: 11,
-    color: '#0369a1',
+    color: colors.tealDark,
     textAlign: 'right',
     marginTop: 4,
   },
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   callBtn: {
     marginTop: 8,
     width: '100%',
-    backgroundColor: '#0284c7',
+    backgroundColor: colors.teal,
     borderRadius: 14,
     paddingVertical: 12,
     flexDirection: 'row-reverse',

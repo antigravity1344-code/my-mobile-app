@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CleanerMarketplaceStats } from '../utils';
 import { CLEANER_FILTER_TABS, type CleanerFilterTab } from '../utils';
+import { colors } from '../../../theme';
 
 interface CleanerFilterTabsProps {
   activeTab: CleanerFilterTab;
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
   },
   countBadgeActive: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.tealSoft,
   },
   countText: {
     fontSize: 10,
@@ -93,6 +94,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   countTextActive: {
-    color: '#0284c7',
+    color: colors.teal,
   },
 });
