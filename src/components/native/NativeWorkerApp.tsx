@@ -125,8 +125,8 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
 
   if (!isLoggedIn || !userData) {
     return (
-      <RNSafeAreaView style={styles.safeAreaDark}>
-        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <RNSafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
         <WorkerAuthScreen onLogin={handleLogin} />
       </RNSafeAreaView>
     );
@@ -140,8 +140,8 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
 
   if (!isApproved) {
     return (
-      <RNSafeAreaView style={styles.safeAreaDark}>
-        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <RNSafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
         <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
       </RNSafeAreaView>
     );
@@ -151,13 +151,13 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
 };
 
 const styles = StyleSheet.create({
-  safeAreaDark: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
   },
   homeLoading: {
     flex: 1,
