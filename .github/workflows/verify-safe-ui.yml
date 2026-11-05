@@ -3,6 +3,7 @@ name: Paksho UI safe integration
 on:
   pull_request:
     branches:
+      - main
       - ui/customer-home-redesign
   workflow_dispatch:
 
