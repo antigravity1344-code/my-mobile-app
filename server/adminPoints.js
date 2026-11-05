@@ -4,6 +4,7 @@
 // همهٔ متن‌ها با textContent نوشته می‌شوند تا هیچ داده‌ای به HTML تبدیل نشود.
 const pointsInputClass = 'block w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1';
 let pointsBusy = false;
+let pointsLoadSeq = 0;
 
 function pointsMessage(text) {
   document.getElementById('pointsMessage').textContent = text;
@@ -122,8 +123,10 @@ async function loadAdminPoints() {
   try {
     if (!(await ensureAdmin())) return;
     pointsMessage('در حال بارگذاری…');
+    const loadId = ++pointsLoadSeq;
     const response = await fetch('/api/admin/point-rules', { headers: adminHeaders(), cache: 'no-store' });
     const data = await response.json();
+    if (loadId !== pointsLoadSeq || pointsBusy) return;
     if (!response.ok || !data.success) {
       pointsMessage('قانون امتیاز دریافت نشد. دوباره تلاش کنید.');
       return;

@@ -5,6 +5,7 @@
 const tierNames = { gray: 'خاکستری', silver: 'نقره‌ای', gold: 'طلایی', gold_plus: 'طلایی پلاس' };
 const tierInputClass = 'block w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1';
 let tierBusy = false;
+let tierLoadSeq = 0;
 
 function tierMessage(text) {
   document.getElementById('tierMessage').textContent = text;
@@ -170,8 +171,10 @@ async function loadAdminTiers() {
   try {
     if (!(await ensureAdmin())) return;
     tierMessage('در حال بارگذاری…');
+    const loadId = ++tierLoadSeq;
     const response = await fetch('/api/admin/point-rules', { headers: adminHeaders(), cache: 'no-store' });
     const data = await response.json();
+    if (loadId !== tierLoadSeq || tierBusy) return;
     if (!response.ok || !data.success) {
       tierMessage('قانون درجه‌ها دریافت نشد. دوباره تلاش کنید.');
       return;
