@@ -20,8 +20,11 @@ class OfferError extends Error {
   }
 }
 
-function maxBasisPointsForTier(tierKey) {
-  return tierKey === 'gold' ? GOLD_MAX_BASIS_POINTS : DEFAULT_MAX_BASIS_POINTS;
+const DEFAULT_POLICY = Object.freeze({ minBps: MIN_BASIS_POINTS, maxBps: DEFAULT_MAX_BASIS_POINTS, goldMaxBps: GOLD_MAX_BASIS_POINTS });
+
+/** سقف مجاز درصد برای درجهٔ متخصص؛ policy از تنظیم مدیر می‌آید و بدون آن پیش‌فرض‌ها اعمال می‌شود. */
+function maxBasisPointsForTier(tierKey, policy = DEFAULT_POLICY) {
+  return tierKey === 'gold' ? policy.goldMaxBps : policy.maxBps;
 }
 
 function isoOrNull(value) {
@@ -31,7 +34,7 @@ function isoOrNull(value) {
 }
 
 /** ورودی ثبت پیشنهاد را اعتبارسنجی می‌کند و مقدار پاک‌شده برمی‌گرداند؛ در خطا OfferError می‌اندازد. */
-function validateOfferInput(body, { tierKey, now }) {
+function validateOfferInput(body, { tierKey, now, policy = DEFAULT_POLICY }) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new OfferError('INPUT_INVALID', 'پیشنهاد معتبر نیست.');
   const serviceId = typeof body.serviceId === 'string' ? body.serviceId.trim() : '';
   if (!serviceId || serviceId.length > 80) throw new OfferError('INPUT_INVALID', 'خدمت پیشنهاد مشخص نیست.');
@@ -46,8 +49,8 @@ function validateOfferInput(body, { tierKey, now }) {
   if (endMs - startMs > MAX_WINDOW_MS) throw new OfferError('INPUT_INVALID', 'بازهٔ کاری نباید بیشتر از ۱۶ ساعت باشد.');
   const bp = body.adjustmentBasisPoints;
   if (!Number.isSafeInteger(bp) || bp % STEP_BASIS_POINTS !== 0) throw new OfferError('INPUT_INVALID', 'درصد قیمت معتبر نیست.');
-  if (bp < MIN_BASIS_POINTS) throw new OfferError('PRICE_OUT_OF_RANGE', 'قیمت پیشنهادی از حداقل مجاز (۵۰٪ تعرفه) کمتر است.');
-  const max = maxBasisPointsForTier(tierKey);
+  if (bp < policy.minBps) throw new OfferError('PRICE_OUT_OF_RANGE', `قیمت پیشنهادی از حداقل مجاز (${policy.minBps / 100}٪ تعرفه) کمتر است.`);
+  const max = maxBasisPointsForTier(tierKey, policy);
   if (bp > max) {
     throw new OfferError('PRICE_OUT_OF_RANGE', max <= 10000
       ? 'قیمت پیشنهادی نمی‌تواند از تعرفهٔ شرکت بالاتر باشد.'
@@ -116,6 +119,7 @@ function createWorkerOffers({ database, transaction }) {
 module.exports = {
   OfferError,
   MIN_BASIS_POINTS,
+  DEFAULT_POLICY,
   maxBasisPointsForTier,
   validateOfferInput,
   createWorkerOffers,

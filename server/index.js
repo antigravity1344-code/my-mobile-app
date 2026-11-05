@@ -874,10 +874,11 @@ app.get('/api/workers/me/offers', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const tierKey = workerTierKey(worker.id);
   const { maxBasisPointsForTier } = require('./workerOffers');
+  const policy = store.offerPolicy.bounds();
   res.json({
     success: true,
-    minBasisPoints: require('./workerOffers').MIN_BASIS_POINTS,
-    maxBasisPoints: maxBasisPointsForTier(tierKey),
+    minBasisPoints: policy.minBps,
+    maxBasisPoints: maxBasisPointsForTier(tierKey, policy),
     offers: store.workerOffers.listForWorker(worker.id).map(workerOfferView),
   });
 });
@@ -890,7 +891,7 @@ app.post('/api/workers/me/offers', (req, res) => {
   }
   try {
     const now = new Date();
-    const input = validateOfferInput(req.body, { tierKey: workerTierKey(worker.id), now });
+    const input = validateOfferInput(req.body, { tierKey: workerTierKey(worker.id), now, policy: store.offerPolicy.bounds() });
     if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
       return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
     }
@@ -1613,6 +1614,21 @@ app.get('/api/loyalty', (req, res) => {
 
 registerCompletionRoutes(app, {store,requireUser,requireAdmin,customerView:customerOrderView,workerView:workerAssignedOrderView});
 registerCommissionRoutes(app, { policy: store.commissionPolicy, requireUser, requireAdmin });
+app.get('/api/admin/offer-policy', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, policy: store.offerPolicy.read() });
+});
+app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const result = store.offerPolicy.publish(req.body);
+  if (result.code === 'invalid') {
+    return res.status(400).json({ success: false, message: 'درصدها باید عدد صحیح از ۱ تا ۳۰۰ باشند و حداقل ≤ حداکثر عادی ≤ حداکثر طلایی؛ نسخه جاری نیز لازم است.' });
+  }
+  if (result.code === 'conflict') {
+    return res.status(409).json({ success: false, message: 'تنظیم قبلاً تغییر کرده است. مقدار جدید را بازخوانی کنید.', policy: result.policy });
+  }
+  return res.json({ success: true, policy: result.policy });
+});
 registerWorkerWalletRoutes(app, {store,requireUser});
 registerPaymentSettingsRoutes(app, { settings: store.paymentSettings, requireAdmin });
 registerServiceAreaRoutes(app, { areas: store.serviceAreas, requireAdmin });
@@ -2093,6 +2109,9 @@ app.get('/admin/tiers.js', (req, res) => {
 });
 
 app.get('/admin/completion.js', (req,res) => res.type('application/javascript').sendFile(path.join(__dirname,'adminCompletion.js')));
+app.get('/admin/offer-policy.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminOfferPolicy.js'));
+});
 app.get('/admin/commission.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminCommission.js'));
 });
@@ -2178,6 +2197,7 @@ app.get('/admin', (req, res) => {
       </button>
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
+      <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
@@ -2243,6 +2263,19 @@ app.get('/admin', (req, res) => {
       <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
       <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
     </section>
+    <section id="tabOfferPolicy" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">قیمت پیشنهاد متخصص</h3>
+      <p class="text-sm text-slate-300">متخصص می‌تواند ساعت آزاد خود را با درصدی از تعرفهٔ شما ثبت کند. حداقل و حداکثر مجاز را اینجا تعیین کنید (عدد صحیح؛ ۱۰۰ یعنی خود تعرفه). برای ممنوع‌کردن قیمت بالاتر از تعرفه، هر دو سقف را ۱۰۰ بگذارید. پیشنهادهای قبلاً ثبت‌شده تغییر نمی‌کنند.</p>
+      <label for="offerPolicyMin" class="block text-sm">حداقل درصد تعرفه (همهٔ متخصصان)</label>
+      <input id="offerPolicyMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="offerPolicyMax" class="block text-sm">حداکثر درصد تعرفه (متخصص عادی)</label>
+      <input id="offerPolicyMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="offerPolicyGold" class="block text-sm">حداکثر درصد تعرفه (متخصص طلایی)</label>
+      <input id="offerPolicyGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <p id="offerPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
+      <button id="offerPolicySave" type="button" onclick="saveAdminOfferPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+    </section>
     <section id="tabAreas" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
       <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. فهرست در فرم نشانی مشتری و محدوده فعالیت متخصص نمایش داده می‌شود. تغییر شهر پیش‌فرض، نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
@@ -2295,6 +2328,7 @@ app.get('/admin', (req, res) => {
   <script src="/admin/tiers.js"></script>
 <script src="/admin/points.js"></script>
   <script src="/admin/commission.js"></script>
+  <script src="/admin/offer-policy.js"></script>
   <script src="/admin/payment.js"></script>
   <script src="/admin/service-areas.js"></script>
   <script src="/admin/worker-bank.js"></script>
@@ -2631,7 +2665,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'completion', 'payment', 'areas']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'completion', 'payment', 'areas']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;
