@@ -103,6 +103,7 @@ export async function previewApi(endpoint: string, options: RequestInit = {}): P
       next: { tierKey: 'silver', remainingOrders: 8, remainingPoints: 0, minRating: 4, ratingMet: true, progress: 0.6 },
     };
   }
+  if (path === '/workers/me/offers' && role === 'worker') return { success: true, minBasisPoints: 5000, maxBasisPoints: 10000, offers: [] };
   if (path === '/workers/me/rating') return { success: true, average: null, count: 0 };
   if (path === '/workers/me/weekly-income') {
     return { success: false, message: 'گزارش درآمد واقعی در پیش‌نمایش در دسترس نیست.' };

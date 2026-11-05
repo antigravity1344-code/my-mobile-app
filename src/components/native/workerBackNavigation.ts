@@ -23,7 +23,7 @@ export function installWorkerBackNavigation(events: BackEvents, view: WorkerMain
   const subscription = events.addEventListener('hardwareBackPress', () => {
     if (backInContent?.()) return true;
     if (view === 'home') return false;
-    navigate(view === 'work_area' || view === 'bank_details' ? 'profile' : 'home');
+    navigate(view === 'work_area' || view === 'bank_details' || view === 'offers' ? 'profile' : 'home');
     return true;
   });
   return () => subscription.remove();

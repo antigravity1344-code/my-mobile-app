@@ -6,10 +6,10 @@ import {
   initialAddressState, loadWorkerAddress, saveWorkerAddress, workerAddressReducer,
 } from './workerAddress';
 
-type Props = { name?: string; onLogout: () => void; onOpenArea: () => void; onOpenBank: () => void };
+type Props = { name?: string; onLogout: () => void; onOpenArea: () => void; onOpenBank: () => void; onOpenOffers: () => void };
 
 /** Specialist-only profile entry. Customer profile and onboarding are separate. */
-export function WorkerAddressScreen({ name, onLogout, onOpenArea, onOpenBank }: Props) {
+export function WorkerAddressScreen({ name, onLogout, onOpenArea, onOpenBank, onOpenOffers }: Props) {
   const [state, dispatch] = useReducer(workerAddressReducer, initialAddressState);
   const request = useRef<AbortController | null>(null);
   const preview = previewActive();
@@ -52,6 +52,10 @@ export function WorkerAddressScreen({ name, onLogout, onOpenArea, onOpenBank }: 
         <Pressable accessibilityRole="button" onPress={onOpenBank} style={styles.card}>
           <Text style={styles.heading}>شبا و رمز تغییر شبا</Text>
           <Text style={styles.description}>ثبت شبا و مدیریت رمز مخصوص آن</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onOpenOffers} style={styles.card}>
+          <Text style={styles.heading}>ساعت‌های پیشنهادی من</Text>
+          <Text style={styles.description}>ثبت بازهٔ آزاد با قیمت دلخواه برای رزرو مشتری</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={onOpenArea} style={styles.card}>
           <Text style={styles.heading}>محدوده فعالیت</Text>

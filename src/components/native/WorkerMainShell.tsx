@@ -19,6 +19,7 @@ import { NativeNotificationsScreen } from '../../features/notifications/NativeNo
 import { unreadCountFromResponse } from '../../features/notifications/notificationsUnread';
 import { WorkerAddressScreen } from './WorkerAddressScreen';
 import { WorkerServiceAreaScreen } from './WorkerServiceAreaScreen';
+import { WorkerOffersScreen } from './WorkerOffersScreen';
 import { WorkerBankDetailsScreen } from './WorkerBankDetailsScreen';
 import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
@@ -27,7 +28,7 @@ import { WORKER_TOKEN_KEY, type WorkerSessionUser } from './workerLoginStorage';
 import { colors } from '../../theme/customerHome';
 import { installWorkerBackNavigation } from './workerBackNavigation';
 
-export type WorkerMainView = WorkerTab | 'alerts' | 'work_area' | 'bank_details' | WorkerHomeCardKey;
+export type WorkerMainView = WorkerTab | 'alerts' | 'work_area' | 'bank_details' | 'offers' | WorkerHomeCardKey;
 
 function isWorkerHomeCard(view: WorkerMainView): view is WorkerHomeCardKey {
   return (WORKER_HOME_CARD_KEYS as readonly string[]).includes(view);
@@ -132,7 +133,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
     void fetchOrders('after-action');
   };
 
-  const activeTab: WorkerTab = mainView === 'work_area' || mainView === 'bank_details' ? 'profile' : mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
+  const activeTab: WorkerTab = mainView === 'work_area' || mainView === 'bank_details' || mainView === 'offers' ? 'profile' : mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
   const cardKnown = hasLoaded && !ordersState.sessionExpired && !(!!ordersState.error && ordersState.available.length === 0 && ordersState.mine.length === 0);
   const newOrdersBadge = hasLoaded && !ordersState.sessionExpired ? workerTabBadge(ordersState.available.length) : null;
 
@@ -174,9 +175,11 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
         ) : mainView === 'my_jobs' ? (
           <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'profile' ? (
-          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} onOpenBank={() => onChangeView('bank_details')} />
+          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} onOpenBank={() => onChangeView('bank_details')} onOpenOffers={() => onChangeView('offers')} />
         ) : mainView === 'work_area' ? (
           <WorkerServiceAreaScreen key={user.id} onBack={() => onChangeView('profile')} />
+        ) : mainView === 'offers' ? (
+          <WorkerOffersScreen key={user.id} onBack={() => onChangeView('profile')} />
         ) : mainView === 'bank_details' ? (
           <WorkerBankDetailsScreen key={user.id} onBack={() => onChangeView('profile')} onLogout={onLogout} />
         ) : mainView === 'alerts' ? (
