@@ -169,7 +169,7 @@ function renderAdminTiers(data) {
 async function loadAdminTiers() {
   if (tierBusy) return;
   try {
-    if (!(await ensureAdmin())) return;
+    if (!(await ensureAdmin())) return false;
     tierMessage('در حال بارگذاری…');
     const loadId = ++tierLoadSeq;
     const response = await fetch('/api/admin/point-rules', { headers: adminHeaders(), cache: 'no-store' });
@@ -177,12 +177,14 @@ async function loadAdminTiers() {
     if (loadId !== tierLoadSeq || tierBusy) return;
     if (!response.ok || !data.success) {
       tierMessage('قانون درجه‌ها دریافت نشد. دوباره تلاش کنید.');
-      return;
+      return false;
     }
     tierMessage('');
     renderAdminTiers(data);
+    return true;
   } catch (error) {
     tierMessage('ارتباط برقرار نشد. دوباره تلاش کنید.');
+    return false;
   }
 }
 
@@ -239,6 +241,9 @@ async function submitAdminTiers() {
   } finally {
     tierBusy = false;
   }
-  await loadAdminTiers();
+  if ((await loadAdminTiers()) === false) {
+    tierMessage('تغییر ذخیره شد، ولی فهرست به‌روز نشد. دوباره بازخوانی کنید.');
+    return;
+  }
   tierMessage('نسخهٔ جدید ثبت شد. درجهٔ هر متخصص با تکمیل سفارش بعدی‌اش به‌روز می‌شود.');
 }

@@ -121,7 +121,7 @@ function renderAdminPoints(data) {
 async function loadAdminPoints() {
   if (pointsBusy) return;
   try {
-    if (!(await ensureAdmin())) return;
+    if (!(await ensureAdmin())) return false;
     pointsMessage('در حال بارگذاری…');
     const loadId = ++pointsLoadSeq;
     const response = await fetch('/api/admin/point-rules', { headers: adminHeaders(), cache: 'no-store' });
@@ -129,12 +129,14 @@ async function loadAdminPoints() {
     if (loadId !== pointsLoadSeq || pointsBusy) return;
     if (!response.ok || !data.success) {
       pointsMessage('قانون امتیاز دریافت نشد. دوباره تلاش کنید.');
-      return;
+      return false;
     }
     pointsMessage('');
     renderAdminPoints(data);
+    return true;
   } catch (error) {
     pointsMessage('ارتباط برقرار نشد. دوباره تلاش کنید.');
+    return false;
   }
 }
 
@@ -168,6 +170,9 @@ async function submitAdminPoints() {
   } finally {
     pointsBusy = false;
   }
-  await loadAdminPoints();
+  if ((await loadAdminPoints()) === false) {
+    pointsMessage('تغییر ذخیره شد، ولی فهرست به‌روز نشد. دوباره بازخوانی کنید.');
+    return;
+  }
   pointsMessage('نسخهٔ جدید ثبت شد. از سفارش‌های بعدی با همین عددها امتیاز داده می‌شود.');
 }
