@@ -86,14 +86,14 @@ jobs:
       - name: App unit tests
         if: ${{ !cancelled() && steps.install-app.outcome == 'success' }}
         run: npm test -- --reporter=dot 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/app-tests.log"
-      - name: All server regression tests including browser XSS (fake SMS)
+      - name: All server and pricing regression tests including browser XSS (fake SMS)
         if: ${{ !cancelled() && steps.install-server.outcome == 'success' && steps.browser-path.outcome == 'success' }}
         env:
           # The isolated XSS fixture alone opts out of Chromium's sandbox because
           # the hosted Ubuntu runner restricts downloaded-browser user namespaces.
           # This changes no application, operating-system, network or TLS setting.
           PAKSHO_TEST_CHROMIUM_SANDBOX: '0'
-        run: node --test --test-concurrency=2 server/*.test.js 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/server-tests.log"
+        run: node --test --test-concurrency=2 server/*.test.js server/pricing/*.test.js 2>&1 | tee "$RUNNER_TEMP/paksho-ci-logs/server-tests.log"
       - name: Preserve verification logs even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
