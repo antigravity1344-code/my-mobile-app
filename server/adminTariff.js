@@ -111,10 +111,12 @@ async function loadAdminTariff() {
   if (tariffBusy || tariffAttempt) return;
   tariffBusy = true;
   tariffControls();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   let feedback = 'ارتباط با سرور برقرار نشد. دوباره بازخوانی کنید.';
   try {
     if (!(await ensureAdmin())) return;
-    const response = await fetch('/api/admin/tariff-versions', { headers: adminHeaders(), cache: 'no-store' });
+    const response = await fetch('/api/admin/tariff-versions', { headers: adminHeaders(), cache: 'no-store', signal: controller.signal });
     if (response.status === 401) {
       adminToken = '';
       sessionStorage.removeItem('paksho_admin_token');
@@ -136,6 +138,7 @@ async function loadAdminTariff() {
     document.getElementById('tariffContent').replaceChildren();
     tariffMessage(feedback);
   } finally {
+    clearTimeout(timeout);
     tariffBusy = false;
     tariffControls();
   }
