@@ -19,6 +19,7 @@ import { AddressCityPicker } from './AddressCityPicker';
 import { addressCityFields } from '../../api/serviceAreas';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
@@ -645,8 +646,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             {review.kind === 'fresh' ? (
               <>
                 <View style={styles.invoiceLine}><Text style={styles.summaryLine}>مبلغ جزء</Text><Text style={styles.summaryLine}>{formatServerAmount(review.subtotal, review.currencyUnit)}</Text></View>
-                {review.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{line.id}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, review.currencyUnit)}</Text></View>)}
-                {review.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{line.id}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, review.currencyUnit)}`}</Text></View>)}
+                {review.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{quoteLineLabel(line.id, 'surcharge')}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, review.currencyUnit)}</Text></View>)}
+                {review.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{quoteLineLabel(line.id, 'discount')}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, review.currencyUnit)}`}</Text></View>)}
                 <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل تأیید</Text><Text style={styles.total}>{formatServerAmount(review.total, review.currencyUnit)}</Text></View>
               </>
             ) : null}

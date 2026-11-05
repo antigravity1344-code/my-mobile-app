@@ -107,6 +107,14 @@ function completionPayload(orderId) {
     assert.equal(profile.json.user.name, 'مشتری آزمایشی');
     assert.equal(Object.hasOwn(profile.json.user, 'nationalId'), false);
 
+    // آدرس فرم هویت باید به‌عنوان آدرس اصلیِ ساختاری هم در فهرست رزرو دیده شود.
+    const initialAddresses = await request(server, { pathname: '/api/users/addresses', token: customer.token });
+    assert.equal(initialAddresses.status, 200);
+    assert.equal(initialAddresses.json.addresses.length, 1);
+    assert.equal(initialAddresses.json.addresses[0].fullAddress, 'تهران، تست');
+    assert.equal(initialAddresses.json.addresses[0].isDefault, true);
+    assert.equal(initialAddresses.json.addresses[0].recipientName, 'مشتری آزمایشی');
+
     const addresses = await request(server, {
       method: 'PUT',
       pathname: '/api/users/addresses',

@@ -637,6 +637,17 @@ app.put('/api/users/customer-profile', (req, res) => {
       current.address = nextAddress;
       if (!current.addresses) current.addresses = [];
       if (!current.addresses.includes(nextAddress)) current.addresses.push(nextAddress);
+      // اولین آدرس فرم هویت باید در فهرست آدرس‌های ساختاریِ رزرو هم دیده شود.
+      if (!Array.isArray(current.savedAddresses) || current.savedAddresses.length === 0) {
+        current.savedAddresses = [sanitizeSavedAddress({
+          id: 'addr-' + crypto.randomBytes(6).toString('hex'),
+          title: 'آدرس اصلی',
+          fullAddress: nextAddress,
+          recipientName: current.name || '',
+          contactPhone: current.phone || '',
+          isDefault: true,
+        })].filter(Boolean);
+      }
     }
     current.isProfileComplete = !!(current.name && current.nationalId);
     return store.updateUser(current);
