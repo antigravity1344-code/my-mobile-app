@@ -31,7 +31,8 @@ test('service switches: off hides the service, blocks quotes/offers, keeps old d
   const u = harness.store.getUser(worker.user.id); u.status = 'APPROVED'; harness.store.updateUser(u);
   const customer = await harness.login(server, '09120000512');
   const put = (body, token = adminToken) => request(server, { method: 'PUT', pathname: '/api/admin/service-switches', token, body });
-  const enabledList = () => request(server, { method: 'GET', pathname: '/api/services/enabled', token: customer.token });
+  const enabledList = () => request(server, { method: 'GET', pathname: '/api/services/enabled', token: customer.token })
+    .then((r) => ({ json: { disabledServiceIds: r.json.disabledServiceIds.filter((id) => id !== 'patient_companion') } }));
   const offer = () => request(server, { method: 'POST', pathname: '/api/workers/me/offers', token: worker.token, body: {
     serviceId: 'hourly_labor', startAt: new Date(Date.now() + 48 * HOUR).toISOString(),
     endAt: new Date(Date.now() + 51 * HOUR).toISOString(), adjustmentBasisPoints: 8000 } });
@@ -43,7 +44,7 @@ test('service switches: off hides the service, blocks quotes/offers, keeps old d
   assert.equal((await put({ serviceId: 'hourly_labor', enabled: 'no' })).status, 400);
   assert.deepEqual((await enabledList()).json.disabledServiceIds, []);
   const snap = await request(server, { method: 'GET', pathname: '/api/admin/service-switches', token: adminToken });
-  assert.equal(snap.json.services.length, 6); assert.ok(snap.json.services.every((s) => s.enabled));
+  assert.equal(snap.json.services.length, 7); assert.ok(snap.json.services.every((s) => s.enabled));
 
   const open = await offer();
   assert.equal(open.status, 201);

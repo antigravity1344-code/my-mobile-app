@@ -7,6 +7,7 @@ const SERVICE_LABELS = Object.freeze({
   office_company_cleaning: 'نظافت دفاتر اداری و شرکت‌ها',
   sofa_carpet_washing: 'مبل‌شویی و فرش‌شویی در محل',
   hourly_labor: 'کارگر ساعتی',
+  patient_companion: 'همراه مریض',
   building_painting: 'نقاشی ساختمان',
 });
 

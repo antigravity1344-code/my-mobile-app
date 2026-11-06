@@ -816,18 +816,32 @@ app.put('/api/users/worker-onboarding', (req, res) => {
 // ------------------- پیشنهاد کاری متخصص -------------------
 // متخصص بازهٔ آزاد و درصدی از تعرفه را ثبت می‌کند؛ مشتری می‌بیند و با مسیر عادی سفارش (نقل‌قول امضاشده) رزرو می‌کند.
 // درصد هرگز از مشتری گرفته نمی‌شود و فقط از رکورد پیشنهاد در سرور خوانده می‌شود.
+// خدمت‌هایی که فقط متخصصِ دارای صلاحیت (کلید مدیر، پیش‌فرض خاموش) انجام می‌دهد: شناسهٔ خدمت ← کلید صلاحیت.
+const QUALIFIED_SERVICES = Object.freeze({ patient_companion: 'patient_companion' });
+function workerQualifiedFor(serviceId, worker) {
+  const feature = QUALIFIED_SERVICES[serviceId];
+  return !feature || Boolean(worker && store.featureSwitches.isWorkerEnabled(feature, worker.id));
+}
+function hasQualifiedWorker(serviceId) {
+  return store.listUsers('WORKER').some((user) => (user.status === 'APPROVED' || user.status === 'ACTIVE') && workerQualifiedFor(serviceId, user));
+}
+/** خدمت برای سفارش تازه باز است: خاموش نشده و (اگر صلاحیتی است) حداقل یک متخصص تأییدشده دارد. */
+function isServiceOrderable(serviceId) {
+  if (!store.serviceSwitches.isEnabled(serviceId)) return false;
+  return !Object.hasOwn(QUALIFIED_SERVICES, serviceId) || hasQualifiedWorker(serviceId);
+}
 const SERVICE_DISABLED_BODY = { success: false, code: 'SERVICE_DISABLED', message: 'این خدمت فعلاً توسط مدیریت غیرفعال شده است.' };
 function isServiceDisabledIn(body) {
   const id = body && typeof body === 'object' ? (typeof body.serviceId === 'string' ? body.serviceId.trim() : '') : '';
-  return Boolean(id) && !store.serviceSwitches.isEnabled(id);
+  return Boolean(id) && !isServiceOrderable(id);
 }
 setOfferResolver(({ offerId, serviceId, now }) => {
   const offer = store.workerOffers.get(offerId);
-  if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId || !store.serviceSwitches.isEnabled(offer.serviceId)) {
+  if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId || !isServiceOrderable(offer.serviceId)) {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
   }
   const worker = store.getUser(offer.workerId);
-  if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE') || !store.featureSwitches.isWorkerEnabled('offers', worker.id)) {
+  if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE') || !store.featureSwitches.isWorkerEnabled('offers', worker.id) || !workerQualifiedFor(offer.serviceId, worker)) {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
   }
   return { basisPoints: offer.adjustmentBasisPoints };
@@ -904,7 +918,8 @@ app.post('/api/workers/me/offers', (req, res) => {
   try {
     const now = new Date();
     const input = validateOfferInput(req.body, { tierKey: workerTierKey(worker.id), now, policy: store.offerPolicy.bounds() });
-    if (!store.serviceSwitches.isEnabled(input.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
+    if (!isServiceOrderable(input.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
+    if (!workerQualifiedFor(input.serviceId, worker)) return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'برای این خدمت صلاحیت شما توسط مدیریت تأیید نشده است.' });
     if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
       return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
     }
@@ -939,7 +954,7 @@ app.get('/api/offers', (req, res) => {
     const worker = store.getUser(offer.workerId);
     if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) continue;
     if (!store.featureSwitches.isWorkerEnabled('offers', worker.id)) continue;
-    if (!store.serviceSwitches.isEnabled(offer.serviceId)) continue;
+    if (!isServiceOrderable(offer.serviceId) || !workerQualifiedFor(offer.serviceId, worker)) continue;
     const view = workerOfferView(offer);
     if (view.total == null) continue;
     const rating = store.workerRatingStats(worker.id);
@@ -1357,7 +1372,7 @@ app.get('/api/orders/available', (req, res) => {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
   store.finalizeDueCancelRequests();
-  const availableOrders = store.getOrders({ status: 'PENDING' }).map(workerAvailableOrderView);
+  const availableOrders = store.getOrders({ status: 'PENDING' }).filter((order) => workerQualifiedFor(order.serviceId, authUser)).map(workerAvailableOrderView);
   res.json({ success: true, orders: availableOrders });
 });
 
@@ -1380,6 +1395,10 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
   }
 
+  const target = store.getOrder(orderId);
+  if (target && !workerQualifiedFor(target.serviceId, cleaner)) {
+    return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'پذیرش این سفارش برای حساب شما مجاز نیست.' });
+  }
   const accepted = store.tryAcceptOrder(orderId, cleaner);
   if (accepted.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'کیف پول شما بدهکار است؛ پیش از پذیرش سفارش تازه، بدهی کمیسیون را تسویه کنید.'});
   if (accepted.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
@@ -1654,7 +1673,13 @@ app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
 });
 app.get('/api/services/enabled', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ success: true, disabledServiceIds: store.serviceSwitches.disabledIds() });
+  // خدمت صلاحیتی: برای مشتری وقتی هیچ متخصص تأییدشده ندارد پنهان است؛ برای متخصصِ بدون صلاحیت همیشه پنهان است.
+  const viewer = authUserFromRequest(req);
+  const hidden = new Set(store.serviceSwitches.disabledIds());
+  for (const serviceId of Object.keys(QUALIFIED_SERVICES)) {
+    if (viewer && viewer.role === 'WORKER' ? !workerQualifiedFor(serviceId, viewer) : !hasQualifiedWorker(serviceId)) hidden.add(serviceId);
+  }
+  res.json({ success: true, disabledServiceIds: [...hidden] });
 });
 app.get('/api/admin/service-switches', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -2656,6 +2681,15 @@ app.get('/admin', (req, res) => {
           offersButton.setAttribute('data-action', 'worker-offers-feature');
           offersButton.addEventListener('click', () => toggleWorkerFeature(w.id, 'offers', !offersOn));
           actions.append(offersButton);
+        }
+        if (w.features && Object.prototype.hasOwnProperty.call(w.features, 'patient_companion')) {
+          const qualified = w.features.patient_companion === true;
+          const qualButton = adminElement('button', (qualified ? 'bg-amber-700' : 'bg-emerald-700') + ' text-white text-xs px-3 py-2 rounded-xl',
+            qualified ? 'لغو صلاحیت همراه مریض' : 'تأیید صلاحیت همراه مریض');
+          qualButton.type = 'button';
+          qualButton.setAttribute('data-action', 'worker-patient-companion');
+          qualButton.addEventListener('click', () => toggleWorkerFeature(w.id, 'patient_companion', !qualified));
+          actions.append(qualButton);
         }
         const manualTopup = adminElement('button', 'bg-sky-700 text-white text-xs px-3 py-2 rounded-xl', 'ثبت شارژ دستی');
         manualTopup.type = 'button';

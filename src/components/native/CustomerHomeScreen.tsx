@@ -57,6 +57,7 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'نظافت محل کار', serviceId: 'office_company_cleaning', Icon: IconServiceOffice },
   { label: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', Icon: IconServiceSofa },
   { label: 'کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
+  { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
   { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
 ];
 
@@ -254,7 +255,7 @@ export function CustomerHomeScreen({
           <Text style={[styles.sectionTitle, styles.servicesTitle]}>خدمات پاکشو</Text>
         </View>
         <View style={styles.serviceGrid}>
-          {(() => { const active = SERVICE_SHORTCUTS.filter((item) => isServiceEnabled(item.serviceId)); return [active.slice(0, 3), active.slice(3)].filter((row) => row.length > 0); })().map((row) => (
+          {(() => { const active = SERVICE_SHORTCUTS.filter((item) => isServiceEnabled(item.serviceId)); const rows: Shortcut[][] = []; for (let i = 0; i < active.length; i += 3) rows.push(active.slice(i, i + 3)); return rows; })().map((row) => (
             <View key={row[0].serviceId} style={styles.serviceRow}>
               {row.map((item) => (
                 <Pressable
@@ -275,6 +276,9 @@ export function CustomerHomeScreen({
                     {item.label}
                   </Text>
                 </Pressable>
+              ))}
+              {Array.from({ length: 3 - row.length }, (_, index) => (
+                <View key={`spacer-${index}`} style={styles.serviceSpacer} />
               ))}
             </View>
           ))}
@@ -651,6 +655,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'stretch',
     gap: 8,
+  },
+  serviceSpacer: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
   },
   serviceCard: {
     flex: 1,

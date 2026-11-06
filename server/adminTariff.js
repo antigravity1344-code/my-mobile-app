@@ -10,7 +10,7 @@ const tariffModelLabels = { fixed: 'برای هر خدمت', hourly: 'برای �
 const tariffServiceLabels = {
   home_unit_cleaning: 'نظافت داخل منزل / واحد', staircase_common_areas: 'نظافت راه‌پله و مشاعات',
   office_company_cleaning: 'نظافت دفاتر اداری و شرکت‌ها', sofa_carpet_washing: 'مبل‌شویی و فرش‌شویی در محل',
-  hourly_labor: 'کارگر ساعتی', building_painting: 'نقاشی ساختمان',
+  hourly_labor: 'کارگر ساعتی', patient_companion: 'همراه مریض', building_painting: 'نقاشی ساختمان',
 };
 const tariffInputClass = 'block w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1';
 

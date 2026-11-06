@@ -3,7 +3,10 @@
 // پیش‌فرض همه روشن است. افزودن قابلیت تازه فقط یک ردیف در FEATURES است. هر تغییر در گزارش ثبت می‌شود.
 const FEATURES = Object.freeze({
   offers: 'قیمت پیشنهاد متخصص',
+  patient_companion: 'صلاحیت همراه مریض',
 });
+// کلیدهای متخصصی که پیش‌فرضشان خاموش است و فقط مدیر روشن می‌کند (صلاحیت).
+const WORKER_DEFAULT_OFF = Object.freeze(new Set(['patient_companion']));
 
 function createFeatureSwitches({ database, transaction }) {
   database.exec(`
@@ -35,7 +38,7 @@ function createFeatureSwitches({ database, transaction }) {
   const known = (feature) => Object.hasOwn(FEATURES, feature);
   const state = (scope, subjectId, feature) => {
     const row = get.get(scope, subjectId, feature);
-    return row ? row.enabled === 1 : true;
+    return row ? row.enabled === 1 : !(scope === 'WORKER' && WORKER_DEFAULT_OFF.has(feature));
   };
 
   return {

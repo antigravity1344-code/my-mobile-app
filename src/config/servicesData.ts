@@ -102,6 +102,27 @@ export const SERVICES_CATALOG: CleaningService[] = [
     },
   },
   {
+    id: 'patient_companion',
+    title: 'همراه مریض',
+    subtitle: 'خدمت ساعتی، حداقل ۴ ساعت',
+    description: 'همراهی و کمک روزمره برای بیمار یا سالمند (غیرپزشکی). فقط توسط متخصصان تأییدشدهٔ مدیریت انجام می‌شود.',
+    iconName: 'heart-outline',
+    pricingType: 'hourly',
+    basePrice: 150000,
+    estimatedDurationHours: 4,
+    badge: 'ساعتی',
+    isVisible: true,
+    configuration: {
+      pricingLabel: 'ساعتی (حداقل ۴ ساعت)',
+      includedOptions: ['همراهی و مراقبت روزمره', 'کمک در جابه‌جایی و غذا'],
+      paidOptions: [],
+      inputs: [
+        { id: 'gender', label: 'جنسیت متخصص', type: 'select', options: ['خانم', 'آقا'] },
+        { id: 'hours', label: 'تعداد ساعت مورد نیاز', type: 'number' },
+      ],
+    },
+  },
+  {
     id: 'building_painting',
     title: 'نقاشی ساختمان',
     subtitle: 'قیمت‌گذاری بر اساس متراژ و نوع رنگ',
