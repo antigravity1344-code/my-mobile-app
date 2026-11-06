@@ -19,6 +19,7 @@ import { AddressCityPicker } from './AddressCityPicker';
 import { addressCityFields } from '../../api/serviceAreas';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
 import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
@@ -85,6 +86,7 @@ interface NativeBookingWizardProps {
 }
 
 export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWizardProps) => {
+  useServiceAvailability();
   const booking = useBooking();
   const offerDraft = getOfferBookingDraft();
   const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
@@ -500,7 +502,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         {booking.step === 1 && <View style={styles.section}>
           <Text style={styles.heading}>نوع سرویس را انتخاب کنید</Text>
           <Pressable onPress={() => setPricingVisible(true)} style={styles.pricingButton}><Text style={styles.pricingButtonText}>مشاهده جدول شفاف تعرفه‌ها</Text></Pressable>
-          {SERVICES_CATALOG.filter((service) => service.isVisible).map((service) => (
+          {SERVICES_CATALOG.filter((service) => service.isVisible && isServiceEnabled(service.id)).map((service) => (
             <Pressable key={service.id} onPress={() => selectService(service)} style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}>
               <View style={styles.cardIcon}><Sparkles size={20} color={colors.teal} /></View>
               <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text><Text style={styles.price}>قیمت را سرور اعلام می‌کند</Text></View>

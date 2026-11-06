@@ -1,4 +1,5 @@
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { isServiceEnabled } from '../../config/serviceAvailability';
 import type { WorkerWallet, WorkerWalletTransaction } from '../../features/worker/services/workerFinance';
 import { JALALI_MONTH_NAMES, toPersianDigits } from '../../utils/jalaliDateOptions';
 import {
@@ -189,7 +190,7 @@ export function normalizeWorkerSkills(skills: unknown): string[] {
  */
 export function workerServiceRows(skills: unknown): WorkerServiceRow[] {
   const active = new Set(normalizeWorkerSkills(skills));
-  const rows: WorkerServiceRow[] = SERVICES_CATALOG.filter((service) => service.isVisible).map((service) => ({
+  const rows: WorkerServiceRow[] = SERVICES_CATALOG.filter((service) => service.isVisible && isServiceEnabled(service.id)).map((service) => ({
     id: service.id,
     title: service.title,
     badge: service.badge || '',
@@ -197,7 +198,7 @@ export function workerServiceRows(skills: unknown): WorkerServiceRow[] {
     known: true,
   }));
   for (const id of active) {
-    if (rows.some((row) => row.id === id)) continue;
+    if (rows.some((row) => row.id === id) || !isServiceEnabled(id)) continue;
     rows.push({ id, title: id, badge: '', active: true, known: false });
   }
   return rows;

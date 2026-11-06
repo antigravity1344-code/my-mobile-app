@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useServiceAvailability } from '../../config/serviceAvailability';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { loadWorkerWallet, type WorkerWallet } from '../../features/worker/services/workerFinance';
@@ -127,6 +128,7 @@ export function WorkerCalendarScreen({
 }
 
 export function WorkerServicesScreen({ onBack }: { onBack: () => void }) {
+  useServiceAvailability();
   const [state, dispatch] = useReducer(workerSkillsReducer, initialSkillsState);
   const request = useRef<AbortController | null>(null);
   const preview = previewActive();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CleaningService } from '../../types/service';
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
 import { Sparkles, Clock, ChevronDown } from 'lucide-react';
 
 interface ServiceSelectorProps {
@@ -24,7 +25,8 @@ export const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     setExpandedId(prev => (prev === id ? null : id));
   };
 
-  const visibleServices = SERVICES_CATALOG.filter((service) => service.isVisible);
+  useServiceAvailability();
+  const visibleServices = SERVICES_CATALOG.filter((service) => service.isVisible && isServiceEnabled(service.id));
 
   const renderIcon = (_iconName: string) => {
     // For now all icons render as Sparkles since we don't have the actual icon mapping

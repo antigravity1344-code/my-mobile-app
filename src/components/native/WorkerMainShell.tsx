@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { refreshServiceAvailability } from '../../config/serviceAvailabilityApi';
 import { Alert, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerHomeScreen } from './WorkerHomeScreen';
@@ -64,6 +65,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
   // پایان نشست روی خانه همان خروج موجود را صدا می‌زند (حساب مسدود را useAccountBlockedLogout جدا مدیریت می‌کند).
   const expired = ordersState.sessionExpired && ordersState.error === WORKER_SESSION_EXPIRED_MESSAGE;
   const logoutFired = useRef(false);
+  useEffect(() => { void refreshServiceAvailability(); }, [mainView]);
   useEffect(() => {
     if (!expired || mainView !== 'home' || logoutFired.current) return;
     logoutFired.current = true;

@@ -17,6 +17,8 @@ import { appStorage } from '../../utils/storage';
 import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
+import { refreshServiceAvailability } from '../../config/serviceAvailabilityApi';
 import { useBooking } from '../../context/BookingContext';
 import { colors, useCustomerFonts } from '../../theme/customerHome';
 import { CustomerHomeScreen } from './CustomerHomeScreen';
@@ -36,6 +38,7 @@ type UserData = CustomerSessionUser;
 export const NativeCustomerApp: React.FC = () => {
   const { login, logout: profileLogout, syncAuthenticatedUser } = useProfile();
   const booking = useBooking();
+  useServiceAvailability();
   const { resetOrders } = useOrders();
   const [fontsLoaded, fontError] = useCustomerFonts();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -44,6 +47,10 @@ export const NativeCustomerApp: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [mainView, setMainView] = useState<CustomerTab | 'alerts' | 'offers'>('home');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isLoggedIn) void refreshServiceAvailability();
+  }, [isLoggedIn]);
 
   useEffect(() => {
     let isMounted = true;
@@ -146,9 +153,10 @@ export const NativeCustomerApp: React.FC = () => {
   }
 
   const openBooking = (serviceId?: string) => {
+    void refreshServiceAvailability();
     booking.resetBooking();
     if (serviceId) {
-      const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible);
+      const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible && isServiceEnabled(item.id));
       if (service) {
         booking.setSelectedService(service);
         booking.setStep(2);
@@ -159,7 +167,7 @@ export const NativeCustomerApp: React.FC = () => {
   };
 
   const bookOffer = (offer: CustomerOffer) => {
-    const service = SERVICES_CATALOG.find((item) => item.id === offer.serviceId && item.isVisible);
+    const service = SERVICES_CATALOG.find((item) => item.id === offer.serviceId && item.isVisible && isServiceEnabled(item.id));
     const start = offerStartSelection(offer.startAt);
     const end = offerStartSelection(offer.endAt);
     const minHours = offer.quantity ?? 1;

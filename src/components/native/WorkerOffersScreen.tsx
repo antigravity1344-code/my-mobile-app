@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useServiceAvailability } from '../../config/serviceAvailability';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, type } from '../../theme/customerHome';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
@@ -15,6 +16,7 @@ const STATUS_LABEL: Record<WorkerOffer['status'], string> = { OPEN: 'باز', BO
 const hourLabel = (hour: number) => toPersianDigits(`${String(hour).padStart(2, '0')}:00`);
 
 export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
+  useServiceAvailability();
   const dates = useMemo(() => buildJalaliDateOptions(new Date(), 21), []);
   const [data, setData] = useState<OffersData | null>(null);
   const [services, setServices] = useState<{ id: string; title: string }[]>([]);

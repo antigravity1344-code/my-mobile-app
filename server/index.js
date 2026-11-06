@@ -816,9 +816,14 @@ app.put('/api/users/worker-onboarding', (req, res) => {
 // ------------------- پیشنهاد کاری متخصص -------------------
 // متخصص بازهٔ آزاد و درصدی از تعرفه را ثبت می‌کند؛ مشتری می‌بیند و با مسیر عادی سفارش (نقل‌قول امضاشده) رزرو می‌کند.
 // درصد هرگز از مشتری گرفته نمی‌شود و فقط از رکورد پیشنهاد در سرور خوانده می‌شود.
+const SERVICE_DISABLED_BODY = { success: false, code: 'SERVICE_DISABLED', message: 'این خدمت فعلاً توسط مدیریت غیرفعال شده است.' };
+function isServiceDisabledIn(body) {
+  const id = body && typeof body === 'object' ? (typeof body.serviceId === 'string' ? body.serviceId.trim() : '') : '';
+  return Boolean(id) && !store.serviceSwitches.isEnabled(id);
+}
 setOfferResolver(({ offerId, serviceId, now }) => {
   const offer = store.workerOffers.get(offerId);
-  if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId) {
+  if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId || !store.serviceSwitches.isEnabled(offer.serviceId)) {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
   }
   const worker = store.getUser(offer.workerId);
@@ -899,6 +904,7 @@ app.post('/api/workers/me/offers', (req, res) => {
   try {
     const now = new Date();
     const input = validateOfferInput(req.body, { tierKey: workerTierKey(worker.id), now, policy: store.offerPolicy.bounds() });
+    if (!store.serviceSwitches.isEnabled(input.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
     if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
       return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
     }
@@ -933,6 +939,7 @@ app.get('/api/offers', (req, res) => {
     const worker = store.getUser(offer.workerId);
     if (!worker || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) continue;
     if (!store.featureSwitches.isWorkerEnabled('offers', worker.id)) continue;
+    if (!store.serviceSwitches.isEnabled(offer.serviceId)) continue;
     const view = workerOfferView(offer);
     if (view.total == null) continue;
     const rating = store.workerRatingStats(worker.id);
@@ -964,6 +971,7 @@ app.post('/api/pricing/quote', (req, res) => {
       message: 'نمایش قیمت سرور در این حالت فعال نیست.',
     });
   }
+  if (isServiceDisabledIn(req.body)) return res.status(409).json(SERVICE_DISABLED_BODY);
   try {
     const priced = issueOrderQuote(req.body || {}, new Date());
     return res.json({ success: true, quote: priced });
@@ -1035,6 +1043,7 @@ app.post('/api/orders', (req, res) => {
       return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
     }
   }
+  if (isServiceDisabledIn(req.body)) return res.status(409).json(SERVICE_DISABLED_BODY);
   if (serverMode) {
     try {
       serverPriced = confirmOrderQuote(req.body || {}, new Date());
@@ -1643,6 +1652,21 @@ app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
   if (result.code !== 'ok') return res.status(400).json({ success: false, message: 'درخواست کلید قابلیت معتبر نیست.' });
   res.json({ success: true, ...store.featureSwitches.snapshot(), workerFeatures: body.scope === 'WORKER' ? store.featureSwitches.forWorker(body.workerId) : undefined });
 });
+app.get('/api/services/enabled', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, disabledServiceIds: store.serviceSwitches.disabledIds() });
+});
+app.get('/api/admin/service-switches', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, ...store.serviceSwitches.snapshot() });
+});
+app.put('/api/admin/service-switches', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const result = store.serviceSwitches.set({ serviceId: body.serviceId, enabled: body.enabled, actor: res.locals.adminAuditActor });
+  if (result.code !== 'ok') return res.status(400).json({ success: false, message: 'درخواست روشن/خاموش‌کردن خدمت معتبر نیست.' });
+  res.json({ success: true, ...store.serviceSwitches.snapshot() });
+});
 app.get('/api/admin/offer-report', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const rows = buildOfferReport({
@@ -2150,6 +2174,9 @@ app.get('/admin/tiers.js', (req, res) => {
 });
 
 app.get('/admin/completion.js', (req,res) => res.type('application/javascript').sendFile(path.join(__dirname,'adminCompletion.js')));
+app.get('/admin/services.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminServices.js'));
+});
 app.get('/admin/offer-policy.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminOfferPolicy.js'));
 });
@@ -2239,6 +2266,7 @@ app.get('/admin', (req, res) => {
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
       <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
+      <button id="tabServicesBtn" onclick="switchTab('services'); loadAdminServices()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">خدمات فعال</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
@@ -2303,6 +2331,12 @@ app.get('/admin', (req, res) => {
       <p id="commissionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
       <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
+    </section>
+    <section id="tabServices" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">خدمات فعال</h3>
+      <p class="text-sm text-slate-300">هر خدمتی را که خاموش کنید در اپ مشتری و متخصص دیده نمی‌شود و سفارش تازه برای آن ثبت نمی‌شود. سفارش‌های قبلی تغییر نمی‌کنند و با روشن‌کردن دوباره همه‌چیز برمی‌گردد.</p>
+      <p id="servicesMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <ul id="servicesList" class="space-y-2"></ul>
     </section>
     <section id="tabOfferPolicy" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قیمت پیشنهاد متخصص</h3>
@@ -2379,6 +2413,7 @@ app.get('/admin', (req, res) => {
 <script src="/admin/points.js"></script>
   <script src="/admin/commission.js"></script>
   <script src="/admin/offer-policy.js"></script>
+  <script src="/admin/services.js"></script>
   <script src="/admin/payment.js"></script>
   <script src="/admin/service-areas.js"></script>
   <script src="/admin/worker-bank.js"></script>
@@ -2724,7 +2759,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'completion', 'payment', 'areas']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'services', 'completion', 'payment', 'areas']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

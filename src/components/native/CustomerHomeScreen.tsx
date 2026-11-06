@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
+import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
 import { useOrders, type OrderItem, type OrderStatus } from '../../features/orders';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
@@ -94,7 +95,7 @@ function orderPlace(order: OrderItem): string {
 }
 
 function visibleServiceId(serviceId: string): string | undefined {
-  const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible);
+  const service = SERVICES_CATALOG.find((item) => item.id === serviceId && item.isVisible && isServiceEnabled(item.id));
   return service?.id;
 }
 
@@ -126,6 +127,7 @@ export function CustomerHomeScreen({
   onOpenSupport,
   onOpenOffers,
 }: Props) {
+  useServiceAvailability();
   const avatarUri = (userAvatar || '').trim();
   const initial = profileInitial(userName);
   const { allOrders, loading, loadError, refreshing, refreshOrders } = useOrders();
@@ -252,7 +254,7 @@ export function CustomerHomeScreen({
           <Text style={[styles.sectionTitle, styles.servicesTitle]}>خدمات پاکشو</Text>
         </View>
         <View style={styles.serviceGrid}>
-          {[SERVICE_SHORTCUTS.slice(0, 3), SERVICE_SHORTCUTS.slice(3)].map((row) => (
+          {(() => { const active = SERVICE_SHORTCUTS.filter((item) => isServiceEnabled(item.serviceId)); return [active.slice(0, 3), active.slice(3)].filter((row) => row.length > 0); })().map((row) => (
             <View key={row[0].serviceId} style={styles.serviceRow}>
               {row.map((item) => (
                 <Pressable
