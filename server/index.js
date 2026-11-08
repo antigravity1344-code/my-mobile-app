@@ -715,13 +715,14 @@ app.put('/api/users/addresses', (req, res) => {
   res.json({ success: true, addresses: savedAddresses });
 });
 
+const WORKER_GENDERS = ['FEMALE', 'MALE'];
 app.put('/api/users/worker-onboarding', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   if (authUser.role !== 'WORKER') {
     return res.status(403).json({ success: false, message: 'فقط متخصص می‌تواند مدارک خودش را ثبت کند.' });
   }
-  const { userId, name, nationalId, birthDate, avatar, idDocFile, address, city, skills, bankSheba } = req.body || {};
+  const { userId, name, nationalId, birthDate, avatar, idDocFile, address, city, skills, bankSheba, gender } = req.body || {};
   if (userId && userId !== authUser.id) {
     return res.status(403).json({ success: false, message: 'تغییر مدارک متخصص دیگر مجاز نیست.' });
   }
@@ -734,6 +735,11 @@ app.put('/api/users/worker-onboarding', (req, res) => {
     return res.status(409).json({ success: false, code: 'BANK_EDIT_REQUIRES_PIN', message: 'برای تغییر شبا از بخش مستقل حساب متخصص و رمز شبا استفاده کنید.' });
   }
   const nextAvatar = typeof avatar === 'string' ? avatar.trim() : '';
+  // جنسیت متخصص: اختیاری؛ فقط مقدار شناخته‌شده پذیرفته می‌شود تا فیلتر درخواست‌ها روی داده‌ی معتبر کار کند.
+  const nextGender = typeof gender === 'string' ? gender.trim().toUpperCase() : '';
+  if (nextGender && !WORKER_GENDERS.includes(nextGender)) {
+    return res.status(400).json({ success: false, message: 'جنسیت متخصص باید مرد یا زن باشد.' });
+  }
   const uploadedIdDoc = parseIdDocFile(idDocFile);
 
   if (!nextName) {
@@ -779,6 +785,7 @@ app.put('/api/users/worker-onboarding', (req, res) => {
       current.city = typeof city === 'string' ? city.trim().slice(0, 80) : current.city;
       current.skills = Array.isArray(skills) ? skills.slice(0, 20).map(s => String(s).slice(0, 40)) : current.skills;
       current.bankSheba = nextBankSheba;
+      if (nextGender) current.gender = nextGender;
       current.status = 'PENDING_VERIFICATION';
       current.isProfileComplete = true;
       return store.updateUser(current);

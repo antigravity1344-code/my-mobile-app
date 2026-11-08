@@ -39,6 +39,7 @@ const USER_FIELDS = new Set([
   'bankSheba',
   'idDoc',
   'createdAt',
+  'gender',
 ]);
 
 const ORDER_FIELDS = new Set([
@@ -277,6 +278,9 @@ function createDataStore(filename) {
     );
   `);
 
+  // جنسیت متخصص (ستون اضافه، additive): برای فیلتر درخواست‌های مشتری بر اساس ترجیح جنسیت.
+  const userColumnNames = new Set(database.prepare("PRAGMA table_info(users)").all().map((column) => column.name));
+  if (!userColumnNames.has("gender")) database.exec("ALTER TABLE users ADD COLUMN gender TEXT");
   const orderColumnNames = new Set(
     database.prepare('PRAGMA table_info(orders)').all().map((column) => column.name)
   );
@@ -395,6 +399,7 @@ function createDataStore(filename) {
       savedAddresses: parseJson(row.savedAddressesJson, []),
       skills: parseJson(row.skillsJson, []),
       bankSheba: fieldCrypto.decryptString(row.bankSheba || ''),
+      gender: row.gender || null,
       idDoc: row.idDoc || '',
       createdAt: row.createdAt,
     };
@@ -478,7 +483,7 @@ function createDataStore(filename) {
     UPDATE users SET
       phone = ?, role = ?, status = ?, isProfileComplete = ?, name = ?, nationalId = ?,
       birthDate = ?, avatar = ?, address = ?, city = ?, addressesJson = ?, savedAddressesJson = ?,
-      skillsJson = ?, bankSheba = ?, idDoc = ?, createdAt = ?
+      skillsJson = ?, bankSheba = ?, idDoc = ?, createdAt = ?, gender = ?
     WHERE id = ?
   `);
   // D-63: a residence edit must not rewrite verification, encrypted fields or documents.
@@ -688,6 +693,7 @@ function createDataStore(filename) {
       fieldCrypto.encryptString(user.bankSheba || ''),
       user.idDoc || '',
       user.createdAt,
+      user.gender || null,
       user.id
     );
     if (!result.changes) {
