@@ -2442,8 +2442,31 @@ app.get('/admin', (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
-    body { font-family: Vazirmatn, sans-serif; background-color: #0f172a; color: #f8fafc; }
+    body { font-family: Vazirmatn, sans-serif; background-color: #F6F2E6; color: #1F2A28; }
     .admin-tabs button { white-space: nowrap; flex-shrink: 0; }
+    /* هم‌رنگی با اپ مشتری و متخصص: کرم، سفید، تیل و کهربایی (از tokens اپ) */
+    .bg-slate-950, .bg-slate-900, .bg-slate-800 { background-color: #FFFFFF !important; }
+    .bg-slate-700, .bg-slate-600 { background-color: #E6F3F2 !important; }
+    .border-slate-700, .border-slate-600, .border-slate-800 { border-color: rgba(31, 42, 40, 0.12) !important; }
+    .text-white, .text-slate-100, .text-slate-200 { color: #1F2A28 !important; }
+    .text-slate-300, .text-slate-400, .text-slate-500 { color: #6B7370 !important; }
+    .bg-sky-700, .bg-sky-600, .bg-emerald-700, .bg-emerald-600 { background-color: #11766F !important; color: #FFFFFF !important; }
+    .bg-amber-700, .bg-amber-600 { background-color: #B45309 !important; color: #FFFFFF !important; }
+    .text-sky-300, .text-sky-400, .text-emerald-300, .text-emerald-400 { color: #0E635D !important; }
+    .text-amber-300, .text-amber-400 { color: #B45309 !important; }
+    .text-red-300, .text-red-400 { color: #B91C1C !important; }
+    .bg-red-700, .bg-red-600 { background-color: #B91C1C !important; color: #FFFFFF !important; }
+    input, select, textarea { background-color: #FFFFFF !important; color: #1F2A28 !important; }
+    button:disabled { opacity: 0.55; }
+    /* گوشی: بدون اسکرول افقی صفحه، عنوان کوچک‌تر و دکمه‌ها کنار هم یا زیر هم */
+    html, body { max-width: 100%; overflow-x: hidden; }
+    @media (max-width: 640px) {
+      body { padding: 12px !important; }
+      h1 { font-size: 1.15rem !important; line-height: 1.6; }
+      .flex { flex-wrap: wrap; }
+      .admin-tabs { overflow-x: auto; flex-wrap: nowrap; }
+      button { min-height: 44px; }
+    }
   </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
