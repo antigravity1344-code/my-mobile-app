@@ -175,3 +175,84 @@ async function toggleWorkerFeature(workerId, feature, enabled) {
     if (message) message.textContent = 'نتیجه عملیات مشخص نیست؛ اطلاعات را بازخوانی و دوباره بررسی کنید.';
   } finally { adminActions.delete(key); }
 }
+
+// ------------------- حدود درخواست ساعت دلخواه مشتری (جدا از حدود متخصص) -------------------
+let customerRequestPolicy = null;
+let customerRequestPolicyBusy = false;
+const CUSTOMER_REQUEST_POLICY_FIELDS = ['customerRequestMin', 'customerRequestMax'];
+function customerRequestPolicyMessage(text) { document.getElementById('customerRequestPolicyMessage').textContent = text; }
+function customerRequestPolicyControls() {
+  document.getElementById('customerRequestPolicyRefresh').disabled = customerRequestPolicyBusy;
+  document.getElementById('customerRequestPolicySave').disabled = customerRequestPolicyBusy || !customerRequestPolicy;
+  for (const id of CUSTOMER_REQUEST_POLICY_FIELDS) document.getElementById(id).disabled = customerRequestPolicyBusy || !customerRequestPolicy;
+}
+function validCustomerRequestPolicy(value) {
+  return value && Number.isSafeInteger(value.version) && value.version >= 0 &&
+    [value.minPercent, value.maxPercent].every((n) => Number.isSafeInteger(n) && n >= 1 && n <= 300);
+}
+function showCustomerRequestPolicy() {
+  document.getElementById('customerRequestMin').value = String(customerRequestPolicy.minPercent);
+  document.getElementById('customerRequestMax').value = String(customerRequestPolicy.maxPercent);
+}
+async function customerRequestPolicyRequest(method, body) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch('/api/admin/customer-request-policy', {
+      method, headers: adminHeaders(), cache: 'no-store', signal: controller.signal,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    if (response.status === 401) {
+      adminToken = '';
+      sessionStorage.removeItem('paksho_admin_token');
+      return { expired: true };
+    }
+    return { response, data: await response.json() };
+  } finally { clearTimeout(timer); }
+}
+async function loadAdminCustomerRequestPolicy() {
+  if (customerRequestPolicyBusy) return;
+  customerRequestPolicyBusy = true;
+  customerRequestPolicy = null;
+  customerRequestPolicyControls();
+  customerRequestPolicyMessage('در حال دریافت تنظیم…');
+  try {
+    if (!adminToken) { customerRequestPolicyMessage('ابتدا وارد حساب مدیر شوید یا صفحه مدیریت را بازخوانی کنید.'); return; }
+    const result = await customerRequestPolicyRequest('GET');
+    if (result.expired) { customerRequestPolicyMessage('نشست مدیر پایان یافته است. برای ورود دوباره صفحه مدیریت را بازخوانی کنید.'); return; }
+    if (!result.response.ok || !result.data.success || !validCustomerRequestPolicy(result.data.policy)) throw new Error('invalid policy');
+    customerRequestPolicy = result.data.policy;
+    showCustomerRequestPolicy();
+    customerRequestPolicyMessage('تنظیم جاری دریافت شد.');
+  } catch {
+    customerRequestPolicyMessage('تنظیم دریافت نشد. اتصال را بررسی کنید و دوباره بازخوانی کنید.');
+  } finally { customerRequestPolicyBusy = false; customerRequestPolicyControls(); }
+}
+async function saveAdminCustomerRequestPolicy() {
+  if (customerRequestPolicyBusy || !customerRequestPolicy) return;
+  const minPercent = offerPolicyNumber('customerRequestMin');
+  const maxPercent = offerPolicyNumber('customerRequestMax');
+  if ([minPercent, maxPercent].some((n) => n === null || n < 1 || n > 300) || minPercent > maxPercent) {
+    customerRequestPolicyMessage('عددهای صحیح ۱ تا ۳۰۰ وارد کنید: حداقل نباید از حداکثر بیشتر باشد.'); return;
+  }
+  const body = { minPercent, maxPercent, expectedVersion: customerRequestPolicy.version };
+  customerRequestPolicyBusy = true; customerRequestPolicyControls(); customerRequestPolicyMessage('در حال ذخیره…');
+  try {
+    const result = await customerRequestPolicyRequest('PUT', body);
+    if (result.expired) {
+      customerRequestPolicy = null;
+      customerRequestPolicyMessage('نشست مدیر پایان یافته است. مقدارهای واردشده حفظ شد؛ دوباره وارد شوید.'); return;
+    }
+    if (result.response.status === 409) {
+      customerRequestPolicy = null;
+      customerRequestPolicyMessage('مدیر دیگری تنظیم را تغییر داده است. مقدارهای واردشده حفظ شد؛ پیش از ذخیره، تنظیم جاری را بازخوانی کنید.'); return;
+    }
+    if (!result.response.ok || !result.data.success || !validCustomerRequestPolicy(result.data.policy)) throw new Error('save failed');
+    customerRequestPolicy = result.data.policy;
+    showCustomerRequestPolicy();
+    customerRequestPolicyMessage('حدود درخواست دلخواه مشتری ذخیره شد.');
+  } catch {
+    customerRequestPolicy = null;
+    customerRequestPolicyMessage('نتیجه ذخیره مشخص نشد. مقدارهای واردشده حفظ شد؛ برای بررسی نتیجه، بازخوانی کنید.');
+  } finally { customerRequestPolicyBusy = false; customerRequestPolicyControls(); }
+}

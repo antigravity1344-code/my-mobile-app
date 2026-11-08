@@ -1213,6 +1213,8 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       'completion_policy_no_delete',
       'completion_policy_no_replace',
       'completion_policy_no_update',
+      'customer_request_policy_no_delete',
+      'customer_request_policy_no_update',
       'feature_switch_log_no_delete',
       'feature_switch_log_no_update',
       'offer_policy_no_delete',

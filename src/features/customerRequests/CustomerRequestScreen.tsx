@@ -4,7 +4,7 @@ import { SERVICES_CATALOG } from '../../config/servicesData';
 import { isServiceEnabled } from '../../config/serviceAvailability';
 import { colors } from '../../theme/customerHome';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
-import { cancelCustomerRequest, createCustomerRequest, listCustomerRequests, type CustomerRequestView } from './customerRequestApi';
+import { cancelCustomerRequest, createCustomerRequest, listCustomerRequests, loadCustomerRequestBounds, type CustomerRequestView } from './customerRequestApi';
 import {
   buildCustomerRequestPayload,
   CUSTOMER_REQUEST_HOURS,
@@ -35,6 +35,8 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
   const [dayIndex, setDayIndex] = useState<number | null>(1);
   const [hour, setHour] = useState<number | null>(null);
   const [hours, setHours] = useState<number>(1);
+  const [bounds, setBounds] = useState<{ minPercent: number; maxPercent: number }>({ minPercent: 70, maxPercent: 130 });
+  const percentChoices = CUSTOMER_REQUEST_PERCENTS.filter((value) => value >= bounds.minPercent && value <= bounds.maxPercent);
   const [percent, setPercent] = useState<number>(100);
   const [gender, setGender] = useState<CustomerRequestGender>('NO_PREFERENCE');
   const [address, setAddress] = useState('');
@@ -46,7 +48,18 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
     const result = await listCustomerRequests();
     if (result.ok) setRequests(result.value);
   };
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    void loadCustomerRequestBounds().then((result) => {
+      if (result) setBounds(result);
+    });
+  }, []);
+  useEffect(() => {
+    // اگر درصد انتخابی بیرون از بازهٔ جدید است، نزدیک‌ترین مقدار مجاز انتخاب می‌شود.
+    if (percentChoices.length && !percentChoices.includes(percent as typeof percentChoices[number])) {
+      setPercent(percentChoices[0]!);
+    }
+  }, [bounds.minPercent, bounds.maxPercent]);
 
   const submit = async () => {
     const day = dayIndex == null ? null : days[dayIndex];
@@ -111,7 +124,7 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
 
       <Text style={styles.label}>درصد قیمت نسبت به تعرفه</Text>
       <View style={styles.chips}>
-        {CUSTOMER_REQUEST_PERCENTS.map((value) => (
+        {percentChoices.map((value) => (
           <Chip key={value} selected={percent === value} label={`${toPersianDigits(value)}٪`} onPress={() => setPercent(value)} />
         ))}
       </View>

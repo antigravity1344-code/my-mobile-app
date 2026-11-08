@@ -47,8 +47,8 @@ function createCustomerRequests({ database, transaction }) {
     WHERE status = 'OPEN' AND endAt > ? ORDER BY startAt ASC LIMIT 200`);
 
   /** اعتبارسنجی ورودی با همان قواعد زمان و درصد پیشنهاد متخصص، ولی با حدود مشتری. */
-  function validate(body, now) {
-    return validateOfferInput(body, { tierKey: 'gold', now, policy: CUSTOMER_POLICY });
+  function validate(body, now, bounds = CUSTOMER_POLICY) {
+    return validateOfferInput(body, { tierKey: 'gold', now, policy: { minBps: bounds.minBps, maxBps: bounds.maxBps, goldMaxBps: bounds.maxBps } });
   }
 
   function create(customerId, input, now, extra = {}) {

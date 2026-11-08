@@ -47,6 +47,17 @@ export async function createCustomerRequest(payload: CustomerRequestPayload): Pr
   }
 }
 
+export async function loadCustomerRequestBounds(): Promise<{ minPercent: number; maxPercent: number } | null> {
+  try {
+    const result = await call('/customer/request-bounds');
+    const body = result && typeof result === 'object' ? (result as { minPercent?: unknown; maxPercent?: unknown }) : null;
+    if (body && typeof body.minPercent === 'number' && typeof body.maxPercent === 'number') return { minPercent: body.minPercent, maxPercent: body.maxPercent };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function listCustomerRequests(): Promise<CustomerRequestResult<CustomerRequestView[]>> {
   try {
     const result = await call('/customer/requests');

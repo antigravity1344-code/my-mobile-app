@@ -970,7 +970,7 @@ app.post('/api/customer/requests', (req, res) => {
   if (resolvePricingMode() !== 'server') return res.status(409).json({ success: false, code: 'PRICING_UNAVAILABLE', message: 'ثبت درخواست قیمتی در این حالت فعال نیست.' });
   try {
     const now = new Date();
-    const input = store.customerRequests.validate(req.body, now);
+    const input = store.customerRequests.validate(req.body, now, store.customerRequestPolicy.bounds());
     const body = req.body || {};
     const address = typeof body.address === 'string' ? body.address.trim().slice(0, 300) : '';
     if (!address) return res.status(400).json({ success: false, code: 'ADDRESS_REQUIRED', message: 'آدرس خدمت را وارد کنید.' });
@@ -1088,6 +1088,15 @@ app.post('/api/workers/me/customer-requests/:requestId/accept', (req, res) => {
     }
     throw error;
   }
+});
+
+// حدود درصد قابل انتخاب مشتری؛ فقط برای نمایش فرم است و سرور همین حدود را دوباره بررسی می‌کند.
+app.get('/api/customer/request-bounds', (req, res) => {
+  const requireCustomer = requireUser(req, res);
+  if (!requireCustomer) return;
+  const b = store.customerRequestPolicy.bounds();
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, minPercent: b.minBps / 100, maxPercent: b.maxBps / 100 });
 });
 
 app.get('/api/customer/requests', (req, res) => {
@@ -1891,6 +1900,16 @@ app.get('/api/admin/offer-report', requireAdmin, (req, res) => {
   });
   res.json({ success: true, rows });
 });
+app.get('/api/admin/customer-request-policy', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, policy: store.customerRequestPolicy.read() });
+});
+app.put('/api/admin/customer-request-policy', requireAdmin, (req, res) => {
+  const result = store.customerRequestPolicy.publish(req.body);
+  if (result.code === 'ok') return res.json({ success: true, policy: result.policy });
+  if (result.code === 'conflict') return res.status(409).json({ success: false, code: 'CONFLICT', policy: result.policy, message: 'تنظیم در جای دیگری تغییر کرده است. بازخوانی کنید.' });
+  return res.status(400).json({ success: false, code: 'INVALID', message: 'حدود واردشده معتبر نیست؛ حداقل نباید از حداکثر بیشتر باشد.' });
+});
 app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const result = store.offerPolicy.publish(req.body);
@@ -2479,7 +2498,7 @@ app.get('/admin', (req, res) => {
       </button>
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
-      <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
+      <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminCustomerRequestPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
       <button id="tabServicesBtn" onclick="switchTab('services'); loadAdminServices()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">خدمات فعال</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
@@ -2564,6 +2583,14 @@ app.get('/admin', (req, res) => {
       <p id="offerPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
       <button id="offerPolicySave" type="button" onclick="saveAdminOfferPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+      <h3 class="font-bold pt-4">حدود درخواست ساعت دلخواه مشتری</h3>
+      <label for="customerRequestMin" class="block text-sm">حداقل درصد تعرفه (مشتری)</label>
+      <input id="customerRequestMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="customerRequestMax" class="block text-sm">حداکثر درصد تعرفه (مشتری)</label>
+      <input id="customerRequestMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <p id="customerRequestPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="customerRequestPolicyRefresh" type="button" onclick="loadAdminCustomerRequestPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم مشتری</button>
+      <button id="customerRequestPolicySave" type="button" onclick="saveAdminCustomerRequestPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره حدود مشتری</button>
       <h4 class="text-base font-bold pt-4">کلید کلی قابلیت</h4>
       <p class="text-sm text-slate-300">با خاموش‌کردن این کلید، فهرست پیشنهادها برای مشتریان خالی می‌شود و هیچ پیشنهاد تازه‌ای رزرو نمی‌شود. سفارش‌های ثبت‌شده تغییر نمی‌کنند. برای یک متخصص مشخص، دکمهٔ «غیرفعال‌سازی قیمت پیشنهاد» را در کارت او در تب متخصصان بزنید.</p>
       <p id="offerGlobalState" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
