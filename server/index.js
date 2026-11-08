@@ -939,6 +939,60 @@ app.delete('/api/workers/me/offers/:offerId', (req, res) => {
   res.json({ success: true });
 });
 
+// ------------------- درخواست ساعت دلخواه مشتری (تبصرهٔ مصوب ۸ نوامبر ۲۰۲۶) -------------------
+// تنها مسیری که درصد قیمت را از مشتری می‌پذیرد؛ درصد فقط در بازهٔ حدود مشتری و به‌صورت رکورد سرور ذخیره می‌شود.
+// سفارش عادی (`/api/pricing/quote`، `/api/orders`) این درصد را نمی‌پذیرد.
+app.post('/api/customer/requests', (req, res) => {
+  const customer = requireUser(req, res);
+  if (!customer) return;
+  if (customer.role !== 'CUSTOMER') return res.status(403).json({ success: false, code: 'NOT_CUSTOMER', message: 'فقط مشتری می‌تواند درخواست ثبت کند.' });
+  if (resolvePricingMode() !== 'server') return res.status(409).json({ success: false, code: 'PRICING_UNAVAILABLE', message: 'ثبت درخواست قیمتی در این حالت فعال نیست.' });
+  try {
+    const now = new Date();
+    const input = store.customerRequests.validate(req.body, now);
+    if (!isServiceOrderable(input.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
+    if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
+      return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
+    }
+    const request = store.customerRequests.create(customer.id, input, now);
+    return res.status(201).json({ success: true, request: customerRequestView(request) });
+  } catch (error) {
+    return sendOfferError(res, error);
+  }
+});
+
+app.get('/api/customer/requests', (req, res) => {
+  const customer = requireUser(req, res);
+  if (!customer) return;
+  if (customer.role !== 'CUSTOMER') return res.status(403).json({ success: false, message: 'فقط مشتری درخواست‌های خودش را می‌بیند.' });
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, requests: store.customerRequests.listForCustomer(customer.id).map(customerRequestView) });
+});
+
+app.delete('/api/customer/requests/:requestId', (req, res) => {
+  const customer = requireUser(req, res);
+  if (!customer) return;
+  if (customer.role !== 'CUSTOMER') return res.status(403).json({ success: false, message: 'فقط مشتری می‌تواند درخواست خودش را لغو کند.' });
+  if (!store.customerRequests.cancel(req.params.requestId, customer.id)) {
+    return res.status(409).json({ success: false, code: 'REQUEST_NOT_OPEN', message: 'این درخواست دیگر قابل لغو نیست.' });
+  }
+  res.json({ success: true });
+});
+
+function customerRequestView(request) {
+  const preview = previewOfferPrice(request.serviceId, request.adjustmentBasisPoints, new Date());
+  return {
+    id: request.id,
+    serviceId: request.serviceId,
+    startAt: request.startAt,
+    endAt: request.endAt,
+    adjustmentBasisPoints: request.adjustmentBasisPoints,
+    status: request.status,
+    total: preview ? preview.total : null,
+    createdAt: request.createdAt,
+  };
+}
+
 // فهرست پیشنهادهای باز برای مشتری: بدون تلفن و اطلاعات تماس متخصص.
 app.get('/api/offers', (req, res) => {
   const authUser = requireUser(req, res);
