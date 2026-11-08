@@ -88,6 +88,23 @@ function selectionFromBody(body) {
 // پیشنهاد متخصص: شناسهٔ پیشنهاد فقط یک گزینهٔ امضاشده است؛ درصد قیمت را هرگز از مشتری نمی‌گیریم.
 // فراخوان‌دهنده (index.js) تابع تصمیم‌گیر را می‌دهد تا این ماژول به پایگاه‌داده وابسته نشود.
 let offerResolver = null;
+// درخواست ساعت دلخواه مشتری: شناسهٔ CRQ- فقط در پذیرش متخصص (داخل withCustomerRequestAcceptance) قابل نقل‌قول است.
+let acceptingCustomerRequest = false;
+function withCustomerRequestAcceptance(fn) {
+  acceptingCustomerRequest = true;
+  try { return fn(); } finally { acceptingCustomerRequest = false; }
+}
+function isAcceptingCustomerRequest() { return acceptingCustomerRequest; }
+/** تعداد واحد خدمت برای یک بازهٔ زمانی: خدمت‌های ثابت بدون تعداد؛ ساعتی حداقل تعداد تعرفه یا ساعت‌های بازه. */
+function quantityForWindow(serviceId, startAt, endAt, now = new Date()) {
+  const policy = loadCommittedTariff();
+  const version = require("./tariffEngine").selectVersion(policy, now);
+  const service = version.services[serviceId];
+  if (!service) return null;
+  if (service.model === "fixed") return undefined;
+  const hours = Math.max(1, Math.ceil((Date.parse(endAt) - Date.parse(startAt)) / 3600000));
+  return Math.max(hours, service.minQuantity || 1);
+}
 function setOfferResolver(resolver) {
   offerResolver = typeof resolver === 'function' ? resolver : null;
 }
@@ -329,4 +346,7 @@ module.exports = {
   matchExistingServerOrder,
   mapPricingError,
   serverRequestConflicts,
+  withCustomerRequestAcceptance,
+  isAcceptingCustomerRequest,
+  quantityForWindow,
 };

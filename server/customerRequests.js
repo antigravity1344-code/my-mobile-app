@@ -41,6 +41,8 @@ function createCustomerRequests({ database, transaction }) {
     WHERE customerId = ? AND status = 'OPEN' AND endAt > ?`);
   const cancel = database.prepare(`UPDATE customer_requests SET status = 'CANCELLED'
     WHERE id = ? AND customerId = ? AND status = 'OPEN'`);
+  const acceptStmt = database.prepare(`UPDATE customer_requests SET status = 'ACCEPTED', acceptedWorkerId = ?, orderId = ?
+    WHERE id = ? AND status = 'OPEN' AND endAt > ?`);
   const openFuture = database.prepare(`SELECT * FROM customer_requests
     WHERE status = 'OPEN' AND endAt > ? ORDER BY startAt ASC LIMIT 200`);
 
@@ -72,6 +74,8 @@ function createCustomerRequests({ database, transaction }) {
     listOpenForWorker: (now, worker, qualifies) => openForWorker.all(now.toISOString())
       .filter((r) => qualifies(r.serviceId, worker))
       .filter((r) => !r.genderPreference || r.genderPreference === 'NO_PREFERENCE' || r.genderPreference === worker.gender),
+    /** پذیرش اتمی: فقط یک متخصص می‌تواند درخواست باز را بگیرد؛ اگر نشد، false. */
+    accept: (id, workerId, orderId, now) => acceptStmt.run(workerId, orderId, id, now.toISOString()).changes === 1,
     /** لغو فقط توسط همان مشتری و فقط تا پیش از پذیرش. */
     cancel: (id, customerId) => cancel.run(id, customerId).changes === 1,
   };

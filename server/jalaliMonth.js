@@ -67,4 +67,4 @@ function jalaliMonthFromIso(value) {
   return { year, month };
 }
 
-module.exports = { gregorianToJalali, jalaliMonthFromIso };
+module.exports = { gregorianToJalali, jalaliMonthFromIso, tehranWallParts };

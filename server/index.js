@@ -28,7 +28,12 @@ const {
   setOfferResolver,
   previewOfferPrice,
   QuoteError,
+  withCustomerRequestAcceptance,
+  isAcceptingCustomerRequest,
+  quantityForWindow,
 } = require('./pricing/orderQuote');
+const { tehranWallParts } = require('./jalaliMonth');
+const { gregorianToJalali } = require('./jalaliMonth');
 const { OfferError, validateOfferInput } = require('./workerOffers');
 const { buildOfferReport } = require('./offerReport');
 const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
@@ -843,6 +848,15 @@ function isServiceDisabledIn(body) {
   return Boolean(id) && !isServiceOrderable(id);
 }
 setOfferResolver(({ offerId, serviceId, now }) => {
+  // درخواست ساعت دلخواه: فقط در پذیرش متخصص قابل نقل‌قول است؛ مشتری با این شناسه قیمت نمی‌گیرد.
+  if (typeof offerId === 'string' && offerId.startsWith('CRQ-')) {
+    const request = store.customerRequests.get(offerId);
+    if (!isAcceptingCustomerRequest() || !request || request.status !== 'OPEN' || Date.parse(request.endAt) <= now.getTime()
+      || request.serviceId !== serviceId || !isServiceOrderable(request.serviceId)) {
+      throw new QuoteError('OFFER_UNAVAILABLE', 'این درخواست دیگر در دسترس نیست.');
+    }
+    return { basisPoints: request.adjustmentBasisPoints };
+  }
   const offer = store.workerOffers.get(offerId);
   if (!offer || offer.status !== 'OPEN' || Date.parse(offer.endAt) <= now.getTime() || offer.serviceId !== serviceId || !isServiceOrderable(offer.serviceId)) {
     throw new QuoteError('OFFER_UNAVAILABLE', 'این پیشنهاد دیگر در دسترس نیست.');
@@ -983,6 +997,97 @@ app.get('/api/workers/me/customer-requests', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const rows = store.customerRequests.listOpenForWorker(new Date(), worker, (serviceId, w) => workerQualifiedFor(serviceId, w) && isServiceOrderable(serviceId));
   res.json({ success: true, requests: rows.slice(0, 50).map((r) => { const v = customerRequestView(r); return { id: v.id, serviceId: v.serviceId, startAt: v.startAt, endAt: v.endAt, total: v.total, genderPreference: r.genderPreference || 'NO_PREFERENCE', createdAt: v.createdAt }; }) });
+});
+
+// پذیرش درخواست ساعت دلخواه توسط متخصص: سفارش با قیمت ذخیره‌شدهٔ همان درخواست ساخته می‌شود (فقط سرور قیمت را می‌دهد).
+function tehranClockText(ms) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tehran', hour12: false, hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(ms));
+  const pick = (type) => parts.find((item) => item.type === type)?.value || '00';
+  return `${pick('hour')}:${pick('minute')}`;
+}
+function tehranJalaliDateText(ms) {
+  const wall = tehranWallParts(ms);
+  const [jy, jm, jd] = gregorianToJalali(wall.year, wall.month, wall.day);
+  return `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
+}
+class RequestBookingFailed extends Error {}
+app.post('/api/workers/me/customer-requests/:requestId/accept', (req, res) => {
+  const worker = requireApprovedWorker(req, res);
+  if (!worker) return;
+  const now = new Date();
+  const request = store.customerRequests.get(req.params.requestId);
+  if (!request) return res.status(404).json({ success: false, code: 'REQUEST_NOT_FOUND', message: 'درخواست پیدا نشد.' });
+  if (request.status !== 'OPEN' || Date.parse(request.endAt) <= now.getTime()) {
+    return res.status(409).json({ success: false, code: 'REQUEST_NOT_OPEN', message: 'این درخواست دیگر باز نیست.' });
+  }
+  if (!isServiceOrderable(request.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
+  if (!workerQualifiedFor(request.serviceId, worker)) {
+    return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'برای این خدمت صلاحیت شما تأیید نشده است.' });
+  }
+  const wanted = request.genderPreference;
+  if (wanted && wanted !== 'NO_PREFERENCE' && wanted !== worker.gender) {
+    return res.status(403).json({ success: false, code: 'GENDER_MISMATCH', message: 'این درخواست مطابق جنسیت ترجیحی مشتری نیست.' });
+  }
+  let serverPriced;
+  let quantity;
+  try {
+    quantity = quantityForWindow(request.serviceId, request.startAt, request.endAt, now);
+    const orderBody = { serviceId: request.serviceId, quantity, options: { offerId: request.id } };
+    const quote = withCustomerRequestAcceptance(() => issueOrderQuote(orderBody, now));
+    serverPriced = withCustomerRequestAcceptance(() => confirmOrderQuote({ ...orderBody, quoteToken: quote.quoteToken, confirmedTotal: quote.total }, now));
+  } catch (error) {
+    const mapped = mapPricingError(error);
+    return res.status(mapped.status).json(mapped.body);
+  }
+  const customer = store.getUser(request.customerId);
+  const orderId = createOrderId();
+  const newOrder = {
+    id: orderId,
+    customerId: request.customerId,
+    customerName: customer?.name || 'کاربر مشتری',
+    customerPhone: customer?.phone || '',
+    customerAvatar: customer?.avatar || '',
+    serviceTitle: 'درخواست ساعت دلخواه',
+    serviceId: request.serviceId,
+    durationHours: typeof quantity === 'number' ? quantity : null,
+    genderPreference: request.genderPreference || null,
+    serviceOptions: {},
+    addressNotes: request.addressNotes || null,
+    recurringFrequency: null,
+    customerTier: null,
+    pricing: serverPriced.pricing,
+    address: request.address,
+    date: tehranJalaliDateText(Date.parse(request.startAt)),
+    time: tehranClockText(Date.parse(request.startAt)),
+    price: serverPriced.price,
+    notes: '',
+    status: 'PENDING',
+    paymentStatus: 'PENDING',
+    paymentMethod: 'CASH',
+    cleanerId: null,
+    cleanerName: null,
+    cleanerAvatar: null,
+    cleanerPhone: null,
+    expectedStartAt: request.startAt,
+    clientRequestId: null,
+    createdAt: now.toISOString(),
+  };
+  try {
+    const order = store.transaction(() => {
+      // اول پذیرش اتمی درخواست؛ اگر کسی زودتر گرفته باشد، هیچ سفارشی ساخته نمی‌شود.
+      if (!store.customerRequests.accept(request.id, worker.id, orderId, now)) throw new RequestBookingFailed('REQUEST_NOT_OPEN');
+      const created = store.createOrder(newOrder);
+      const accepted = store.tryAcceptOrder(created.id, worker);
+      if (accepted.code !== 'ok') throw new RequestBookingFailed(accepted.code === 'wallet-debt' ? 'WORKER_WALLET_DEBT' : 'REQUEST_NOT_OPEN');
+      return accepted.order;
+    });
+    return res.status(201).json({ success: true, order: { id: order.id, status: order.status, price: order.price, address: order.address, date: order.date, time: order.time } });
+  } catch (error) {
+    if (error instanceof RequestBookingFailed) {
+      return res.status(409).json({ success: false, code: error.message, message: error.message === 'WORKER_WALLET_DEBT' ? 'بدهی کیف پول شما مانع پذیرش است.' : 'این درخواست دیگر باز نیست.' });
+    }
+    throw error;
+  }
 });
 
 app.get('/api/customer/requests', (req, res) => {
