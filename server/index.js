@@ -2458,6 +2458,8 @@ app.get('/admin', (req, res) => {
     .bg-red-700, .bg-red-600 { background-color: #B91C1C !important; color: #FFFFFF !important; }
     input, select, textarea { background-color: #FFFFFF !important; color: #1F2A28 !important; }
     button:disabled { opacity: 0.55; }
+    /* اندازه‌ی یکسان دکمه‌ها با اپ‌ها: حداقل ۴۴ پیکسل و گوشه‌ی ۱۲ */
+    button { min-height: 44px; border-radius: 12px; }
     /* گوشی: بدون اسکرول افقی صفحه، عنوان کوچک‌تر و دکمه‌ها کنار هم یا زیر هم */
     html, body { max-width: 100%; overflow-x: hidden; }
     @media (max-width: 640px) {
