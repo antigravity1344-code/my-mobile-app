@@ -1676,10 +1676,16 @@ app.get('/api/services/enabled', (req, res) => {
   // خدمت صلاحیتی: برای مشتری وقتی هیچ متخصص تأییدشده ندارد پنهان است؛ برای متخصصِ بدون صلاحیت همیشه پنهان است.
   const viewer = authUserFromRequest(req);
   const hidden = new Set(store.serviceSwitches.disabledIds());
+  // مشتری: خدمت صلاحیتی همیشه در فهرست دیده می‌شود؛ اگر متخصص آماده نباشد، «آماده نیست» برمی‌گردد و سفارش بسته می‌ماند.
+  const unavailable = new Set();
   for (const serviceId of Object.keys(QUALIFIED_SERVICES)) {
-    if (viewer && viewer.role === 'WORKER' ? !workerQualifiedFor(serviceId, viewer) : !hasQualifiedWorker(serviceId)) hidden.add(serviceId);
+    if (viewer && viewer.role === 'WORKER') {
+      if (!workerQualifiedFor(serviceId, viewer)) hidden.add(serviceId);
+    } else if (!hasQualifiedWorker(serviceId)) {
+      unavailable.add(serviceId);
+    }
   }
-  res.json({ success: true, disabledServiceIds: [...hidden] });
+  res.json({ success: true, disabledServiceIds: [...hidden], unavailableServiceIds: [...unavailable] });
 });
 app.get('/api/admin/service-switches', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');

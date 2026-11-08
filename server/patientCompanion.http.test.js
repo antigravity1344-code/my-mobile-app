@@ -32,18 +32,20 @@ test('patient_companion: hidden until a qualified approved worker exists, only q
   approve(qualified); approve(plain);
   const customer = await harness.login(server, '09120000623');
   const hidden = (token) => request(server, { method: 'GET', pathname: '/api/services/enabled', token }).then((r) => r.json.disabledServiceIds);
+  const unavailable = (token) => request(server, { method: 'GET', pathname: '/api/services/enabled', token }).then((r) => r.json.unavailableServiceIds);
   const flip = (workerId, enabled) => request(server, { method: 'PUT', pathname: '/api/admin/feature-switches', token: adminToken,
     body: { scope: 'WORKER', workerId, feature: 'patient_companion', enabled } });
   const quote = () => request(server, { method: 'POST', pathname: '/api/pricing/quote', token: customer.token, body: { serviceId: 'patient_companion', quantity: 4, options: {} } });
 
-  // پیش‌فرض: هیچ‌کس صلاحیت ندارد → برای همه پنهان و سفارش بسته
-  assert.ok((await hidden(customer.token)).includes('patient_companion'));
+  // پیش‌فرض: هیچ‌کس صلاحیت ندارد → مشتری خدمت را می‌بیند ولی «آماده نیست»؛ سفارش بسته
+  assert.ok((await unavailable(customer.token)).includes('patient_companion'));
+  assert.ok(!(await hidden(customer.token)).includes('patient_companion'));
   assert.ok((await hidden(qualified.token)).includes('patient_companion'));
   const q0 = await quote(); assert.equal(q0.status, 409); assert.equal(q0.json.code, 'SERVICE_DISABLED');
 
   // تأیید صلاحیت یک نفر
   assert.equal((await flip(qualified.user.id, true)).status, 200);
-  assert.ok(!(await hidden(customer.token)).includes('patient_companion'));
+  assert.ok(!(await unavailable(customer.token)).includes('patient_companion'));
   assert.ok(!(await hidden(qualified.token)).includes('patient_companion'));
   assert.ok((await hidden(plain.token)).includes('patient_companion'));
   assert.equal((await quote()).status, 200);
@@ -71,7 +73,7 @@ test('patient_companion: hidden until a qualified approved worker exists, only q
 
   // لغو صلاحیت آخرین نفر → دوباره پنهان
   assert.equal((await flip(qualified.user.id, false)).status, 200);
-  assert.ok((await hidden(customer.token)).includes('patient_companion'));
+  assert.ok((await unavailable(customer.token)).includes('patient_companion'));
   assert.equal((await quote()).status, 409);
 
   const users = await request(server, { method: 'GET', pathname: '/api/admin/users?role=WORKER', token: adminToken });

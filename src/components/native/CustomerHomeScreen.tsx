@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
+import { isServiceEnabled, isServiceListed, isServiceUnavailable, useServiceAvailability } from '../../config/serviceAvailability';
 import { useOrders, type OrderItem, type OrderStatus } from '../../features/orders';
 import { formatStoredAmount } from '../../features/orders/services/money';
 import { colors, radius, shadowCtaBtn, shadowMd, shadowSm, space, type } from '../../theme/customerHome';
@@ -60,6 +60,11 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
   { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
 ];
+
+// پیام وقتی خدمتی دیده می‌شود ولی متخصص آماده ندارد.
+const NO_SPECIALIST_MESSAGES: Readonly<Record<string, string>> = {
+  patient_companion: 'فعلاً هیچ همراه مریض آماده نیست. لطفاً بعداً دوباره بررسی کنید.',
+};
 
 type Props = {
   userName?: string;
@@ -169,6 +174,11 @@ export function CustomerHomeScreen({
   );
 
   const openService = (serviceId: string) => {
+    if (isServiceUnavailable(serviceId)) {
+      const label = SERVICE_SHORTCUTS.find((item) => item.serviceId === serviceId)?.label ?? 'این خدمت';
+      Alert.alert(label, NO_SPECIALIST_MESSAGES[serviceId] ?? 'فعلاً متخصص آماده‌ای برای این خدمت وجود ندارد. لطفاً بعداً دوباره بررسی کنید.');
+      return;
+    }
     onStartBooking(visibleServiceId(serviceId));
   };
 
@@ -255,7 +265,7 @@ export function CustomerHomeScreen({
           <Text style={[styles.sectionTitle, styles.servicesTitle]}>خدمات پاکشو</Text>
         </View>
         <View style={styles.serviceGrid}>
-          {(() => { const active = SERVICE_SHORTCUTS.filter((item) => isServiceEnabled(item.serviceId)); const rows: Shortcut[][] = []; for (let i = 0; i < active.length; i += 3) rows.push(active.slice(i, i + 3)); return rows; })().map((row) => (
+          {(() => { const active = SERVICE_SHORTCUTS.filter((item) => isServiceListed(item.serviceId)); const rows: Shortcut[][] = []; for (let i = 0; i < active.length; i += 3) rows.push(active.slice(i, i + 3)); return rows; })().map((row) => (
             <View key={row[0].serviceId} style={styles.serviceRow}>
               {row.map((item) => (
                 <Pressable

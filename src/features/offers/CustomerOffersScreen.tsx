@@ -32,7 +32,7 @@ export function CustomerOffersScreen({ onBack, onBook }: { onBack: () => void; o
     <Text style={styles.title}>ساعت‌های پیشنهادی متخصصان</Text>
     <Text style={styles.note}>متخصصان ساعت‌های آزاد خود را با قیمت مشخص ثبت کرده‌اند. هر کدام را بخواهید رزرو کنید؛ سفارش مستقیماً برای همان متخصص ثبت می‌شود.</Text>
     {phase === 'loading' && <ActivityIndicator color={colors.teal} />}
-    {phase === 'ready' && offers && !offers.length && <Text style={styles.note}>فعلاً پیشنهاد بازی وجود ندارد. می‌توانید سفارش عادی ثبت کنید.</Text>}
+    {phase === 'ready' && offers && !offers.length && <Text style={styles.note}>فعلاً هیچ متخصصی پیشنهادی ثبت نکرده است. می‌توانید سفارش عادی ثبت کنید.</Text>}
     {phase === 'ready' && offers?.map((offer) => {
       const off = percentOff(offer.adjustmentBasisPoints);
       return <View key={offer.id} style={styles.card}>
