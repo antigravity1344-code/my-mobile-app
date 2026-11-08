@@ -11,6 +11,7 @@ import {
   offerRangeFromSelection, priceDeltaLabel, stepBasisPoints, type OffersData, type WorkerOffer,
 } from './workerOffers';
 import { previewActive } from './previewRuntime';
+import { WorkerCustomerRequests } from '../../features/customerRequests/WorkerCustomerRequests';
 
 const STATUS_LABEL: Record<WorkerOffer['status'], string> = { OPEN: 'باز', BOOKED: 'رزرو شد', CANCELLED: 'لغو شد' };
 const hourLabel = (hour: number) => toPersianDigits(`${String(hour).padStart(2, '0')}:00`);
@@ -80,6 +81,7 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
   const titleOf = (id: string) => services.find(row => row.id === id)?.title || id;
   return <ScrollView contentContainerStyle={styles.content}>
     <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت به حساب متخصص</Text></Pressable>
+    <WorkerCustomerRequests />
     <Text style={styles.title}>ساعت‌های پیشنهادی من</Text>
     <Text style={styles.note}>بازهٔ آزاد خود را با قیمت پایین‌تر از تعرفه ثبت کنید تا مشتری ببیند و رزرو کند. {max > 10000 ? 'درجهٔ شما اجازهٔ قیمت بالاتر از تعرفه را هم می‌دهد.' : 'قیمت نمی‌تواند از تعرفهٔ شرکت بالاتر باشد.'}</Text>
     {preview && <Text style={styles.note}>این بخش در پیش‌نمایش فقط نمایشی است؛ ثبت غیرفعال است.</Text>}
