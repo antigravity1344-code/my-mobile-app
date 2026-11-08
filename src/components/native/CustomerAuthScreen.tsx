@@ -191,7 +191,7 @@ const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
     padding: 20,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     textAlign: 'right',
-    color: '#ffffff',
+    color: colors.text,
     fontSize: 24,
   },
   brandSubtitle: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     ...fa,
     fontWeight: '400',
     textAlign: 'right',
-    color: '#94a3b8',
+    color: colors.muted,
     fontSize: 11,
     marginTop: 2,
   },
