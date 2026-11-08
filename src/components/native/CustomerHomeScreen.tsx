@@ -59,6 +59,8 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
   { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
   { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
+  { label: 'ساعت‌های پیشنهادی', serviceId: 'offer_slots', Icon: IconServiceWorker },
+  { label: 'درخواست ساعت دلخواه', serviceId: 'custom_request', Icon: IconServiceHome },
 ];
 
 // پیام وقتی خدمتی دیده می‌شود ولی متخصص آماده ندارد.
@@ -75,6 +77,7 @@ type Props = {
   onOpenNotifications: () => void;
   onOpenSupport: () => void;
   onOpenOffers?: () => void;
+  onOpenRequest?: () => void;
 };
 
 function profileInitial(name?: string): string {
@@ -132,6 +135,7 @@ export function CustomerHomeScreen({
   onOpenNotifications,
   onOpenSupport,
   onOpenOffers,
+  onOpenRequest,
 }: Props) {
   useServiceAvailability();
   const avatarUri = (userAvatar || '').trim();
@@ -174,6 +178,9 @@ export function CustomerHomeScreen({
   );
 
   const openService = (serviceId: string) => {
+    // کاشی‌های ویژه: پیشنهادهای متخصص و درخواست ساعت دلخواه (صفحه‌های جدا، نه رزرو خدمت).
+    if (serviceId === 'offer_slots') { onOpenOffers?.(); return; }
+    if (serviceId === 'custom_request') { onOpenRequest?.(); return; }
     if (isServiceUnavailable(serviceId)) {
       const label = SERVICE_SHORTCUTS.find((item) => item.serviceId === serviceId)?.label ?? 'این خدمت';
       Alert.alert(label, NO_SPECIALIST_MESSAGES[serviceId] ?? 'فعلاً متخصص آماده‌ای برای این خدمت وجود ندارد. لطفاً بعداً دوباره بررسی کنید.');
@@ -253,12 +260,6 @@ export function CustomerHomeScreen({
       ) : null}
       {hero.kind === 'none' ? <WelcomeHero /> : null}
 
-      {onOpenOffers ? (
-        <Pressable accessibilityRole="button" onPress={onOpenOffers} style={({ pressed }) => [styles.offersCard, pressed && styles.pressed]}>
-          <Text style={styles.offersTitle}>ساعت‌های پیشنهادی متخصصان</Text>
-          <Text style={styles.offersText}>ساعت‌های آزاد متخصصان با قیمت مشخص؛ هر کدام را مستقیم رزرو کنید</Text>
-        </Pressable>
-      ) : null}
 
       <View style={[styles.section, styles.servicesSection]}>
         <View style={styles.sectionHead}>

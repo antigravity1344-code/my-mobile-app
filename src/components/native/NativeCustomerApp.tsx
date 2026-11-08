@@ -6,6 +6,7 @@ import { CustomerAuthScreen } from './CustomerAuthScreen';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { CustomerOffersScreen } from '../../features/offers/CustomerOffersScreen';
+import { CustomerRequestScreen } from '../../features/customerRequests/CustomerRequestScreen';
 import { offerDurationChoices, setOfferBookingDraft } from '../../features/offers/offerBookingDraft';
 import { offerStartSelection, type CustomerOffer } from '../../features/offers/customerOffersModel';
 import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
@@ -45,7 +46,7 @@ export const NativeCustomerApp: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [mainView, setMainView] = useState<CustomerTab | 'alerts' | 'offers'>('home');
+  const [mainView, setMainView] = useState<CustomerTab | 'alerts' | 'offers' | 'request'>('home');
   const [focusOrderId, setFocusOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -186,7 +187,7 @@ export const NativeCustomerApp: React.FC = () => {
     setMainView('wizard');
   };
 
-  const activeTab: CustomerTab = mainView === 'alerts' || mainView === 'offers' ? 'home' : mainView;
+  const activeTab: CustomerTab = mainView === 'alerts' || mainView === 'offers' || mainView === 'request' ? 'home' : mainView;
 
   return (
     <EdgeSafeAreaView style={styles.homeShell} edges={['top', 'left', 'right']}>
@@ -212,7 +213,10 @@ export const NativeCustomerApp: React.FC = () => {
             onOpenNotifications={() => setMainView('alerts')}
             onOpenSupport={() => setMainView('support')}
             onOpenOffers={() => setMainView('offers')}
+            onOpenRequest={() => setMainView('request')}
           />
+        ) : mainView === 'request' ? (
+          <CustomerRequestScreen onBack={() => setMainView('home')} />
         ) : mainView === 'offers' ? (
           <CustomerOffersScreen onBack={() => setMainView('home')} onBook={bookOffer} />
         ) : mainView === 'orders' ? (
