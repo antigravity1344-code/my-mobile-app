@@ -29,7 +29,7 @@ test('customer request: bounded customer percentage is stored, other order paths
   const server = await harness.serverFor(t);
   const customer = await harness.login(server, '09120000701');
   const create = (body, token = customer.token) => request(server, { method: 'POST', pathname: '/api/customer/requests', token, body });
-  const base = { serviceId: 'hourly_labor', startAt: inHours(48), endAt: inHours(52) };
+  const base = { serviceId: 'hourly_labor', startAt: inHours(48), endAt: inHours(52), address: 'آدرس آزمایشی' };
 
   // ÙˆØ±ÙˆØ¯ÛŒ Ù…Ø¹ØªØ¨Ø± Ø¯Ø± Ø¨Ø§Ø²Ù‡Ù” Ù…Ø´ØªØ±ÛŒ Ø°Ø®ÛŒØ±Ù‡ Ù…ÛŒâ€ŒØ´ÙˆØ¯
   const ok = await create({ ...base, adjustmentBasisPoints: 9000 });

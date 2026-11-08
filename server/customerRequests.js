@@ -25,9 +25,16 @@ function createCustomerRequests({ database, transaction }) {
     CREATE INDEX IF NOT EXISTS idx_customer_requests_customer ON customer_requests(customerId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_customer_requests_open ON customer_requests(status, startAt);
   `);
+  // ستون‌های آدرس و ترجیح جنسیت (additive): جدول قدیمی‌تر را امن تکمیل می‌کند.
+  const columns = new Set(database.prepare("PRAGMA table_info(customer_requests)").all().map((c) => c.name));
+  for (const [name, def] of [['address', 'address TEXT'], ['addressNotes', 'addressNotes TEXT'], ['genderPreference', 'genderPreference TEXT']]) {
+    if (!columns.has(name)) database.exec("ALTER TABLE customer_requests ADD COLUMN " + def);
+  }
   const insert = database.prepare(`INSERT INTO customer_requests
-    (id, customerId, serviceId, startAt, endAt, adjustmentBasisPoints, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)`);
+    (id, customerId, serviceId, startAt, endAt, adjustmentBasisPoints, status, createdAt, address, addressNotes, genderPreference)
+    VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)`);
+  const openForWorker = database.prepare(`SELECT * FROM customer_requests
+    WHERE status = 'OPEN' AND endAt > ? ORDER BY startAt ASC LIMIT 200`);
   const byId = database.prepare('SELECT * FROM customer_requests WHERE id = ?');
   const byCustomer = database.prepare('SELECT * FROM customer_requests WHERE customerId = ? ORDER BY createdAt DESC LIMIT 100');
   const openCount = database.prepare(`SELECT COUNT(*) AS n FROM customer_requests
@@ -42,13 +49,14 @@ function createCustomerRequests({ database, transaction }) {
     return validateOfferInput(body, { tierKey: 'gold', now, policy: CUSTOMER_POLICY });
   }
 
-  function create(customerId, input, now) {
+  function create(customerId, input, now, extra = {}) {
     return transaction(() => {
       if (openCount.get(customerId, now.toISOString()).n >= MAX_OPEN_PER_CUSTOMER) {
         throw new OfferError('TOO_MANY_REQUESTS', 'تعداد درخواست‌های باز شما به سقف رسیده است.');
       }
       const id = 'CRQ-' + crypto.randomBytes(8).toString('hex');
-      insert.run(id, customerId, input.serviceId, input.startAt, input.endAt, input.adjustmentBasisPoints, now.toISOString());
+      insert.run(id, customerId, input.serviceId, input.startAt, input.endAt, input.adjustmentBasisPoints, now.toISOString(),
+        extra.address || null, extra.addressNotes || null, extra.genderPreference || null);
       return byId.get(id);
     });
   }
@@ -60,6 +68,10 @@ function createCustomerRequests({ database, transaction }) {
     get: (id) => byId.get(String(id)) || null,
     listForCustomer: (customerId) => byCustomer.all(customerId),
     listOpen: (now) => openFuture.all(now.toISOString()),
+    /** درخواست‌های باز برای متخصص: فقط خدمت‌هایی که صلاحیتش را دارد و جنسیتی که مشتری خواسته (یا بدون ترجیح). */
+    listOpenForWorker: (now, worker, qualifies) => openForWorker.all(now.toISOString())
+      .filter((r) => qualifies(r.serviceId, worker))
+      .filter((r) => !r.genderPreference || r.genderPreference === 'NO_PREFERENCE' || r.genderPreference === worker.gender),
     /** لغو فقط توسط همان مشتری و فقط تا پیش از پذیرش. */
     cancel: (id, customerId) => cancel.run(id, customerId).changes === 1,
   };

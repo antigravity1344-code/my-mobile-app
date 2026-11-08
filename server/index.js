@@ -957,15 +957,32 @@ app.post('/api/customer/requests', (req, res) => {
   try {
     const now = new Date();
     const input = store.customerRequests.validate(req.body, now);
+    const body = req.body || {};
+    const address = typeof body.address === 'string' ? body.address.trim().slice(0, 300) : '';
+    if (!address) return res.status(400).json({ success: false, code: 'ADDRESS_REQUIRED', message: 'آدرس خدمت را وارد کنید.' });
+    const addressNotes = typeof body.addressNotes === 'string' ? body.addressNotes.trim().slice(0, 300) : '';
+    const genderPreference = body.genderPreference === undefined ? 'NO_PREFERENCE' : String(body.genderPreference);
+    if (!['FEMALE', 'MALE', 'NO_PREFERENCE'].includes(genderPreference)) {
+      return res.status(400).json({ success: false, code: 'GENDER_INVALID', message: 'ترجیح جنسیت معتبر نیست.' });
+    }
     if (!isServiceOrderable(input.serviceId)) return res.status(409).json(SERVICE_DISABLED_BODY);
     if (!previewOfferPrice(input.serviceId, input.adjustmentBasisPoints, now)) {
       return res.status(409).json({ success: false, code: 'SERVICE_NOT_IN_TARIFF', message: 'این خدمت در تعرفهٔ فعلی نیست.' });
     }
-    const request = store.customerRequests.create(customer.id, input, now);
+    const request = store.customerRequests.create(customer.id, input, now, { address, addressNotes, genderPreference });
     return res.status(201).json({ success: true, request: customerRequestView(request) });
   } catch (error) {
     return sendOfferError(res, error);
   }
+});
+
+// درخواست‌های باز برای متخصص آماده: فقط خدمت‌های دارای صلاحیت او و جنسیت مطابق ترجیح مشتری. آدرس قبل از پذیرش نمایش داده نمی‌شود.
+app.get('/api/workers/me/customer-requests', (req, res) => {
+  const worker = requireApprovedWorker(req, res);
+  if (!worker) return;
+  res.set('Cache-Control', 'no-store');
+  const rows = store.customerRequests.listOpenForWorker(new Date(), worker, (serviceId, w) => workerQualifiedFor(serviceId, w) && isServiceOrderable(serviceId));
+  res.json({ success: true, requests: rows.slice(0, 50).map((r) => { const v = customerRequestView(r); return { id: v.id, serviceId: v.serviceId, startAt: v.startAt, endAt: v.endAt, total: v.total, genderPreference: r.genderPreference || 'NO_PREFERENCE', createdAt: v.createdAt }; }) });
 });
 
 app.get('/api/customer/requests', (req, res) => {
