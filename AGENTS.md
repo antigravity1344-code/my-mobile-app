@@ -124,3 +124,8 @@ _None found._
 
 ### Verified device workflow (2026-10-21)
 Read docs/SOURCE_IDENTITY.md before any standalone APK build/install acceptance. Use scripts/verified-phone.cjs with the approved full SHA, branch, role and exact phone serial; never infer identity from launcher icons. Current implementation passed 10 guard tests and dirty-tree preflight; complete build/install validation remains pending. Do not erase or stash work just to pass the guard. This does not authorize commit/push or branch operations.
+
+
+## قانون هماهنگی rebuild هر دو اپ — ۱۹ آبان ۱۴۰۵ (۹ نوامبر ۲۰۲۶)
+
+بعد از هر تغییری که روی `main` قرار می‌گیرد، هر دو اپ (`com.paksho.customer` و `com.paksho.worker`) باید با هم rebuild و روی گوشی تست نصب شوند، نه یکی‌یکی و نه با فاصلهٔ زمانی. هیچ ایجنتی نباید فقط یکی از دو اپ را به‌روز کند و دیگری را به حال خود بگذارد. گزارش پایانی هر ایجنت باید SHA باندل هر دو اپ را کنار هم نشان دهد.
