@@ -463,7 +463,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       exitWizard();
     } else if (action === 'confirmExit') {
       Alert.alert(
-        'از ثبت سفارش خارج شوید؟',
+        'از ثبت سفارش خارج می‌شوید؟',
         'اطلاعاتی که وارد کرده‌اید پاک می‌شود.',
         [
           { text: 'ادامه ثبت سفارش', style: 'cancel' },
