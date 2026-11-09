@@ -1176,11 +1176,36 @@ app.get('/api/offers', (req, res) => {
 });
 
 // پیش‌نمایش قیمت. مبلغ فقط از تعرفه همین استقرار محاسبه می‌شود.
+// قیمت‌گیری بدون ورود (مصوب مالک ۹ نوامبر ۲۰۲۶ برای سایت‌های مشتری): فقط قیمت برمی‌گردد و
+// هیچ داده کاربری در آن نیست. تعداد درخواست بی‌ورود به ازای هر IP محدود است.
+const ANON_QUOTE_LIMIT = 30;
+const ANON_QUOTE_WINDOW_MS = 10 * 60 * 1000;
+const anonQuoteWindows = new Map();
+function anonQuoteAllowed(req) {
+  const key = req.ip || 'unknown';
+  const now = Date.now();
+  const window = anonQuoteWindows.get(key);
+  if (!window || now - window.startedAt > ANON_QUOTE_WINDOW_MS) {
+    anonQuoteWindows.set(key, { count: 1, startedAt: now });
+    return true;
+  }
+  if (window.count >= ANON_QUOTE_LIMIT) return false;
+  window.count += 1;
+  return true;
+}
+
 app.post('/api/pricing/quote', (req, res) => {
-  const authUser = requireUser(req, res);
-  if (!authUser) return;
-  if (authUser.role !== 'CUSTOMER') {
-    return res.status(403).json({ success: false, message: 'فقط مشتری می‌تواند قیمت را ببیند.' });
+  const authUser = authUserFromRequest(req);
+  if (authUser) {
+    if (authUser.status === 'BLOCKED') {
+      return res.status(403).json({ success: false, code: 'ACCOUNT_BLOCKED', message: 'حساب شما مسدود شده است.' });
+    }
+    if (authUser.role !== 'CUSTOMER') {
+      return res.status(403).json({ success: false, message: 'فقط مشتری می‌تواند قیمت را ببیند.' });
+    }
+  } else if (!anonQuoteAllowed(req)) {
+    res.set('Retry-After', String(ANON_QUOTE_WINDOW_MS / 1000));
+    return res.status(429).json({ success: false, code: 'RATE_LIMITED', message: 'تعداد درخواست قیمت بیش از حد مجاز است.' });
   }
   if (resolvePricingMode() !== 'server') {
     return res.status(409).json({
