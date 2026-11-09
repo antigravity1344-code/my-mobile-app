@@ -5,11 +5,12 @@ const FEATURES = Object.freeze({
   offers: 'قیمت پیشنهاد متخصص',
   patient_companion: 'صلاحیت همراه مریض',
   site_extras: 'افزودنی، پاک‌کننده و کد تخفیف سایت مستقل',
+  detergent_package: 'پکیج مواد شوینده (فقط با روشن کردن مدیر)',
 });
 // کلیدهای متخصصی که پیش‌فرضشان خاموش است و فقط مدیر روشن می‌کند (صلاحیت).
 const WORKER_DEFAULT_OFF = Object.freeze(new Set(['patient_companion']));
 // کلیدهایی که برای کل شرکت پیش‌فرض خاموش‌اند. site_extras وقتی سایت مستقل است روشن می‌شود.
-const GLOBAL_DEFAULT_OFF = Object.freeze(new Set(['site_extras']));
+const GLOBAL_DEFAULT_OFF = Object.freeze(new Set(['site_extras', 'detergent_package']));
 
 function createFeatureSwitches({ database, transaction }) {
   database.exec(`

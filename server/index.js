@@ -1204,6 +1204,12 @@ function anonQuoteAllowed(req) {
   return true;
 }
 
+// پکیج مواد شوینده فقط وقتی کلیدش روشن است پذیرفته می‌شود (پیش‌فرض خاموش؛ مدیر از پنل روشن می‌کند).
+function detergentBlocked(body) {
+  const options = body && typeof body === 'object' && body.options && typeof body.options === 'object' ? body.options : null;
+  return Boolean(options && options.detergent === true && !store.featureSwitches.isGlobalEnabled('detergent_package'));
+}
+
 app.post('/api/pricing/quote', (req, res) => {
   const authUser = authUserFromRequest(req);
   if (authUser) {
@@ -1224,6 +1230,7 @@ app.post('/api/pricing/quote', (req, res) => {
       message: 'نمایش قیمت سرور در این حالت فعال نیست.',
     });
   }
+  if (detergentBlocked(req.body)) return res.status(409).json({ success: false, code: 'FEATURE_DISABLED', message: 'پکیج مواد شوینده در این مجموعه فعال نیست.' });
   if (isServiceDisabledIn(req.body)) return res.status(409).json(SERVICE_DISABLED_BODY);
   try {
     const priced = issueOrderQuote(req.body || {}, new Date());
@@ -1338,6 +1345,7 @@ app.post('/api/orders', (req, res) => {
       return res.json({ success: true, order: customerOrderView(existing), duplicate: true });
     }
   }
+  if (detergentBlocked(req.body)) return res.status(409).json({ success: false, code: 'FEATURE_DISABLED', message: 'پکیج مواد شوینده در این مجموعه فعال نیست.' });
   if (isServiceDisabledIn(req.body)) return res.status(409).json(SERVICE_DISABLED_BODY);
   if (serverMode) {
     try {
