@@ -2,8 +2,11 @@
   "app": "com.paksho.customer",
   "sha": "682e8f4ca7fb711729abd25f3e2959892d0ab889",
   "startedAt": "2026-11-09T09:05:26Z",
-  "status": "in_progress",
+  "status": "done",
+  "finishedAt": "2026-11-09T09:44:42Z",
+  "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
   "command": "gradle.bat :app:assembleCustomerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
   "gradleUserHome": "C:\\g",
-  "note": "HEAD moved to f77699f during this build; that commit only updates AGENTS.md. The build process started on 682e8f4."
+  "bundleSha": "682e8f4ca7fb711729abd25f3e2959892d0ab889",
+  "note": "BUILD SUCCESSFUL in 38m 58s. createBundleCustomerDebugJsAndAssets was UP-TO-DATE. assets/index.android.bundle inside the APK contains 682e8f4 and does not contain f77699f or a4d60cb. APK size 73764262 bytes."
 }
