@@ -400,7 +400,12 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           onPress={() => setActiveTab('available')}
           style={[styles.tabItem, activeTab === 'available' && styles.tabItemActive]}
         >
-          <Text style={[styles.tabText, activeTab === 'available' && styles.tabTextActive]}>
+          <Text
+            style={[styles.tabText, activeTab === 'available' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             سفارش‌های جدید ({toPersianDigits(availableOrders.length)})
           </Text>
         </Pressable>
@@ -408,7 +413,12 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           onPress={() => setActiveTab('my_jobs')}
           style={[styles.tabItem, activeTab === 'my_jobs' && styles.tabItemActive]}
         >
-          <Text style={[styles.tabText, activeTab === 'my_jobs' && styles.tabTextActive]}>
+          <Text
+            style={[styles.tabText, activeTab === 'my_jobs' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             کارهای من ({toPersianDigits(activeJobs.length)})
           </Text>
         </Pressable>
@@ -416,7 +426,14 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           onPress={() => setActiveTab('wallet')}
           style={[styles.tabItem, activeTab === 'wallet' && styles.tabItemActive]}
         >
-          <Text style={[styles.tabText, activeTab === 'wallet' && styles.tabTextActive]}>کیف پول</Text>
+          <Text
+            style={[styles.tabText, activeTab === 'wallet' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            کیف پول
+          </Text>
         </Pressable>
       </View>
 
@@ -599,9 +616,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#065f46', fontSize: 12, flex: 1, textAlign: 'right'
   },
-  tabBar: { flexDirection: 'row-reverse', backgroundColor: colors.white, marginHorizontal: 16, marginTop: 12, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: colors.border, ...shadowSm
+  tabBar: { flexDirection: 'row-reverse', justifyContent: 'space-evenly', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 16, marginTop: 12, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: colors.border, ...shadowSm
   },
-  tabItem: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10,
+  tabItem: { flexShrink: 1, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10,
     minHeight: 44,
   },
   tabItemActive: { backgroundColor: colors.teal
@@ -610,7 +627,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: colors.muted, fontSize: 12,
+    color: colors.muted, fontSize: 12, textAlign: 'center', flexShrink: 1,
   },
   tabTextActive: { color: colors.white
   },

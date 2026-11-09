@@ -481,11 +481,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 <Text style={styles.startPromptDescription}>مبلغ نهایی اعلام‌شده: {formatStoredAmount(order.completion.finalAmount, order.quoteCurrencyUnit)}</Text>
                 <Text style={styles.startPromptDescription}>{completionStatusText(order.completion.status)}</Text>
                 {order.completion.status === 'pending' && order.status !== 'CANCEL_REQUESTED' ? (
-                  <View style={styles.startPromptActions}>
-                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('yes')} style={styles.startPromptYes}>
+                  <View style={styles.completionPromptActions}>
+                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('yes')} style={styles.completionPromptYes}>
                       <Text style={styles.startPromptYesText}>{isRespondingToCompletion ? 'در حال ثبت...' : 'تأیید پایان کار و مبلغ'}</Text>
                     </Pressable>
-                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('no')} style={styles.startPromptNo}>
+                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('no')} style={styles.completionPromptNo}>
                       <Text style={styles.startPromptNoText}>موافق نیستم؛ بررسی مدیر</Text>
                     </Pressable>
                   </View>
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
   startPromptYesText: {
     ...type.bold,
     ...fa,
-    fontWeight: '400', color: '#fff', fontSize: 12
+    fontWeight: '400', color: '#fff', fontSize: 12, textAlign: 'center', width: '100%'
   },
   startPromptNo: { flex: 1, borderWidth: 1, borderColor: '#b91c1c', borderRadius: 10, paddingVertical: 12, alignItems: 'center',
     minHeight: 44,
@@ -596,7 +596,14 @@ const styles = StyleSheet.create({
   startPromptNoText: {
     ...type.bold,
     ...fa,
-    fontWeight: '400', color: '#b91c1c', fontSize: 12
+    fontWeight: '400', color: '#b91c1c', fontSize: 12, textAlign: 'center', width: '100%'
+  },
+  completionPromptActions: { gap: 8, marginTop: 12 },
+  completionPromptYes: { alignSelf: 'stretch', backgroundColor: '#0f766e', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center',
+    minHeight: 44,
+  },
+  completionPromptNo: { alignSelf: 'stretch', borderWidth: 1, borderColor: '#b91c1c', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center',
+    minHeight: 44,
   },
   overlay: {
     flex: 1,
