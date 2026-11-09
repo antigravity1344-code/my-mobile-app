@@ -74,6 +74,7 @@ export function bookingSelectionFingerprint(input: {
   genderPreference: string;
   recurringFrequency: string;
   notes: string;
+  workerTier?: string;
 }): string {
   return JSON.stringify(stable(input));
 }

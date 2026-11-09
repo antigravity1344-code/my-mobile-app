@@ -550,6 +550,7 @@ export const orderService = {
         ...(expectedStartAt ? { expectedStartAt } : {}),
         // کلید تکرارنشدنی همین رزرو: تکرار ارسال (مثلاً بعد از قطع شبکه) سفارش دوم نمی‌سازد.
         ...(newOrder.clientRequestId ? { clientRequestId: newOrder.clientRequestId } : {}),
+        ...(newOrder.workerTier ? { workerTier: newOrder.workerTier } : {}),
       };
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);

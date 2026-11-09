@@ -26,6 +26,7 @@ const {
   mapPricingError,
   serverRequestConflicts,
   setOfferResolver,
+  setTierResolver,
   previewOfferPrice,
   QuoteError,
   withCustomerRequestAcceptance,
@@ -35,6 +36,7 @@ const {
 const { tehranWallParts } = require('./jalaliMonth');
 const { gregorianToJalali } = require('./jalaliMonth');
 const { OfferError, validateOfferInput } = require('./workerOffers');
+const { workerMeetsRequestedTier } = require('./tierPricingPolicy');
 const { buildOfferReport } = require('./offerReport');
 const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
 const { readSourceIdentity, sourceIdentityScriptJson } = require('../tools/sourceIdentity.cjs');
@@ -867,6 +869,7 @@ setOfferResolver(({ offerId, serviceId, now }) => {
   }
   return { basisPoints: offer.adjustmentBasisPoints };
 });
+setTierResolver((tier) => store.tierPricingPolicy.basisPointsFor(tier));
 
 function workerTierKey(workerId) {
   const account = store.getUserPoints(workerId);
@@ -1352,7 +1355,11 @@ app.post('/api/orders', (req, res) => {
     cleanerPhone: null,
     expectedStartAt: storedExpectedStartAt,
     clientRequestId: storedClientRequestId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ...(storedPricing && storedPricing.requestedWorkerTier ? {
+      requestedWorkerTier: storedPricing.requestedWorkerTier,
+      tierPolicyVersion: storedPricing.tierPolicyVersion,
+    } : {}),
   };
 
   // رزرو پیشنهاد متخصص: پنجرهٔ زمانی باید کاملاً داخل بازهٔ پیشنهاد باشد.
@@ -1463,6 +1470,7 @@ function workerAvailableOrderView(order) {
     price: order.price,
     ...workerOrderCurrencyView(order),
     paymentMethod: order.paymentMethod,
+    requestedWorkerTier: order.requestedWorkerTier || null,
     // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
     createdAt: order.createdAt,
     area,
@@ -1564,7 +1572,10 @@ app.get('/api/orders/available', (req, res) => {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
   store.finalizeDueCancelRequests();
-  const availableOrders = store.getOrders({ status: 'PENDING' }).filter((order) => workerQualifiedFor(order.serviceId, authUser)).map(workerAvailableOrderView);
+  const availableOrders = store.getOrders({ status: 'PENDING' }).filter((order) => (
+    workerQualifiedFor(order.serviceId, authUser) &&
+    workerMeetsRequestedTier(workerTierKey(authUser.id), order.requestedWorkerTier)
+  )).map(workerAvailableOrderView);
   res.json({ success: true, orders: availableOrders });
 });
 
@@ -1590,6 +1601,9 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   const target = store.getOrder(orderId);
   if (target && !workerQualifiedFor(target.serviceId, cleaner)) {
     return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'پذیرش این سفارش برای حساب شما مجاز نیست.' });
+  }
+  if (target && !workerMeetsRequestedTier(workerTierKey(cleaner.id), target.requestedWorkerTier)) {
+    return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'درجهٔ شما برای سطح قفل‌شدهٔ این سفارش کافی نیست.' });
   }
   const accepted = store.tryAcceptOrder(orderId, cleaner);
   if (accepted.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'کیف پول شما بدهکار است؛ پیش از پذیرش سفارش تازه، بدهی کمیسیون را تسویه کنید.'});
@@ -1915,6 +1929,21 @@ app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
   const result = store.offerPolicy.publish(req.body);
   if (result.code === 'invalid') {
     return res.status(400).json({ success: false, message: 'درصدها باید عدد صحیح از ۱ تا ۳۰۰ باشند و حداقل ≤ حداکثر خاکستری ≤ حداکثر نقره‌ای ≤ حداکثر طلایی؛ نسخه جاری نیز لازم است.' });
+  }
+  if (result.code === 'conflict') {
+    return res.status(409).json({ success: false, message: 'تنظیم قبلاً تغییر کرده است. مقدار جدید را بازخوانی کنید.', policy: result.policy });
+  }
+  return res.json({ success: true, policy: result.policy });
+});
+app.get('/api/admin/tier-pricing', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, policy: store.tierPricingPolicy.read() });
+});
+app.put('/api/admin/tier-pricing', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const result = store.tierPricingPolicy.publish(req.body);
+  if (result.code === 'invalid') {
+    return res.status(400).json({ success: false, message: 'نقره‌ای و طلایی باید عدد صحیح از ۱۰۰ تا ۳۰۰ باشند و نقره‌ای از طلایی بیشتر نباشد. خاکستری همیشه ۱۰۰ است و نسخهٔ جاری لازم است.' });
   }
   if (result.code === 'conflict') {
     return res.status(409).json({ success: false, message: 'تنظیم قبلاً تغییر کرده است. مقدار جدید را بازخوانی کنید.', policy: result.policy });
@@ -2254,6 +2283,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       const workerProblem = adminWorkerProblem(store.getUser(order.cleanerId));
       if (workerProblem) return { code: workerProblem };
       if (!store.workerWallet.read(order.cleanerId).canAcceptNewOrders) return { code: 'wallet-debt' };
+      if (!workerMeetsRequestedTier(workerTierKey(order.cleanerId), order.requestedWorkerTier)) return { code: 'not-qualified' };
     }
     if (savesAsPending) {
       // سفارش PENDING متخصص ندارد: فیلدهای متخصص و acceptedAt از شیء حافظه هم پاک می‌شوند
@@ -2334,6 +2364,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
   });
 
   if (updated.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'متخصص بدهی کمیسیون دارد و تا تسویه نمی‌تواند سفارش تازه بپذیرد.'});
+  if (updated.code === 'not-qualified') return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'درجهٔ این متخصص برای سطح قفل‌شدهٔ سفارش کافی نیست.' });
   if (updated.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
   if (updated.code === 'bad-cleaner') {
     return res.status(400).json({ success: false, message: 'متخصص معتبر یافت نشد.' });
@@ -2412,6 +2443,9 @@ app.get('/admin/services.js', (req, res) => {
 });
 app.get('/admin/offer-policy.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminOfferPolicy.js'));
+});
+app.get('/admin/tier-lock.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminTierLock.js'));
 });
 app.get('/admin/commission.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminCommission.js'));
@@ -2524,6 +2558,7 @@ app.get('/admin', (req, res) => {
       <button id="tabCompletionBtn" onclick="switchTab('completion'); loadAdminCompletion()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">سیاست پایان کار</button>
       <button id="tabCommissionBtn" onclick="switchTab('commission'); loadAdminCommission()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کمیسیون شرکت</button>
       <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminCustomerRequestPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
+      <button id="tabTierLockBtn" onclick="switchTab('tierLock'); loadAdminTierLock()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قفل سطح سفارش</button>
       <button id="tabServicesBtn" onclick="switchTab('services'); loadAdminServices()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">خدمات فعال</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
@@ -2628,6 +2663,18 @@ app.get('/admin', (req, res) => {
       <ul id="offerReportList" class="space-y-2"></ul>
       <button id="offerReportRefresh" type="button" onclick="loadAdminOfferReport()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی گزارش</button>
     </section>
+    <section id="tabTierLock" class="space-y-4 hidden" hidden>
+      <h3 class="text-lg font-bold">قفل سطح سفارش معمولی</h3>
+      <p class="text-sm text-slate-300">این تنظیم جدا از «قیمت پیشنهاد متخصص» است. مشتری در سفارش معمولی سطح را انتخاب می‌کند و قیمت همان لحظه قفل می‌شود. خاکستری همیشه ۱۰۰٪ تعرفه است و فیلد ندارد. نقره‌ای و طلایی را اینجا تعیین کنید. ضریب فقط روی نرخ پایه می‌نشیند؛ هزینهٔ ثابت جانبی ضرب نمی‌شود. نظافت راه‌پله و مشاعات قیمت ثابت می‌ماند. سفارش‌های قبلی با تغییر این تنظیم عوض نمی‌شوند.</p>
+      <p class="text-sm">خاکستری: ۱۰۰٪ (ثابت)</p>
+      <label for="tierLockSilver" class="block text-sm">درصد تعرفه برای سطح نقره‌ای</label>
+      <input id="tierLockSilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="tierLockGold" class="block text-sm">درصد تعرفه برای سطح طلایی</label>
+      <input id="tierLockGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <p id="tierLockMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+      <button id="tierLockRefresh" type="button" onclick="loadAdminTierLock()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
+      <button id="tierLockSave" type="button" onclick="saveAdminTierLock()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+    </section>
     <section id="tabAreas" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
       <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. فهرست در فرم نشانی مشتری و محدوده فعالیت متخصص نمایش داده می‌شود. تغییر شهر پیش‌فرض، نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
@@ -2681,6 +2728,7 @@ app.get('/admin', (req, res) => {
 <script src="/admin/points.js"></script>
   <script src="/admin/commission.js"></script>
   <script src="/admin/offer-policy.js"></script>
+  <script src="/admin/tier-lock.js"></script>
   <script src="/admin/services.js"></script>
   <script src="/admin/payment.js"></script>
   <script src="/admin/service-areas.js"></script>
@@ -3036,7 +3084,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'services', 'completion', 'payment', 'areas']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'tierLock', 'services', 'completion', 'payment', 'areas']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

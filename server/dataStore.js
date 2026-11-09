@@ -13,6 +13,7 @@ const { createWorkerOffers } = require('./workerOffers');
 const { createCustomerRequests } = require('./customerRequests');
 const { createCustomerRequestPolicy } = require('./customerRequestPolicy');
 const { createOfferPolicy } = require('./offerPolicy');
+const { createTierPricingPolicy } = require('./tierPricingPolicy');
 const { createFeatureSwitches } = require('./featureSwitches');
 const { createServiceSwitches } = require('./serviceSwitches');
 const { createPaymentSettings } = require('./paymentSettings');
@@ -301,6 +302,9 @@ function createDataStore(filename) {
     ['startStatus', "startStatus TEXT NOT NULL DEFAULT 'not_recorded'"],
     // کلید تکرارنشدنی ثبت سفارش از طرف اپ (D-07): فقط با createOrder نوشته می‌شود و در پاسخ‌ها فرستاده نمی‌شود.
     ['clientRequestId', 'clientRequestId TEXT'],
+    // D-82: سطح قفل‌شدهٔ سفارش معمولی. فقط از نقل‌قول امضاشده نوشته می‌شود، نه از بدنهٔ عمومی سفارش.
+    ['requestedWorkerTier', 'requestedWorkerTier TEXT'],
+    ['tierPolicyVersion', 'tierPolicyVersion INTEGER'],
     // مرحله ۳ (D-13، D-14): فقط با دستورهای لغو نوشته می‌شوند، نه با updateOrder عمومی.
     ['cancelInitiator', 'cancelInitiator TEXT'],
     ['cancelFault', 'cancelFault TEXT'],
@@ -445,6 +449,8 @@ function createDataStore(filename) {
       cancelFault: row.cancelFault == null ? null : row.cancelFault,
       cancelRequestedAt: row.cancelRequestedAt == null ? null : row.cancelRequestedAt,
       cancelQuote: parseCancelQuote(row.cancelQuoteJson),
+      requestedWorkerTier: row.requestedWorkerTier == null ? null : row.requestedWorkerTier,
+      tierPolicyVersion: row.tierPolicyVersion == null ? null : row.tierPolicyVersion,
     };
     const optional = [
       'customerAvatar',
@@ -524,6 +530,7 @@ function createDataStore(filename) {
   const listOrdersStmt = database.prepare('SELECT * FROM orders ORDER BY seq ASC');
   const nextOrderSeq = database.prepare('SELECT COALESCE(MIN(seq), 0) - 1 AS seq FROM orders');
   const setExpectedStartAtStmt = database.prepare('UPDATE orders SET expectedStartAt = ? WHERE id = ?');
+  const setRequestedTierStmt = database.prepare('UPDATE orders SET requestedWorkerTier = ?, tierPolicyVersion = ? WHERE id = ?');
   const setClientRequestIdStmt = database.prepare('UPDATE orders SET clientRequestId = ? WHERE id = ?');
   const selectOrderByClientRequestStmt = database.prepare(
     'SELECT * FROM orders WHERE customerId = ? AND clientRequestId = ?'
@@ -753,6 +760,10 @@ function createDataStore(filename) {
       }
       if (typeof order.clientRequestId === 'string' && order.clientRequestId) {
         setClientRequestIdStmt.run(order.clientRequestId, order.id);
+      }
+      if (typeof order.requestedWorkerTier === 'string' && order.requestedWorkerTier) {
+        const version = Number.isSafeInteger(order.tierPolicyVersion) ? order.tierPolicyVersion : 0;
+        setRequestedTierStmt.run(order.requestedWorkerTier, version, order.id);
       }
       return getOrder(order.id);
     });
@@ -1681,6 +1692,7 @@ function createDataStore(filename) {
   const customerRequests = createCustomerRequests({ database, transaction });
   const customerRequestPolicy = createCustomerRequestPolicy({ database, transaction });
   const offerPolicy = createOfferPolicy({ database, transaction });
+  const tierPricingPolicy = createTierPricingPolicy({ database, transaction });
   const featureSwitches = createFeatureSwitches({ database, transaction });
   const serviceSwitches = createServiceSwitches({ database, transaction });
   const paymentSettings = createPaymentSettings({
@@ -1714,6 +1726,7 @@ function createDataStore(filename) {
     customerRequests,
     customerRequestPolicy,
     offerPolicy,
+    tierPricingPolicy,
     featureSwitches,
     serviceSwitches,
     paymentSettings,

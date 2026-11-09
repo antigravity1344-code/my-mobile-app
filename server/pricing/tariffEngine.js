@@ -224,6 +224,13 @@ function quote(policy, input) {
     quantity = input.quantity;
   }
   let subtotal = mulDivHalfUp(service.rate, quantity, 1);
+  // D-82: ضریب سطح فقط روی نرخ پایه است. هزینهٔ جانبی ثابت بعداً بدون ضریب اضافه می‌شود.
+  // تعدیل پیشنهاد متخصص (priceAdjustment) جداست و همچنان روی جمع پس از هزینه‌های جانبی می‌نشیند.
+  if (Object.prototype.hasOwnProperty.call(input, 'baseRateBasisPoints') && input.baseRateBasisPoints != null) {
+    assertSafeInteger(input.baseRateBasisPoints, 'INPUT_INVALID', 'ضریب سطح معتبر نیست.');
+    if (input.baseRateBasisPoints < 1 || input.baseRateBasisPoints > 100000) fail('INPUT_INVALID', 'ضریب سطح معتبر نیست.');
+    subtotal = mulDivHalfUp(subtotal, input.baseRateBasisPoints, 10000);
+  }
   const breakdown = [{ kind: 'base', amount: subtotal }];
   for (const factor of service.factors) {
     if (!Object.hasOwn(options, factor.optionId) || options[factor.optionId] !== factor.equals) continue;

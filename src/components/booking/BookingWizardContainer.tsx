@@ -15,6 +15,9 @@ import {
 import {
   QUOTE_STALE_MESSAGE,
   buildQuoteRequest,
+  CUSTOMER_WORKER_TIERS,
+  tierLockApplies,
+  type CustomerWorkerTier,
   confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
@@ -64,6 +67,8 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     nextStep,
     prevStep,
   } = useBooking();
+  const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
+  const tierLock = tierLockApplies(selectedService?.id, false);
 
   const quoteSelection = selectedService
     ? {
@@ -71,6 +76,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       pricingType: selectedService.pricingType,
       durationHours,
       serviceOptions,
+      ...(tierLock ? { workerTier } : {}),
     }
     : null;
   const { view: quoteView, confirmable, refreshQuote } = useCustomerPriceQuote(quoteSelection);
@@ -102,6 +108,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       genderPreference,
       recurringFrequency,
       notes,
+      ...(tierLock ? { workerTier } : {}),
     })
     : '';
   const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
@@ -170,6 +177,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       confirmedTotal: sent.confirmedTotal,
       quoteCurrencyUnit: sent.currencyUnit,
       quoteQuantity: sent.quantity,
+      ...(tierLock ? { workerTier } : {}),
       timeline: [
         {
           step: 'SUBMITTED',
@@ -285,6 +293,24 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               onNext={nextStep}
               onPrev={prevStep}
             />
+            {tierLock && (
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
+                <div className="mb-1 text-sm font-bold text-slate-700">سطح متخصص</div>
+                <p className="mb-3 text-xs text-slate-500">قیمت همین سطح در لحظهٔ ثبت قفل می‌شود. هزینهٔ ثابت جانبی جدا می‌ماند.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {CUSTOMER_WORKER_TIERS.map((tier) => (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      onClick={() => setWorkerTier(tier.id)}
+                      className={`rounded-xl border px-3 py-2 text-sm ${workerTier === tier.id ? 'border-teal-600 bg-teal-50 font-bold text-teal-800' : 'border-slate-200 text-slate-600'}`}
+                    >
+                      {tier.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
               <div className="mb-3 text-sm font-bold text-slate-700">تکرار سفارش</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

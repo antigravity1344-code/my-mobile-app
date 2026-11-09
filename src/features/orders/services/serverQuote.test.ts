@@ -38,6 +38,31 @@ describe('server quote contract', () => {
     });
   });
 
+  it('sends the chosen worker tier and keeps an offer booking on its own price', () => {
+    const tiered = buildQuoteRequest({
+      serviceId: 'home_unit_cleaning',
+      pricingType: 'hourly',
+      durationHours: 4,
+      serviceOptions: { detergent: true },
+      workerTier: 'silver',
+    });
+    expect(tiered).toEqual({
+      ok: true,
+      body: { serviceId: 'home_unit_cleaning', quantity: 4, options: { detergent: true }, workerTier: 'silver' },
+    });
+    const offered = buildQuoteRequest({
+      serviceId: 'home_unit_cleaning',
+      pricingType: 'hourly',
+      durationHours: 3,
+      serviceOptions: { offerId: 'offer-1' },
+      workerTier: 'gold',
+    });
+    expect(offered).toEqual({
+      ok: true,
+      body: { serviceId: 'home_unit_cleaning', quantity: 3, options: { offerId: 'offer-1' } },
+    });
+  });
+
   it('does not invent a quantity for a count that the customer has not chosen', () => {
     const built = buildQuoteRequest({
       serviceId: 'sofa',

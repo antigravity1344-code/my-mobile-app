@@ -89,6 +89,8 @@ export interface OrderItem {
   confirmedTotal?: number;
   quoteCurrencyUnit?: string;
   quoteQuantity?: number;
+  /** سطح متخصص که مشتری برای سفارش معمولی قفل کرده است. */
+  workerTier?: 'gray' | 'silver' | 'gold';
   createdAt: string;
   updatedAt: string;
 }

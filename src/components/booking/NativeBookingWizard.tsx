@@ -45,6 +45,9 @@ import {
 import {
   QUOTE_STALE_MESSAGE,
   buildQuoteRequest,
+  CUSTOMER_WORKER_TIERS,
+  tierLockApplies,
+  type CustomerWorkerTier,
   confirmableServerQuote,
   formatServerAmount,
   isQuoteRefreshCode,
@@ -90,6 +93,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const booking = useBooking();
   const offerDraft = getOfferBookingDraft();
   const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
+  const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
+  const tierLock = tierLockApplies(booking.selectedService?.id, offerMode);
   const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -106,6 +111,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       pricingType: booking.selectedService.pricingType,
       durationHours: booking.durationHours,
       serviceOptions: booking.serviceOptions,
+      ...(tierLock ? { workerTier } : {}),
     }
     : null;
   const { view: quoteView, confirmable, refreshQuote } = useCustomerPriceQuote(quoteSelection);
@@ -319,6 +325,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       genderPreference: booking.genderPreference,
       recurringFrequency: booking.recurringFrequency,
       notes: booking.notes,
+      ...(tierLock ? { workerTier } : {}),
     })
     : '';
   const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
@@ -391,6 +398,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       confirmedTotal: sent.confirmedTotal,
       quoteCurrencyUnit: sent.currencyUnit,
       quoteQuantity: sent.quantity,
+      ...(tierLock ? { workerTier } : {}),
       timeline: [
         {
           step: 'SUBMITTED',
@@ -528,6 +536,13 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color={colors.teal} /><Text style={[styles.flex, styles.slotText]}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color={colors.teal} />}</Pressable>)}
           </>}
           {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{(offerMode && offerDraft ? offerDurationChoices(offerDraft.startAt, offerDraft.endAt, offerDraft.minHours) : [4, 5, 6, 8]).map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          {tierLock && <>
+            <Text style={styles.label}>سطح متخصص</Text>
+            <Text style={styles.muted}>قیمت همین سطح در لحظهٔ ثبت قفل می‌شود. هزینهٔ ثابت جانبی جدا می‌ماند.</Text>
+            <View style={styles.choiceRow}>
+              {CUSTOMER_WORKER_TIERS.map((tier) => <Pressable key={tier.id} onPress={() => setWorkerTier(tier.id)} style={[styles.choice, workerTier === tier.id && styles.choiceSelected]}><Text style={workerTier === tier.id ? styles.choiceTextSelected : styles.choiceText}>{tier.label}</Text></Pressable>)}
+            </View>
+          </>}
           {!offerMode && <>
           <Text style={styles.label}>تکرار سفارش</Text>
           <View style={styles.choiceRow}>

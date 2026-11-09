@@ -8,17 +8,31 @@ export const QUOTE_STALE_MESSAGE = 'قیمت معتبر نیست. مبلغ جد�
 
 const NON_OPTION_KEYS = new Set(['durationHours', 'price', 'total', 'basePrice', 'confirmedTotal', 'quoteToken']);
 
+export const CUSTOMER_WORKER_TIERS = [
+  { id: 'gray', label: 'خاکستری' },
+  { id: 'silver', label: 'نقره‌ای' },
+  { id: 'gold', label: 'طلایی' },
+] as const;
+export type CustomerWorkerTier = (typeof CUSTOMER_WORKER_TIERS)[number]['id'];
+export const FIXED_TIER_SERVICE_ID = 'staircase_common_areas';
+
+export function tierLockApplies(serviceId: string | undefined, offerMode: boolean): boolean {
+  return !offerMode && !!serviceId && serviceId !== FIXED_TIER_SERVICE_ID;
+}
+
 export type QuoteSelection = {
   serviceId: string;
   pricingType: PricingType | string;
   durationHours: number;
   serviceOptions: Record<string, string | number | boolean>;
+  workerTier?: CustomerWorkerTier;
 };
 
 export type QuoteRequestBody = {
   serviceId: string;
   quantity?: number;
   options: Record<string, string | number | boolean>;
+  workerTier?: CustomerWorkerTier;
 };
 
 export type ServerQuoteLine = { id: string; amount: number };
@@ -72,6 +86,11 @@ function positiveIntegerOption(options: Record<string, string | number | boolean
   return null;
 }
 
+function withWorkerTier(body: QuoteRequestBody, selection: QuoteSelection, options: QuoteRequestBody['options']): QuoteRequestBody {
+  if (!selection.workerTier || Object.prototype.hasOwnProperty.call(options, 'offerId')) return body;
+  return { ...body, workerTier: selection.workerTier };
+}
+
 export function buildQuoteRequest(selection: QuoteSelection): { ok: true; body: QuoteRequestBody } | { ok: false; message: string } {
   const serviceId = selection.serviceId.trim();
   if (!serviceId) return { ok: false, message: 'خدمت را انتخاب کنید.' };
@@ -80,14 +99,14 @@ export function buildQuoteRequest(selection: QuoteSelection): { ok: true; body: 
     if (!isInteger(selection.durationHours) || selection.durationHours < 1) {
       return { ok: false, message: 'مدت خدمت را انتخاب کنید.' };
     }
-    return { ok: true, body: { serviceId, quantity: selection.durationHours, options } };
+    return { ok: true, body: withWorkerTier({ serviceId, quantity: selection.durationHours, options }, selection, options) };
   }
   if (selection.pricingType === 'fixed') {
-    return { ok: true, body: { serviceId, options } };
+    return { ok: true, body: withWorkerTier({ serviceId, options }, selection, options) };
   }
   const quantity = positiveIntegerOption(options);
   if (quantity == null) return { ok: false, message: 'تعداد یا متراژ را انتخاب کنید.' };
-  return { ok: true, body: { serviceId, quantity, options } };
+  return { ok: true, body: withWorkerTier({ serviceId, quantity, options }, selection, options) };
 }
 
 export function quoteSelectionKey(selection: QuoteSelection): string {
