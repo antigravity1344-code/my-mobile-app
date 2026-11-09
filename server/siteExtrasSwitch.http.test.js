@@ -30,6 +30,7 @@ test('site_extras switch: off by default, admin can turn it on, public endpoint 
   const before = await request(server, { method: 'GET', pathname: '/api/site/features' });
   assert.equal(before.status, 200);
   assert.equal(before.json.siteExtras, false);
+  assert.equal(before.json.detergentPackage, false);
 
   const on = await request(server, { method: 'PUT', pathname: '/api/admin/feature-switches', token: adminToken,
     body: { scope: 'GLOBAL', feature: 'site_extras', enabled: true } });

@@ -2054,7 +2054,11 @@ app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
 // وضعیت کلیدهای سایت برای سایت مشتری (بدون ورود). فقط یک بیت: آیا افزودنی/پاک‌کننده/کد تخفیف فعال است.
 app.get('/api/site/features', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  return res.json({ success: true, siteExtras: store.featureSwitches.isGlobalEnabled('site_extras') });
+  return res.json({
+    success: true,
+    siteExtras: store.featureSwitches.isGlobalEnabled('site_extras'),
+    detergentPackage: store.featureSwitches.isGlobalEnabled('detergent_package'),
+  });
 });
 
 app.get('/api/services/enabled', (req, res) => {
