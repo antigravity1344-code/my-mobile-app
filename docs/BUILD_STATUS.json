@@ -1,12 +1,20 @@
 {
-  "app": "com.paksho.customer",
-  "sha": "682e8f4ca7fb711729abd25f3e2959892d0ab889",
-  "startedAt": "2026-11-09T09:05:26Z",
-  "status": "done",
-  "finishedAt": "2026-11-09T09:44:42Z",
-  "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
-  "command": "gradle.bat :app:assembleCustomerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
+  "sha": "c60d6ead70ae42371e8d47c2a6e5ab33adb49ebf",
+  "startedAt": "2026-11-09T19:22:00Z",
+  "status": "in_progress",
+  "reason": "Installed debug APKs embed JS (debuggableVariants empty). Customer artifact is 682e8f4 and the worker app was installed earlier, so Metro cannot load D-81, D-82, or D-83. Rebuilding both debug APKs from c60d6ea before the phone test.",
+  "apps": [
+    {
+      "app": "com.paksho.customer",
+      "status": "in_progress",
+      "command": "gradle.bat :app:assembleCustomerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon"
+    },
+    {
+      "app": "com.paksho.worker",
+      "status": "in_progress",
+      "command": "gradle.bat :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon"
+    }
+  ],
   "gradleUserHome": "C:\\g",
-  "bundleSha": "682e8f4ca7fb711729abd25f3e2959892d0ab889",
-  "note": "BUILD SUCCESSFUL in 38m 58s. createBundleCustomerDebugJsAndAssets was UP-TO-DATE. assets/index.android.bundle inside the APK contains 682e8f4 and does not contain f77699f or a4d60cb. APK size 73764262 bytes."
+  "phoneSerial": "R83X900E9CB"
 }
