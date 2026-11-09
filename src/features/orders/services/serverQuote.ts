@@ -26,6 +26,7 @@ export type QuoteSelection = {
   durationHours: number;
   serviceOptions: Record<string, string | number | boolean>;
   workerTier?: CustomerWorkerTier;
+  directRequestWorkerId?: string;
 };
 
 export type QuoteRequestBody = {
@@ -33,6 +34,7 @@ export type QuoteRequestBody = {
   quantity?: number;
   options: Record<string, string | number | boolean>;
   workerTier?: CustomerWorkerTier;
+  directRequestWorkerId?: string;
 };
 
 export type ServerQuoteLine = { id: string; amount: number };
@@ -87,6 +89,9 @@ function positiveIntegerOption(options: Record<string, string | number | boolean
 }
 
 function withWorkerTier(body: QuoteRequestBody, selection: QuoteSelection, options: QuoteRequestBody['options']): QuoteRequestBody {
+  if (selection.directRequestWorkerId && !Object.prototype.hasOwnProperty.call(options, 'offerId')) {
+    return { ...body, directRequestWorkerId: selection.directRequestWorkerId };
+  }
   if (!selection.workerTier || Object.prototype.hasOwnProperty.call(options, 'offerId')) return body;
   return { ...body, workerTier: selection.workerTier };
 }

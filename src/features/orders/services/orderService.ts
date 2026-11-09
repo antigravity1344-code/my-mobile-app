@@ -184,6 +184,7 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     quoteCurrencyUnit: reloadedMoney.currencyUnit,
     createdAt,
     updatedAt: o.completedAt || o.cancelledAt || createdAt,
+    directRequestWorkerId: typeof o.directRequestWorkerId === 'string' ? o.directRequestWorkerId : undefined,
     cleaner: o.cleanerId
       ? {
           id: o.cleanerId,
@@ -551,6 +552,7 @@ export const orderService = {
         // کلید تکرارنشدنی همین رزرو: تکرار ارسال (مثلاً بعد از قطع شبکه) سفارش دوم نمی‌سازد.
         ...(newOrder.clientRequestId ? { clientRequestId: newOrder.clientRequestId } : {}),
         ...(newOrder.workerTier ? { workerTier: newOrder.workerTier } : {}),
+        ...(newOrder.directRequestWorkerId ? { directRequestWorkerId: newOrder.directRequestWorkerId } : {}),
       };
 
       await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);

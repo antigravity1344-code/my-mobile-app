@@ -90,12 +90,37 @@ function selectionFromBody(body) {
   if (workerTier && workerTier !== 'gray' && body.serviceId === FIXED_PRICE_SERVICE) {
     throw new QuoteError('INPUT_INVALID', 'نظافت راه‌پله و مشاعات قیمت ثابت دارد و سطح متخصص روی آن اعمال نمی‌شود.');
   }
+  let directRequestWorkerId = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'directRequestWorkerId') && body.directRequestWorkerId != null && body.directRequestWorkerId !== '') {
+    if (typeof body.directRequestWorkerId !== 'string' || body.directRequestWorkerId.trim() === '' || body.directRequestWorkerId.length > 80) {
+      throw new QuoteError('INPUT_INVALID', 'متخصص درخواست طلایی معتبر نیست.');
+    }
+    directRequestWorkerId = body.directRequestWorkerId.trim();
+  }
+  if (directRequestWorkerId && hasOffer) {
+    throw new QuoteError('INPUT_INVALID', 'درخواست طلایی با پیشنهاد متخصص جمع نمی‌شود.');
+  }
+  if (directRequestWorkerId && workerTier) {
+    throw new QuoteError('INPUT_INVALID', 'درخواست طلایی سطح جداگانه نمی‌گیرد؛ قیمتش مستقل است.');
+  }
   return {
     serviceId: body.serviceId,
     quantity,
     options,
     ...(workerTier ? { workerTier } : {}),
+    ...(directRequestWorkerId ? { directRequestWorkerId } : {}),
   };
+}
+
+function directForSelection(selection, offerAdjustment) {
+  if (!selection.directRequestWorkerId) return null;
+  if (offerAdjustment) throw new QuoteError('INPUT_INVALID', 'درخواست طلایی با پیشنهاد متخصص جمع نمی‌شود.');
+  if (!directRequestResolver) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
+  const resolved = directRequestResolver(selection.directRequestWorkerId);
+  if (!resolved || !Number.isSafeInteger(resolved.basisPoints) || !Number.isSafeInteger(resolved.version) || !Number.isSafeInteger(resolved.windowMinutes)) {
+    throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
+  }
+  return resolved;
 }
 
 function tierForSelection(selection, offerAdjustment) {
@@ -116,6 +141,7 @@ function tierForSelection(selection, offerAdjustment) {
 // فراخوان‌دهنده (index.js) تابع تصمیم‌گیر را می‌دهد تا این ماژول به پایگاه‌داده وابسته نشود.
 let offerResolver = null;
 let tierResolver = null;
+let directRequestResolver = null;
 const WORKER_TIERS = new Set(['gray', 'silver', 'gold']);
 const FIXED_PRICE_SERVICE = 'staircase_common_areas';
 // درخواست ساعت دلخواه مشتری: شناسهٔ CRQ- فقط در پذیرش متخصص (داخل withCustomerRequestAcceptance) قابل نقل‌قول است.
@@ -141,6 +167,10 @@ function setOfferResolver(resolver) {
 
 function setTierResolver(resolver) {
   tierResolver = typeof resolver === 'function' ? resolver : null;
+}
+
+function setDirectRequestResolver(resolver) {
+  directRequestResolver = typeof resolver === 'function' ? resolver : null;
 }
 
 function splitOfferOption(selection, now) {
@@ -185,16 +215,18 @@ function trustedQuote(selection, now) {
     throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
   }
   const split = splitOfferOption(selection, now);
-  const tier = tierForSelection(selection, split.adjustment);
+  const direct = directForSelection(selection, split.adjustment);
+  const tier = direct ? null : tierForSelection(selection, split.adjustment);
+  const basisPoints = direct ? direct.basisPoints : (tier && tier.basisPoints != null ? tier.basisPoints : null);
   const priced = quote(policy, {
     serviceId: selection.serviceId,
     quantity: selection.quantity,
     options: split.options,
     at: now,
     ...(split.adjustment ? { priceAdjustment: split.adjustment } : {}),
-    ...(tier && tier.basisPoints != null ? { baseRateBasisPoints: tier.basisPoints } : {}),
+    ...(basisPoints != null ? { baseRateBasisPoints: basisPoints } : {}),
   });
-  return { priced, secret, tier };
+  return { priced, secret, tier, direct };
 }
 
 function publicQuote(priced, token, expiresAt) {
@@ -212,7 +244,7 @@ function publicQuote(priced, token, expiresAt) {
 
 function issueOrderQuote(body, now = new Date()) {
   const selection = selectionFromBody(body);
-  const { priced, secret, tier } = trustedQuote(selection, now);
+  const { priced, secret, tier, direct } = trustedQuote(selection, now);
   const issuedAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + QUOTE_TTL_MS).toISOString();
   const payload = {
@@ -227,6 +259,11 @@ function issueOrderQuote(body, now = new Date()) {
     issuedAt,
     expiresAt,
     ...(tier ? { workerTier: tier.workerTier, tierPolicyVersion: tier.version } : {}),
+    ...(direct ? {
+      directRequestWorkerId: selection.directRequestWorkerId,
+      tierPolicyVersion: direct.version,
+      goldenRequestWindowMinutes: direct.windowMinutes,
+    } : {}),
   };
   const token = signQuote(payload, secret);
   if (token.length > MAX_QUOTE_TOKEN_CHARS) {
@@ -239,6 +276,7 @@ function sameSelection(signed, selection) {
   return signed.serviceId === selection.serviceId
     && signed.quantity === (selection.quantity == null ? 1 : selection.quantity)
     && (signed.workerTier || null) === (selection.workerTier || null)
+    && (signed.directRequestWorkerId || null) === (selection.directRequestWorkerId || null)
     && JSON.stringify(stable(signed.options || {})) === JSON.stringify(stable(selection.options || {}));
 }
 
@@ -246,6 +284,15 @@ function signedTierFields(signed) {
   if (!signed || typeof signed.workerTier !== 'string') return {};
   return {
     requestedWorkerTier: signed.workerTier,
+    tierPolicyVersion: Number.isSafeInteger(signed.tierPolicyVersion) ? signed.tierPolicyVersion : 0,
+  };
+}
+
+function signedDirectFields(signed) {
+  if (!signed || typeof signed.directRequestWorkerId !== 'string') return {};
+  return {
+    directRequestWorkerId: signed.directRequestWorkerId,
+    goldenRequestWindowMinutes: Number.isSafeInteger(signed.goldenRequestWindowMinutes) ? signed.goldenRequestWindowMinutes : 30,
     tierPolicyVersion: Number.isSafeInteger(signed.tierPolicyVersion) ? signed.tierPolicyVersion : 0,
   };
 }
@@ -276,6 +323,7 @@ function readQuoteReplay(body) {
       tariffVersionId: signed.tariffVersionId,
       total: signed.total,
       ...signedTierFields(signed),
+      ...signedDirectFields(signed),
     },
   };
 }
@@ -330,6 +378,7 @@ function confirmOrderQuote(body, now = new Date()) {
       surcharges: priced.breakdown.filter((line) => line.kind === 'surcharge'),
       discounts: priced.breakdown.filter((line) => line.kind === 'discount'),
       ...signedTierFields(signed),
+      ...signedDirectFields(signed),
     },
   };
 }
@@ -354,9 +403,10 @@ function mapPricingError(error) {
   return { status: 500, body: { success: false, code: 'PRICING_FAILED', message: 'محاسبه قیمت انجام نشد.' } };
 }
 
-function fingerprintBody(fields, requestedWorkerTier) {
+function fingerprintBody(fields, requestedWorkerTier, directRequestWorkerId) {
   const body = { ...fields };
   if (typeof requestedWorkerTier === 'string' && requestedWorkerTier) body.requestedWorkerTier = requestedWorkerTier;
+  if (typeof directRequestWorkerId === 'string' && directRequestWorkerId) body.directRequestWorkerId = directRequestWorkerId;
   return JSON.stringify(stable(body));
 }
 
@@ -369,7 +419,7 @@ function storedServerFingerprint(order) {
     options: pricing.options,
     tariffVersionId: pricing.tariffVersionId,
     total: pricing.total,
-  }, order.requestedWorkerTier);
+  }, order.requestedWorkerTier, order.directRequestWorkerId);
 }
 
 function requestFingerprint(priced) {
@@ -379,7 +429,7 @@ function requestFingerprint(priced) {
     options: priced.pricing.options,
     tariffVersionId: priced.pricing.tariffVersionId,
     total: priced.price,
-  }, priced.pricing.requestedWorkerTier);
+  }, priced.pricing.requestedWorkerTier, priced.pricing.directRequestWorkerId);
 }
 
 function serverRequestConflicts(existing, priced) {
@@ -391,6 +441,7 @@ function serverRequestConflicts(existing, priced) {
 module.exports = {
   setOfferResolver,
   setTierResolver,
+  setDirectRequestResolver,
   previewOfferPrice,
   QUOTE_TTL_MS,
   NO_TARIFF_MESSAGE,

@@ -305,6 +305,9 @@ function createDataStore(filename) {
     // D-82: سطح قفل‌شدهٔ سفارش معمولی. فقط از نقل‌قول امضاشده نوشته می‌شود، نه از بدنهٔ عمومی سفارش.
     ['requestedWorkerTier', 'requestedWorkerTier TEXT'],
     ['tierPolicyVersion', 'tierPolicyVersion INTEGER'],
+    // D-83: درخواست طلایی. فقط از نقل‌قول امضاشده نوشته می‌شود.
+    ['directRequestWorkerId', 'directRequestWorkerId TEXT'],
+    ['directRequestExpiresAt', 'directRequestExpiresAt TEXT'],
     // مرحله ۳ (D-13، D-14): فقط با دستورهای لغو نوشته می‌شوند، نه با updateOrder عمومی.
     ['cancelInitiator', 'cancelInitiator TEXT'],
     ['cancelFault', 'cancelFault TEXT'],
@@ -451,6 +454,8 @@ function createDataStore(filename) {
       cancelQuote: parseCancelQuote(row.cancelQuoteJson),
       requestedWorkerTier: row.requestedWorkerTier == null ? null : row.requestedWorkerTier,
       tierPolicyVersion: row.tierPolicyVersion == null ? null : row.tierPolicyVersion,
+      directRequestWorkerId: row.directRequestWorkerId == null ? null : row.directRequestWorkerId,
+      directRequestExpiresAt: row.directRequestExpiresAt == null ? null : row.directRequestExpiresAt,
     };
     const optional = [
       'customerAvatar',
@@ -531,6 +536,7 @@ function createDataStore(filename) {
   const nextOrderSeq = database.prepare('SELECT COALESCE(MIN(seq), 0) - 1 AS seq FROM orders');
   const setExpectedStartAtStmt = database.prepare('UPDATE orders SET expectedStartAt = ? WHERE id = ?');
   const setRequestedTierStmt = database.prepare('UPDATE orders SET requestedWorkerTier = ?, tierPolicyVersion = ? WHERE id = ?');
+  const setDirectRequestStmt = database.prepare('UPDATE orders SET directRequestWorkerId = ?, directRequestExpiresAt = ?, tierPolicyVersion = ? WHERE id = ?');
   const setClientRequestIdStmt = database.prepare('UPDATE orders SET clientRequestId = ? WHERE id = ?');
   const selectOrderByClientRequestStmt = database.prepare(
     'SELECT * FROM orders WHERE customerId = ? AND clientRequestId = ?'
@@ -764,6 +770,12 @@ function createDataStore(filename) {
       if (typeof order.requestedWorkerTier === 'string' && order.requestedWorkerTier) {
         const version = Number.isSafeInteger(order.tierPolicyVersion) ? order.tierPolicyVersion : 0;
         setRequestedTierStmt.run(order.requestedWorkerTier, version, order.id);
+      }
+      if (typeof order.directRequestWorkerId === 'string' && order.directRequestWorkerId) {
+        const expiresAt = normalizeIsoTimestamp(order.directRequestExpiresAt);
+        if (!expiresAt) throw new Error('INVALID_DIRECT_REQUEST');
+        const version = Number.isSafeInteger(order.tierPolicyVersion) ? order.tierPolicyVersion : 0;
+        setDirectRequestStmt.run(order.directRequestWorkerId, expiresAt, version, order.id);
       }
       return getOrder(order.id);
     });
@@ -1235,6 +1247,53 @@ function createDataStore(filename) {
       addNotification(order.cleanerId, order.id, 'ORDER_CANCELLED', 'سفارش لغو شد', 'مشتری این سفارش را لغو کرد.');
     }
     return { code: 'ok', order: getOrder(order.id) };
+  }
+
+  function voidDirectRequest(orderId, info) {
+    const actor = info && typeof info === 'object' ? info : {};
+    const expired = actor.reason === 'expired';
+    return transaction(() => {
+      const order = getOrder(orderId);
+      if (!order) return { code: 'missing' };
+      if (!order.directRequestWorkerId) return { code: 'not-direct' };
+      if (order.status === 'CANCELLED') return { code: 'duplicate', order };
+      if (order.status !== 'PENDING') return { code: 'bad-status' };
+      const nowIso = new Date().toISOString();
+      order.status = 'CANCELLED';
+      order.cancelledAt = nowIso;
+      order.cancelledBy = actor.actorRole === 'worker' ? actor.actorId : 'system';
+      order.cancelReason = expired ? 'مهلت درخواست طلایی تمام شد.' : 'متخصص درخواست طلایی را نپذیرفت.';
+      updateOrder(order);
+      setCancelMetaStmt.run(actor.actorRole === 'worker' ? 'worker' : 'system', 'none', order.id);
+      requireOrderEvent(appendOrderEvent({
+        orderId: order.id,
+        actorRole: actor.actorRole === 'worker' ? 'worker' : 'system',
+        actorId: actor.actorRole === 'worker' ? actor.actorId : null,
+        kind: 'ORDER_CANCELLED',
+        idempotencyKey: 'direct-void:' + order.id,
+        workerId: order.directRequestWorkerId,
+        note: order.cancelReason,
+      }));
+      addNotification(
+        order.customerId,
+        order.id,
+        'ORDER_CANCELLED',
+        'درخواست طلایی بی‌اثر شد',
+        expired
+          ? 'مهلت پاسخ متخصص تمام شد. می‌توانید درخواست تازه‌ای ثبت کنید.'
+          : 'متخصص این درخواست را نپذیرفت. می‌توانید درخواست تازه‌ای ثبت کنید.'
+      );
+      return { code: 'ok', order: getOrder(order.id) };
+    });
+  }
+
+  function expireDueDirectRequests(now = new Date()) {
+    const instant = now instanceof Date ? now.getTime() : Date.parse(now);
+    if (!Number.isFinite(instant)) return [];
+    const due = listOrders({ status: 'PENDING' }).filter((order) => (
+      order.directRequestWorkerId && order.directRequestExpiresAt && Date.parse(order.directRequestExpiresAt) <= instant
+    ));
+    return due.map((order) => voidDirectRequest(order.id, { actorRole: 'system', reason: 'expired' }));
   }
 
   function tryCancelOrder(orderId, customerId, allowedStatuses, reason, options) {
@@ -1769,6 +1828,8 @@ function createDataStore(filename) {
     tryAcceptOrder,
     tryCompleteOrder,
     tryCancelOrder,
+    voidDirectRequest,
+    expireDueDirectRequests,
     finalizeCancelRequest,
     finalizeDueCancelRequests,
     setCancelFault,

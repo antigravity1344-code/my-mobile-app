@@ -53,6 +53,8 @@ export interface ApiOrder {
   customerAvatar: string;
   serviceTitle: string;
   serviceId?: string | null;
+  directRequestWorkerId?: string | null;
+  requestedWorkerTier?: string | null;
   durationHours?: number | null;
   genderPreference?: 'FEMALE' | 'MALE' | 'NO_PREFERENCE' | string | null;
   serviceOptions?: Record<string, string | number | boolean> | null;

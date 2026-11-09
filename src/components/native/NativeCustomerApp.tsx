@@ -8,6 +8,7 @@ import { NativeBookingWizard } from '../booking/NativeBookingWizard';
 import { CustomerOffersScreen } from '../../features/offers/CustomerOffersScreen';
 import { CustomerRequestScreen } from '../../features/customerRequests/CustomerRequestScreen';
 import { offerDurationChoices, setOfferBookingDraft } from '../../features/offers/offerBookingDraft';
+import { setDirectRequestDraft } from '../../features/orders/services/directRequestDraft';
 import { offerStartSelection, type CustomerOffer } from '../../features/offers/customerOffersModel';
 import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
 import { OrdersScreen, useOrders } from '../../features/orders';
@@ -223,6 +224,14 @@ export const NativeCustomerApp: React.FC = () => {
           <OrdersScreen
             initialOrderId={focusOrderId}
             onNavigateToBooking={() => {
+              setFocusOrderId(null);
+              setMainView('wizard');
+            }}
+            onGoldenRequest={(order) => {
+              const workerId = order.cleaner?.id || order.directRequestWorkerId;
+              if (!workerId) return;
+              setDirectRequestDraft({ workerId, workerName: order.cleaner?.name || 'این متخصص' });
+              booking.resetBooking();
               setFocusOrderId(null);
               setMainView('wizard');
             }}

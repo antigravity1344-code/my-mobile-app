@@ -39,13 +39,14 @@ export function WorkerAvailableOrderCard({ order, onOpen }: {
   );
 }
 
-export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBack, onAccept }: {
+export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBack, onAccept, onDecline }: {
   order: NativeOrder | undefined;
   busy: boolean;
   loading: boolean;
   notice?: ReactNode;
   onBack: () => void;
   onAccept: (order: NativeOrder) => void;
+  onDecline?: (order: NativeOrder) => void;
 }) {
   const text = order ? availableOrderText(order) : null;
   return (
@@ -68,6 +69,7 @@ export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBa
             <Text style={styles.price}>{text.price}</Text>
             {order.detailsNote ? <Text style={styles.meta}>{toPersianDigits(order.detailsNote)}</Text> : null}
             <Text style={styles.note}>آدرس دقیق و تماس پس از پذیرش نمایش داده می‌شود.</Text>
+            {order.directRequest ? <Text style={styles.note}>این درخواست طلایی فقط برای شماست. اگر نپذیرید، برای دیگران باز نمی‌شود.</Text> : null}
             {canAcceptWorkerOrder(order.status) ? (
               <Pressable
                 accessibilityRole="button"
@@ -80,6 +82,18 @@ export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBa
                 <Text style={styles.acceptText}>{busy ? 'در حال پذیرش...' : 'پذیرش سفارش'}</Text>
               </Pressable>
             ) : <Text style={styles.meta}>{workerStatusLabel(order.status)}</Text>}
+            {order.directRequest && canAcceptWorkerOrder(order.status) && onDecline ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="رد درخواست طلایی"
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
+                onPress={() => onDecline(order)}
+                style={[styles.declineButton, busy && styles.disabled]}
+              >
+                <Text style={styles.declineText}>نمی‌پذیرم</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : <Text style={styles.meta}>این سفارش دیگر در فهرست سفارش‌های جدید نیست. به فهرست برگردید.</Text>}
       </ScrollView>
@@ -109,5 +123,7 @@ const styles = StyleSheet.create({
   note: { ...type.regular, ...fa, fontSize: 12, lineHeight: 22, color: colors.muted },
   acceptButton: { minHeight: 48, padding: 12, borderRadius: 12, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
   acceptText: { ...type.bold, ...fa, fontSize: 14, color: colors.white },
+  declineButton: { minHeight: 48, padding: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  declineText: { ...type.bold, ...fa, fontSize: 14, color: colors.text },
   disabled: { opacity: 0.6 },
 });

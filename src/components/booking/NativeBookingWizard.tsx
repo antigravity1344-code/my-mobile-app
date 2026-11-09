@@ -27,6 +27,7 @@ import { JalaliDateOption, TimeSlot } from '../../types/booking';
 import { CleaningService } from '../../types/service';
 import { isValidAddress, normalizePersianDigits, getAddressValidationErrors } from '../../utils/bookingValidation';
 import { useOrders, type OrderItem } from '../../features/orders';
+import { getDirectRequestDraft, setDirectRequestDraft } from '../../features/orders/services/directRequestDraft';
 import { useProfile, type SavedAddress } from '../../features/profile';
 import { getWizardBackAction, getWizardCloseAction, type WizardBackAction } from './wizardBackNavigation';
 import { createScrollToEndOnce, rtlOrder } from './rtlHorizontalList';
@@ -94,7 +95,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const offerDraft = getOfferBookingDraft();
   const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
   const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
-  const tierLock = tierLockApplies(booking.selectedService?.id, offerMode);
+  const directDraft = !offerMode ? getDirectRequestDraft() : null;
+  const tierLock = tierLockApplies(booking.selectedService?.id, offerMode) && !directDraft;
   const { addNewOrder } = useOrders();
   const dates = useMemo(makeDates, []);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -112,6 +114,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       durationHours: booking.durationHours,
       serviceOptions: booking.serviceOptions,
       ...(tierLock ? { workerTier } : {}),
+      ...(directDraft ? { directRequestWorkerId: directDraft.workerId } : {}),
     }
     : null;
   const { view: quoteView, confirmable, refreshQuote } = useCustomerPriceQuote(quoteSelection);
@@ -326,6 +329,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       recurringFrequency: booking.recurringFrequency,
       notes: booking.notes,
       ...(tierLock ? { workerTier } : {}),
+      ...(directDraft ? { directRequestWorkerId: directDraft.workerId } : {}),
     })
     : '';
   const recovering = Boolean(selectionFingerprint && clientRequestKey.current?.selectionFingerprint === selectionFingerprint);
@@ -399,6 +403,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       quoteCurrencyUnit: sent.currencyUnit,
       quoteQuantity: sent.quantity,
       ...(tierLock ? { workerTier } : {}),
+      ...(directDraft ? { directRequestWorkerId: directDraft.workerId } : {}),
       timeline: [
         {
           step: 'SUBMITTED',
@@ -427,9 +432,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       const orderId = result.order?.id || result.order?.orderNumber || newOrder.id;
       setCreatedOrderId(orderId);
       setSubmissionState('success');
+      if (directDraft) setDirectRequestDraft(null);
       setSubmissionMessage(offerMode
         ? `درخواست «${newOrder.serviceTitle}» برای ${offerDraft?.workerName || 'متخصص'} ثبت و رزرو شد.`
-        : `درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
+        : directDraft
+          ? `درخواست طلایی «${newOrder.serviceTitle}» فقط برای ${directDraft.workerName || 'این متخصص'} ثبت شد.`
+          : `درخواست «${newOrder.serviceTitle}» ثبت شد و در انتظار متخصص است.`);
     } else if (isQuoteRefreshCode(result.code)) {
       refreshQuote();
       setSubmissionState('error');
@@ -444,6 +452,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   const isSubmitted = submissionState === 'success';
   const exitWizard = () => {
     // Nothing is sent to the server here; just drop the half-filled draft and leave.
+    setDirectRequestDraft(null);
     booking.resetBooking();
     onExit?.();
   };
@@ -536,6 +545,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color={colors.teal} /><Text style={[styles.flex, styles.slotText]}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color={colors.teal} />}</Pressable>)}
           </>}
           {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{(offerMode && offerDraft ? offerDurationChoices(offerDraft.startAt, offerDraft.endAt, offerDraft.minHours) : [4, 5, 6, 8]).map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          {directDraft && <Text style={styles.muted}>درخواست طلایی برای {directDraft.workerName || 'این متخصص'}. قیمتش جدا از سطح متخصص است و فقط همان متخصص آن را می‌بیند.</Text>}
           {tierLock && <>
             <Text style={styles.label}>سطح متخصص</Text>
             <Text style={styles.muted}>قیمت همین سطح در لحظهٔ ثبت قفل می‌شود. هزینهٔ ثابت جانبی جدا می‌ماند.</Text>

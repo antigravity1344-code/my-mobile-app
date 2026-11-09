@@ -75,6 +75,7 @@ export function bookingSelectionFingerprint(input: {
   recurringFrequency: string;
   notes: string;
   workerTier?: string;
+  directRequestWorkerId?: string;
 }): string {
   return JSON.stringify(stable(input));
 }

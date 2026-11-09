@@ -55,7 +55,7 @@ test('D-82 tier lock: price, stairs, acceptance and unchanged past orders', asyn
 
   const policy = await adminReq('GET', '/api/admin/tier-pricing');
   assert.equal(policy.status, 200);
-  assert.deepEqual(policy.json.policy, { version: 0, grayPercent: 100, silverPercent: 110, goldPercent: 130, effectiveAt: null });
+  assert.deepEqual(policy.json.policy, { version: 0, grayPercent: 100, silverPercent: 110, goldPercent: 130, goldenRequestPercent: 130, windowMinutes: 30, effectiveAt: null });
   assert.equal((await adminReq('GET', '/api/admin/tier-pricing', undefined)).status, 200);
   assert.equal((await workerReq('gray', 'GET', '/api/admin/tier-pricing')).status, 401);
   for (const bad of [

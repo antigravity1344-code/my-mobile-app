@@ -135,6 +135,26 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     }
   };
 
+  const handleDeclineDirectRequest = async (order: NativeOrder) => {
+    if (!order.directRequest || !canAcceptWorkerOrder(order.status)) return;
+    if (!beginOrderAction(order.id)) return;
+    try {
+      const res = await apiFetch('/orders/' + order.id + '/direct-request/decline', { method: 'PUT', body: '{}' });
+      if (res.success) {
+        setSelectedOrderId((current) => current === order.id ? null : current);
+        setSuccessAlert('درخواست طلایی رد شد و برای متخصص دیگری باز نمی‌شود.');
+        setTimeout(() => setSuccessAlert(null), 5000);
+      } else if (!isAccountBlockedResponse(res)) {
+        showActionError(res.message || 'رد درخواست انجام نشد.');
+      }
+    } catch {
+      showActionError('اتصال اینترنت را بررسی و دوباره تلاش کنید.');
+    } finally {
+      endOrderAction(order.id);
+      void fetchOrders('after-action');
+    }
+  };
+
   const reportWorkerStart = async (order: NativeOrder) => {
     if (!user?.id || !canReportWorkerStart(order.status, order.startReported, order.startAcceptanceKey)) return;
     if (!beginOrderAction(order.id)) return;
@@ -527,6 +547,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           notice={ordersError}
           onBack={() => setSelectedOrderId(null)}
           onAccept={(order) => void handleAcceptOrder(order)}
+          onDecline={(order) => void handleDeclineDirectRequest(order)}
         />
       ) : null}
     </View>

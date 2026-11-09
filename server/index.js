@@ -27,6 +27,7 @@ const {
   serverRequestConflicts,
   setOfferResolver,
   setTierResolver,
+  setDirectRequestResolver,
   previewOfferPrice,
   QuoteError,
   withCustomerRequestAcceptance,
@@ -870,6 +871,13 @@ setOfferResolver(({ offerId, serviceId, now }) => {
   return { basisPoints: offer.adjustmentBasisPoints };
 });
 setTierResolver((tier) => store.tierPricingPolicy.basisPointsFor(tier));
+setDirectRequestResolver((workerId) => {
+  const worker = store.getUser(workerId);
+  if (!worker || worker.role !== 'WORKER' || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) {
+    throw new QuoteError('INPUT_INVALID', 'متخصص انتخاب‌شده برای درخواست طلایی در دسترس نیست.');
+  }
+  return store.tierPricingPolicy.goldenRequest();
+});
 
 function workerTierKey(workerId) {
   const account = store.getUserPoints(workerId);
@@ -1360,6 +1368,11 @@ app.post('/api/orders', (req, res) => {
       requestedWorkerTier: storedPricing.requestedWorkerTier,
       tierPolicyVersion: storedPricing.tierPolicyVersion,
     } : {}),
+    ...(storedPricing && storedPricing.directRequestWorkerId ? {
+      directRequestWorkerId: storedPricing.directRequestWorkerId,
+      directRequestExpiresAt: new Date(Date.now() + storedPricing.goldenRequestWindowMinutes * 60 * 1000).toISOString(),
+      tierPolicyVersion: storedPricing.tierPolicyVersion,
+    } : {}),
   };
 
   // رزرو پیشنهاد متخصص: پنجرهٔ زمانی باید کاملاً داخل بازهٔ پیشنهاد باشد.
@@ -1471,6 +1484,7 @@ function workerAvailableOrderView(order) {
     ...workerOrderCurrencyView(order),
     paymentMethod: order.paymentMethod,
     requestedWorkerTier: order.requestedWorkerTier || null,
+    directRequestWorkerId: order.directRequestWorkerId || null,
     // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
     createdAt: order.createdAt,
     area,
@@ -1553,6 +1567,7 @@ app.get('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
   store.finalizeDueCancelRequests();
+  store.expireDueDirectRequests();
   if (authUser.role === 'CUSTOMER') {
     return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }).map(customerOrderView) });
   }
@@ -1572,7 +1587,9 @@ app.get('/api/orders/available', (req, res) => {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.', orders: [] });
   }
   store.finalizeDueCancelRequests();
+  store.expireDueDirectRequests();
   const availableOrders = store.getOrders({ status: 'PENDING' }).filter((order) => (
+    (!order.directRequestWorkerId || order.directRequestWorkerId === authUser.id) &&
     workerQualifiedFor(order.serviceId, authUser) &&
     workerMeetsRequestedTier(workerTierKey(authUser.id), order.requestedWorkerTier)
   )).map(workerAvailableOrderView);
@@ -1598,7 +1615,14 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
     return res.status(403).json({ success: false, message: 'حساب متخصص شما هنوز تایید نشده است.' });
   }
 
+  store.expireDueDirectRequests();
   const target = store.getOrder(orderId);
+  if (target && target.directRequestWorkerId && target.status === 'CANCELLED' && target.cancelReason === 'مهلت درخواست طلایی تمام شد.') {
+    return res.status(409).json({ success: false, code: 'DIRECT_REQUEST_EXPIRED', message: 'مهلت این درخواست طلایی تمام شده است.' });
+  }
+  if (target && target.directRequestWorkerId && target.directRequestWorkerId !== cleaner.id) {
+    return res.status(403).json({ success: false, code: 'DIRECT_REQUEST_FORBIDDEN', message: 'این سفارش فقط برای متخصص دیگری است.' });
+  }
   if (target && !workerQualifiedFor(target.serviceId, cleaner)) {
     return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'پذیرش این سفارش برای حساب شما مجاز نیست.' });
   }
@@ -1607,11 +1631,38 @@ app.put('/api/orders/:orderId/accept', (req, res) => {
   }
   const accepted = store.tryAcceptOrder(orderId, cleaner);
   if (accepted.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'کیف پول شما بدهکار است؛ پیش از پذیرش سفارش تازه، بدهی کمیسیون را تسویه کنید.'});
+  if (accepted.code === 'conflict' && target && target.directRequestWorkerId && store.getOrder(orderId).cancelReason === 'مهلت درخواست طلایی تمام شد.') {
+    return res.status(409).json({ success: false, code: 'DIRECT_REQUEST_EXPIRED', message: 'مهلت این درخواست طلایی تمام شده است.' });
+  }
   if (accepted.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد' });
   if (accepted.code === 'conflict') {
     return res.status(400).json({ success: false, message: acceptConflictMessage(accepted.order, cleaner.id) });
   }
   res.json({ success: true, order: workerAssignedOrderView(accepted.order) });
+});
+
+app.put('/api/orders/:orderId/direct-request/decline', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  if (authUser.role !== 'WORKER') {
+    return res.status(403).json({ success: false, message: 'فقط متخصص هدف می‌تواند درخواست طلایی را رد کند.' });
+  }
+  store.expireDueDirectRequests();
+  const target = store.getOrder(req.params.orderId);
+  if (!target) return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  if (!target.directRequestWorkerId) {
+    return res.status(400).json({ success: false, message: 'این سفارش درخواست طلایی نیست.' });
+  }
+  if (target.directRequestWorkerId !== authUser.id) {
+    return res.status(403).json({ success: false, code: 'DIRECT_REQUEST_FORBIDDEN', message: 'این سفارش فقط برای متخصص دیگری است.' });
+  }
+  if (target.status === 'CANCELLED' && target.cancelReason === 'مهلت درخواست طلایی تمام شد.') {
+    return res.status(409).json({ success: false, code: 'DIRECT_REQUEST_EXPIRED', message: 'مهلت این درخواست طلایی تمام شده است.' });
+  }
+  const declined = store.voidDirectRequest(target.id, { actorRole: 'worker', actorId: authUser.id, reason: 'declined' });
+  if (declined.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
+  if (declined.code === 'bad-status') return res.status(409).json({ success: false, message: 'این درخواست دیگر قابل رد کردن نیست.' });
+  return res.json({ success: true, order: workerAssignedOrderView(declined.order) });
 });
 
 // ثبت شروع کار: رویدادی مستقل از وضعیت اصلی سفارش و مستقل از سیاست مالی.
@@ -1935,6 +1986,17 @@ app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
   }
   return res.json({ success: true, policy: result.policy });
 });
+app.put('/api/admin/golden-request', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const result = store.tierPricingPolicy.publishGoldenRequest(req.body);
+  if (result.code === 'invalid') {
+    return res.status(400).json({ success: false, message: 'درصد درخواست طلایی باید عدد صحیح از ۱ تا ۳۰۰ باشد و مهلت از ۱ تا ۱۴۴۰ دقیقه. نسخهٔ جاری هم لازم است.' });
+  }
+  if (result.code === 'conflict') {
+    return res.status(409).json({ success: false, message: 'تنظیم قبلاً تغییر کرده است. مقدار جدید را بازخوانی کنید.', policy: result.policy });
+  }
+  return res.json({ success: true, policy: result.policy });
+});
 app.get('/api/admin/tier-pricing', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ success: true, policy: store.tierPricingPolicy.read() });
@@ -2173,6 +2235,7 @@ app.put('/api/admin/approve-worker/:userId', (req, res) => {
 
 app.get('/api/admin/orders', (req, res) => {
   store.finalizeDueCancelRequests();
+  store.expireDueDirectRequests();
   res.json({ success: true, orders: store.listOrders().map(order => ({...order,completion:store.completionFor(order)})) });
 });
 
@@ -2284,6 +2347,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
       if (workerProblem) return { code: workerProblem };
       if (!store.workerWallet.read(order.cleanerId).canAcceptNewOrders) return { code: 'wallet-debt' };
       if (!workerMeetsRequestedTier(workerTierKey(order.cleanerId), order.requestedWorkerTier)) return { code: 'not-qualified' };
+      if (order.directRequestWorkerId && order.cleanerId !== order.directRequestWorkerId) return { code: 'not-target' };
     }
     if (savesAsPending) {
       // سفارش PENDING متخصص ندارد: فیلدهای متخصص و acceptedAt از شیء حافظه هم پاک می‌شوند
@@ -2365,6 +2429,7 @@ app.put('/api/admin/orders/:orderId', (req, res) => {
 
   if (updated.code === 'wallet-debt') return res.status(409).json({success:false,code:'WORKER_WALLET_DEBT',message:'متخصص بدهی کمیسیون دارد و تا تسویه نمی‌تواند سفارش تازه بپذیرد.'});
   if (updated.code === 'not-qualified') return res.status(403).json({ success: false, code: 'NOT_QUALIFIED', message: 'درجهٔ این متخصص برای سطح قفل‌شدهٔ سفارش کافی نیست.' });
+  if (updated.code === 'not-target') return res.status(403).json({ success: false, code: 'DIRECT_REQUEST_FORBIDDEN', message: 'درخواست طلایی را نمی‌توان به متخصص دیگری سپرد.' });
   if (updated.code === 'missing') return res.status(404).json({ success: false, message: 'سفارش یافت نشد.' });
   if (updated.code === 'bad-cleaner') {
     return res.status(400).json({ success: false, message: 'متخصص معتبر یافت نشد.' });
@@ -2674,6 +2739,13 @@ app.get('/admin', (req, res) => {
       <p id="tierLockMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="tierLockRefresh" type="button" onclick="loadAdminTierLock()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
       <button id="tierLockSave" type="button" onclick="saveAdminTierLock()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+      <h3 class="text-base font-bold pt-4">درخواست طلایی</h3>
+      <p class="text-sm text-slate-300">این درصد مستقل از درصد طلایی بالاست. قیمت درخواست مستقیم یک متخصص همیشه همین درصدِ نرخ پایه است، حتی اگر آن متخصص خاکستری باشد و حتی برای نظافت راه‌پله. مهلت پاسخ جدا ذخیره می‌شود. ذخیرهٔ این بخش درصد سطح سفارش را عوض نمی‌کند.</p>
+      <label for="goldenRequestPercent" class="block text-sm">درصد درخواست طلایی</label>
+      <input id="goldenRequestPercent" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="goldenRequestWindow" class="block text-sm">مهلت پاسخ متخصص (دقیقه)</label>
+      <input id="goldenRequestWindow" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <button id="goldenRequestSave" type="button" onclick="saveAdminGoldenRequest()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درخواست طلایی</button>
     </section>
     <section id="tabAreas" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>

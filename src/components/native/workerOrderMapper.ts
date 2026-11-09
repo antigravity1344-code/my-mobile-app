@@ -35,6 +35,8 @@ export interface NativeOrder {
   rawTime: string;
   /** کلید خدمت از سرور (مثلاً staircase_common_areas)؛ null یعنی سرور کلیدی نفرستاده است. */
   serviceId: string | null;
+  /** درخواست طلایی که فقط همین متخصص هدف آن را می‌بیند. */
+  directRequest: boolean;
 }
 
 export function mapWorkerOrder(o: ApiOrder): NativeOrder {
@@ -66,5 +68,6 @@ export function mapWorkerOrder(o: ApiOrder): NativeOrder {
     rawDate: typeof o.date === 'string' ? o.date : '',
     rawTime: typeof o.time === 'string' ? o.time : '',
     serviceId: typeof o.serviceId === 'string' && o.serviceId.trim() ? o.serviceId.trim() : null,
+    directRequest: typeof o.directRequestWorkerId === 'string' && o.directRequestWorkerId.length > 0,
   };
 }

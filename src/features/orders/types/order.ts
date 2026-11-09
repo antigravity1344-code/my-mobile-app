@@ -91,6 +91,8 @@ export interface OrderItem {
   quoteQuantity?: number;
   /** سطح متخصص که مشتری برای سفارش معمولی قفل کرده است. */
   workerTier?: 'gray' | 'silver' | 'gold';
+  /** درخواست طلایی: شناسهٔ متخصص هدف، اگر این سفارش مستقیم برای او باشد. */
+  directRequestWorkerId?: string;
   createdAt: string;
   updatedAt: string;
 }

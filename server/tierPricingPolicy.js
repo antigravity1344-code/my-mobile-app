@@ -1,7 +1,7 @@
 'use strict';
 // D-82: ضریب سطح سفارش معمولی. جدا از offer_policy (پیشنهاد آزاد متخصص).
 // خاکستری همیشه ۱۰۰٪ است و ذخیره نمی‌شود. نقره‌ای و طلایی نسخه‌دار و تغییرناپذیرند.
-const DEFAULTS = Object.freeze({ silverBps: 11000, goldBps: 13000 });
+const DEFAULTS = Object.freeze({ silverBps: 11000, goldBps: 13000, goldenRequestBps: 13000, windowMinutes: 30 });
 const GRAY_BPS = 10000;
 const MAX_PERCENT = 300;
 const TIER_RANK = Object.freeze({ gray: 0, silver: 1, gold: 2, gold_plus: 3 });
@@ -18,7 +18,11 @@ function createTierPricingPolicy({ database, transaction }) {
       goldBps INTEGER NOT NULL,
       createdAt TEXT NOT NULL,
       actor TEXT NOT NULL,
-      CHECK (silverBps >= ${GRAY_BPS} AND silverBps <= goldBps AND goldBps <= ${MAX_PERCENT * 100})
+      goldenRequestBps INTEGER NOT NULL DEFAULT ${DEFAULTS.goldenRequestBps},
+      windowMinutes INTEGER NOT NULL DEFAULT ${DEFAULTS.windowMinutes},
+      CHECK (silverBps >= ${GRAY_BPS} AND silverBps <= goldBps AND goldBps <= ${MAX_PERCENT * 100}),
+      CHECK (goldenRequestBps >= 100 AND goldenRequestBps <= ${MAX_PERCENT * 100}),
+      CHECK (windowMinutes >= 1 AND windowMinutes <= 1440)
     );
     CREATE TRIGGER IF NOT EXISTS tier_pricing_policy_no_update
     BEFORE UPDATE ON tier_pricing_policy
@@ -27,15 +31,38 @@ function createTierPricingPolicy({ database, transaction }) {
     BEFORE DELETE ON tier_pricing_policy
     BEGIN SELECT RAISE(ABORT, 'tier pricing policy history is immutable'); END;
   `);
+  const columns = new Set(database.prepare('PRAGMA table_info(tier_pricing_policy)').all().map((column) => column.name));
+  if (!columns.has('goldenRequestBps')) {
+    database.exec(`ALTER TABLE tier_pricing_policy ADD COLUMN goldenRequestBps INTEGER NOT NULL DEFAULT ${DEFAULTS.goldenRequestBps}`);
+  }
+  if (!columns.has('windowMinutes')) {
+    database.exec(`ALTER TABLE tier_pricing_policy ADD COLUMN windowMinutes INTEGER NOT NULL DEFAULT ${DEFAULTS.windowMinutes}`);
+  }
   const latest = database.prepare('SELECT * FROM tier_pricing_policy ORDER BY version DESC LIMIT 1');
   const insert = database.prepare(
-    'INSERT INTO tier_pricing_policy (version, silverBps, goldBps, createdAt, actor) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO tier_pricing_policy (version, silverBps, goldBps, goldenRequestBps, windowMinutes, createdAt, actor) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
 
   function bounds() {
     const row = latest.get();
-    if (!row) return { silverBps: DEFAULTS.silverBps, goldBps: DEFAULTS.goldBps, version: 0 };
-    return { silverBps: row.silverBps, goldBps: row.goldBps, version: row.version };
+    if (!row) {
+      return {
+        silverBps: DEFAULTS.silverBps, goldBps: DEFAULTS.goldBps,
+        goldenRequestBps: DEFAULTS.goldenRequestBps, windowMinutes: DEFAULTS.windowMinutes, version: 0,
+      };
+    }
+    return {
+      silverBps: row.silverBps,
+      goldBps: row.goldBps,
+      goldenRequestBps: Number.isSafeInteger(row.goldenRequestBps) ? row.goldenRequestBps : DEFAULTS.goldenRequestBps,
+      windowMinutes: Number.isSafeInteger(row.windowMinutes) ? row.windowMinutes : DEFAULTS.windowMinutes,
+      version: row.version,
+    };
+  }
+
+  function goldenRequest() {
+    const current = bounds();
+    return { basisPoints: current.goldenRequestBps, version: current.version, windowMinutes: current.windowMinutes };
   }
 
   function basisPointsFor(tierKey) {
@@ -53,6 +80,8 @@ function createTierPricingPolicy({ database, transaction }) {
       grayPercent: GRAY_BPS / 100,
       silverPercent: current.silverBps / 100,
       goldPercent: current.goldBps / 100,
+      goldenRequestPercent: current.goldenRequestBps / 100,
+      windowMinutes: current.windowMinutes,
       effectiveAt: row ? row.createdAt : null,
     };
   }
@@ -68,12 +97,31 @@ function createTierPricingPolicy({ database, transaction }) {
     return transaction(() => {
       const current = read();
       if (current.version !== input.expectedVersion) return { code: 'conflict', policy: current };
-      insert.run(current.version + 1, silverBps, goldBps, new Date().toISOString(), 'admin');
+      const kept = bounds();
+      insert.run(current.version + 1, silverBps, goldBps, kept.goldenRequestBps, kept.windowMinutes, new Date().toISOString(), 'admin');
       return { code: 'ok', policy: read() };
     });
   }
 
-  return { read, publish, bounds, basisPointsFor };
+  function publishGoldenRequest(input) {
+    const keys = ['percent', 'windowMinutes', 'expectedVersion'];
+    if (!input || typeof input !== 'object' || Array.isArray(input) ||
+        Object.keys(input).length !== keys.length || !keys.every((key) => Object.hasOwn(input, key)) ||
+        !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) return { code: 'invalid' };
+    const goldenRequestBps = Number.isSafeInteger(input.percent) && input.percent >= 1 && input.percent <= MAX_PERCENT ? input.percent * 100 : null;
+    if (goldenRequestBps === null || !Number.isSafeInteger(input.windowMinutes) || input.windowMinutes < 1 || input.windowMinutes > 1440) {
+      return { code: 'invalid' };
+    }
+    return transaction(() => {
+      const current = read();
+      if (current.version !== input.expectedVersion) return { code: 'conflict', policy: current };
+      const kept = bounds();
+      insert.run(current.version + 1, kept.silverBps, kept.goldBps, goldenRequestBps, input.windowMinutes, new Date().toISOString(), 'admin');
+      return { code: 'ok', policy: read() };
+    });
+  }
+
+  return { read, publish, publishGoldenRequest, bounds, basisPointsFor, goldenRequest };
 }
 
 function workerMeetsRequestedTier(workerTierKey, requestedTier) {

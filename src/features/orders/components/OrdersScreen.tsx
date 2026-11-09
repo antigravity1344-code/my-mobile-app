@@ -33,6 +33,7 @@ import { type, colors } from '../../../theme';
 
 interface OrdersScreenProps {
   onNavigateToBooking?: () => void;
+  onGoldenRequest?: (order: OrderItem) => void;
   initialOrderId?: string | null;
 }
 
@@ -43,7 +44,7 @@ const SORT_OPTIONS: { key: OrderSortOption; label: string }[] = [
   { key: 'PRICE_LOW', label: 'کمترین مبلغ' },
 ];
 
-export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking, initialOrderId }) => {
+export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking, onGoldenRequest, initialOrderId }) => {
   const {
     orders,
     loading,
@@ -275,6 +276,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onNavigateToBooking,
                   setOpenWithCancel(true);
                   selectOrder(ord.id);
                 }}
+                onGoldenRequest={onGoldenRequest}
               />
             ))}
           </View>

@@ -23,6 +23,7 @@ interface OrderCardProps {
   onPressDetails: (order: OrderItem) => void;
   onPressRate?: (order: OrderItem) => void;
   onPressCancel?: (order: OrderItem) => void;
+  onGoldenRequest?: (order: OrderItem) => void;
 }
 
 const RECURRING_LABELS: Record<string, string> = {
@@ -36,6 +37,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onPressDetails,
   onPressRate,
   onPressCancel,
+  onGoldenRequest,
 }) => {
   const isCancellable = isOrderCancellable(order.status);
   const isCompleted = order.status === 'COMPLETED';
@@ -154,6 +156,18 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               <Text style={styles.rateBtnText}>
                 {hasRated ? `امتیاز: ${toPersianDigits(order.ratings?.customerRating ?? '')}` : 'ثبت امتیاز'}
               </Text>
+            </Pressable>
+          )}
+
+          {(order.status === 'COMPLETED' || order.status === 'CANCELLED') && Boolean(onGoldenRequest) && Boolean(order.cleaner?.id || order.directRequestWorkerId) && (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onGoldenRequest?.(order);
+              }}
+              style={[styles.actionBtn, styles.rateBtn]}
+            >
+              <Text style={styles.rateBtnText}>درخواست طلایی</Text>
             </Pressable>
           )}
 
