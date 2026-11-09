@@ -32,7 +32,7 @@ test('admin offer policy panel: Persian digits, validation, persistence and conf
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + '/admin');
-  const min = page.locator('#offerPolicyMin'), max = page.locator('#offerPolicyMax'), gold = page.locator('#offerPolicyGold');
+  const min = page.locator('#offerPolicyMin'), max = page.locator('#offerPolicyMax'), silver = page.locator('#offerPolicySilver'), gold = page.locator('#offerPolicyGold');
   const save = page.locator('#offerPolicySave');
   const waitMessage = text => page.waitForFunction(value => document.getElementById('offerPolicyMessage').textContent.includes(value), text);
   await page.locator('#tabOfferPolicyBtn').click();
@@ -41,15 +41,15 @@ test('admin offer policy panel: Persian digits, validation, persistence and conf
   const report = await request(server, { method: 'GET', pathname: '/api/admin/offer-report', token });
   assert.equal(report.status, 200); assert.deepEqual(report.json.rows, []);
   assert.equal((await request(server, { method: 'GET', pathname: '/api/admin/offer-report' })).status, 401);
-  assert.deepEqual([await min.inputValue(), await max.inputValue(), await gold.inputValue()], ['70', '100', '130']);
-  await min.fill('۶۰'); await max.fill('۱۰۵'); await gold.fill('۱۴۰'); await save.click(); await waitMessage('ذخیره شد');
-  assert.deepEqual(harness.store.offerPolicy.bounds(), { minBps: 6000, maxBps: 10500, goldMaxBps: 14000 });
+  assert.deepEqual([await min.inputValue(), await max.inputValue(), await silver.inputValue(), await gold.inputValue()], ['70', '100', '110', '130']);
+  await min.fill('۶۰'); await max.fill('۱۰۵'); await silver.fill('۱۲۰'); await gold.fill('۱۴۰'); await save.click(); await waitMessage('ذخیره شد');
+  assert.deepEqual(harness.store.offerPolicy.bounds(), { minBps: 6000, maxBps: 10500, silverMaxBps: 12000, goldMaxBps: 14000 });
   await page.reload(); await page.locator('#tabOfferPolicyBtn').click(); await waitMessage('تنظیم جاری دریافت شد');
   assert.equal(await max.inputValue(), '105');
   await min.fill('120'); await save.click(); await waitMessage('حداقل ≤ حداکثر');
   assert.equal(harness.store.offerPolicy.read().version, 1);
   const changed = await request(server, { method: 'PUT', pathname: '/api/admin/offer-policy', token,
-    body: { minPercent: 55, maxPercent: 100, goldMaxPercent: 120, expectedVersion: 1 } });
+    body: { minPercent: 55, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 120, expectedVersion: 1 } });
   assert.equal(changed.status, 200);
   await min.fill('60'); await save.click(); await waitMessage('مدیر دیگری');
   assert.equal(await save.isDisabled(), true);

@@ -2,9 +2,11 @@
 const crypto = require('node:crypto');
 
 // حدود قیمت پیشنهادی متخصص نسبت به تعرفهٔ شرکت (بر حسب basis points؛ ۱۰۰۰۰ = خود تعرفه).
-// متخصص عادی فقط می‌تواند ارزان‌تر بگذارد؛ طلایی تا ۱۳۰٪ تعرفه. این حدود پیش‌فرض‌اند و در یک جا قابل تغییرند.
+// زیر ۱۰۰٪ برای هر درجه مجاز است. سقف: خاکستری ۱۰۰٪ (افزودهٔ صفر)، نقره‌ای ۱۱۰٪، طلایی و طلایی‌پلاس ۱۳۰٪.
+// این حدود پیش‌فرض‌اند و مدیر هر استقرار می‌تواند آن‌ها را عوض کند.
 const MIN_BASIS_POINTS = 7000;
 const DEFAULT_MAX_BASIS_POINTS = 10000;
+const SILVER_MAX_BASIS_POINTS = 11000;
 const GOLD_MAX_BASIS_POINTS = 13000;
 const STEP_BASIS_POINTS = 100;
 const MIN_WINDOW_MS = 60 * 60 * 1000;
@@ -20,11 +22,21 @@ class OfferError extends Error {
   }
 }
 
-const DEFAULT_POLICY = Object.freeze({ minBps: MIN_BASIS_POINTS, maxBps: DEFAULT_MAX_BASIS_POINTS, goldMaxBps: GOLD_MAX_BASIS_POINTS });
+const DEFAULT_POLICY = Object.freeze({
+  minBps: MIN_BASIS_POINTS,
+  maxBps: DEFAULT_MAX_BASIS_POINTS,
+  silverMaxBps: SILVER_MAX_BASIS_POINTS,
+  goldMaxBps: GOLD_MAX_BASIS_POINTS,
+});
 
 /** سقف مجاز درصد برای درجهٔ متخصص؛ policy از تنظیم مدیر می‌آید و بدون آن پیش‌فرض‌ها اعمال می‌شود. */
 function maxBasisPointsForTier(tierKey, policy = DEFAULT_POLICY) {
-  return tierKey === 'gold' ? policy.goldMaxBps : policy.maxBps;
+  const gold = policy.goldMaxBps;
+  const gray = policy.maxBps;
+  const silver = Number.isSafeInteger(policy.silverMaxBps) ? policy.silverMaxBps : Math.min(gold, SILVER_MAX_BASIS_POINTS);
+  if (tierKey === 'gold' || tierKey === 'gold_plus') return gold;
+  if (tierKey === 'silver') return Math.min(silver, gold);
+  return Math.min(gray, gold);
 }
 
 function isoOrNull(value) {

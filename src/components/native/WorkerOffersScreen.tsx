@@ -83,7 +83,7 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
     <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت به حساب متخصص</Text></Pressable>
     <WorkerCustomerRequests />
     <Text style={styles.title}>ساعت‌های پیشنهادی من</Text>
-    <Text style={styles.note}>بازهٔ آزاد خود را با قیمت پایین‌تر از تعرفه ثبت کنید تا مشتری ببیند و رزرو کند. {max > 10000 ? 'درجهٔ شما اجازهٔ قیمت بالاتر از تعرفه را هم می‌دهد.' : 'قیمت نمی‌تواند از تعرفهٔ شرکت بالاتر باشد.'}</Text>
+    <Text style={styles.note}>بازهٔ هزینهٔ خدمت را حتی‌المقدور کمتر انتخاب کنید تا مشتری به قبول خدمت تشویق شود. حداقل و حداکثر تعیین قیمت توسط متخصص و حتی مشتری در سند ذکر شده است.</Text>
     {preview && <Text style={styles.note}>این بخش در پیش‌نمایش فقط نمایشی است؛ ثبت غیرفعال است.</Text>}
     {!!data && !data.enabled && <Text accessibilityLiveRegion="polite" style={styles.note}>{data.disabledMessage || 'ثبت قیمت پیشنهاد برای حساب شما غیرفعال است.'}</Text>}
     {phase === 'loading' && <ActivityIndicator color={colors.teal} />}

@@ -27,8 +27,15 @@ test('offer input policy: tier bounds, steps, window and horizon', () => {
     adjustmentBasisPoints: 7000,
   };
   assert.equal(validateOfferInput(base, { tierKey: 'gray', now }).adjustmentBasisPoints, 7000);
+  assert.equal(maxBasisPointsForTier('gray'), 10000);
+  assert.equal(maxBasisPointsForTier('silver'), 11000);
   assert.equal(maxBasisPointsForTier('gold'), 13000);
-  assert.throws(() => validateOfferInput({ ...base, adjustmentBasisPoints: 11000 }, { tierKey: 'silver', now }), { code: 'PRICE_OUT_OF_RANGE' });
+  assert.equal(maxBasisPointsForTier('gold_plus'), 13000);
+  assert.equal(validateOfferInput({ ...base, adjustmentBasisPoints: 10000 }, { tierKey: 'gray', now }).adjustmentBasisPoints, 10000);
+  assert.throws(() => validateOfferInput({ ...base, adjustmentBasisPoints: 10100 }, { tierKey: 'gray', now }), { code: 'PRICE_OUT_OF_RANGE' });
+  assert.equal(validateOfferInput({ ...base, adjustmentBasisPoints: 11000 }, { tierKey: 'silver', now }).adjustmentBasisPoints, 11000);
+  assert.equal(validateOfferInput({ ...base, adjustmentBasisPoints: 7000 }, { tierKey: 'silver', now }).adjustmentBasisPoints, 7000);
+  assert.throws(() => validateOfferInput({ ...base, adjustmentBasisPoints: 11100 }, { tierKey: 'silver', now }), { code: 'PRICE_OUT_OF_RANGE' });
   assert.equal(validateOfferInput({ ...base, adjustmentBasisPoints: 13000 }, { tierKey: 'gold', now }).adjustmentBasisPoints, 13000);
   assert.throws(() => validateOfferInput({ ...base, adjustmentBasisPoints: 13100 }, { tierKey: 'gold', now }), { code: 'PRICE_OUT_OF_RANGE' });
   assert.throws(() => validateOfferInput({ ...base, adjustmentBasisPoints: 4900 }, { tierKey: 'gold', now }), { code: 'PRICE_OUT_OF_RANGE' });

@@ -45,7 +45,7 @@ export function CustomerOffersScreen({ onBack, onBook }: { onBack: () => void; o
         {offer.total != null && <Text style={styles.price}>
           {formatOfferPrice(offer.total, offer.currencyUnit)}{offer.quantity && offer.quantity > 1 ? ` برای ${toPersianDigits(offer.quantity)} ساعت` : ''}
         </Text>}
-        {off !== 0 && <Text style={off > 0 ? styles.good : styles.note}>{off > 0 ? `${toPersianDigits(off)}٪ ارزان‌تر از تعرفه` : `${toPersianDigits(-off)}٪ بالاتر از تعرفه (متخصص طلایی)`}</Text>}
+        {off !== 0 && <Text style={off > 0 ? styles.good : styles.note}>{off > 0 ? `${toPersianDigits(off)}٪ ارزان‌تر از تعرفه` : `${toPersianDigits(-off)}٪ بالاتر از تعرفه`}</Text>}
         <Pressable accessibilityRole="button" onPress={() => onBook(offer)} style={styles.button}><Text style={styles.buttonText}>رزرو این ساعت</Text></Pressable>
       </View>;
     })}

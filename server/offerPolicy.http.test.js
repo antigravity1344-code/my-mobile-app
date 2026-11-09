@@ -36,15 +36,17 @@ test('admin offer policy: defaults, validation, versioning and effect on new off
 
   assert.equal((await areq('GET', undefined, workerLogin.token)).status, 401);
   const initial = await areq('GET');
-  assert.deepEqual(initial.json.policy, { version: 0, minPercent: 70, maxPercent: 100, goldMaxPercent: 130, effectiveAt: null });
+  assert.deepEqual(initial.json.policy, { version: 0, minPercent: 70, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 130, effectiveAt: null });
 
   for (const bad of [
-    { minPercent: 80, maxPercent: 70, goldMaxPercent: 130, expectedVersion: 0 },
-    { minPercent: 50, maxPercent: 120, goldMaxPercent: 110, expectedVersion: 0 },
-    { minPercent: 0, maxPercent: 100, goldMaxPercent: 130, expectedVersion: 0 },
-    { minPercent: 50, maxPercent: 100, goldMaxPercent: 301, expectedVersion: 0 },
-    { minPercent: 50.5, maxPercent: 100, goldMaxPercent: 130, expectedVersion: 0 },
-    { minPercent: 50, maxPercent: 100, goldMaxPercent: 130 },
+    { minPercent: 80, maxPercent: 70, silverMaxPercent: 110, goldMaxPercent: 130, expectedVersion: 0 },
+    { minPercent: 50, maxPercent: 120, silverMaxPercent: 125, goldMaxPercent: 110, expectedVersion: 0 },
+    { minPercent: 70, maxPercent: 100, silverMaxPercent: 90, goldMaxPercent: 130, expectedVersion: 0 },
+    { minPercent: 0, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 130, expectedVersion: 0 },
+    { minPercent: 50, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 301, expectedVersion: 0 },
+    { minPercent: 50.5, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 130, expectedVersion: 0 },
+    { minPercent: 50, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 130 },
+    { minPercent: 70, maxPercent: 100, goldMaxPercent: 130, expectedVersion: 0 },
   ]) assert.equal((await areq('PUT', bad)).status, 400);
 
   const startAt = new Date(Date.now() + 48 * HOUR).toISOString();
@@ -53,17 +55,29 @@ test('admin offer policy: defaults, validation, versioning and effect on new off
     serviceId: 'hourly', startAt: new Date(Date.parse(startAt) + offset * 24 * HOUR).toISOString(),
     endAt: new Date(Date.parse(endAt) + offset * 24 * HOUR).toISOString(), adjustmentBasisPoints: bp,
   });
-  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(12000))).status, 400); // سقف پیش‌فرض ۱۰۰٪
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(10100))).status, 400); // سقف پیش‌فرض خاکستری ۱۰۰٪
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(11000))).status, 400);
 
-  const saved = await areq('PUT', { minPercent: 70, maxPercent: 110, goldMaxPercent: 150, expectedVersion: 0 });
+  const saved = await areq('PUT', { minPercent: 70, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 150, expectedVersion: 0 });
   assert.equal(saved.status, 200);
   assert.equal(saved.json.policy.version, 1);
-  assert.equal((await areq('PUT', { minPercent: 60, maxPercent: 100, goldMaxPercent: 130, expectedVersion: 0 })).status, 409);
+  assert.equal(saved.json.policy.silverMaxPercent, 110);
+  assert.equal((await areq('PUT', { minPercent: 60, maxPercent: 100, silverMaxPercent: 110, goldMaxPercent: 130, expectedVersion: 0 })).status, 409);
 
   const info = await wreq('GET', '/api/workers/me/offers');
   assert.equal(info.json.minBasisPoints, 7000);
-  assert.equal(info.json.maxBasisPoints, 11000);
+  assert.equal(info.json.maxBasisPoints, 10000);
   assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(6000))).status, 400);
-  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(11500))).status, 400);
-  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(11000))).status, 201);
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(10000))).status, 201);
+
+  harness.store.ensureAccount(workerLogin.user.id);
+  const { DatabaseSync } = require('node:sqlite');
+  const tierDb = new DatabaseSync(process.env.PAKSHO_SQLITE_PATH);
+  tierDb.prepare("UPDATE user_points SET tierKey = 'silver' WHERE userId = ?").run(workerLogin.user.id);
+  tierDb.close();
+  const silverInfo = await wreq('GET', '/api/workers/me/offers');
+  assert.equal(silverInfo.json.maxBasisPoints, 11000);
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(11100, 1))).status, 400);
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(11000, 1))).status, 201);
+  assert.equal((await wreq('POST', '/api/workers/me/offers', offerBody(8000, 2))).status, 201);
 });

@@ -1914,7 +1914,7 @@ app.put('/api/admin/offer-policy', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const result = store.offerPolicy.publish(req.body);
   if (result.code === 'invalid') {
-    return res.status(400).json({ success: false, message: 'درصدها باید عدد صحیح از ۱ تا ۳۰۰ باشند و حداقل ≤ حداکثر عادی ≤ حداکثر طلایی؛ نسخه جاری نیز لازم است.' });
+    return res.status(400).json({ success: false, message: 'درصدها باید عدد صحیح از ۱ تا ۳۰۰ باشند و حداقل ≤ حداکثر خاکستری ≤ حداکثر نقره‌ای ≤ حداکثر طلایی؛ نسخه جاری نیز لازم است.' });
   }
   if (result.code === 'conflict') {
     return res.status(409).json({ success: false, message: 'تنظیم قبلاً تغییر کرده است. مقدار جدید را بازخوانی کنید.', policy: result.policy });
@@ -2598,12 +2598,14 @@ app.get('/admin', (req, res) => {
     </section>
     <section id="tabOfferPolicy" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قیمت پیشنهاد متخصص</h3>
-      <p class="text-sm text-slate-300">متخصص می‌تواند ساعت آزاد خود را با درصدی از تعرفهٔ شما ثبت کند. حداقل و حداکثر مجاز را اینجا تعیین کنید (عدد صحیح؛ ۱۰۰ یعنی خود تعرفه). برای ممنوع‌کردن قیمت بالاتر از تعرفه، هر دو سقف را ۱۰۰ بگذارید. پیشنهادهای قبلاً ثبت‌شده تغییر نمی‌کنند.</p>
-      <label for="offerPolicyMin" class="block text-sm">حداقل درصد تعرفه (همهٔ متخصصان)</label>
+      <p class="text-sm text-slate-300">هر متخصص می‌تواند زیر ۱۰۰٪ تعرفه قیمت بگذارد، تا همین حداقل مشترک. سقف بالاتر از تعرفه به درجه بستگی دارد: خاکستری صفر درصد اضافه (سقف ۱۰۰)، نقره‌ای ۱۱۰ و طلایی ۱۳۰. ترتیب ذخیره‌شده حداقل ≤ خاکستری ≤ نقره‌ای ≤ طلایی است. پیشنهادهای قبلاً ثبت‌شده تغییر نمی‌کنند. حدود مشتری جداست و پایین همین برگه است.</p>
+      <label for="offerPolicyMin" class="block text-sm">حداقل درصد تعرفه (همهٔ متخصصان؛ زیر ۱۰۰٪)</label>
       <input id="offerPolicyMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="offerPolicyMax" class="block text-sm">حداکثر درصد تعرفه (متخصص عادی)</label>
+      <label for="offerPolicyMax" class="block text-sm">حداکثر درصد تعرفه (متخصص خاکستری)</label>
       <input id="offerPolicyMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="offerPolicyGold" class="block text-sm">حداکثر درصد تعرفه (متخصص طلایی)</label>
+      <label for="offerPolicySilver" class="block text-sm">حداکثر درصد تعرفه (متخصص نقره‌ای)</label>
+      <input id="offerPolicySilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <label for="offerPolicyGold" class="block text-sm">حداکثر درصد تعرفه (متخصص طلایی و طلایی پلاس)</label>
       <input id="offerPolicyGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
       <p id="offerPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>

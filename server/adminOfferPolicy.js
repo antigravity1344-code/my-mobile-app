@@ -2,7 +2,7 @@
 
 let offerPolicy = null;
 let offerPolicyBusy = false;
-const OFFER_POLICY_FIELDS = ['offerPolicyMin', 'offerPolicyMax', 'offerPolicyGold'];
+const OFFER_POLICY_FIELDS = ['offerPolicyMin', 'offerPolicyMax', 'offerPolicySilver', 'offerPolicyGold'];
 function offerPolicyMessage(text) { document.getElementById('offerPolicyMessage').textContent = text; }
 function offerPolicyControls() {
   document.getElementById('offerPolicyRefresh').disabled = offerPolicyBusy;
@@ -11,11 +11,12 @@ function offerPolicyControls() {
 }
 function validOfferPolicy(value) {
   return value && Number.isSafeInteger(value.version) && value.version >= 0 &&
-    [value.minPercent, value.maxPercent, value.goldMaxPercent].every((n) => Number.isSafeInteger(n) && n >= 1 && n <= 300);
+    [value.minPercent, value.maxPercent, value.silverMaxPercent, value.goldMaxPercent].every((n) => Number.isSafeInteger(n) && n >= 1 && n <= 300);
 }
 function showOfferPolicy() {
   document.getElementById('offerPolicyMin').value = String(offerPolicy.minPercent);
   document.getElementById('offerPolicyMax').value = String(offerPolicy.maxPercent);
+  document.getElementById('offerPolicySilver').value = String(offerPolicy.silverMaxPercent);
   document.getElementById('offerPolicyGold').value = String(offerPolicy.goldMaxPercent);
 }
 function offerPolicyNumber(id) {
@@ -62,11 +63,13 @@ async function saveAdminOfferPolicy() {
   if (offerPolicyBusy || !offerPolicy) return;
   const minPercent = offerPolicyNumber('offerPolicyMin');
   const maxPercent = offerPolicyNumber('offerPolicyMax');
+  const silverMaxPercent = offerPolicyNumber('offerPolicySilver');
   const goldMaxPercent = offerPolicyNumber('offerPolicyGold');
-  if ([minPercent, maxPercent, goldMaxPercent].some((n) => n === null || n < 1 || n > 300) || minPercent > maxPercent || maxPercent > goldMaxPercent) {
-    offerPolicyMessage('عددهای صحیح ۱ تا ۳۰۰ وارد کنید: حداقل ≤ حداکثر عادی ≤ حداکثر طلایی.'); return;
+  if ([minPercent, maxPercent, silverMaxPercent, goldMaxPercent].some((n) => n === null || n < 1 || n > 300) ||
+      minPercent > maxPercent || maxPercent > silverMaxPercent || silverMaxPercent > goldMaxPercent) {
+    offerPolicyMessage('عددهای صحیح ۱ تا ۳۰۰ وارد کنید: حداقل ≤ حداکثر خاکستری ≤ حداکثر نقره‌ای ≤ حداکثر طلایی.'); return;
   }
-  const body = { minPercent, maxPercent, goldMaxPercent, expectedVersion: offerPolicy.version };
+  const body = { minPercent, maxPercent, silverMaxPercent, goldMaxPercent, expectedVersion: offerPolicy.version };
   offerPolicyBusy = true; offerPolicyControls(); offerPolicyMessage('در حال ذخیره…');
   try {
     const result = await offerPolicyRequest('PUT', body);
