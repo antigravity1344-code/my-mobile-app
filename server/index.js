@@ -1995,6 +1995,12 @@ app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
   if (result.code !== 'ok') return res.status(400).json({ success: false, message: 'درخواست کلید قابلیت معتبر نیست.' });
   res.json({ success: true, ...store.featureSwitches.snapshot(), workerFeatures: body.scope === 'WORKER' ? store.featureSwitches.forWorker(body.workerId) : undefined });
 });
+// وضعیت کلیدهای سایت برای سایت مشتری (بدون ورود). فقط یک بیت: آیا افزودنی/پاک‌کننده/کد تخفیف فعال است.
+app.get('/api/site/features', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({ success: true, siteExtras: store.featureSwitches.isGlobalEnabled('site_extras') });
+});
+
 app.get('/api/services/enabled', (req, res) => {
   res.set('Cache-Control', 'no-store');
   // خدمت صلاحیتی: برای مشتری وقتی هیچ متخصص تأییدشده ندارد پنهان است؛ برای متخصصِ بدون صلاحیت همیشه پنهان است.

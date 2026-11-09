@@ -4,9 +4,12 @@
 const FEATURES = Object.freeze({
   offers: 'قیمت پیشنهاد متخصص',
   patient_companion: 'صلاحیت همراه مریض',
+  site_extras: 'افزودنی، پاک‌کننده و کد تخفیف سایت مستقل',
 });
 // کلیدهای متخصصی که پیش‌فرضشان خاموش است و فقط مدیر روشن می‌کند (صلاحیت).
 const WORKER_DEFAULT_OFF = Object.freeze(new Set(['patient_companion']));
+// کلیدهایی که برای کل شرکت پیش‌فرض خاموش‌اند. site_extras وقتی سایت مستقل است روشن می‌شود.
+const GLOBAL_DEFAULT_OFF = Object.freeze(new Set(['site_extras']));
 
 function createFeatureSwitches({ database, transaction }) {
   database.exec(`
@@ -38,7 +41,9 @@ function createFeatureSwitches({ database, transaction }) {
   const known = (feature) => Object.hasOwn(FEATURES, feature);
   const state = (scope, subjectId, feature) => {
     const row = get.get(scope, subjectId, feature);
-    return row ? row.enabled === 1 : !(scope === 'WORKER' && WORKER_DEFAULT_OFF.has(feature));
+    if (row) return row.enabled === 1;
+    if (scope === 'WORKER') return !WORKER_DEFAULT_OFF.has(feature);
+    return !GLOBAL_DEFAULT_OFF.has(feature);
   };
 
   return {
@@ -53,7 +58,7 @@ function createFeatureSwitches({ database, transaction }) {
     },
     snapshot() {
       const global = {};
-      for (const feature of Object.keys(FEATURES)) global[feature] = true;
+      for (const feature of Object.keys(FEATURES)) global[feature] = !GLOBAL_DEFAULT_OFF.has(feature);
       for (const row of allGlobal.all()) if (known(row.feature)) global[row.feature] = row.enabled === 1;
       return { features: Object.entries(FEATURES).map(([key, label]) => ({ key, label })), global };
     },
