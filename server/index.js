@@ -1224,6 +1224,48 @@ app.post('/api/pricing/quote', (req, res) => {
   }
 });
 
+// پیگیری عمومی سفارش با کد پیگیری (شناسه سفارش ORD-…). مصوب مالک ۹ نوامبر ۲۰۲۶ برای سایت‌های مشتری.
+// فقط خلاصهٔ غیرشخصی برمی‌گردد: نام، تلفن، نشانی دقیق، متخصص و مبلغ هرگز در این پاسخ نیستند.
+const TRACK_LIMIT = 60;
+const TRACK_WINDOW_MS = 10 * 60 * 1000;
+const trackWindows = new Map();
+function trackAllowed(req) {
+  const key = req.ip || 'unknown';
+  const now = Date.now();
+  const window = trackWindows.get(key);
+  if (!window || now - window.startedAt > TRACK_WINDOW_MS) {
+    trackWindows.set(key, { count: 1, startedAt: now });
+    return true;
+  }
+  if (window.count >= TRACK_LIMIT) return false;
+  window.count += 1;
+  return true;
+}
+
+app.get('/api/track/:code', (req, res) => {
+  if (!trackAllowed(req)) {
+    res.set('Retry-After', String(TRACK_WINDOW_MS / 1000));
+    return res.status(429).json({ success: false, code: 'RATE_LIMITED', message: 'تعداد درخواست پیگیری بیش از حد مجاز است.' });
+  }
+  const code = String(req.params.code || '').trim();
+  const order = /^ORD-[0-9A-Z]+-[0-9a-f]{8}$/.test(code) ? store.getOrder(code) : null;
+  if (!order) {
+    return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'سفارشی با این کد پیدا نشد.' });
+  }
+  return res.json({
+    success: true,
+    order: {
+      trackingCode: order.id,
+      status: order.status,
+      serviceTitle: order.serviceTitle,
+      date: order.date ?? null,
+      time: order.time ?? null,
+      area: orderAreaFromAddress(order.address) || null,
+      createdAt: order.createdAt ?? null,
+    },
+  });
+});
+
 // 5. سفارش جدید
 app.post('/api/orders', (req, res) => {
   const authUser = requireUser(req, res);
