@@ -117,7 +117,9 @@ function completionPayload(orderId) {
   }
 
   const anonymous = await request(server, { method: 'POST', pathname: '/api/pricing/quote', body: { serviceId: 'hourly', quantity: 1 } });
-  assert.equal(anonymous.status, 401);
+  // قیمت‌گیری بدون ورود باز است (مصوب مالک ۹ نوامبر ۲۰۲۶)؛ فقط قیمت برمی‌گردد.
+  assert.equal(anonymous.status, 200);
+  assert.ok(anonymous.json.quote && anonymous.json.quote.quoteToken);
 
   const workerQuote = await request(server, {
     method: 'POST', pathname: '/api/pricing/quote', token: workerLogin.token, body: { serviceId: 'hourly', quantity: 1 },

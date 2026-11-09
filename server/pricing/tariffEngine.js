@@ -269,6 +269,19 @@ function quote(policy, input) {
     discountTotal += amount;
     breakdown.push({ kind: 'discount', id: discount.id, amount: -amount });
   }
+  // کد تخفیف مشتری (درصدی): بعد از تخفیف‌های تعرفه روی جمع باقی‌مانده اعمال می‌شود.
+  if (input.promoDiscount != null) {
+    const promo = input.promoDiscount;
+    if (typeof promo !== 'object' || Array.isArray(promo) || typeof promo.id !== 'string' || promo.id === '') {
+      fail('INPUT_INVALID', 'کد تخفیف معتبر نیست.');
+    }
+    assertSafeInteger(promo.basisPoints, 'INPUT_INVALID', 'درصد کد تخفیف باید عدد صحیح باشد.');
+    if (promo.basisPoints < 1 || promo.basisPoints > 10000) fail('INPUT_INVALID', 'درصد کد تخفیف معتبر نیست.');
+    const remaining = subtotal - discountTotal;
+    const amount = mulDivHalfUp(remaining, promo.basisPoints, 10000);
+    discountTotal += amount;
+    breakdown.push({ kind: 'discount', id: promo.id, amount: -amount });
+  }
   if (discountTotal > subtotal) fail('CALCULATION_INVALID', 'تخفیف از مبلغ خدمت بیشتر است.');
   return deepFreeze({
     companyId: policy.companyId,

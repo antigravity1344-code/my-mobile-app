@@ -28,6 +28,7 @@ const {
   setOfferResolver,
   setTierResolver,
   setDirectRequestResolver,
+  setPromoResolver,
   previewOfferPrice,
   QuoteError,
   withCustomerRequestAcceptance,
@@ -871,6 +872,15 @@ setOfferResolver(({ offerId, serviceId, now }) => {
   return { basisPoints: offer.adjustmentBasisPoints };
 });
 setTierResolver((tier) => store.tierPricingPolicy.basisPointsFor(tier));
+// کد تخفیف درصدی: اعتبار هنگام نقل‌قول و تأیید سفارش بررسی می‌شود؛ مصرف در ثبت سفارش انجام می‌شود.
+setPromoResolver((code) => {
+  const row = store.discountCodes.find(code);
+  if (!row || row.active !== 1) throw new QuoteError('PROMO_INVALID', 'کد تخفیف معتبر نیست.');
+  if (row.expiresAt && Date.parse(row.expiresAt) <= Date.now()) throw new QuoteError('PROMO_EXPIRED', 'مهلت این کد تخفیف تمام شده است.');
+  if (row.maxUses != null && row.usedCount >= row.maxUses) throw new QuoteError('PROMO_EXHAUSTED', 'ظرفیت این کد تخفیف تمام شده است.');
+  return { id: 'promo:' + row.code, basisPoints: row.basisPoints };
+});
+
 setDirectRequestResolver((workerId) => {
   const worker = store.getUser(workerId);
   if (!worker || worker.role !== 'WORKER' || (worker.status !== 'APPROVED' && worker.status !== 'ACTIVE')) {
@@ -1465,12 +1475,19 @@ app.post('/api/orders', (req, res) => {
   class OfferBookingFailed extends Error {}
   let savedOrder;
   try {
+  // کد تخفیف فقط وقتی مصرف می‌شود که سفارش واقعاً ساخته شود؛ داخل همین تراکنش است و در خطا برمی‌گردد.
+  const promoUsed = serverPriced && typeof req.body?.discountCode === 'string' && req.body.discountCode.trim() !== ''
+    ? store.discountCodes.normalizeCode(req.body.discountCode)
+    : null;
   savedOrder = store.transaction(() => {
     // بررسی دوباره داخل تراکنش: دو درخواست هم‌زمان با یک کلید فقط یک سفارش می‌سازند.
     const repeated = store.findOrderByClientRequest(user.id, storedClientRequestId);
     if (repeated) {
       if (serverPriced && serverRequestConflicts(repeated, serverPriced)) return { requestConflict: true };
       return repeated;
+    }
+    if (promoUsed && !store.discountCodes.consume(promoUsed)) {
+      throw new QuoteError('PROMO_EXHAUSTED', 'ظرفیت این کد تخفیف تمام شده است.');
     }
     const order = store.createOrder(newOrder);
     if (offerId !== undefined) {
@@ -1495,6 +1512,10 @@ app.post('/api/orders', (req, res) => {
         code: 'OFFER_UNAVAILABLE',
         message: 'این پیشنهاد دیگر در دسترس نیست. لطفاً پیشنهاد دیگری انتخاب کنید.',
       });
+    }
+    if (error instanceof QuoteError) {
+      const mapped = mapPricingError(error);
+      return res.status(mapped.status).json(mapped.body);
     }
     throw error;
   }
@@ -1982,6 +2003,33 @@ app.get('/api/admin/feature-switches', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ success: true, ...store.featureSwitches.snapshot() });
 });
+// کدهای تخفیف: مدیر می‌سازد و غیرفعال می‌کند. تاریخ انقضا و سقف استفاده اختیاری‌اند.
+app.get('/api/admin/discount-codes', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({ success: true, codes: store.discountCodes.list() });
+});
+
+app.post('/api/admin/discount-codes', requireAdmin, (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const result = store.discountCodes.create({
+    code: body.code,
+    percent: body.percent,
+    expiresAt: body.expiresAt,
+    maxUses: body.maxUses,
+  });
+  if (result.code === 'exists') return res.status(409).json({ success: false, code: 'EXISTS', message: 'این کد تخفیف قبلاً ساخته شده است.' });
+  if (result.code !== 'ok') return res.status(400).json({ success: false, code: 'INPUT_INVALID', message: 'اطلاعات کد تخفیف معتبر نیست.' });
+  return res.status(201).json({ success: true, code: result.view });
+});
+
+app.put('/api/admin/discount-codes/:code/active', requireAdmin, (req, res) => {
+  const active = req.body?.active === true;
+  if (typeof req.body?.active !== 'boolean') return res.status(400).json({ success: false, code: 'INPUT_INVALID', message: 'وضعیت کد باید درست یا نادرست باشد.' });
+  const result = store.discountCodes.setActive(req.params.code, active);
+  if (result.code !== 'ok') return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'کد تخفیف پیدا نشد.' });
+  return res.json({ success: true, code: result.view });
+});
+
 app.put('/api/admin/feature-switches', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const body = req.body && typeof req.body === 'object' ? req.body : {};

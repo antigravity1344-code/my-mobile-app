@@ -103,12 +103,19 @@ function selectionFromBody(body) {
   if (directRequestWorkerId && workerTier) {
     throw new QuoteError('INPUT_INVALID', 'درخواست طلایی سطح جداگانه نمی‌گیرد؛ قیمتش مستقل است.');
   }
+  let discountCode = null;
+  if (Object.prototype.hasOwnProperty.call(body, 'discountCode') && body.discountCode != null && body.discountCode !== '') {
+    if (typeof body.discountCode !== 'string') throw new QuoteError('INPUT_INVALID', 'کد تخفیف معتبر نیست.');
+    discountCode = body.discountCode.trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{3,32}$/.test(discountCode)) throw new QuoteError('INPUT_INVALID', 'کد تخفیف معتبر نیست.');
+  }
   return {
     serviceId: body.serviceId,
     quantity,
     options,
     ...(workerTier ? { workerTier } : {}),
     ...(directRequestWorkerId ? { directRequestWorkerId } : {}),
+    ...(discountCode ? { discountCode } : {}),
   };
 }
 
@@ -142,6 +149,7 @@ function tierForSelection(selection, offerAdjustment) {
 let offerResolver = null;
 let tierResolver = null;
 let directRequestResolver = null;
+let promoResolver = null;
 const WORKER_TIERS = new Set(['gray', 'silver', 'gold']);
 const FIXED_PRICE_SERVICE = 'staircase_common_areas';
 // درخواست ساعت دلخواه مشتری: شناسهٔ CRQ- فقط در پذیرش متخصص (داخل withCustomerRequestAcceptance) قابل نقل‌قول است.
@@ -171,6 +179,21 @@ function setTierResolver(resolver) {
 
 function setDirectRequestResolver(resolver) {
   directRequestResolver = typeof resolver === 'function' ? resolver : null;
+}
+
+/** resolver(code) → {id, basisPoints} یا QuoteError. */
+function setPromoResolver(resolver) {
+  promoResolver = typeof resolver === 'function' ? resolver : null;
+}
+
+function promoForSelection(selection) {
+  if (!selection.discountCode) return null;
+  if (!promoResolver) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
+  const resolved = promoResolver(selection.discountCode);
+  if (!resolved || typeof resolved.id !== 'string' || !Number.isSafeInteger(resolved.basisPoints)) {
+    throw new QuoteError('PROMO_INVALID', 'کد تخفیف معتبر نیست.');
+  }
+  return resolved;
 }
 
 function splitOfferOption(selection, now) {
@@ -218,6 +241,7 @@ function trustedQuote(selection, now) {
   const direct = directForSelection(selection, split.adjustment);
   const tier = direct ? null : tierForSelection(selection, split.adjustment);
   const basisPoints = direct ? direct.basisPoints : (tier && tier.basisPoints != null ? tier.basisPoints : null);
+  const promo = promoForSelection(selection);
   const priced = quote(policy, {
     serviceId: selection.serviceId,
     quantity: selection.quantity,
@@ -225,6 +249,7 @@ function trustedQuote(selection, now) {
     at: now,
     ...(split.adjustment ? { priceAdjustment: split.adjustment } : {}),
     ...(basisPoints != null ? { baseRateBasisPoints: basisPoints } : {}),
+    ...(promo ? { promoDiscount: promo } : {}),
   });
   return { priced, secret, tier, direct };
 }
@@ -251,6 +276,7 @@ function issueOrderQuote(body, now = new Date()) {
     serviceId: priced.serviceId,
     quantity: selection.quantity == null ? 1 : selection.quantity,
     options: stable(selection.options || {}),
+    ...(selection.discountCode ? { discountCode: selection.discountCode } : {}),
     tariffVersionId: priced.tariffVersionId,
     subtotal: priced.subtotal,
     discountTotal: priced.discountTotal,
@@ -277,6 +303,7 @@ function sameSelection(signed, selection) {
     && signed.quantity === (selection.quantity == null ? 1 : selection.quantity)
     && (signed.workerTier || null) === (selection.workerTier || null)
     && (signed.directRequestWorkerId || null) === (selection.directRequestWorkerId || null)
+    && (signed.discountCode || null) === (selection.discountCode || null)
     && JSON.stringify(stable(signed.options || {})) === JSON.stringify(stable(selection.options || {}));
 }
 
@@ -442,6 +469,7 @@ module.exports = {
   setOfferResolver,
   setTierResolver,
   setDirectRequestResolver,
+  setPromoResolver,
   previewOfferPrice,
   QUOTE_TTL_MS,
   NO_TARIFF_MESSAGE,

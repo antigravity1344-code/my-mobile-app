@@ -15,6 +15,7 @@ const { createCustomerRequestPolicy } = require('./customerRequestPolicy');
 const { createOfferPolicy } = require('./offerPolicy');
 const { createTierPricingPolicy } = require('./tierPricingPolicy');
 const { createFeatureSwitches } = require('./featureSwitches');
+const { createDiscountCodes } = require('./discountCodes');
 const { createServiceSwitches } = require('./serviceSwitches');
 const { createPaymentSettings } = require('./paymentSettings');
 const { createPaymentCharges } = require('./paymentCharges');
@@ -1753,6 +1754,7 @@ function createDataStore(filename) {
   const offerPolicy = createOfferPolicy({ database, transaction });
   const tierPricingPolicy = createTierPricingPolicy({ database, transaction });
   const featureSwitches = createFeatureSwitches({ database, transaction });
+  const discountCodes = createDiscountCodes({ database, transaction });
   const serviceSwitches = createServiceSwitches({ database, transaction });
   const paymentSettings = createPaymentSettings({
     database,
@@ -1787,6 +1789,7 @@ function createDataStore(filename) {
     offerPolicy,
     tierPricingPolicy,
     featureSwitches,
+    discountCodes,
     serviceSwitches,
     paymentSettings,
     paymentCharges,
