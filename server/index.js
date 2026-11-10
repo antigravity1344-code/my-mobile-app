@@ -1,4 +1,4 @@
-const { orderPriceStatus } = require('./pricing/priceStatus');
+const { orderPriceStatus, currentPricingRules } = require('./pricing/priceStatus');
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -2077,7 +2077,12 @@ app.get('/api/services/enabled', (req, res) => {
       unavailable.add(serviceId);
     }
   }
-  res.json({ success: true, disabledServiceIds: [...hidden], unavailableServiceIds: [...unavailable] });
+  res.json({
+    success: true,
+    disabledServiceIds: [...hidden],
+    unavailableServiceIds: [...unavailable],
+    pricingRules: currentPricingRules(),
+  });
 });
 app.get('/api/admin/service-switches', requireAdmin, (req, res) => {
   res.set('Cache-Control', 'no-store');

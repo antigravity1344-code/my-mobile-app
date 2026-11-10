@@ -25,7 +25,7 @@ test('D-82 tier lock: price, stairs, acceptance and unchanged past orders', asyn
         hourly: { model: 'hourly', rate: 1000, minQuantity: 1, maxQuantity: 8 },
         extra: { model: 'hourly', rate: 1000, minQuantity: 1, maxQuantity: 8, surcharges: [{ id: 'tools', optionId: 'tools', amount: 100 }] },
         factored: { model: 'hourly', rate: 1000, minQuantity: 1, maxQuantity: 8, factors: [{ id: 'place', optionId: 'place', equals: 'outer', basisPoints: 15000 }] },
-        staircase_common_areas: { model: 'fixed', rate: 500000 },
+        staircase_common_areas: { model: 'fixed', rate: 500000, exemptFromTierLock: true },
       },
     }],
   });
@@ -93,6 +93,7 @@ test('D-82 tier lock: price, stairs, acceptance and unchanged past orders', asyn
   const stairsGray = await quote({ serviceId: 'staircase_common_areas', workerTier: 'gray' });
   const stairsPlain = await quote({ serviceId: 'staircase_common_areas' });
   assert.equal(stairsSilver.status, 400);
+  assert.match(stairsSilver.json.message, /قفل سطح/);
   assert.equal(stairsGold.status, 400);
   assert.equal(stairsGray.json.quote.total, 500000);
   assert.equal(stairsPlain.json.quote.total, 500000);

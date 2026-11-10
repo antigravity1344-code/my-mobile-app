@@ -2,25 +2,52 @@
 
 // وضعیت قیمت سفارش برای نمایش در اپ‌ها (docs/PLAN-server-owned-price-status.fa.md).
 // سرور تصمیم می‌گیرد؛ اپ‌ها فقط همین را نمایش می‌دهند.
-//
-// مرحلهٔ ۱ (افزایشی، بدون تغییر رفتار): قاعدهٔ «قیمت ثابت» فعلاً همان شناسهٔ راه‌پله است.
-// حذف این فهرست سخت‌کد و خواندن نوع قیمت از تعرفه، مرحلهٔ بعدی و بعد از تست گوشی است.
-const FIXED_PRICE_SERVICE_IDS = ['staircase_common_areas'];
+// قیمت ثابت از model تعرفه می‌آید. نام خدمت این تصمیم را عوض نمی‌کند.
+const { loadCommittedTariff } = require('./tariffPublication');
+const { selectVersion } = require('./tariffEngine');
+
+function tariffService(serviceId, now) {
+  if (typeof serviceId !== 'string' || serviceId === '') return null;
+  try {
+    const version = selectVersion(loadCommittedTariff(), now);
+    return version.services[serviceId] || null;
+  } catch (error) {
+    return null;
+  }
+}
 
 /**
  * @returns {{status: 'locked', lockedAmount: number} | {status: 'hourly_pending'} | {status: 'unknown'}}
  */
-function orderPriceStatus(order) {
+function orderPriceStatus(order, now = new Date()) {
   const price = order && order.price;
   if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
     return { status: 'unknown' };
   }
   const isGolden = Boolean(order.directRequestWorkerId);
-  const isFixed = FIXED_PRICE_SERVICE_IDS.includes(order.serviceId);
+  const service = tariffService(order.serviceId, now);
+  const isFixed = Boolean(service && service.model === 'fixed');
   if (isGolden || isFixed) {
     return { status: 'locked', lockedAmount: price };
   }
   return { status: 'hourly_pending' };
 }
 
-module.exports = { orderPriceStatus, FIXED_PRICE_SERVICE_IDS };
+/** مدل و پرچم معافیت هر خدمت در تعرفهٔ معتبر الان؛ برای نمایش اپ، بدون نرخ. */
+function currentPricingRules(now = new Date()) {
+  try {
+    const version = selectVersion(loadCommittedTariff(), now);
+    return Object.keys(version.services).map((serviceId) => {
+      const service = version.services[serviceId];
+      return {
+        serviceId,
+        model: service.model,
+        exemptFromTierLock: service.exemptFromTierLock === true,
+      };
+    });
+  } catch (error) {
+    return [];
+  }
+}
+
+module.exports = { orderPriceStatus, currentPricingRules };
