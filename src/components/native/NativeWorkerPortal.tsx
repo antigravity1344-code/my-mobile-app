@@ -301,7 +301,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
             <Text style={styles.wageValue}>
-              {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit))}
+              {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit), order.priceStatus)}
             </Text>
           </View>
         </View>

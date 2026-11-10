@@ -41,7 +41,15 @@ export function workerPriceLine(
   serviceId: string | null | undefined,
   rawPrice: number | null | undefined,
   format: (amount: number) => string,
+  priceStatus?: { status: string; lockedAmount?: number } | null,
 ): string {
+  // سرور تصمیم می‌گیرد (docs/PLAN-server-owned-price-status.fa.md). اگر وضعیت نرسیده، قاعدهٔ قبلی می‌ماند.
+  if (priceStatus) {
+    if (priceStatus.status === 'locked' && typeof priceStatus.lockedAmount === 'number' && Number.isFinite(priceStatus.lockedAmount) && priceStatus.lockedAmount > 0) {
+      return `مبلغ سفارش: ${format(priceStatus.lockedAmount)}`;
+    }
+    return WORKER_PRICE_UNKNOWN;
+  }
   if (!serviceId || !WORKER_FIXED_PRICE_SERVICE_IDS.includes(serviceId)) return WORKER_PRICE_UNKNOWN;
   if (typeof rawPrice !== 'number' || !Number.isFinite(rawPrice) || rawPrice <= 0) return WORKER_PRICE_UNKNOWN;
   return `مبلغ سفارش: ${format(rawPrice)}`;

@@ -44,6 +44,8 @@ export interface ApiCompletion {
 }
 
 export interface ApiOrder {
+  /** وضعیت قیمت از سرور (docs/PLAN-server-owned-price-status.fa.md). نسخه‌های قدیمی سرور ندارند. */
+  priceStatus?: { status: 'locked'; lockedAmount: number } | { status: 'hourly_pending' } | { status: 'unknown' } | null;
   completion?: ApiCompletion | null;
   completionAcceptanceKey?: string | null;
   id: string;

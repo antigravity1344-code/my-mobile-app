@@ -59,6 +59,18 @@ describe('worker home model', () => {
     expect(workerPriceLine('unknown_service', 450000, f)).toBe(WORKER_PRICE_UNKNOWN);
   });
 
+  it('server price status wins: locked golden request shows its amount even for hourly services', () => {
+    const f = (n: number) => `${n} T`;
+    expect(workerPriceLine('home_unit_cleaning', 2275000, f, { status: 'locked', lockedAmount: 2275000 })).toBe('مبلغ سفارش: 2275000 T');
+    expect(workerPriceLine('staircase_common_areas', 450000, f, { status: 'locked', lockedAmount: 450000 })).toBe('مبلغ سفارش: 450000 T');
+  });
+
+  it('server price status: hourly_pending and unknown never show an amount', () => {
+    const f = (n: number) => `${n} T`;
+    expect(workerPriceLine('home_unit_cleaning', 450000, f, { status: 'hourly_pending' })).toBe(WORKER_PRICE_UNKNOWN);
+    expect(workerPriceLine('home_unit_cleaning', 450000, f, { status: 'unknown' })).toBe(WORKER_PRICE_UNKNOWN);
+  });
+
   it('my jobs keeps the same D-70 price rule after extracting the available-order views', () => {
     const src = read('NativeWorkerPortal.tsx');
     expect(src.match(/workerPriceLine\(order\.serviceId, order\.rawPrice,/g)?.length).toBe(1);

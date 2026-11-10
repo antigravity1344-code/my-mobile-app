@@ -12,7 +12,7 @@ function availableOrderText(order: NativeOrder) {
     service: order.serviceTitle,
     district: order.district || 'محدوده نامشخص',
     time: toPersianDigits(`${order.date} | ${order.timeSlot}`),
-    price: workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit)),
+    price: workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit), order.priceStatus),
   };
 }
 

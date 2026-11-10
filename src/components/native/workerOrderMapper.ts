@@ -30,6 +30,8 @@ export interface NativeOrder {
   createdAt: string;
   /** مبلغ خام سرور؛ null یعنی سرور مبلغی نفرستاده است. */
   rawPrice: number | null;
+  /** وضعیت قیمت از سرور؛ null یعنی سرور نفرستاده (رفتار قبلی). */
+  priceStatus: ApiOrder['priceStatus'] | null;
   /** تاریخ و ساعت خام سرور، بدون مقدار جایگزین. */
   rawDate: string;
   rawTime: string;
@@ -65,6 +67,7 @@ export function mapWorkerOrder(o: ApiOrder): NativeOrder {
     status: normalizeWorkerOrderStatus(o.status),
     createdAt: o.createdAt || '',
     rawPrice: typeof o.price === 'number' && Number.isFinite(o.price) ? o.price : null,
+    priceStatus: o.priceStatus ?? null,
     rawDate: typeof o.date === 'string' ? o.date : '',
     rawTime: typeof o.time === 'string' ? o.time : '',
     serviceId: typeof o.serviceId === 'string' && o.serviceId.trim() ? o.serviceId.trim() : null,

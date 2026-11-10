@@ -273,7 +273,7 @@ export function WorkerHomeScreen({
                   </View>
                 ) : null}
                 <Text style={styles.priceText}>
-                  {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit))}
+                  {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit), order.priceStatus)}
                 </Text>
                 {canAcceptWorkerOrder(order.status) ? (
                   <Pressable
