@@ -170,6 +170,9 @@ function renderAdminTariff() {
       const exempt = tariffField(row, 'معاف از قفل سطح — ' + (tariffServiceLabels[id] || id),
         'tariffTierExempt' + index, 'checkbox', 'on');
       exempt.checked = service.exemptFromTierLock === true;
+      if (version.status === 'published') {
+        row.append(adminElement('p', 'text-xs', exempt.checked ? 'معاف از قفل سطح' : 'مشمول قفل سطح'));
+      }
       tariffAdjustments(row, service);
       rates.append(row);
       return { id, input, exempt };
