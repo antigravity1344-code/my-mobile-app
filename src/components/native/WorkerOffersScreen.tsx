@@ -89,9 +89,9 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
     {phase === 'loading' && <ActivityIndicator color={colors.teal} />}
     {!!data && <>
       <Text style={styles.label}>خدمت</Text>
-      <View style={styles.wrap}>{services.map(row => <Pressable key={row.id} accessibilityRole="button" disabled={!editable}
+      <View style={styles.serviceGrid}>{services.map(row => <Pressable key={row.id} accessibilityRole="button" disabled={!editable}
         accessibilityState={{ selected: row.id === serviceId, disabled: !editable }} onPress={() => setServiceId(row.id)}
-        style={[styles.chip, row.id === serviceId && styles.selected]}><Text style={styles.text}>{row.title}</Text></Pressable>)}</View>
+        style={[styles.chip, styles.serviceChip, row.id === serviceId && styles.selected]}><Text style={styles.serviceText} numberOfLines={2}>{row.title}</Text></Pressable>)}</View>
       <Text style={styles.label}>روز</Text>
       <ScrollView horizontal contentContainerStyle={styles.row}>{dates.slice(1).map(day => <Pressable key={day.dateString} accessibilityRole="button" disabled={!editable}
         accessibilityState={{ selected: day.dateString === dateString, disabled: !editable }} onPress={() => setDateString(day.dateString)}
@@ -137,7 +137,11 @@ const styles = StyleSheet.create({
   label: { ...type.semibold, textAlign: 'right', color: colors.text }, note: { ...type.regular, textAlign: 'right', color: colors.muted, lineHeight: 24 },
   heading: { ...type.semibold, textAlign: 'right', color: colors.text },
   link: { ...type.medium, textAlign: 'right', color: colors.teal }, row: { flexDirection: 'row-reverse', gap: 8, flexGrow: 1 },
-  wrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }, chip: { padding: 12, borderWidth: 1, borderColor: colors.mutedLight, borderRadius: 12 },
+  wrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  serviceGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  chip: { padding: 12, borderWidth: 1, borderColor: colors.mutedLight, borderRadius: 12 },
+  serviceChip: { width: '48.5%', minHeight: 72, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  serviceText: { ...type.medium, color: colors.text, textAlign: 'center', lineHeight: 22 },
   selected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, text: { ...type.medium, color: colors.text },
   stepper: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   stepButton: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal },

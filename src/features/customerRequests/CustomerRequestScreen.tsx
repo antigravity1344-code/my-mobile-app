@@ -95,9 +95,9 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
       <Text style={styles.body}>{serviceTitle}. زمان و درصد قیمت را انتخاب کنید؛ قیمت فقط در بازه‌ی مجاز پذیرفته می‌شود.</Text>
 
       <Text style={styles.label}>خدمت</Text>
-      <View style={styles.chips}>
+      <View style={styles.serviceGrid}>
         {services.map((service) => (
-          <Chip key={service.id} selected={serviceId === service.id} label={service.title} onPress={() => setServiceId(service.id)} />
+          <Chip key={service.id} equal selected={serviceId === service.id} label={service.title} onPress={() => setServiceId(service.id)} />
         ))}
       </View>
 
@@ -158,10 +158,10 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function Chip({ selected, label, onPress }: { selected: boolean; label: string; onPress: () => void }) {
+function Chip({ selected, label, onPress, equal = false }: { selected: boolean; label: string; onPress: () => void; equal?: boolean }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}>
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, equal && styles.chipEqual, selected && styles.chipSelected]}>
+      <Text numberOfLines={equal ? 2 : undefined} style={[styles.chipText, equal && styles.chipTextEqual, selected && styles.chipTextSelected]}>{label}</Text>
     </Pressable>
   );
 }
@@ -173,9 +173,12 @@ const styles = StyleSheet.create({
   body: { color: colors.muted, textAlign: 'right', lineHeight: 22 },
   label: { fontWeight: '700', color: colors.text, textAlign: 'right', marginTop: 8 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  serviceGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.white },
+  chipEqual: { width: '48.5%', minHeight: 72, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   chipSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
   chipText: { color: colors.text },
+  chipTextEqual: { textAlign: 'center', lineHeight: 22 },
   chipTextSelected: { color: colors.white, fontWeight: '700' },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12, minHeight: 64, textAlign: 'right', backgroundColor: colors.white },
   message: { color: colors.teal, textAlign: 'right' },
