@@ -2687,7 +2687,40 @@ app.get('/admin', (req, res) => {
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
     body { font-family: Vazirmatn, sans-serif; background-color: #F6F2E6; color: #1F2A28; }
-    .admin-tabs button { white-space: nowrap; flex-shrink: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+    .admin-layout { width: 100%; max-width: 72rem; margin-inline: auto; text-align: right; overflow-wrap: anywhere; }
+    .admin-layout [hidden] { display: none !important; }
+    .admin-layout header { flex-wrap: wrap; gap: 12px; }
+    .admin-layout header > div { flex: 1 1 18rem; min-width: 0; }
+    .admin-layout .admin-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: 56px;
+      gap: 8px;
+      overflow: visible;
+    }
+    .admin-layout .admin-tabs > button {
+      min-width: 0;
+      width: 100%;
+      height: 100%;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      text-align: right;
+      white-space: normal;
+      line-height: 1.5;
+      background: #fff;
+    }
+    .admin-tabs > button.border-sky-400 { background: #E6F3F2; border-color: #11766F; }
+    #statsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    #statsGrid > div { min-width: 0; text-align: right; }
+    #statsGrid h2 { font-size: 1.5rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+    #totalRevenue { color: #5B387B; }
+    #totalRevenue:empty::before { content: '0'; }
+    .admin-layout > section { min-width: 0; }
+    .admin-layout > section :is(h2, h3) { font-size: 1.125rem; font-weight: 700; line-height: 1.6; }
+    .admin-layout :is(fieldset, input, select, textarea, button, img) { min-width: 0; max-width: 100%; }
+    .admin-layout section .flex > * { min-width: 0; }
+    .admin-layout section .overflow-x-auto { max-width: 100%; }
     /* هم‌رنگی با اپ مشتری و متخصص: کرم، سفید، تیل و کهربایی (از tokens اپ) */
     .bg-slate-950, .bg-slate-900, .bg-slate-800 { background-color: #FFFFFF !important; }
     .bg-slate-700, .bg-slate-600 { background-color: #E6F3F2 !important; }
@@ -2704,19 +2737,16 @@ app.get('/admin', (req, res) => {
     button:disabled { opacity: 0.55; }
     /* اندازه‌ی یکسان دکمه‌ها با اپ‌ها: حداقل ۴۴ پیکسل و گوشه‌ی ۱۲ */
     button { min-height: 44px; border-radius: 12px; }
-    /* گوشی: بدون اسکرول افقی صفحه، عنوان کوچک‌تر و دکمه‌ها کنار هم یا زیر هم */
-    html, body { max-width: 100%; overflow-x: hidden; }
     @media (max-width: 640px) {
       body { padding: 12px !important; }
       h1 { font-size: 1.15rem !important; line-height: 1.6; }
       .flex { flex-wrap: wrap; }
-      .admin-tabs { overflow-x: auto; flex-wrap: nowrap; }
-      button { min-height: 44px; }
+      .admin-layout .admin-tabs, #statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
-  <div class="max-w-6xl mx-auto space-y-6">
+  <div class="admin-layout max-w-6xl mx-auto space-y-6">
     
     <!-- هدر -->
     <header class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
