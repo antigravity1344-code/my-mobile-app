@@ -1228,6 +1228,8 @@ function assertReturnAppended(after, before, previousWorkerId, label) {
       'points_ledger_no_delete',
       'points_ledger_no_overwrite',
       'points_ledger_no_update',
+      'tier_pricing_policy_no_delete',
+      'tier_pricing_policy_no_update',
       'worker_bank_audit_no_delete',
       'worker_bank_audit_no_replace',
       'worker_bank_audit_no_update',
