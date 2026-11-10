@@ -102,8 +102,9 @@ test('site switches load, save independently, reload and restore the displayed s
   await context.route('**/api/admin/feature-switches', (route) => route.request().method() === 'PUT'
     ? route.fulfill({ status: 400, json: { success: false, message: 'خطای آزمایشی کلید قابلیت' } })
     : route.continue());
-  await extras.uncheck();
+  await extras.click();
   await page.getByText(/خطای آزمایشی کلید قابلیت/).waitFor();
+  await page.waitForSelector('#siteFeatureControls:enabled');
   assert.equal(await extras.isChecked(), true);
 });
 
