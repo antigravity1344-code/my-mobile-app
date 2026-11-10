@@ -2638,6 +2638,10 @@ app.get('/admin/tariff.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminTariff.js'));
 });
 
+app.get('/admin/site-settings.js', (req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'adminSiteSettings.js'));
+});
+
 app.get('/admin/tiers.js', (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminTiers.js'));
 });
@@ -2765,6 +2769,8 @@ app.get('/admin', (req, res) => {
       <button id="tabOfferPolicyBtn" onclick="switchTab('offerPolicy'); loadAdminOfferPolicy(); loadAdminCustomerRequestPolicy(); loadAdminOfferReport(); loadAdminFeatureSwitches()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قیمت پیشنهاد متخصص</button>
       <button id="tabTierLockBtn" onclick="switchTab('tierLock'); loadAdminTierLock()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قفل سطح سفارش</button>
       <button id="tabServicesBtn" onclick="switchTab('services'); loadAdminServices()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">خدمات فعال</button>
+      <button id="tabSiteFeaturesBtn" onclick="switchTab('siteFeatures'); loadAdminSiteFeatures()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">قابلیت‌های سایت</button>
+      <button id="tabDiscountCodesBtn" onclick="switchTab('discountCodes'); loadAdminDiscountCodes()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">کدهای تخفیف</button>
       <button id="tabPaymentBtn" onclick="switchTab('payment'); loadAdminPayment()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">تنظیمات پرداخت</button>
       <button id="tabAreasBtn" onclick="switchTab('areas'); loadAdminAreas()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">شهرها و محله‌ها</button>
       <button id="tabPointsBtn" onclick="switchTab('points'); loadAdminPoints()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
@@ -2829,6 +2835,28 @@ app.get('/admin', (req, res) => {
       <p id="commissionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
       <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
+    </section>
+    <section id="tabSiteFeatures" class="space-y-4 hidden" hidden>
+      <h2 class="text-lg font-bold">قابلیت‌های سایت</h2>
+      <p id="siteFeaturesMessage" role="status"></p>
+      <fieldset id="siteFeatureControls" class="space-y-3" disabled>
+        <label class="block"><input type="checkbox" id="site_extras"> امکانات تکمیلی سایت</label>
+        <label class="block"><input type="checkbox" id="detergent_package"> بستهٔ مواد شوینده</label>
+      </fieldset>
+    </section>
+    <section id="tabDiscountCodes" class="space-y-4 hidden" hidden>
+      <h2 class="text-lg font-bold">کدهای تخفیف</h2>
+      <p id="discountCodesMessage" role="status"></p>
+      <fieldset id="discountCodeControls" class="space-y-4" disabled>
+        <form id="discountCodeForm" onsubmit="createAdminDiscountCode(event)" class="space-y-3 bg-slate-800 rounded-xl p-4">
+          <label class="block">کد تخفیف <input name="code" required dir="ltr" class="bg-slate-900 rounded p-2"></label>
+          <label class="block">درصد تخفیف <input name="percent" type="number" required min="1" max="100" step="1" class="bg-slate-900 rounded p-2"></label>
+          <label class="block">انقضا (اختیاری، به وقت دستگاه شما) <input name="expiresAt" type="datetime-local" class="bg-slate-900 rounded p-2"></label>
+          <label class="block">سقف استفاده (اختیاری) <input name="maxUses" type="number" min="1" step="1" class="bg-slate-900 rounded p-2"></label>
+          <button class="bg-sky-700 px-4 py-2 rounded-xl">ساخت کد تخفیف</button>
+        </form>
+        <ul id="discountCodeList" class="space-y-2"></ul>
+      </fieldset>
     </section>
     <section id="tabServices" class="space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">خدمات فعال</h3>
@@ -2936,6 +2964,7 @@ app.get('/admin', (req, res) => {
   </details>
 
   <script src="/admin/tariff.js"></script>
+  <script src="/admin/site-settings.js"></script>
   <script src="/admin/tiers.js"></script>
 <script src="/admin/points.js"></script>
   <script src="/admin/commission.js"></script>
@@ -3296,7 +3325,7 @@ app.get('/admin', (req, res) => {
     }
 
     function switchTab(tab) {
-      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'tierLock', 'services', 'completion', 'payment', 'areas']) {
+      for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'tierLock', 'services', 'completion', 'payment', 'areas', 'siteFeatures', 'discountCodes']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
         const panel = document.getElementById('tab' + suffix);
         panel.hidden = name !== tab;

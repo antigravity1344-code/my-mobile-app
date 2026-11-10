@@ -55,7 +55,7 @@ function fixture(overrides = {}) {
   return policy;
 }
 
-async function pageFor(t, initialToken = token) {
+async function pageFor(t, initialToken = token, tab = 'Tariffs') {
   const context = await browser.newContext({ serviceWorkers: 'block', timezoneId: 'Asia/Tehran' });
   t.after(() => context.close());
   await context.route('**/*', (route) => new URL(route.request().url()).origin === origin
@@ -69,8 +69,10 @@ async function pageFor(t, initialToken = token) {
   page.on('pageerror', (error) => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, []));
   await page.goto(origin + '/admin');
-  await page.locator('#tabTariffsBtn').click();
-  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent !== '');
+  await page.locator('#tab' + tab + 'Btn').click();
+  if (tab === 'Tariffs') {
+    await page.waitForFunction(() => document.getElementById('tariffMessage').textContent !== '');
+  }
   return { page, context };
 }
 
@@ -79,6 +81,57 @@ async function saveDraft(page, rate = '۱۲۰۰') {
   await page.locator('#tariffDraftFrom').fill(FUTURE_LOCAL);
   await page.locator('#tariffSave').click();
 }
+
+test('site switches load, save independently, reload and restore the displayed state on error', async (t) => {
+  const { page, context } = await pageFor(t, token, 'SiteFeatures');
+  const extras = page.getByRole('checkbox', { name: 'امکانات تکمیلی سایت' });
+  const detergent = page.getByRole('checkbox', { name: 'بستهٔ مواد شوینده' });
+  await page.waitForSelector('#siteFeatureControls:enabled');
+  assert.equal(await extras.isChecked(), false);
+  assert.equal(await detergent.isChecked(), false);
+  for (const checkbox of [extras, detergent]) {
+    await checkbox.check();
+    await page.waitForSelector('#siteFeatureControls:enabled');
+    assert.equal(await checkbox.isChecked(), true);
+  }
+  await page.reload();
+  await page.locator('#tabSiteFeaturesBtn').click();
+  await page.waitForSelector('#siteFeatureControls:enabled');
+  assert.equal(await extras.isChecked(), true);
+  assert.equal(await detergent.isChecked(), true);
+  await context.route('**/api/admin/feature-switches', (route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 400, json: { success: false, message: 'خطای آزمایشی کلید قابلیت' } })
+    : route.continue());
+  await extras.uncheck();
+  await page.getByText(/خطای آزمایشی کلید قابلیت/).waitFor();
+  assert.equal(await extras.isChecked(), true);
+});
+
+test('discount codes can be created, listed and deactivated, and duplicate codes show an error', async (t) => {
+  const { page } = await pageFor(t, token, 'DiscountCodes');
+  const form = page.locator('#discountCodeForm');
+  const list = page.locator('#discountCodeList');
+  await list.getByText('هنوز کد تخفیفی ثبت نشده است.').waitFor();
+  async function fillAndSubmit() {
+    await form.locator('[name="code"]').fill('ADMIN-TEST20');
+    await form.locator('[name="percent"]').fill('20');
+    await form.locator('[name="expiresAt"]').fill(FUTURE_LOCAL);
+    await form.locator('[name="maxUses"]').fill('3');
+    await form.getByRole('button', { name: 'ساخت کد تخفیف' }).click();
+  }
+  await fillAndSubmit();
+  await list.getByText('ADMIN-TEST20', { exact: true }).waitFor();
+  assert.match(await list.textContent(), /20٪.*سقف استفاده: 3.*استفاده‌شده: 0/);
+  assert.doesNotMatch(await list.textContent(), /بدون انقضا/);
+  await fillAndSubmit();
+  await page.getByText('این کد تخفیف قبلاً ساخته شده است.').waitFor();
+  assert.equal(await list.getByText('ADMIN-TEST20', { exact: true }).count(), 1);
+  await list.getByRole('button', { name: 'غیرفعال کردن', exact: true }).click();
+  await list.getByRole('button', { name: 'فعال کردن', exact: true }).waitFor();
+  await page.reload();
+  await page.locator('#tabDiscountCodesBtn').click();
+  await list.getByText('غیرفعال', { exact: true }).waitFor();
+});
 
 test('tariff read uses only the existing admin session and never exposes disk state', async () => {
   fixture();
