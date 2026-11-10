@@ -1,3 +1,4 @@
+const { orderPriceStatus } = require('./pricing/priceStatus');
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -1543,7 +1544,7 @@ app.post('/api/orders', (req, res) => {
 function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  return { ...rest, completion: store.completionFor(order), startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
+  return { ...rest, priceStatus: orderPriceStatus(order), completion: store.completionFor(order), startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -1581,6 +1582,7 @@ function workerAvailableOrderView(order) {
     paymentMethod: order.paymentMethod,
     requestedWorkerTier: order.requestedWorkerTier || null,
     directRequestWorkerId: order.directRequestWorkerId || null,
+    priceStatus: orderPriceStatus(order),
     // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
     createdAt: order.createdAt,
     area,
