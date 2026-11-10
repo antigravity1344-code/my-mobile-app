@@ -160,6 +160,68 @@ test('the real admin form saves and publishes a priced clone without altering ex
   assert.deepEqual(stored.pricingJson, orderBefore.pricingJson);
 });
 
+test('published staircase exemption preserves the base rate and rejects higher tiers on new orders', async (t) => {
+  const serviceId = 'staircase_common_areas';
+  const rate = 500000;
+  fixture({ versions: [{ id: 'legacy', status: 'published', validFrom: '2020-01-01T00:00:00Z',
+    validTo: null, services: { [serviceId]: { model: 'fixed', rate } } }] });
+  const customer = await harness.login(server, '09120001204');
+  const customerRequest = (pathname, body) => request(server, {
+    method: 'POST', pathname, token: customer.token, body,
+  });
+  const getQuote = (workerTier) => customerRequest('/api/pricing/quote', { serviceId, workerTier });
+  const legacyQuote = await getQuote('gray');
+  assert.equal(legacyQuote.status, 200);
+  assert.equal(legacyQuote.json.quote.total, rate);
+  const legacySilver = await getQuote('silver');
+  assert.equal(legacySilver.status, 200);
+  assert.equal(legacySilver.json.quote.total, 550000);
+  const { page } = await pageFor(t);
+  const exemption = page.locator('#tariffTierExempt0');
+  assert.equal(await exemption.isChecked(), false);
+  assert.equal(await page.getByText('مشمول قفل سطح', { exact: true }).isVisible(), true);
+  const start = Math.ceil((Date.now() + 120_000) / 60_000) * 60_000;
+  const tehranStart = new Date(start + 210 * 60_000).toISOString().slice(0, 16);
+  await exemption.check();
+  await page.locator('#tariffDraftFrom').fill(tehranStart);
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
+  const draft = readAdminTariff().versions.find((version) => version.status === 'draft');
+  assert.equal(draft.services[serviceId].exemptFromTierLock, true);
+  await page.locator('#tariffSupersede').selectOption('legacy');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#tariffPublish').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس منتشر شد'));
+  const published = readAdminTariff();
+  assert.equal(published.versions.find((version) => version.id === draft.id).status, 'published');
+  const legacy = published.versions.find((version) => version.id === 'legacy');
+  assert.equal(legacy.services[serviceId].rate, rate);
+  assert.equal(legacy.services[serviceId].exemptFromTierLock, false);
+  await page.locator('#tariffSource').selectOption('legacy');
+  assert.equal(await page.getByText('مشمول قفل سطح', { exact: true }).isVisible(), true);
+  assert.equal(await page.locator('#tariffRate0').inputValue(), String(rate));
+
+  t.mock.timers.enable({ apis: ['Date'], now: start });
+  const silver = await getQuote('silver');
+  assert.equal(silver.status, 400);
+  assert.match(silver.json.message, /قفل سطح/);
+  const gray = await getQuote('gray');
+  assert.equal(gray.status, 200);
+  assert.equal(gray.json.quote.tariffVersionId, draft.id);
+  assert.equal(gray.json.quote.total, rate);
+  const orderBody = {
+    serviceId, workerTier: 'gray', quoteToken: gray.json.quote.quoteToken, confirmedTotal: rate,
+    serviceTitle: 'راه‌پله آزمایشی', address: 'آدرس ساختگی', date: '1405-07-28', time: '10:00',
+    clientRequestId: 'admin-stairs-exemption',
+  };
+  const locked = await customerRequest('/api/orders', { ...orderBody, workerTier: 'silver' });
+  assert.equal(locked.status, 409);
+  const created = await customerRequest('/api/orders', orderBody);
+  assert.equal(created.status, 200, JSON.stringify(created.json));
+  assert.equal(created.json.order.price, rate);
+  assert.equal(created.json.order.requestedWorkerTier, 'gray');
+});
+
 test('unknown draft and publish responses freeze the editor and retry each identical committed request', async (t) => {
   fixture();
   const { page, context } = await pageFor(t);
