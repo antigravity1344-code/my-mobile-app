@@ -2686,16 +2686,16 @@ app.get('/admin', (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
-    body { font-family: Vazirmatn, sans-serif; background-color: #F6F2E6; color: #1F2A28; }
+    body { font-family: Vazirmatn, sans-serif; background-color: #F6F2E6; color: #1F2A28; padding: 24px 20px !important; }
     *, *::before, *::after { box-sizing: border-box; }
     .admin-layout { width: 100%; max-width: 72rem; margin-inline: auto; text-align: right; overflow-wrap: anywhere; }
     .admin-layout [hidden] { display: none !important; }
-    .admin-layout header { flex-wrap: wrap; gap: 12px; }
+    .admin-layout header { flex-wrap: wrap; gap: 16px; }
     .admin-layout header > div { flex: 1 1 18rem; min-width: 0; }
     .admin-layout .admin-tabs {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      grid-auto-rows: 56px;
+      grid-auto-rows: 44px;
       gap: 8px;
       overflow: visible;
     }
@@ -2703,19 +2703,26 @@ app.get('/admin', (req, res) => {
       min-width: 0;
       width: 100%;
       height: 100%;
-      padding: 8px 12px;
-      font-size: 0.875rem;
+      padding: 0 8px;
+      font-size: 0.75rem;
       text-align: right;
       white-space: normal;
-      line-height: 1.5;
+      line-height: 1.25;
       background: #fff;
+      color: #1F2A28 !important;
+      border: 1px solid #D8DEDB;
     }
-    .admin-tabs > button.border-sky-400 { background: #E6F3F2; border-color: #11766F; }
+    .admin-layout .admin-tabs > button.border-sky-400 {
+      background: #11766F;
+      border-color: #11766F;
+      color: #FFFFFF !important;
+    }
     #statsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
     #statsGrid > div { min-width: 0; text-align: right; }
-    #statsGrid h2 { font-size: 1.5rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
-    #totalRevenue { color: #5B387B; }
-    #totalRevenue:empty::before { content: '0'; }
+    #statsGrid h2 { font-size: 1.5rem; line-height: 1.4; font-variant-numeric: tabular-nums; color: #11766F !important; }
+    #statsGrid .admin-stat-zero { display: inline-block; transform: scaleY(1.8); }
+    .admin-layout :is(div, section, header, form, fieldset, li):is(.rounded-xl, .rounded-2xl) { border-radius: 16px; }
+    .admin-layout [class~="text-[10px]"] { font-size: 12px; }
     .admin-layout > section { min-width: 0; }
     .admin-layout > section :is(h2, h3) { font-size: 1.125rem; font-weight: 700; line-height: 1.6; }
     .admin-layout :is(fieldset, input, select, textarea, button, img) { min-width: 0; max-width: 100%; }
@@ -2733,12 +2740,19 @@ app.get('/admin', (req, res) => {
     .text-amber-300, .text-amber-400 { color: #B45309 !important; }
     .text-red-300, .text-red-400 { color: #B91C1C !important; }
     .bg-red-700, .bg-red-600 { background-color: #B91C1C !important; color: #FFFFFF !important; }
+    .admin-layout [class~="bg-emerald-500/20"] { background-color: #E6F3F2; color: #0E635D !important; }
+    .admin-layout [class~="bg-rose-500/20"] { background-color: #FDECEC; color: #B91C1C !important; }
+    .admin-layout [class~="bg-amber-500/20"], .admin-layout .bg-slate-700.text-slate-400 {
+      background-color: #F1EFE8 !important;
+      color: #4B5552 !important;
+    }
+    .admin-layout :is(.bg-rose-600, .bg-rose-700) { background-color: #B91C1C; color: #FFFFFF !important; }
     input, select, textarea { background-color: #FFFFFF !important; color: #1F2A28 !important; }
     button:disabled { opacity: 0.55; }
     /* اندازه‌ی یکسان دکمه‌ها با اپ‌ها: حداقل ۴۴ پیکسل و گوشه‌ی ۱۲ */
     button { min-height: 44px; border-radius: 12px; }
     @media (max-width: 640px) {
-      body { padding: 12px !important; }
+      body { padding-block: 16px !important; }
       h1 { font-size: 1.15rem !important; line-height: 1.6; }
       .flex { flex-wrap: wrap; }
       .admin-layout .admin-tabs, #statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2751,7 +2765,7 @@ app.get('/admin', (req, res) => {
     <!-- هدر -->
     <header class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
       <div>
-        <h1 class="text-2xl font-black text-sky-400">داشبورد مدیریت پاکشو (Admin Panel)</h1>
+        <h1 class="text-2xl font-black text-sky-400">داشبورد مدیریت پاکشو</h1>
         <p class="text-xs text-slate-400 mt-1">مدیریت سفارش‌ها، تایید مدارک متخصصین و آمار کل سامانه</p>
       </div>
       <button onclick="logoutAdmin()" class="bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow">خروج مدیر</button>
@@ -3083,6 +3097,15 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    function renderStat(id, value) {
+      const target = document.getElementById(id);
+      if (value === 0) {
+        target.replaceChildren(adminElement('span', 'admin-stat-zero', '۰'));
+      } else {
+        target.textContent = value;
+      }
+    }
+
     function loadAllData() {
       if (dashboardLoad) return dashboardLoad;
       const refresh = document.getElementById('dashboardRefresh');
@@ -3093,16 +3116,16 @@ app.get('/admin', (req, res) => {
           await Promise.all([
             loadDashboardSection('stats', '/api/admin/stats', (data) => {
               const s = data.stats;
-              document.getElementById('totalOrders').innerText = s.totalOrders;
-              document.getElementById('pendingWorkers').innerText = s.pendingWorkersCount;
-              document.getElementById('totalWorkers').innerText = s.totalWorkers;
+              renderStat('totalOrders', s.totalOrders);
+              renderStat('pendingWorkers', s.pendingWorkersCount);
+              renderStat('totalWorkers', s.totalWorkers);
               if (s.revenueUnit) {
                 document.getElementById('revenueLabel').innerText = 'درآمد کل (' + s.revenueUnit + ')';
-                document.getElementById('totalRevenue').innerText = s.totalRevenue.toLocaleString('fa-IR');
+                renderStat('totalRevenue', s.totalRevenue === 0 ? 0 : s.totalRevenue.toLocaleString('fa-IR'));
               } else {
                 document.getElementById('revenueLabel').innerText = 'درآمد کل (به تفکیک واحد)';
-                document.getElementById('totalRevenue').innerText = Object.entries(s.revenueByUnit || {})
-                  .map(([unit, amount]) => Number(amount).toLocaleString('fa-IR') + ' ' + unit).join(' + ');
+                renderStat('totalRevenue', Object.entries(s.revenueByUnit || {})
+                  .map(([unit, amount]) => Number(amount).toLocaleString('fa-IR') + ' ' + unit).join(' + ') || 0);
               }
             }),
             loadDashboardSection('workers', '/api/admin/users?role=WORKER', (data) => renderWorkers(data.users)),
