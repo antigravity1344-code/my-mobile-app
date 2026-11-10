@@ -103,7 +103,8 @@ const workerDocuments = createWorkerDocumentStorage(
     : path.join(__dirname, 'uploads', 'worker-docs')
 );
 
-app.use(cors());
+const { corsOptionsFromEnv } = require('./corsConfig');
+app.use(cors(corsOptionsFromEnv(process.env)));
 app.use(express.json({ limit: '12mb' }));
 app.use('/uploads', (req, res) => {
   res.status(404).json({ success: false, message: 'یافت نشد.' });
