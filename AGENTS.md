@@ -126,9 +126,13 @@ _None found._
 Read docs/SOURCE_IDENTITY.md before any standalone APK build/install acceptance. Use scripts/verified-phone.cjs with the approved full SHA, branch, role and exact phone serial; never infer identity from launcher icons. Current implementation passed 10 guard tests and dirty-tree preflight; complete build/install validation remains pending. Do not erase or stash work just to pass the guard. This does not authorize commit/push or branch operations.
 
 
-## قانون هماهنگی rebuild هر دو اپ — ۱۹ آبان ۱۴۰۵ (۹ نوامبر ۲۰۲۶)
+## قانون هماهنگی ساخت هر دو اپ (بازنویسی‌شده ۱۰ نوامبر ۲۰۲۶)
 
-بعد از هر تغییری که روی `main` قرار می‌گیرد، هر دو اپ (`com.paksho.customer` و `com.paksho.worker`) باید با هم rebuild و روی گوشی تست نصب شوند، نه یکی‌یکی و نه با فاصلهٔ زمانی. هیچ ایجنتی نباید فقط یکی از دو اپ را به‌روز کند و دیگری را به حال خود بگذارد. گزارش پایانی هر ایجنت باید SHA باندل هر دو اپ را کنار هم نشان دهد.
+(بازنویسی ۱۰ نوامبر ۲۰۲۶ به تأیید مالک: قاعدهٔ «rebuild بعد از هر تغییر روی main» برداشته شد، چون هزینهٔ زیادی داشت.)
+
+- تغییرات فقط JavaScript/TypeScript با Expo/Metro روی گوشی تست می‌شوند؛ APK ساخته نمی‌شود.
+- ساخت و نصب **هر دو اپ** (`com.paksho.customer` و `com.paksho.worker`) فقط در این دو حالت انجام می‌شود: تغییر بومی (native)، یا قبل از یک جلسهٔ تست گوشی برای تصمیم ادغام.
+- وقتی هر دو اپ ساخته یا نصب می‌شوند، باید با هم و با **همان SHA** ساخته شوند؛ هیچ ایجنتی نباید فقط یکی از دو اپ را به‌روز کند و دیگری را بگذارد. گزارش پایانی باید SHA باندل هر دو اپ را کنار هم نشان دهد.
 
 
 ## قانون commit/push فوری بعد از بیلد و هر تغییر — ۱۹ آبان ۱۴۰۵ (۹ نوامبر ۲۰۲۶)
