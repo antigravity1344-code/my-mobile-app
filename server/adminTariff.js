@@ -158,18 +158,21 @@ function renderAdminTariff() {
   editor.append(rates);
   const start = tariffField(editor, 'شروع اعتبار (به وقت دستگاه شما)', 'tariffDraftFrom', 'datetime-local', '');
   const end = tariffField(editor, 'پایان اعتبار، اختیاری (به وقت دستگاه شما)', 'tariffDraftTo', 'datetime-local', '');
-  let rateInputs = [];
+  let serviceInputs = [];
   function selectSource() {
     const version = tariffState.versions.find((item) => item.id === source.value);
     rates.replaceChildren();
-    rateInputs = Object.entries(version.services).map(([id, service], index) => {
+    serviceInputs = Object.entries(version.services).map(([id, service], index) => {
       const row = adminElement('div', 'border-b border-slate-700 pb-2');
       const input = tariffField(row, (tariffServiceLabels[id] || id) + ' — ' + tariffModelLabels[service.model] + ' (' + tariffState.currencyUnit + ')',
         'tariffRate' + index, 'text', String(service.rate));
       input.inputMode = 'numeric';
+      const exempt = tariffField(row, 'معاف از قفل سطح — ' + (tariffServiceLabels[id] || id),
+        'tariffTierExempt' + index, 'checkbox', 'on');
+      exempt.checked = service.exemptFromTierLock === true;
       tariffAdjustments(row, service);
       rates.append(row);
-      return { id, input };
+      return { id, input, exempt };
     });
     start.value = '';
     end.value = tariffLocalInput(version.validTo);
@@ -177,7 +180,7 @@ function renderAdminTariff() {
   source.onchange = selectSource;
   source.value = tariffState.versions[tariffState.versions.length - 1].id;
   selectSource();
-  editor.append(adminElement('p', 'text-xs text-slate-300', 'در این فرم فقط نرخ پایه تغییر می‌کند. سایر شرایط هر خدمت از نسخه مبنا حفظ می‌شوند.'));
+  editor.append(adminElement('p', 'text-xs text-slate-300', 'نرخ پایه و معافیت هر خدمت از قفل سطح قابل تغییر است. سایر شرایط از نسخه مبنا حفظ می‌شوند.'));
   const save = adminElement('button', 'bg-sky-700 px-4 py-2 rounded-xl', 'ذخیره پیش‌نویس');
   save.id = 'tariffSave';
   save.type = 'button';
@@ -188,7 +191,10 @@ function renderAdminTariff() {
       delete version.status;
       version.validFrom = tariffInstant(start.value);
       version.validTo = end.value ? tariffInstant(end.value) : null;
-      for (const { id, input } of rateInputs) version.services[id].rate = tariffRate(input.value);
+      for (const { id, input, exempt } of serviceInputs) {
+        version.services[id].rate = tariffRate(input.value);
+        version.services[id].exemptFromTierLock = exempt.checked;
+      }
       beginAdminTariff('/api/admin/tariff-versions', { baseRevision: tariffState.revision, version }, 'پیش‌نویس ذخیره شد؛ هنوز منتشر نشده است.');
     } catch (error) { tariffMessage(error.message); }
   };
@@ -214,6 +220,7 @@ function renderAdminTariff() {
     summary.replaceChildren(adminElement('p', '', 'پایان اعتبار: ' + tariffDate(version.validTo)));
     for (const [id, service] of Object.entries(version.services)) {
       const row = adminElement('div', '', (tariffServiceLabels[id] || id) + ': ' + service.rate + ' ' + tariffState.currencyUnit + ' ' + tariffModelLabels[service.model]);
+      row.append(adminElement('p', 'text-xs', service.exemptFromTierLock === true ? 'معاف از قفل سطح' : 'مشمول قفل سطح'));
       tariffAdjustments(row, service);
       summary.append(row);
     }

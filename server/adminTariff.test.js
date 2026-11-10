@@ -47,7 +47,7 @@ function fixture(overrides = {}) {
         discounts: [{ id: 'existing', basisPoints: 500 }] },
       sofa_carpet_washing: { model: 'count', rate: 50 },
       building_painting: { model: 'area', rate: 4 },
-      fixed: { model: 'fixed', rate: 20 },
+      fixed: { model: 'fixed', rate: 20, exemptFromTierLock: true },
     },
   };
   const policy = { companyId: 'fixture-company', currencyUnit: 'minor', versions: [version], ...overrides };
@@ -119,6 +119,12 @@ test('the real admin form saves and publishes a priced clone without altering ex
   assert.ok(content.includes('برای هر عدد'));
   assert.ok(content.includes('برای هر متر مربع'));
   assert.ok(content.includes('minor'));
+  const homeExemption = page.getByRole('checkbox', { name: 'معاف از قفل سطح — نظافت داخل منزل / واحد', exact: true });
+  const fixedExemption = page.getByRole('checkbox', { name: 'معاف از قفل سطح — fixed', exact: true });
+  assert.equal(await homeExemption.isChecked(), false);
+  assert.equal(await fixedExemption.isChecked(), true);
+  await homeExemption.check();
+  await fixedExemption.uncheck();
   await saveDraft(page);
   await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
   let state = readAdminTariff();
@@ -127,7 +133,14 @@ test('the real admin form saves and publishes a priced clone without altering ex
   const draft = state.versions.find((version) => version.status === 'draft');
   const expectedServices = structuredClone(original.versions[0].services);
   expectedServices.home_unit_cleaning.rate = 1200;
+  expectedServices.home_unit_cleaning.exemptFromTierLock = true;
+  expectedServices.fixed.exemptFromTierLock = false;
   assert.deepEqual(JSON.parse(JSON.stringify(draft.services)), expectedServices);
+  await page.reload();
+  await page.locator('#tabTariffsBtn').click();
+  await page.locator('#tariffSource').selectOption(draft.id);
+  assert.equal(await homeExemption.isChecked(), true);
+  assert.equal(await fixedExemption.isChecked(), false);
   assert.equal(quote(validatePolicy(state), { at: '2026-10-20T00:00:00Z', serviceId: 'home_unit_cleaning', quantity: 2 }).total, orderBefore.price);
   await page.locator('#tariffSupersede').selectOption('v1');
   let confirmation;
