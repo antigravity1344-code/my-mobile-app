@@ -130,17 +130,30 @@ function directForSelection(selection, offerAdjustment) {
   return resolved;
 }
 
-function tierForSelection(selection, offerAdjustment) {
+function tierLockExempt(serviceId, now = new Date()) {
+  if (serviceId === FIXED_PRICE_SERVICE) return true;
+  try {
+    const policy = loadCommittedTariff();
+    const version = require('./tariffEngine').selectVersion(policy, now);
+    const service = version.services[serviceId];
+    return !!(service && service.exemptFromTierLock);
+  } catch (error) {
+    return false;
+  }
+}
+
+function tierForSelection(selection, offerAdjustment, now) {
   if (!selection.workerTier || offerAdjustment) return null;
   if (!tierResolver) throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
-  const resolved = tierResolver(selection.serviceId === FIXED_PRICE_SERVICE ? 'gray' : selection.workerTier);
+  const exempt = tierLockExempt(selection.serviceId, now);
+  const resolved = tierResolver(exempt ? 'gray' : selection.workerTier);
   if (!resolved || !Number.isSafeInteger(resolved.basisPoints) || !Number.isSafeInteger(resolved.version)) {
     throw new QuoteError('QUOTE_UNAVAILABLE', 'محاسبه قیمت این استقرار آماده نیست.');
   }
   return {
     workerTier: selection.workerTier,
     version: resolved.version,
-    basisPoints: selection.serviceId === FIXED_PRICE_SERVICE ? null : resolved.basisPoints,
+    basisPoints: exempt ? null : resolved.basisPoints,
   };
 }
 
@@ -239,7 +252,7 @@ function trustedQuote(selection, now) {
   }
   const split = splitOfferOption(selection, now);
   const direct = directForSelection(selection, split.adjustment);
-  const tier = direct ? null : tierForSelection(selection, split.adjustment);
+  const tier = direct ? null : tierForSelection(selection, split.adjustment, now);
   const basisPoints = direct ? direct.basisPoints : (tier && tier.basisPoints != null ? tier.basisPoints : null);
   const promo = promoForSelection(selection);
   const priced = quote(policy, {
@@ -269,6 +282,10 @@ function publicQuote(priced, token, expiresAt) {
 
 function issueOrderQuote(body, now = new Date()) {
   const selection = selectionFromBody(body);
+  // پرچم تعرفه همان اثر معافیت راه‌پله را دارد. فهرست سخت‌کد تا تست نهایی گوشی حذف نمی‌شود.
+  if (selection.workerTier && selection.workerTier !== 'gray' && selection.serviceId !== FIXED_PRICE_SERVICE && tierLockExempt(selection.serviceId, now)) {
+    throw new QuoteError('INPUT_INVALID', 'این خدمت از قفل سطح معاف است و سطح متخصص روی آن اعمال نمی‌شود.');
+  }
   const { priced, secret, tier, direct } = trustedQuote(selection, now);
   const issuedAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + QUOTE_TTL_MS).toISOString();
