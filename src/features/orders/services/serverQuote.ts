@@ -1,5 +1,6 @@
 import type { FinalPrice } from '../../../utils/pricing';
 import type { PricingType } from '../../../types/service';
+import { isTierExempt } from '../../../config/serviceAvailability';
 
 export const NO_TARIFF_MESSAGE = 'تعرفه این خدمت هنوز تعیین نشده است.';
 export const CONNECTION_MESSAGE = 'ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
@@ -14,10 +15,8 @@ export const CUSTOMER_WORKER_TIERS = [
   { id: 'gold', label: 'طلایی' },
 ] as const;
 export type CustomerWorkerTier = (typeof CUSTOMER_WORKER_TIERS)[number]['id'];
-export const FIXED_TIER_SERVICE_ID = 'staircase_common_areas';
-
 export function tierLockApplies(serviceId: string | undefined, offerMode: boolean): boolean {
-  return !offerMode && !!serviceId && serviceId !== FIXED_TIER_SERVICE_ID;
+  return !offerMode && !!serviceId && !isTierExempt(serviceId);
 }
 
 export type QuoteSelection = {

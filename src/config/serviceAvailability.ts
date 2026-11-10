@@ -5,6 +5,8 @@ import { useSyncExternalStore } from 'react';
 let disabled: ReadonlySet<string> = new Set();
 // خدمت‌های صلاحیتی که هنوز متخصص آماده ندارند: در فهرست دیده می‌شوند ولی قابل سفارش نیستند.
 let unavailable: ReadonlySet<string> = new Set();
+// خدمت‌هایی که تعرفه آن‌ها را از قفل سطح معاف کرده است. تا رسیدن تعرفه هیچ خدمتی معاف نیست.
+let tierExempt: ReadonlySet<string> = new Set();
 let version = 0;
 const listeners = new Set<() => void>();
 
@@ -21,6 +23,47 @@ export function parseDisabledServiceIds(value: unknown): string[] | null {
 
 export function parseUnavailableServiceIds(value: unknown): string[] {
   return parseIds(value, 'unavailableServiceIds') ?? [];
+}
+
+const PRICE_MODELS = new Set(['hourly', 'fixed', 'count', 'area']);
+
+export type ServicePricingRule = {
+  serviceId: string;
+  model: 'hourly' | 'fixed' | 'count' | 'area';
+  exemptFromTierLock: boolean;
+};
+
+/** قواعد قیمت از تعرفهٔ سرور. فیلد غایب یعنی سرور هنوز آن را نمی‌فرستد و هیچ معافیتی شناخته نیست. */
+export function parsePricingRules(value: unknown): ServicePricingRule[] | null {
+  if (!value || typeof value !== 'object') return null;
+  const body = value as { success?: unknown; pricingRules?: unknown };
+  if (body.success !== true) return null;
+  if (!Array.isArray(body.pricingRules)) return [];
+  const rules: ServicePricingRule[] = [];
+  for (const item of body.pricingRules) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as { serviceId?: unknown; model?: unknown; exemptFromTierLock?: unknown };
+    if (typeof row.serviceId !== 'string' || row.serviceId.length === 0 || row.serviceId.length > 80) continue;
+    if (typeof row.model !== 'string' || !PRICE_MODELS.has(row.model)) continue;
+    rules.push({
+      serviceId: row.serviceId,
+      model: row.model as ServicePricingRule['model'],
+      exemptFromTierLock: row.exemptFromTierLock === true,
+    });
+  }
+  return rules;
+}
+
+export function isTierExempt(serviceId: string): boolean {
+  return tierExempt.has(serviceId);
+}
+
+export function setPricingRules(rules: readonly ServicePricingRule[]): void {
+  const next = new Set(rules.filter((rule) => rule.exemptFromTierLock).map((rule) => rule.serviceId));
+  if (next.size === tierExempt.size && [...next].every((id) => tierExempt.has(id))) return;
+  tierExempt = next;
+  version += 1;
+  listeners.forEach((listener) => listener());
 }
 
 export function setServiceAvailability(disabledIds: readonly string[], unavailableIds: readonly string[] = []): void {

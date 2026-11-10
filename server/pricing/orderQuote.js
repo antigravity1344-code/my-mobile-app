@@ -87,9 +87,6 @@ function selectionFromBody(body) {
   }
   const hasOffer = options && typeof options === 'object' && !Array.isArray(options) && Object.hasOwn(options, 'offerId');
   if (hasOffer) workerTier = null;
-  if (workerTier && workerTier !== 'gray' && body.serviceId === FIXED_PRICE_SERVICE) {
-    throw new QuoteError('INPUT_INVALID', 'نظافت راه‌پله و مشاعات قیمت ثابت دارد و سطح متخصص روی آن اعمال نمی‌شود.');
-  }
   let directRequestWorkerId = null;
   if (Object.prototype.hasOwnProperty.call(body, 'directRequestWorkerId') && body.directRequestWorkerId != null && body.directRequestWorkerId !== '') {
     if (typeof body.directRequestWorkerId !== 'string' || body.directRequestWorkerId.trim() === '' || body.directRequestWorkerId.length > 80) {
@@ -131,7 +128,6 @@ function directForSelection(selection, offerAdjustment) {
 }
 
 function tierLockExempt(serviceId, now = new Date()) {
-  if (serviceId === FIXED_PRICE_SERVICE) return true;
   try {
     const policy = loadCommittedTariff();
     const version = require('./tariffEngine').selectVersion(policy, now);
@@ -164,7 +160,6 @@ let tierResolver = null;
 let directRequestResolver = null;
 let promoResolver = null;
 const WORKER_TIERS = new Set(['gray', 'silver', 'gold']);
-const FIXED_PRICE_SERVICE = 'staircase_common_areas';
 // درخواست ساعت دلخواه مشتری: شناسهٔ CRQ- فقط در پذیرش متخصص (داخل withCustomerRequestAcceptance) قابل نقل‌قول است.
 let acceptingCustomerRequest = false;
 function withCustomerRequestAcceptance(fn) {
@@ -282,8 +277,8 @@ function publicQuote(priced, token, expiresAt) {
 
 function issueOrderQuote(body, now = new Date()) {
   const selection = selectionFromBody(body);
-  // پرچم تعرفه همان اثر معافیت راه‌پله را دارد. فهرست سخت‌کد تا تست نهایی گوشی حذف نمی‌شود.
-  if (selection.workerTier && selection.workerTier !== 'gray' && selection.serviceId !== FIXED_PRICE_SERVICE && tierLockExempt(selection.serviceId, now)) {
+  // معافیت از قفل سطح فقط از پرچم تعرفه می‌آید، نه از نام خدمت.
+  if (selection.workerTier && selection.workerTier !== 'gray' && tierLockExempt(selection.serviceId, now)) {
     throw new QuoteError('INPUT_INVALID', 'این خدمت از قفل سطح معاف است و سطح متخصص روی آن اعمال نمی‌شود.');
   }
   const { priced, secret, tier, direct } = trustedQuote(selection, now);

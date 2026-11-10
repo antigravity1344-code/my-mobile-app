@@ -23,7 +23,8 @@ const seeded = seedCommittedPolicy(process.env, {
     services: {
       open: { model: 'hourly', rate: 1000, minQuantity: 1 },
       locked: { model: 'hourly', rate: 1000, minQuantity: 1, exemptFromTierLock: true },
-      staircase_common_areas: { model: 'fixed', rate: 500000 },
+      staircase_common_areas: { model: 'fixed', rate: 500000, exemptFromTierLock: true },
+      plain_fixed: { model: 'fixed', rate: 500000 },
     },
   }],
 });
@@ -67,12 +68,15 @@ test('exemptFromTierLock keeps the base price and rejects a higher tier', () => 
   assert.equal(gold.code, 'INPUT_INVALID');
 });
 
-test('the hardcoded stairs exemption still rejects silver before that list is removed', () => {
+test('a fixed service is exempt from tier lock only when the tariff flag is on', () => {
   const silver = inputError(() => issueOrderQuote({ serviceId: 'staircase_common_areas', workerTier: 'silver' }, at));
   assert.ok(silver instanceof QuoteError);
-  assert.match(silver.message, /راه‌پله/);
+  assert.equal(silver.code, 'INPUT_INVALID');
+  assert.match(silver.message, /قفل سطح/);
   const gray = issueOrderQuote({ serviceId: 'staircase_common_areas', workerTier: 'gray' }, at);
   assert.equal(gray.total, 500000);
+  const plainSilver = issueOrderQuote({ serviceId: 'plain_fixed', workerTier: 'silver' }, at);
+  assert.equal(plainSilver.total, 550000);
 });
 
 test('a golden request on an exempt service still uses the independent percent', () => {

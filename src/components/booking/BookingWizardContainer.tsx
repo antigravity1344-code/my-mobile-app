@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useServiceAvailability } from '../../config/serviceAvailability';
 import { useBooking } from '../../context/BookingContext';
 import { addressCityFields } from '../../api/serviceAreas';
 import { CleaningService } from '../../types/service';
@@ -67,6 +68,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     nextStep,
     prevStep,
   } = useBooking();
+  useServiceAvailability();
   const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
   const tierLock = tierLockApplies(selectedService?.id, false);
 

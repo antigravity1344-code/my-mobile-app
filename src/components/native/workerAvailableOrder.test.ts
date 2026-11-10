@@ -51,11 +51,11 @@ describe('compact available-order cards and details', () => {
   });
 
   it.each([
-    { serviceId: 'home_unit_cleaning', rawPrice: 450000, expected: WORKER_PRICE_UNKNOWN },
-    { serviceId: 'staircase_common_areas', rawPrice: 450000, expected: `مبلغ سفارش: ${formatStoredAmount(450000, order.currencyUnit)}` },
-    { serviceId: 'staircase_common_areas', rawPrice: null, expected: WORKER_PRICE_UNKNOWN },
-  ])('preserves the existing price rule in both views: $serviceId / $rawPrice', ({ serviceId, rawPrice, expected }) => {
-    const value = { ...order, serviceId, rawPrice };
+    { serviceId: 'home_unit_cleaning', rawPrice: 450000, priceStatus: { status: 'hourly_pending' as const }, expected: WORKER_PRICE_UNKNOWN },
+    { serviceId: 'staircase_common_areas', rawPrice: 450000, priceStatus: { status: 'locked' as const, lockedAmount: 450000 }, expected: `مبلغ سفارش: ${formatStoredAmount(450000, order.currencyUnit)}` },
+    { serviceId: 'staircase_common_areas', rawPrice: 450000, priceStatus: null, expected: WORKER_PRICE_UNKNOWN },
+  ])('shows a fixed amount only when the server locks it: $serviceId / $rawPrice', ({ serviceId, rawPrice, priceStatus, expected }) => {
+    const value = { ...order, serviceId, rawPrice, priceStatus };
     const card = renderToStaticMarkup(createElement(WorkerAvailableOrderCard, { order: value, onOpen: vi.fn() }));
     const page = renderToStaticMarkup(details({ order: value }));
     expect(card).toContain(expected);

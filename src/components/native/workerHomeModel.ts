@@ -28,31 +28,19 @@ export function workerTabBadge(count: number | null | undefined): string | null 
 }
 
 /**
- * خدمت‌هایی که قیمت ثابت و معلوم دارند (D-70): فقط نظافت راه‌پله و مشاعات.
- * نظافت منزل و اداره ساعتی‌اند و مبلغشان نهایی نیست؛ خدمت ناشناخته هم نهایی حساب نمی‌شود.
- */
-export const WORKER_FIXED_PRICE_SERVICE_IDS: readonly string[] = ['staircase_common_areas'];
-
-/**
- * خط مبلغ کارت سفارش در خانهٔ متخصص (D-70). نوع خدمت از کلید serviceId سرور تشخیص داده می‌شود، نه از متن عنوان.
- * فقط برای خدمت با قیمت ثابت و مبلغ معتبر مثبت، مبلغ ثبت‌شده نمایش داده می‌شود.
+ * خط مبلغ کارت سفارش در خانهٔ متخصص.
+ * سرور با priceStatus تصمیم می‌گیرد (docs/PLAN-server-owned-price-status.fa.md). نام خدمت مبلغ را مشخص نمی‌کند.
  */
 export function workerPriceLine(
-  serviceId: string | null | undefined,
-  rawPrice: number | null | undefined,
+  _serviceId: string | null | undefined,
+  _rawPrice: number | null | undefined,
   format: (amount: number) => string,
   priceStatus?: { status: string; lockedAmount?: number } | null,
 ): string {
-  // سرور تصمیم می‌گیرد (docs/PLAN-server-owned-price-status.fa.md). اگر وضعیت نرسیده، قاعدهٔ قبلی می‌ماند.
-  if (priceStatus) {
-    if (priceStatus.status === 'locked' && typeof priceStatus.lockedAmount === 'number' && Number.isFinite(priceStatus.lockedAmount) && priceStatus.lockedAmount > 0) {
-      return `مبلغ سفارش: ${format(priceStatus.lockedAmount)}`;
-    }
-    return WORKER_PRICE_UNKNOWN;
+  if (priceStatus && priceStatus.status === 'locked' && typeof priceStatus.lockedAmount === 'number' && Number.isFinite(priceStatus.lockedAmount) && priceStatus.lockedAmount > 0) {
+    return `مبلغ سفارش: ${format(priceStatus.lockedAmount)}`;
   }
-  if (!serviceId || !WORKER_FIXED_PRICE_SERVICE_IDS.includes(serviceId)) return WORKER_PRICE_UNKNOWN;
-  if (typeof rawPrice !== 'number' || !Number.isFinite(rawPrice) || rawPrice <= 0) return WORKER_PRICE_UNKNOWN;
-  return `مبلغ سفارش: ${format(rawPrice)}`;
+  return WORKER_PRICE_UNKNOWN;
 }
 
 const toLatin = (s: string) =>

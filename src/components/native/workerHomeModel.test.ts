@@ -46,9 +46,9 @@ describe('worker home model', () => {
     expect(workerTabBadge(150)).toBe('۹۹+');
   });
 
-  it('price line (D-70): only stairwell cleaning shows a valid stored amount', () => {
+  it('price line ignores the service id until the server sends a locked amount', () => {
     const f = (n: number) => `${n} T`;
-    expect(workerPriceLine('staircase_common_areas', 450000, f)).toBe('مبلغ سفارش: 450000 T');
+    expect(workerPriceLine('staircase_common_areas', 450000, f)).toBe(WORKER_PRICE_UNKNOWN);
     expect(workerPriceLine('staircase_common_areas', 0, f)).toBe(WORKER_PRICE_UNKNOWN);
     expect(workerPriceLine('staircase_common_areas', null, f)).toBe(WORKER_PRICE_UNKNOWN);
     expect(workerPriceLine('staircase_common_areas', Number.NaN, f)).toBe(WORKER_PRICE_UNKNOWN);
