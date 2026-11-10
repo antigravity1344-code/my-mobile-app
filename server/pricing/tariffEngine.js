@@ -124,12 +124,17 @@ function validatePolicy(raw) {
           fail('TARIFF_INVALID', 'بازه مقدار خدمت نامعتبر است.');
         }
       }
+      // exemptFromTierLock: خدمتی که قفل سطح متخصص روی آن اعمال نمی‌شود (مثلاً راه‌پله). پیش‌فرض خاموش.
+      if (service.exemptFromTierLock != null && typeof service.exemptFromTierLock !== 'boolean') {
+        fail('TARIFF_INVALID', 'پرچم معافیت از قفل سطح باید درست یا نادرست باشد.');
+      }
       Object.defineProperty(services, serviceId, {
         value: {
         model: service.model,
         rate: service.rate,
         minQuantity: service.minQuantity == null ? null : service.minQuantity,
         maxQuantity: service.maxQuantity == null ? null : service.maxQuantity,
+        exemptFromTierLock: service.exemptFromTierLock === true,
         ...copyAdjustments(service),
       },
         enumerable: true,
