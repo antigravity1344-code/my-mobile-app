@@ -2703,11 +2703,11 @@ app.get('/admin', (req, res) => {
       min-width: 0;
       width: 100%;
       height: 100%;
-      padding: 0 8px;
-      font-size: 0.75rem;
+      padding: 0 4px;
+      font-size: 14px;
       text-align: right;
       white-space: normal;
-      line-height: 1.25;
+      line-height: 1.1;
       background: #fff;
       color: #1F2A28 !important;
       border: 1px solid #D8DEDB;
@@ -2719,8 +2719,24 @@ app.get('/admin', (req, res) => {
     }
     #statsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
     #statsGrid > div { min-width: 0; text-align: right; }
-    #statsGrid h2 { font-size: 1.5rem; line-height: 1.4; font-variant-numeric: tabular-nums; color: #11766F !important; }
-    #statsGrid .admin-stat-zero { display: inline-block; transform: scaleY(1.8); }
+    #statsGrid > div > span { font-size: 13px; color: #6B7370; }
+    #statsGrid h2 { font-size: 24px; font-weight: 900; line-height: 1.4; font-variant-numeric: tabular-nums; color: #11766F !important; }
+    /* Keep the Persian zero as text and give its small Vazirmatn glyph a full-size outline. */
+    #statsGrid .admin-stat-zero {
+      display: inline-block;
+      position: relative;
+      -webkit-text-fill-color: transparent;
+    }
+    #statsGrid .admin-stat-zero::after {
+      content: '';
+      position: absolute;
+      inset: 50% auto auto 50%;
+      transform: translate(-50%, -50%);
+      width: 13px;
+      height: 21px;
+      border: 3px solid currentColor;
+      border-radius: 50%;
+    }
     .admin-layout :is(div, section, header, form, fieldset, li):is(.rounded-xl, .rounded-2xl) { border-radius: 16px; }
     .admin-layout [class~="text-[10px]"] { font-size: 12px; }
     .admin-layout > section { min-width: 0; }
