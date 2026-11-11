@@ -2682,7 +2682,7 @@ app.get('/admin', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>داشبورد مدیریت پاکشو (Paksho Admin)</title>
+  <title>داشبورد مدیریت اپ پاکشو</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
@@ -2690,8 +2690,9 @@ app.get('/admin', (req, res) => {
     *, *::before, *::after { box-sizing: border-box; }
     .admin-layout { width: 100%; max-width: 72rem; margin-inline: auto; text-align: right; overflow-wrap: anywhere; }
     .admin-layout [hidden] { display: none !important; }
-    .admin-layout header { flex-wrap: wrap; gap: 16px; }
-    .admin-layout header > div { flex: 1 1 18rem; min-width: 0; }
+    .admin-layout header { flex-wrap: wrap; gap: 16px; flex-direction: column; align-items: center; text-align: center; }
+    .admin-layout header > div { flex: 1 1 100%; min-width: 0; text-align: center; }
+    .admin-layout header :is(h1, p) { text-align: center; }
     .admin-layout .admin-tabs {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2705,12 +2706,24 @@ app.get('/admin', (req, res) => {
       height: 100%;
       padding: 0 4px;
       font-size: 14px;
-      text-align: right;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       white-space: normal;
       line-height: 1.1;
       background: #fff;
       color: #1F2A28 !important;
       border: 1px solid #D8DEDB;
+    }
+    .admin-layout .admin-service-row { flex-wrap: nowrap; align-items: center; }
+    .admin-layout .admin-service-title { flex: 1 1 auto; min-width: 0; text-align: right; }
+    .admin-layout .admin-service-toggle {
+      flex: 0 0 auto;
+      width: auto;
+      max-width: none;
+      min-width: max-content;
+      white-space: nowrap;
     }
     .admin-layout .admin-tabs > button.border-sky-400 {
       background: #11766F;
@@ -2718,7 +2731,8 @@ app.get('/admin', (req, res) => {
       color: #FFFFFF !important;
     }
     #statsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-    #statsGrid > div { min-width: 0; text-align: right; }
+    #statsGrid > div, #adminLogin { min-width: 0; text-align: center; }
+    #adminLogin input { text-align: center; }
     #statsGrid > div > span { font-size: 13px; color: #6B7370; }
     #statsGrid h2 { font-size: 24px; font-weight: 900; line-height: 1.4; font-variant-numeric: tabular-nums; color: #11766F !important; }
     /* Keep the Persian zero as text and give its small Vazirmatn glyph a full-size outline. */
@@ -2767,6 +2781,10 @@ app.get('/admin', (req, res) => {
     button:disabled { opacity: 0.55; }
     /* اندازه‌ی یکسان دکمه‌ها با اپ‌ها: حداقل ۴۴ پیکسل و گوشه‌ی ۱۲ */
     button { min-height: 44px; border-radius: 12px; }
+    .admin-layout :is(header, form, #statsGrid > div, .admin-tabs > button, .rounded-xl, .rounded-2xl),
+    .admin-layout :is(input, select, textarea) {
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
     @media (max-width: 640px) {
       body { padding-block: 16px !important; }
       h1 { font-size: 1.15rem !important; line-height: 1.6; }
@@ -2781,7 +2799,7 @@ app.get('/admin', (req, res) => {
     <!-- هدر -->
     <header class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
       <div>
-        <h1 class="text-2xl font-black text-sky-400">داشبورد مدیریت پاکشو</h1>
+        <h1 class="text-2xl font-black text-sky-400">داشبورد مدیریت اپ پاکشو</h1>
         <p class="text-xs text-slate-400 mt-1">مدیریت سفارش‌ها، تایید مدارک متخصصین و آمار کل سامانه</p>
       </div>
       <button onclick="logoutAdmin()" class="bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow">خروج مدیر</button>
@@ -2789,6 +2807,14 @@ app.get('/admin', (req, res) => {
         🔄 بروزرسانی اطلاعات
       </button>
     </header>
+
+    <form id="adminLogin" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-3 max-w-md">
+      <h2 class="text-lg font-bold">ورود مدیر</h2>
+      <p id="adminLoginMessage" role="alert" class="text-sm text-amber-300"></p>
+      <label for="adminPassword" class="block text-sm">رمز مدیر</label>
+      <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
+      <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ورود</button>
+    </form>
 
     <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
     <!-- کارت‌های آمار -->
@@ -3047,10 +3073,25 @@ app.get('/admin', (req, res) => {
       '\\nشاخه: ' + identityBranch + '\\nوضعیت: ' + identityState;
     let adminToken = sessionStorage.getItem('paksho_admin_token') || '';
 
-    async function ensureAdmin() {
-      if (adminToken) return true;
-      const password = window.prompt('رمز مدیر را وارد کنید (از متغیر محیط سرور)');
-      if (!password) return false;
+    function showAdminLogin(message) {
+      const form = document.getElementById('adminLogin');
+      form.hidden = false;
+      document.getElementById('adminLoginMessage').textContent = message || '';
+    }
+
+    function hideAdminLogin() {
+      const form = document.getElementById('adminLogin');
+      form.hidden = true;
+      document.getElementById('adminLoginMessage').textContent = '';
+      document.getElementById('adminPassword').value = '';
+    }
+
+    function clearAdminSession() {
+      adminToken = '';
+      sessionStorage.removeItem('paksho_admin_token');
+    }
+
+    async function submitAdminLogin(password) {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3058,13 +3099,32 @@ app.get('/admin', (req, res) => {
       });
       const data = await res.json();
       if (!data.success || !data.token) {
-        window.alert(data.message || 'ورود مدیر ناموفق بود');
+        showAdminLogin(data.message || 'ورود مدیر ناموفق بود');
         return false;
       }
       adminToken = data.token;
       sessionStorage.setItem('paksho_admin_token', adminToken);
+      hideAdminLogin();
       return true;
     }
+
+    async function ensureAdmin() {
+      if (adminToken) return true;
+      showAdminLogin('رمز مدیر این اجرای آزمایشی را در کادر زیر وارد کنید.');
+      return false;
+    }
+
+    document.getElementById('adminLogin').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const password = document.getElementById('adminPassword').value;
+      if (!password) {
+        showAdminLogin('رمز مدیر را وارد کنید.');
+        return;
+      }
+      if (!(await submitAdminLogin(password))) return;
+      dashboardLoad = null;
+      await loadAllData();
+    });
 
     async function logoutAdmin() {
       if (adminToken) {
@@ -3101,11 +3161,17 @@ app.get('/admin', (req, res) => {
       try {
         const response = await fetch(url, { headers: adminHeaders(), cache: 'no-store', signal: controller.signal });
         const data = await response.json();
+        if (response.status === 401) {
+          clearAdminSession();
+          showAdminLogin(data.message || 'نشست مدیر تمام شده. دوباره وارد شوید.');
+          throw new Error('login-required');
+        }
         if (!response.ok || !data.success) throw new Error('load-failed');
         render(data);
         dashboardLoaded[section] = true;
         document.getElementById(section + 'Message').textContent = '';
-      } catch {
+      } catch (err) {
+        if (err && err.message === 'login-required') throw err;
         dashboardLoadError(section, 'دریافت اطلاعات انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.' +
           (dashboardLoaded[section] ? ' اطلاعات قبلی نمایش داده می‌شود.' : ''));
       } finally {
@@ -3148,9 +3214,11 @@ app.get('/admin', (req, res) => {
             loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
           ]);
           void loadAdminTariff();
-        } catch {
-          for (const section of ['stats', 'workers', 'orders']) {
-            dashboardLoadError(section, 'ورود مدیر انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
+        } catch (err) {
+          if (!(err && err.message === 'login-required')) {
+            for (const section of ['stats', 'workers', 'orders']) {
+              dashboardLoadError(section, 'ورود مدیر انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
+            }
           }
         } finally {
           refresh.disabled = false;
