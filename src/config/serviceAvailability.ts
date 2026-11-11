@@ -7,6 +7,9 @@ let disabled: ReadonlySet<string> = new Set();
 let unavailable: ReadonlySet<string> = new Set();
 // خدمت‌هایی که تعرفه آن‌ها را از قفل سطح معاف کرده است. تا رسیدن تعرفه هیچ خدمتی معاف نیست.
 let tierExempt: ReadonlySet<string> = new Set();
+export const SOFA_SERVICE_ID = 'sofa_carpet_washing';
+export const SOFA_DISABLED_MESSAGE = 'این خدمت در این مجموعه فعال نیست';
+let sofaRule: ServicePricingRule | undefined;
 let version = 0;
 const listeners = new Set<() => void>();
 
@@ -31,6 +34,8 @@ export type ServicePricingRule = {
   serviceId: string;
   model: 'hourly' | 'fixed' | 'count' | 'area';
   exemptFromTierLock: boolean;
+  pricingMode?: 'units' | 'mattress_seat' | null;
+  seatSizes?: readonly ('7' | '9')[];
 };
 
 /** قواعد قیمت از تعرفهٔ سرور. فیلد غایب یعنی سرور هنوز آن را نمی‌فرستد و هیچ معافیتی شناخته نیست. */
@@ -42,13 +47,17 @@ export function parsePricingRules(value: unknown): ServicePricingRule[] | null {
   const rules: ServicePricingRule[] = [];
   for (const item of body.pricingRules) {
     if (!item || typeof item !== 'object') continue;
-    const row = item as { serviceId?: unknown; model?: unknown; exemptFromTierLock?: unknown };
+    const row = item as { serviceId?: unknown; model?: unknown; exemptFromTierLock?: unknown; pricingMode?: unknown; seatSizes?: unknown };
     if (typeof row.serviceId !== 'string' || row.serviceId.length === 0 || row.serviceId.length > 80) continue;
     if (typeof row.model !== 'string' || !PRICE_MODELS.has(row.model)) continue;
     rules.push({
       serviceId: row.serviceId,
       model: row.model as ServicePricingRule['model'],
       exemptFromTierLock: row.exemptFromTierLock === true,
+      ...(row.serviceId === SOFA_SERVICE_ID ? {
+        pricingMode: row.pricingMode === 'units' || row.pricingMode === 'mattress_seat' ? row.pricingMode : null,
+        seatSizes: Array.isArray(row.seatSizes) ? row.seatSizes.filter((size): size is '7' | '9' => size === '7' || size === '9') : [],
+      } : {}),
     });
   }
   return rules;
@@ -60,10 +69,17 @@ export function isTierExempt(serviceId: string): boolean {
 
 export function setPricingRules(rules: readonly ServicePricingRule[]): void {
   const next = new Set(rules.filter((rule) => rule.exemptFromTierLock).map((rule) => rule.serviceId));
-  if (next.size === tierExempt.size && [...next].every((id) => tierExempt.has(id))) return;
+  const nextSofa = rules.find(rule => rule.serviceId === SOFA_SERVICE_ID);
+  if (next.size === tierExempt.size && [...next].every((id) => tierExempt.has(id))
+      && JSON.stringify(sofaRule) === JSON.stringify(nextSofa)) return;
   tierExempt = next;
+  sofaRule = nextSofa;
   version += 1;
   listeners.forEach((listener) => listener());
+}
+
+export function getSofaPricingRule(): ServicePricingRule | undefined {
+  return sofaRule;
 }
 
 export function setServiceAvailability(disabledIds: readonly string[], unavailableIds: readonly string[] = []): void {

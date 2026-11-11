@@ -545,7 +545,7 @@ export const orderService = {
         time: submittedTimeText(newOrder.timeSlot),
         quoteToken,
         confirmedTotal,
-        price: confirmedTotal,
+        ...(newOrder.serviceId === 'sofa_carpet_washing' ? {} : { price: confirmedTotal }),
         notes: typeof newOrder.notes === 'string' ? newOrder.notes : '',
         // شروع بازه انتخاب‌شده به وقت تهران، به‌صورت UTC؛ اگر قابل ساختن نباشد فرستاده نمی‌شود.
         ...(expectedStartAt ? { expectedStartAt } : {}),

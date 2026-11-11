@@ -16,7 +16,7 @@ const SCENARIOS: Array<{ title: string; serviceId: string; options: PricingOptio
   { title: 'منزل، ۴ ساعت', serviceId: 'home_unit_cleaning', options: { durationHours: 4 } },
   { title: 'راه‌پله، ۳ طبقه', serviceId: 'staircase_common_areas', options: { floors: 3, buildingAge: 'نوساز تا ۱۰ سال' } },
   { title: 'راه‌پله، ۵ طبقه با پارکینگ', serviceId: 'staircase_common_areas', options: { floors: 5, parking: true, buildingAge: 'نوساز تا ۱۰ سال' } },
-  { title: 'مبل‌شویی، ۷ نفره', serviceId: 'sofa_carpet_washing', options: { sofaSeats: '۷ نفره', mattresses: 0 } },
+  { title: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', options: {} },
 ];
 
 export const PricingTable = ({ visible, onClose, onSelect }: PricingTableProps) => (

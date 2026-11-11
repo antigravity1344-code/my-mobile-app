@@ -63,8 +63,8 @@ export const SERVICES_CATALOG: CleaningService[] = [
   {
     id: 'sofa_carpet_washing',
     title: 'مبل‌شویی و فرش‌شویی در محل',
-    subtitle: 'قیمت‌گذاری بر اساس تعداد نشیمن و تشک',
-    description: 'شستشوی مبلمان و فرش در محل با محاسبه تعداد نشیمن و تشک.',
+    subtitle: 'قیمت‌گذاری طبق تعرفهٔ مجموعه',
+    description: 'شستشوی مبلمان و فرش در محل.',
     iconName: 'color-palette-outline',
     pricingType: 'count_based',
     basePrice: 350000,
@@ -72,11 +72,7 @@ export const SERVICES_CATALOG: CleaningService[] = [
     badge: 'تعدادی',
     isVisible: true,
     configuration: {
-      pricingLabel: 'بر اساس تعداد نشیمن مبل و تشک',
-      inputs: [
-        { id: 'sofaSeats', label: 'تعداد نشیمن مبل', type: 'select', options: ['۷ نفره', '۹ نفره'] },
-        { id: 'mattresses', label: 'تعداد تشک', type: 'number' },
-      ],
+      pricingLabel: 'طبق تعرفهٔ مجموعه',
     },
   },
   {

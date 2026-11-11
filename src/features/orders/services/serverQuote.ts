@@ -1,6 +1,6 @@
 import type { FinalPrice } from '../../../utils/pricing';
 import type { PricingType } from '../../../types/service';
-import { isTierExempt } from '../../../config/serviceAvailability';
+import { getSofaPricingRule, isTierExempt, SOFA_DISABLED_MESSAGE, SOFA_SERVICE_ID } from '../../../config/serviceAvailability';
 
 export const NO_TARIFF_MESSAGE = 'تعرفه این خدمت هنوز تعیین نشده است.';
 export const CONNECTION_MESSAGE = 'ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
@@ -99,6 +99,25 @@ export function buildQuoteRequest(selection: QuoteSelection): { ok: true; body: 
   const serviceId = selection.serviceId.trim();
   if (!serviceId) return { ok: false, message: 'خدمت را انتخاب کنید.' };
   const options = quoteOptions(selection.serviceOptions);
+  const sofaQuantity = options.sofaQuantity;
+  const seatSize = options.seatSize;
+  delete options.sofaQuantity;
+  delete options.seatSize;
+  if (serviceId === SOFA_SERVICE_ID) {
+    const rule = getSofaPricingRule();
+    if (!rule?.pricingMode) return { ok: false, message: SOFA_DISABLED_MESSAGE };
+    if (typeof sofaQuantity !== 'string' || !/^\d+$/.test(sofaQuantity) ||
+        !Number.isSafeInteger(Number(sofaQuantity)) || Number(sofaQuantity) < 1) {
+      return { ok: false, message: rule.pricingMode === 'units' ? 'تعداد واحد را وارد کنید.' : 'تعداد تشک را وارد کنید.' };
+    }
+    if (rule.pricingMode === 'mattress_seat') {
+      if ((seatSize !== '7' && seatSize !== '9') || !rule.seatSizes?.includes(seatSize)) {
+        return { ok: false, message: 'نوع نشیمن را انتخاب کنید.' };
+      }
+      options.seatSize = seatSize;
+    }
+    return { ok: true, body: withWorkerTier({ serviceId, quantity: Number(sofaQuantity), options }, selection, options) };
+  }
   if (selection.pricingType === 'hourly') {
     if (!isInteger(selection.durationHours) || selection.durationHours < 1) {
       return { ok: false, message: 'مدت خدمت را انتخاب کنید.' };

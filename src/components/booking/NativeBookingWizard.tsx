@@ -19,7 +19,7 @@ import { AddressCityPicker } from './AddressCityPicker';
 import { addressCityFields } from '../../api/serviceAreas';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
+import { getSofaPricingRule, isServiceEnabled, SOFA_DISABLED_MESSAGE, SOFA_SERVICE_ID, useServiceAvailability } from '../../config/serviceAvailability';
 import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
@@ -92,6 +92,8 @@ interface NativeBookingWizardProps {
 export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWizardProps) => {
   useServiceAvailability();
   const booking = useBooking();
+  const sofa = booking.selectedService?.id === SOFA_SERVICE_ID;
+  const sofaRule = sofa ? getSofaPricingRule() : undefined;
   const offerDraft = getOfferBookingDraft();
   const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
   const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
@@ -486,7 +488,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     return () => subscription.remove();
   }, []);
 
-  const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
+  const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot && (!sofa || builtSelection?.ok)) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
@@ -530,6 +532,25 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
 
         {booking.step === 2 && <View style={styles.section}>
           <Text style={styles.heading}>تاریخ و ساعت</Text>
+          {sofa && (!sofaRule?.pricingMode ? <Text style={styles.label}>{SOFA_DISABLED_MESSAGE}</Text> : (
+            <View style={styles.optionBlock}>
+              {sofaRule.pricingMode === 'mattress_seat' && <>
+                <Text style={styles.label}>نوع نشیمن</Text>
+                <View style={styles.choiceRow}>{sofaRule.seatSizes?.map(size => (
+                  <Pressable key={size} onPress={() => booking.setServiceOption('seatSize', size)}
+                    style={[styles.choice, booking.serviceOptions.seatSize === size && styles.choiceSelected]}>
+                    <Text style={booking.serviceOptions.seatSize === size ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(Number(size))} نفره</Text>
+                  </Pressable>
+                ))}</View>
+              </>}
+              <Text style={styles.label}>{sofaRule.pricingMode === 'units' ? 'تعداد واحد' : 'تعداد تشک'}</Text>
+              <TextInput keyboardType="numeric" placeholder="مثلاً ۲" placeholderTextColor="#94a3b8"
+                value={String(booking.serviceOptions.sofaQuantity ?? '')}
+                accessibilityLabel={sofaRule.pricingMode === 'units' ? 'تعداد واحد' : 'تعداد تشک'}
+                onChangeText={value => booking.setServiceOption('sofaQuantity', normalizePersianDigits(value))}
+                style={styles.input} />
+            </View>
+          ))}
           <Text style={styles.earlyBirdHint}>مبلغ نهایی را سرور از تعرفه شرکت محاسبه می‌کند و قبل از ثبت نشان می‌دهد.</Text>
           {offerMode && offerDraft && <View style={styles.optionBlock}>
             <Text style={styles.label}>ساعت پیشنهادی {offerDraft.workerName}</Text>

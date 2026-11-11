@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { useServiceAvailability } from '../../config/serviceAvailability';
+import React, { useEffect, useRef, useState } from 'react';
+import { getSofaPricingRule, SOFA_DISABLED_MESSAGE, SOFA_SERVICE_ID, useServiceAvailability } from '../../config/serviceAvailability';
+import { refreshServiceAvailability } from '../../config/serviceAvailabilityApi';
 import { useBooking } from '../../context/BookingContext';
 import { addressCityFields } from '../../api/serviceAreas';
 import { CleaningService } from '../../types/service';
@@ -63,12 +64,16 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     customerTier,
     addressDetails,
     serviceOptions,
+    setServiceOption,
     updateAddressField,
     resetBooking,
     nextStep,
     prevStep,
   } = useBooking();
   useServiceAvailability();
+  const sofa = selectedService?.id === SOFA_SERVICE_ID;
+  const sofaRule = sofa ? getSofaPricingRule() : undefined;
+  useEffect(() => { if (sofa) void refreshServiceAvailability(); }, [sofa]);
   const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
   const tierLock = tierLockApplies(selectedService?.id, false);
 
@@ -281,6 +286,22 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
 
         {step === 2 && (
           <>
+            {sofa && (!sofaRule?.pricingMode ? <p>{SOFA_DISABLED_MESSAGE}</p> : (
+              <div className="space-y-3 text-right">
+                {sofaRule.pricingMode === 'mattress_seat' && <label className="block">
+                  نوع نشیمن
+                  <select value={String(serviceOptions.seatSize ?? '')} onChange={event => setServiceOption('seatSize', event.target.value)}>
+                    <option value="">انتخاب کنید</option>
+                    {sofaRule.seatSizes?.map(size => <option key={size} value={size}>{Number(size).toLocaleString('fa-IR')} نفره</option>)}
+                  </select>
+                </label>}
+                <label className="block">
+                  {sofaRule.pricingMode === 'units' ? 'تعداد واحد' : 'تعداد تشک'}
+                  <input inputMode="numeric" value={String(serviceOptions.sofaQuantity ?? '')}
+                    onChange={event => setServiceOption('sofaQuantity', normalizePersianDigits(event.target.value))} />
+                </label>
+              </div>
+            ))}
             <DateTimeSelector
               selectedDate={selectedDate}
               selectedTimeSlot={selectedTimeSlot}
@@ -292,7 +313,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
               onChangeDuration={setDurationHours}
               onChangeGender={setGenderPreference}
               onChangeNotes={setNotes}
-              onNext={nextStep}
+              onNext={() => { if (!sofa || builtSelection?.ok) nextStep(); }}
               onPrev={prevStep}
             />
             {tierLock && (
