@@ -363,3 +363,30 @@ test('missing tariff and expired admin session show a clear error without seedin
   await expired.page.locator('#tariffRefresh').click();
   await expired.page.waitForSelector('#tariffSave');
 });
+
+test('sofa pricing mode picker saves a draft with mode and seat factors', async (t) => {
+  fixture();
+  const { page } = await pageFor(t);
+  // ترتیب خدمت‌ها در فهرست الفبایی است؛ مبل‌شویی چهارمین (اندیس ۳) است.
+  const sofa = 3;
+  await page.locator('#tariffSofaMode' + sofa).selectOption('mattress_seat');
+  await page.locator('#tariffSofaSeat9_' + sofa).fill('1٫3');
+  const start = Math.ceil((Date.now() + 120_000) / 60_000) * 60_000;
+  await page.locator('#tariffDraftFrom').fill(new Date(start + 210 * 60_000).toISOString().slice(0, 16));
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
+  const draft = readAdminTariff().versions.find((version) => version.status === 'draft');
+  assert.equal(draft.services.sofa_carpet_washing.pricingMode, 'mattress_seat');
+  assert.deepEqual(draft.services.sofa_carpet_washing.seatFactors, { '7': 10000, '9': 13000 });
+});
+
+test('sofa pricing mode rejects a seat factor that is not a positive number', async (t) => {
+  fixture();
+  const { page } = await pageFor(t);
+  await page.locator('#tariffSofaMode3').selectOption('mattress_seat');
+  await page.locator('#tariffSofaSeat9_3').fill('abc');
+  const start = Math.ceil((Date.now() + 120_000) / 60_000) * 60_000;
+  await page.locator('#tariffDraftFrom').fill(new Date(start + 210 * 60_000).toISOString().slice(0, 16));
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('ضریب نشیمن'));
+});

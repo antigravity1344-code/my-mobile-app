@@ -71,6 +71,14 @@ function tariffRate(value) {
   return amount;
 }
 
+function tariffFactor(value) {
+  const number = Number(String(value).replace('٫', '.').trim());
+  if (!Number.isFinite(number) || number <= 0 || number > 10) {
+    throw new Error('ضریب نشیمن باید عددی مثبت و کمتر از ۱۰ باشد.');
+  }
+  return Math.round(number * 10000);
+}
+
 function tariffField(parent, label, id, type, value) {
   const wrapper = adminElement('label', 'block text-sm', label);
   const input = adminElement('input', tariffInputClass);
@@ -170,12 +178,31 @@ function renderAdminTariff() {
       const exempt = tariffField(row, 'معاف از قفل سطح — ' + (tariffServiceLabels[id] || id),
         'tariffTierExempt' + index, 'checkbox', 'on');
       exempt.checked = service.exemptFromTierLock === true;
+      let modeSelect = null;
+      let seat7 = null;
+      let seat9 = null;
+      if (id === 'sofa_carpet_washing') {
+        const modeWrap = adminElement('label', 'block text-sm', 'حالت قیمت‌گذاری مبل‌شویی');
+        modeSelect = adminElement('select', tariffInputClass);
+        modeSelect.id = 'tariffSofaMode' + index;
+        [['', 'خاموش'], ['mattress_seat', 'حالت ب: تشک و نوع نشیمن'], ['units', 'حالت الف: واحد']].forEach(([value, text]) => {
+          const option = adminElement('option', '', text);
+          option.value = value;
+          modeSelect.append(option);
+        });
+        modeSelect.value = service.pricingMode || '';
+        modeWrap.append(modeSelect);
+        row.append(modeWrap);
+        const factors = service.seatFactors || { '7': 10000, '9': 13000 };
+        seat7 = tariffField(row, 'ضریب نشیمن ۷ نفره (۱ = بدون تغییر)', 'tariffSofaSeat7_' + index, 'text', String(factors['7'] / 10000));
+        seat9 = tariffField(row, 'ضریب نشیمن ۹ نفره (مثلاً ۱٫۳)', 'tariffSofaSeat9_' + index, 'text', String(factors['9'] / 10000));
+      }
       if (version.status === 'published') {
         row.append(adminElement('p', 'text-xs', exempt.checked ? 'معاف از قفل سطح' : 'مشمول قفل سطح'));
       }
       tariffAdjustments(row, service);
       rates.append(row);
-      return { id, input, exempt };
+      return { id, input, exempt, modeSelect, seat7, seat9 };
     });
     start.value = '';
     end.value = tariffLocalInput(version.validTo);
@@ -194,9 +221,21 @@ function renderAdminTariff() {
       delete version.status;
       version.validFrom = tariffInstant(start.value);
       version.validTo = end.value ? tariffInstant(end.value) : null;
-      for (const { id, input, exempt } of serviceInputs) {
+      for (const { id, input, exempt, modeSelect, seat7, seat9 } of serviceInputs) {
         version.services[id].rate = tariffRate(input.value);
         version.services[id].exemptFromTierLock = exempt.checked;
+        if (modeSelect) {
+          const mode = modeSelect.value || null;
+          version.services[id].pricingMode = mode;
+          if (mode === 'mattress_seat') {
+            version.services[id].seatFactors = {
+              '7': tariffFactor(seat7.value),
+              '9': tariffFactor(seat9.value),
+            };
+          } else {
+            delete version.services[id].seatFactors;
+          }
+        }
       }
       beginAdminTariff('/api/admin/tariff-versions', { baseRevision: tariffState.revision, version }, 'پیش‌نویس ذخیره شد؛ هنوز منتشر نشده است.');
     } catch (error) { tariffMessage(error.message); }
