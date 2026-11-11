@@ -60,3 +60,38 @@ test('seat factors are rejected outside the mattress_seat mode', () => {
     /فقط برای حالت مبل‌شویی/,
   );
 });
+
+const { quote } = require('./tariffEngine');
+
+function frozen(service) {
+  const policy = policyWith(service);
+  return policy;
+}
+
+test('mattress_seat: 7-seat factor 1.0 gives rate × mattresses', () => {
+  const result = quote(frozen(modeB), { at, serviceId: 's', quantity: 2, options: { seatSize: '7' } });
+  assert.equal(result.total, 700000);
+});
+
+test('mattress_seat: 9-seat factor 1.3 scales the rate', () => {
+  const result = quote(frozen(modeB), { at, serviceId: 's', quantity: 2, options: { seatSize: '9' } });
+  assert.equal(result.total, 910000);
+});
+
+test('mattress_seat: seat size is required', () => {
+  assert.throws(() => quote(frozen(modeB), { at, serviceId: 's', quantity: 2 }), /نوع نشیمن/);
+});
+
+test('mattress_seat: seat size other than 7 or 9 is rejected', () => {
+  assert.throws(() => quote(frozen(modeB), { at, serviceId: 's', quantity: 2, options: { seatSize: '5' } }), /نوع نشیمن/);
+});
+
+test('units: quantity × rate with no seat factor', () => {
+  const units = { model: 'count', rate: 350000, pricingMode: 'units' };
+  assert.equal(quote(frozen(units), { at, serviceId: 's', quantity: 3 }).total, 1050000);
+});
+
+test('seatSize is rejected for a service without mattress_seat mode', () => {
+  const plain = { model: 'count', rate: 350000 };
+  assert.throws(() => quote(frozen(plain), { at, serviceId: 's', quantity: 1, options: { seatSize: '7' } }), /نوع نشیمن فقط/);
+});

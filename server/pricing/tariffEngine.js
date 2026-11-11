@@ -202,7 +202,8 @@ function isOptionValue(value) {
 }
 
 // انتخاب‌هایی که صرفاً ترجیح سفارش‌اند و هرگز قیمت را تغییر نمی‌دهند؛ نبودن آن‌ها در تعرفه نباید رزرو را رد کند.
-const NON_PRICING_OPTION_IDS = new Set(['gender']);
+const NON_PRICING_OPTION_IDS = new Set(['gender', 'seatSize']);
+const SEAT_SIZES = new Set(['7', '9']);
 
 function allowedOptionIds(service) {
   const ids = new Set();
@@ -250,6 +251,14 @@ function quote(policy, input) {
     quantity = input.quantity;
   }
   let subtotal = mulDivHalfUp(service.rate, quantity, 1);
+  // مبل‌شویی حالت mattress_seat: نوع نشیمن (۷ یا ۹ نفره) از options.seatSize می‌آید و ضریب آن روی نرخ اعمال می‌شود.
+  if (service.pricingMode === 'mattress_seat') {
+    const seatSize = options.seatSize == null ? null : String(options.seatSize);
+    if (!seatSize || !SEAT_SIZES.has(seatSize)) fail('INPUT_INVALID', 'نوع نشیمن مبل (۷ یا ۹ نفره) لازم است.');
+    subtotal = mulDivHalfUp(subtotal, service.seatFactors[seatSize], 10000);
+  } else if (options.seatSize != null) {
+    fail('INPUT_INVALID', 'نوع نشیمن فقط برای مبل‌شویی با این حالت مجاز است.');
+  }
   // D-82: ضریب سطح فقط روی نرخ پایه است. هزینهٔ جانبی ثابت بعداً بدون ضریب اضافه می‌شود.
   // تعدیل پیشنهاد متخصص (priceAdjustment) جداست و همچنان روی جمع پس از هزینه‌های جانبی می‌نشیند.
   if (Object.prototype.hasOwnProperty.call(input, 'baseRateBasisPoints') && input.baseRateBasisPoints != null) {
