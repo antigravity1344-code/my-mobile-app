@@ -3,6 +3,7 @@
 const fs = require('fs');
 
 const MODELS = new Set(['hourly', 'fixed', 'count', 'area']);
+const PRICING_MODES = new Set(['units', 'mattress_seat']);
 
 class TariffError extends Error {
   constructor(code, message) {
@@ -128,6 +129,24 @@ function validatePolicy(raw) {
       if (service.exemptFromTierLock != null && typeof service.exemptFromTierLock !== 'boolean') {
         fail('TARIFF_INVALID', 'پرچم معافیت از قفل سطح باید درست یا نادرست باشد.');
       }
+      // pricingMode (مبل‌شویی): 'units' یا 'mattress_seat'. پیش‌فرض: خاموش (null).
+      // seatFactors فقط برای 'mattress_seat' لازم است؛ ضریب بر حسب basis point (۱۰۰۰۰ = ۱٫۰).
+      if (service.pricingMode != null && !PRICING_MODES.has(service.pricingMode)) {
+        fail('TARIFF_INVALID', 'حالت قیمت‌گذاری خدمت معتبر نیست.');
+      }
+      if (service.pricingMode === 'mattress_seat') {
+        const factors = service.seatFactors;
+        if (!factors || typeof factors !== 'object' || Array.isArray(factors)) {
+          fail('TARIFF_INVALID', 'ضرایب نشیمن برای این حالت لازم است.');
+        }
+        for (const key of ['7', '9']) {
+          if (!Object.hasOwn(factors, key)) fail('TARIFF_INVALID', 'ضریب نشیمن ۷ یا ۹ نفره کامل نیست.');
+          assertSafeInteger(factors[key], 'TARIFF_INVALID', 'ضریب نشیمن باید عدد صحیح باشد.');
+          if (factors[key] <= 0) fail('TARIFF_INVALID', 'ضریب نشیمن باید مثبت باشد.');
+        }
+      } else if (service.seatFactors != null) {
+        fail('TARIFF_INVALID', 'ضرایب نشیمن فقط برای حالت مبل‌شویی مجاز است.');
+      }
       Object.defineProperty(services, serviceId, {
         value: {
         model: service.model,
@@ -135,6 +154,8 @@ function validatePolicy(raw) {
         minQuantity: service.minQuantity == null ? null : service.minQuantity,
         maxQuantity: service.maxQuantity == null ? null : service.maxQuantity,
         exemptFromTierLock: service.exemptFromTierLock === true,
+        pricingMode: service.pricingMode == null ? null : service.pricingMode,
+        seatFactors: service.seatFactors == null ? null : { '7': service.seatFactors['7'], '9': service.seatFactors['9'] },
         ...copyAdjustments(service),
       },
         enumerable: true,

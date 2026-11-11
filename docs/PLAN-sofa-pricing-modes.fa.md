@@ -53,3 +53,10 @@
 
 - بدون تغییر در قیمت‌های فعلی تا تأیید مالک.
 - بدون تغییر در تعرفه‌های واقعی؛ فقط مقادیر آزمایشی در محیط تست.
+
+## وضعیت مرحلهٔ ۱ (۱۱ نوامبر ۲۰۲۶)
+
+- انجام شد: فیلدهای `pricingMode` (`units` یا `mattress_seat`) و `seatFactors` (ضرایب ۷ و ۹ نفره) در `server/pricing/tariffEngine.js` اضافه و اعتبارسنجی شد.
+- تست‌ها: `server/pricing/sofaPricingMode.test.js` با ۷ تست پاس. تست‌های `server/pricing/*.test.js` و `server/*.test.js` (به‌جز یک مورد زیر) پاس شدند.
+- هنوز انجام نشده (مراحل بعد): محاسبهٔ نقل‌قول بر اساس حالت، انتخاب‌گر پنل مدیر، و فرم اپ و سایت.
+- شکست موجود و غیرمرتبط: «missing tariff and expired admin session…» در `server/adminTariff.test.js` روی main هم شکست می‌خورد (تایم‌اوت صفحهٔ مدیر در مرورگر آزمایشی).
