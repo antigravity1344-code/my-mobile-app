@@ -430,6 +430,9 @@ function mapPricingError(error) {
     if (error.code === 'INPUT_INVALID') {
       return { status: 400, body: { success: false, code: 'INPUT_INVALID', message: error.message } };
     }
+    if (error.code === 'SERVICE_UNAVAILABLE') {
+      return { status: 409, body: { success: false, code: 'SERVICE_UNAVAILABLE', message: error.message } };
+    }
     return { status: 409, body: { success: false, code: error.code, message: 'محاسبه قیمت انجام نشد.' } };
   }
   if (error instanceof QuoteError) {

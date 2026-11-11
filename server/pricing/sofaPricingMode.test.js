@@ -95,3 +95,41 @@ test('seatSize is rejected for a service without mattress_seat mode', () => {
   const plain = { model: 'count', rate: 350000 };
   assert.throws(() => quote(frozen(plain), { at, serviceId: 's', quantity: 1, options: { seatSize: '7' } }), /نوع نشیمن فقط/);
 });
+
+test('sofa with pricing mode off: quote is refused with SERVICE_UNAVAILABLE', () => {
+  const { quote } = require('./tariffEngine');
+  const policy = policyWith({ model: 'count', rate: 350000 });
+  // نام شناسه باید همان شناسهٔ مبل‌شویی باشد
+  const sofaPolicy = validatePolicy({
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{ id: 'v1', status: 'published', validFrom: '2026-01-01T00:00:00.000Z', validTo: null, services: { sofa_carpet_washing: { model: 'count', rate: 350000 } } }],
+  });
+  assert.ok(policy);
+  assert.throws(
+    () => quote(sofaPolicy, { serviceId: 'sofa_carpet_washing', quantity: 2, options: {}, at }),
+    (error) => error.code === 'SERVICE_UNAVAILABLE',
+  );
+});
+
+test('sofa with a pricing mode still quotes normally', () => {
+  const { quote } = require('./tariffEngine');
+  const sofaPolicy = validatePolicy({
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{ id: 'v1', status: 'published', validFrom: '2026-01-01T00:00:00.000Z', validTo: null, services: { sofa_carpet_washing: modeB } }],
+  });
+  const result = quote(sofaPolicy, { serviceId: 'sofa_carpet_washing', quantity: 2, options: { seatSize: '9' }, at });
+  assert.equal(result.total, 910000);
+});
+
+test('other services without a pricing mode are not affected', () => {
+  const { quote } = require('./tariffEngine');
+  const plainPolicy = validatePolicy({
+    companyId: 'deployment-under-test',
+    currencyUnit: 'minor',
+    versions: [{ id: 'v1', status: 'published', validFrom: '2026-01-01T00:00:00.000Z', validTo: null, services: { home_unit_cleaning: { model: 'count', rate: 100 } } }],
+  });
+  const result = quote(plainPolicy, { serviceId: 'home_unit_cleaning', quantity: 2, options: {}, at });
+  assert.equal(result.total, 200);
+});

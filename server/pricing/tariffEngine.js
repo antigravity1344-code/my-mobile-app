@@ -204,6 +204,8 @@ function isOptionValue(value) {
 // انتخاب‌هایی که صرفاً ترجیح سفارش‌اند و هرگز قیمت را تغییر نمی‌دهند؛ نبودن آن‌ها در تعرفه نباید رزرو را رد کند.
 const NON_PRICING_OPTION_IDS = new Set(['gender', 'seatSize']);
 const SEAT_SIZES = new Set(['7', '9']);
+// خدمت‌هایی که حالت قیمت‌گذاری دارند؛ وقتی حالت خاموش (null) است، سرور قیمت نمی‌دهد.
+const SERVICES_REQUIRING_PRICING_MODE = new Set(['sofa_carpet_washing']);
 
 function allowedOptionIds(service) {
   const ids = new Set();
@@ -232,6 +234,9 @@ function quote(policy, input) {
   const service = version.services[input.serviceId];
   if (!service || typeof service !== 'object' || !MODELS.has(service.model)) {
     fail('SERVICE_NOT_IN_TARIFF', 'این خدمت در تعرفه معتبر نیست.');
+  }
+  if (SERVICES_REQUIRING_PRICING_MODE.has(input.serviceId) && service.pricingMode == null) {
+    fail('SERVICE_UNAVAILABLE', 'این خدمت فعلاً در دسترس نیست.');
   }
   const options = input.options == null ? {} : input.options;
   if (!options || typeof options !== 'object' || Array.isArray(options)) fail('INPUT_INVALID', 'گزینه‌ها معتبر نیستند.');
