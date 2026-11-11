@@ -31,7 +31,12 @@ export type ServicePricingRule = {
   serviceId: string;
   model: 'hourly' | 'fixed' | 'count' | 'area';
   exemptFromTierLock: boolean;
+  pricingMode?: 'units' | 'mattress_seat' | null;
 };
+
+export type ServicePricingMode = 'units' | 'mattress_seat' | null;
+const PRICING_MODES = new Set(['units', 'mattress_seat']);
+let pricingModes: ReadonlyMap<string, 'units' | 'mattress_seat'> = new Map();
 
 /** قواعد قیمت از تعرفهٔ سرور. فیلد غایب یعنی سرور هنوز آن را نمی‌فرستد و هیچ معافیتی شناخته نیست. */
 export function parsePricingRules(value: unknown): ServicePricingRule[] | null {
@@ -42,16 +47,23 @@ export function parsePricingRules(value: unknown): ServicePricingRule[] | null {
   const rules: ServicePricingRule[] = [];
   for (const item of body.pricingRules) {
     if (!item || typeof item !== 'object') continue;
-    const row = item as { serviceId?: unknown; model?: unknown; exemptFromTierLock?: unknown };
+    const row = item as { serviceId?: unknown; model?: unknown; exemptFromTierLock?: unknown; pricingMode?: unknown };
     if (typeof row.serviceId !== 'string' || row.serviceId.length === 0 || row.serviceId.length > 80) continue;
     if (typeof row.model !== 'string' || !PRICE_MODELS.has(row.model)) continue;
     rules.push({
       serviceId: row.serviceId,
       model: row.model as ServicePricingRule['model'],
       exemptFromTierLock: row.exemptFromTierLock === true,
+      pricingMode: typeof row.pricingMode === 'string' && PRICING_MODES.has(row.pricingMode)
+        ? (row.pricingMode as 'units' | 'mattress_seat') : null,
     });
   }
   return rules;
+}
+
+/** حالت قیمت‌گذاری سرور برای خدمت (فقط مبل‌شویی مقدار دارد). null یعنی تعیین نشده. */
+export function servicePricingMode(serviceId: string): ServicePricingMode {
+  return pricingModes.get(serviceId) ?? null;
 }
 
 export function isTierExempt(serviceId: string): boolean {
@@ -59,6 +71,7 @@ export function isTierExempt(serviceId: string): boolean {
 }
 
 export function setPricingRules(rules: readonly ServicePricingRule[]): void {
+  pricingModes = new Map(rules.flatMap((rule) => (rule.pricingMode ? [[rule.serviceId, rule.pricingMode] as const] : [])));
   const next = new Set(rules.filter((rule) => rule.exemptFromTierLock).map((rule) => rule.serviceId));
   if (next.size === tierExempt.size && [...next].every((id) => tierExempt.has(id))) return;
   tierExempt = next;

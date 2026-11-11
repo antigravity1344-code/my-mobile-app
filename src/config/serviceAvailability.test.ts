@@ -52,8 +52,8 @@ describe('serviceAvailability', () => {
         { serviceId: 'bad', model: 'other', exemptFromTierLock: true },
       ],
     })).toEqual([
-      { serviceId: 'staircase_common_areas', model: 'fixed', exemptFromTierLock: true },
-      { serviceId: 'home_unit_cleaning', model: 'hourly', exemptFromTierLock: false },
+      { serviceId: 'staircase_common_areas', model: 'fixed', exemptFromTierLock: true, pricingMode: null },
+      { serviceId: 'home_unit_cleaning', model: 'hourly', exemptFromTierLock: false, pricingMode: null },
     ]);
     expect(tierLockApplies('staircase_common_areas', false)).toBe(true);
     setPricingRules([{ serviceId: 'staircase_common_areas', model: 'fixed', exemptFromTierLock: true }]);

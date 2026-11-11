@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SOFA_SERVICE_ID, sofaInputsFor } from '../../config/sofaPricingMode';
 import {
   Alert,
   BackHandler,
@@ -19,7 +20,7 @@ import { AddressCityPicker } from './AddressCityPicker';
 import { addressCityFields } from '../../api/serviceAreas';
 import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { isServiceEnabled, useServiceAvailability } from '../../config/serviceAvailability';
+import { isServiceEnabled, servicePricingMode, useServiceAvailability } from '../../config/serviceAvailability';
 import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
@@ -586,7 +587,10 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             placeholderTextColor="#94a3b8"
             style={[styles.input, styles.textArea]}
           />
-          {booking.selectedService?.configuration.inputs?.map((input) => (
+          {(booking.selectedService?.id === SOFA_SERVICE_ID
+            ? sofaInputsFor(servicePricingMode(SOFA_SERVICE_ID))
+            : booking.selectedService?.configuration.inputs
+          )?.map((input) => (
             <View key={input.id} style={styles.optionBlock}>
               <Text style={styles.label}>{input.label}</Text>
               {input.type === 'number' && <TextInput keyboardType="numeric" placeholder={input.id === 'floors' ? 'مثال: ۴' : 'مثال: ۰'} placeholderTextColor="#94a3b8" value={String(booking.serviceOptions[input.id] ?? '')} onChangeText={(value) => booking.setServiceOption(input.id, Number(value.replace(/[^0-9]/g, '')) || 0)} style={styles.input} />}

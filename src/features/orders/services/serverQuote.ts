@@ -1,6 +1,7 @@
 import type { FinalPrice } from '../../../utils/pricing';
 import type { PricingType } from '../../../types/service';
-import { isTierExempt } from '../../../config/serviceAvailability';
+import { isTierExempt, servicePricingMode } from '../../../config/serviceAvailability';
+import { SOFA_SERVICE_ID, sofaQuoteShape } from '../../../config/sofaPricingMode';
 
 export const NO_TARIFF_MESSAGE = 'تعرفه این خدمت هنوز تعیین نشده است.';
 export const CONNECTION_MESSAGE = 'ارتباط برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
@@ -98,6 +99,14 @@ function withWorkerTier(body: QuoteRequestBody, selection: QuoteSelection, optio
 export function buildQuoteRequest(selection: QuoteSelection): { ok: true; body: QuoteRequestBody } | { ok: false; message: string } {
   const serviceId = selection.serviceId.trim();
   if (!serviceId) return { ok: false, message: 'خدمت را انتخاب کنید.' };
+  if (serviceId === SOFA_SERVICE_ID) {
+    const mode = servicePricingMode(serviceId);
+    const shaped = sofaQuoteShape(mode, quoteOptions(selection.serviceOptions));
+    if (!shaped) {
+      return { ok: false, message: mode ? 'تعداد تشک یا نوع نشیمن مبل را انتخاب کنید.' : 'این خدمت فعلاً در دسترس نیست.' };
+    }
+    return { ok: true, body: withWorkerTier({ serviceId, quantity: shaped.quantity, options: shaped.options }, selection, shaped.options) };
+  }
   const options = quoteOptions(selection.serviceOptions);
   if (selection.pricingType === 'hourly') {
     if (!isInteger(selection.durationHours) || selection.durationHours < 1) {
