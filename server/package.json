@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "backup": "node backupCli.js backup",
+    "verify-backup": "node backupCli.js verify",
+    "restore": "node backupCli.js restore"
   },
   "dependencies": {
     "cors": "^2.8.5",
