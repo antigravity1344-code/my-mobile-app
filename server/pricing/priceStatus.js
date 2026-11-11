@@ -43,6 +43,8 @@ function currentPricingRules(now = new Date()) {
         serviceId,
         model: service.model,
         exemptFromTierLock: service.exemptFromTierLock === true,
+        pricingMode: service.pricingMode == null ? null : service.pricingMode,
+        seatSizes: service.pricingMode === 'mattress_seat' ? ['7', '9'] : null,
       };
     });
   } catch (error) {

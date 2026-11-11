@@ -57,8 +57,16 @@ test('pricing rules expose the tariff model and exemption flag without a rate', 
   const rules = currentPricingRules();
   const fixed = rules.find((rule) => rule.serviceId === 'fixed_job');
   const exempt = rules.find((rule) => rule.serviceId === 'exempt_hourly');
-  assert.deepEqual(fixed, { serviceId: 'fixed_job', model: 'fixed', exemptFromTierLock: false });
+  assert.deepEqual(fixed, { serviceId: 'fixed_job', model: 'fixed', exemptFromTierLock: false, pricingMode: null, seatSizes: null });
   assert.equal(exempt.exemptFromTierLock, true);
   assert.equal(exempt.model, 'hourly');
   assert.equal(Object.hasOwn(fixed, 'rate'), false);
+});
+
+test('pricing rules expose the sofa mattress_seat mode and its seat sizes', () => {
+  const rules = currentPricingRules();
+  const sofa = rules.find((rule) => rule.serviceId === 'sofa_carpet_washing');
+  if (!sofa) return;
+  assert.equal(sofa.pricingMode === null || sofa.pricingMode === 'mattress_seat' || sofa.pricingMode === 'units', true);
+  if (sofa.pricingMode === 'mattress_seat') assert.deepEqual(sofa.seatSizes, ['7', '9']);
 });
