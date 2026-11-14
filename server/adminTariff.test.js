@@ -71,7 +71,13 @@ async function pageFor(t, initialToken = token, tab = 'Tariffs') {
   await page.goto(origin + '/admin');
   await page.locator('#tab' + tab + 'Btn').click();
   if (tab === 'Tariffs') {
-    await page.waitForFunction(() => document.getElementById('tariffMessage').textContent !== '');
+    await page.waitForFunction(() => {
+      const tariffMessage = document.getElementById('tariffMessage');
+      const adminLogin = document.getElementById('adminLogin');
+      const dashboardRefresh = document.getElementById('dashboardRefresh');
+      return Boolean(tariffMessage?.textContent?.trim())
+        || Boolean(adminLogin && !adminLogin.hidden && dashboardRefresh && !dashboardRefresh.disabled);
+    });
   }
   return { page, context };
 }
@@ -357,10 +363,12 @@ test('missing tariff and expired admin session show a clear error without seedin
   assert.equal(fs.existsSync(process.env.PAKSHO_TARIFF_FILE), false);
   fixture();
   const expired = await pageFor(t, 'expired-token');
-  assert.ok((await expired.page.locator('#tariffMessage').textContent()).includes('نشست مدیر پایان یافته'));
+  assert.equal(await expired.page.locator('#adminLogin').isVisible(), true);
+  assert.ok((await expired.page.locator('#adminLoginMessage').textContent()).trim());
   assert.equal(await expired.page.evaluate(() => sessionStorage.getItem('paksho_admin_token')), null);
-  expired.page.once('dialog', (dialog) => dialog.accept(harness.adminPassword));
-  await expired.page.locator('#tariffRefresh').click();
+  assert.equal(await expired.page.locator('#tariffSave').count(), 0);
+  await expired.page.locator('#adminPassword').fill(harness.adminPassword);
+  await expired.page.locator('#adminLogin button[type="submit"]').click();
   await expired.page.waitForSelector('#tariffSave');
 });
 

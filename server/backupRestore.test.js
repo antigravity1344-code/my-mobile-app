@@ -15,7 +15,7 @@ function setup() {
   const tariffPath = path.join(root, 'live', 'tariff.json');
   const docDir = path.join(root, 'live', 'worker-docs');
   const store = createDataStore(dbPath);
-  void store;
+  store.close();
   const db = new DatabaseSync(dbPath);
   db.exec('CREATE TABLE IF NOT EXISTS backup_probe (id INTEGER PRIMARY KEY, label TEXT)');
   db.prepare('INSERT INTO backup_probe (label) VALUES (?)').run('ردیف یک');
