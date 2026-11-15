@@ -1,31 +1,13 @@
 {
-  "sha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c",
-  "startedAt": "2026-11-15T11:55:10Z",
-  "status": "done",
-  "finishedAt": "2026-11-15T12:06:08Z",
-  "reason": "Both debug APKs were rebuilt from clean main 7cf8104. Each embedded bundle contains that full commit and does not contain 2b8fdfe. On 15 Nov 2026 both were installed with adb install -r on R83X900E9CB; installed file hashes matched the artifacts. Data was kept. The in-app badge was not opened.",
+  "sha": "975aaba",
+  "startedAt": "2026-11-15T15:45:28Z",
+  "status": "in_progress",
+  "reason": "Rebuild both debug APKs so the embedded API address is http://37.221.113.61/api. The previous 7cf8104 files point at the computer.",
   "apps": [
-    {
-      "app": "com.paksho.customer",
-      "status": "done",
-      "finishedAt": "2026-11-15T12:05:43Z",
-      "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
-      "bytes": 73771030,
-      "bundleSha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c"
-    },
-    {
-      "app": "com.paksho.worker",
-      "status": "done",
-      "finishedAt": "2026-11-15T12:06:08Z",
-      "artifactPath": "android/app/build/outputs/apk/worker/debug/app-worker-debug.apk",
-      "bytes": 72469714,
-      "bundleSha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c"
-    }
+    { "app": "com.paksho.customer", "status": "in_progress" },
+    { "app": "com.paksho.worker", "status": "in_progress" }
   ],
   "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets --rerun :app:createBundleWorkerDebugJsAndAssets --rerun :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
-  "apiUrl": "http://127.0.0.1:3000/api",
-  "phoneSerial": "R83X900E9CB",
-  "installedAt": "2026-11-15T12:26:30Z",
-  "installMode": "adb install -r --user 0",
-  "installedHashesMatch": true
+  "apiUrl": "http://37.221.113.61/api",
+  "phoneSerial": "R83X900E9CB"
 }
