@@ -6,6 +6,27 @@ const path = require('path');
 const { TariffError, validatePolicy } = require('./tariffEngine');
 
 const REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;
+// Billing shape only. Rates stay empty until an admin types them; nothing here is a price.
+const INITIAL_TARIFF_SERVICES = Object.freeze([
+  Object.freeze({ id: 'home_unit_cleaning', model: 'hourly' }),
+  Object.freeze({ id: 'staircase_common_areas', model: 'fixed', exemptFromTierLock: true }),
+  Object.freeze({ id: 'office_company_cleaning', model: 'hourly' }),
+  Object.freeze({ id: 'sofa_carpet_washing', model: 'count' }),
+  Object.freeze({ id: 'hourly_labor', model: 'hourly' }),
+  Object.freeze({ id: 'patient_companion', model: 'hourly' }),
+  Object.freeze({ id: 'building_painting', model: 'area' }),
+]);
+
+function initialTariffSetup() {
+  return {
+    currencyUnit: 'تومان',
+    services: INITIAL_TARIFF_SERVICES.map((service) => ({
+      id: service.id,
+      model: service.model,
+      ...(service.exemptFromTierLock ? { exemptFromTierLock: true } : {}),
+    })),
+  };
+}
 
 let locked = false;
 
@@ -622,6 +643,54 @@ function adoptUnjournaledTariff(env = process.env, input = {}) {
   });
 }
 
+function establishInitialTariff(input, env = process.env) {
+  const requestId = input && input.requestId;
+  if (typeof requestId !== 'string' || !REQUEST_ID.test(requestId)) return { ok: false, code: 'INPUT_INVALID' };
+  const rates = input && input.rates;
+  if (!rates || typeof rates !== 'object' || Array.isArray(rates)) return { ok: false, code: 'INPUT_INVALID' };
+  const expected = INITIAL_TARIFF_SERVICES.map((service) => service.id);
+  const keys = Object.keys(rates);
+  if (keys.length !== expected.length || expected.some((id) => !Object.hasOwn(rates, id))) {
+    return { ok: false, code: 'INPUT_INVALID' };
+  }
+  const services = {};
+  for (const service of INITIAL_TARIFF_SERVICES) {
+    const rate = rates[service.id];
+    if (!Number.isSafeInteger(rate) || rate < 1) return { ok: false, code: 'INPUT_INVALID' };
+    services[service.id] = {
+      model: service.model,
+      rate,
+      ...(service.exemptFromTierLock ? { exemptFromTierLock: true } : {}),
+    };
+  }
+  const now = input.now instanceof Date ? input.now : new Date();
+  const version = {
+    id: 'initial', status: 'published', validFrom: now.toISOString(), validTo: null, services,
+  };
+  const bodyHash = hashBytes(Buffer.from(canonical(version)));
+  return withLock(() => {
+    if (!tariffFile(env)) return { ok: false, code: 'TARIFF_NOT_CONFIGURED' };
+    let records = [];
+    try {
+      records = readRecords(env);
+    } catch (error) {
+      return { ok: false, code: 'TARIFF_DAMAGED' };
+    }
+    const replay = sameRequest(records, requestId, bodyHash);
+    if (replay) return replay;
+    if (latestCommitted(records) || readBytes(tariffFile(env))) return { ok: false, code: 'REVISION_CONFLICT' };
+    const next = { companyId: 'paksho', currencyUnit: 'تومان', revision: 1, versions: [version] };
+    try {
+      validatePolicy(next);
+    } catch (error) {
+      return { ok: false, code: error instanceof TariffError ? error.code : 'TARIFF_INVALID' };
+    }
+    return commitBytes(env, Buffer.from(canonical(next)), {
+      requestId, bodyHash, revision: 1, versionId: 'initial', actor: input.actor || 'admin', at: now.toISOString(),
+    }, input.io || defaultIo());
+  });
+}
+
 function seedCommittedPolicy(env, document, options = {}) {
   const requestId = options.requestId || `seed${crypto.randomBytes(8).toString('hex')}`.slice(0, 64);
   if (!REQUEST_ID.test(requestId)) return { ok: false, code: 'INPUT_INVALID' };
@@ -671,6 +740,8 @@ module.exports = {
   registerDraft,
   publishVersion,
   adoptUnjournaledTariff,
+  establishInitialTariff,
+  initialTariffSetup,
   seedCommittedPolicy,
   recoverUnlocked,
 };

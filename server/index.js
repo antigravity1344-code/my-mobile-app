@@ -41,7 +41,7 @@ const { gregorianToJalali } = require('./jalaliMonth');
 const { OfferError, validateOfferInput } = require('./workerOffers');
 const { workerMeetsRequestedTier } = require('./tierPricingPolicy');
 const { buildOfferReport } = require('./offerReport');
-const { registerDraft, publishVersion, readAdminTariff } = require('./pricing/tariffPublication');
+const { registerDraft, publishVersion, readAdminTariff, establishInitialTariff, initialTariffSetup } = require('./pricing/tariffPublication');
 const { readSourceIdentity, sourceIdentityScriptJson } = require('../tools/sourceIdentity.cjs');
 const SOURCE_IDENTITY = readSourceIdentity();
 
@@ -2164,7 +2164,15 @@ app.use('/api/admin', requireAdmin);
 app.get('/api/admin/tariff-versions', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const result = readAdminTariff();
-  if (!result.ok) return res.status(409).json({ success: false, code: result.code });
+  if (!result.ok) {
+    const body = { success: false, code: result.code };
+    if (result.code === 'TARIFF_NOT_CONFIGURED') {
+      const file = process.env.PAKSHO_TARIFF_FILE;
+      body.canCreate = typeof file === 'string' && file.trim() !== '';
+      body.setup = initialTariffSetup();
+    }
+    return res.status(409).json(body);
+  }
   const { revision, companyId, currencyUnit, versions } = result;
   return res.json({ success: true, revision, companyId, currencyUnit, versions });
 });
@@ -2181,6 +2189,16 @@ function sendTariffPublication(res, result) {
   const status = result.code === 'INPUT_INVALID' ? 400 : 409;
   return res.status(status).json({ success: false, code: result.code });
 }
+
+app.post('/api/admin/tariff-setup', (req, res) => {
+  const body = req.body || {};
+  return sendTariffPublication(res, establishInitialTariff({
+    requestId: body.requestId,
+    rates: body.rates,
+    actor: 'admin',
+    now: new Date(),
+  }));
+});
 
 app.post('/api/admin/tariff-versions', (req, res) => {
   const body = req.body || {};

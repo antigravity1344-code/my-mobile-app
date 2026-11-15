@@ -132,6 +132,13 @@ async function loadAdminTariff() {
       throw new Error(feedback);
     }
     const data = await response.json();
+    if (response.status === 409 && data.code === 'TARIFF_NOT_CONFIGURED' && data.canCreate && Array.isArray(data.setup && data.setup.services)) {
+      tariffState = null;
+      tariffBlocked = false;
+      renderTariffSetup(data.setup.services);
+      tariffMessage('هنوز تعرفه‌ای ثبت نشده است. قیمت هر خدمت را بنویسید. تا ثبت نکنید، مشتری قیمتی نمی‌بیند.');
+      return;
+    }
     if (!response.ok || !data.success) {
       feedback = tariffError(data.code);
       throw new Error(feedback);
@@ -150,6 +157,70 @@ async function loadAdminTariff() {
     tariffBusy = false;
     tariffControls();
   }
+}
+
+function renderTariffSetup(services) {
+  const container = document.getElementById('tariffContent');
+  container.replaceChildren(adminElement('p', 'text-sm', 'مبلغی از قبل نوشته نشده است. قیمت هر خدمت را به تومان وارد کنید.'));
+  const editor = adminElement('fieldset', 'bg-slate-800 rounded-xl p-4 space-y-3');
+  editor.append(adminElement('legend', 'font-bold', 'ثبت اولین تعرفه'));
+  const inputs = services.map((service) => {
+    const input = tariffField(editor, (tariffServiceLabels[service.id] || service.id) + ' — ' + (tariffModelLabels[service.model] || service.model) + ' (تومان)',
+      'tariffSetup-' + service.id, 'text', '');
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    return { id: service.id, input };
+  });
+  const save = adminElement('button', 'bg-sky-700 px-4 py-2 rounded-xl', 'ثبت تعرفه');
+  save.id = 'tariffSetupSave';
+  save.type = 'button';
+  save.onclick = () => saveInitialTariff(inputs);
+  editor.append(save);
+  container.append(editor);
+}
+
+async function saveInitialTariff(inputs) {
+  if (tariffBusy || tariffAttempt) return;
+  const rates = {};
+  try {
+    for (const item of inputs) {
+      const amount = tariffRate(item.input.value);
+      if (amount < 1) throw new Error('قیمت هر خدمت را با عدد بزرگ‌تر از صفر بنویسید.');
+      rates[item.id] = amount;
+    }
+  } catch (error) {
+    tariffMessage(error.message);
+    return;
+  }
+  tariffBusy = true;
+  tariffControls();
+  let saved = false;
+  try {
+    const response = await fetch('/api/admin/tariff-setup', {
+      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ requestId: tariffUniqueId('setup-'), rates }),
+    });
+    if (response.status === 401) {
+      adminToken = '';
+      sessionStorage.removeItem('paksho_admin_token');
+      tariffMessage('نشست مدیر پایان یافته است. برای ورود مجدد، بازخوانی کنید.');
+      return;
+    }
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      tariffMessage(data.code === 'INPUT_INVALID'
+        ? 'قیمت هر خدمت را با عدد بزرگ‌تر از صفر بنویسید.'
+        : tariffError(data.code));
+      return;
+    }
+    saved = true;
+    tariffMessage('تعرفه ثبت شد. از این پس مشتری همین قیمت‌ها را می‌بیند.');
+  } catch {
+    tariffMessage('ارتباط با سرور برقرار نشد. دوباره تلاش کنید.');
+  } finally {
+    tariffBusy = false;
+    tariffControls();
+  }
+  if (saved) await loadAdminTariff();
 }
 
 function renderAdminTariff() {

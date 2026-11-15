@@ -355,12 +355,32 @@ test('tariff labels render hostile strings as data in a real browser', async (t)
   assert.equal(await page.locator('#tariffContent img, #tariffContent svg, #tariffContent script, #tariffContent [onerror]').count(), 0);
 });
 
-test('missing tariff and expired admin session show a clear error without seeding or an editable form', async (t) => {
+test('missing tariff stays unpublished until the admin types prices, and an expired session shows login', async (t) => {
   process.env.PAKSHO_TARIFF_FILE = path.join(tmp, 'missing.json');
   const { page } = await pageFor(t);
-  assert.ok((await page.locator('#tariffMessage').textContent()).includes('هنوز راه‌اندازی نشده'));
+  assert.ok((await page.locator('#tariffMessage').textContent()).includes('هنوز تعرفه‌ای ثبت نشده'));
   assert.equal(await page.locator('#tariffSave').count(), 0);
+  const blanks = page.locator('#tariffContent input');
+  assert.equal(await blanks.count(), 7);
+  for (let index = 0; index < 7; index += 1) assert.equal(await blanks.nth(index).inputValue(), '');
+  assert.equal(/\d/.test(await page.locator('#tariffContent').innerText()), false);
   assert.equal(fs.existsSync(process.env.PAKSHO_TARIFF_FILE), false);
+  const customer = await harness.login(server, '09120001901');
+  const before = await request(server, { method: 'POST', pathname: '/api/pricing/quote', token: customer.token,
+    body: { serviceId: 'home_unit_cleaning', quantity: 1 } });
+  assert.equal(before.json.code, 'NO_TARIFF');
+  const rates = {
+    home_unit_cleaning: 410000, staircase_common_areas: 420000, office_company_cleaning: 430000,
+    sofa_carpet_washing: 440000, hourly_labor: 450000, patient_companion: 460000, building_painting: 470000,
+  };
+  for (const [id, rate] of Object.entries(rates)) await page.locator('#tariffSetup-' + id).fill(String(rate));
+  await page.locator('#tariffSetupSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('تعرفه خوانده شد'));
+  assert.equal(readAdminTariff().versions[0].services.home_unit_cleaning.rate, 410000);
+  const after = await request(server, { method: 'POST', pathname: '/api/pricing/quote', token: customer.token,
+    body: { serviceId: 'home_unit_cleaning', quantity: 1 } });
+  assert.equal(after.status, 200);
+  assert.equal(after.json.quote.total, 410000);
   fixture();
   const expired = await pageFor(t, 'expired-token');
   assert.equal(await expired.page.locator('#adminLogin').isVisible(), true);

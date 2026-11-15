@@ -13,6 +13,8 @@ const {
   publishVersion,
   readAdminTariff,
   registerDraft,
+  establishInitialTariff,
+  initialTariffSetup,
   seedCommittedPolicy,
 } = require('./tariffPublication');
 
@@ -654,6 +656,27 @@ test('admin tariff read returns only validated fields, ISO dates and the unchang
   assert.deepEqual(fs.readFileSync(`${env.PAKSHO_TARIFF_FILE}.publication.jsonl`), logBefore);
   const input = { at: FROM, serviceId: 'hour', quantity: 2, options: { extra: true, factor: true } };
   assert.deepEqual(quote(validatePolicy(result), input), quote(validatePolicy(raw), input));
+});
+
+test('the first tariff is created only from admin-entered rates and never from a sample price', () => {
+  const setup = initialTariffSetup();
+  assert.equal(JSON.stringify(setup).includes('rate'), false);
+  assert.equal(setup.services.length, 7);
+  const env = envFor('paksho-initial-tariff-');
+  const rates = Object.fromEntries(setup.services.map((service, index) => [service.id, 410000 + index]));
+  assert.equal(establishInitialTariff({ requestId: 'setup-01', rates: { ...rates, home_unit_cleaning: 0 }, now: NOW }, env).code, 'INPUT_INVALID');
+  assert.equal(fs.existsSync(env.PAKSHO_TARIFF_FILE), false);
+  const created = establishInitialTariff({ requestId: 'setup-01', rates, now: NOW }, env);
+  assert.equal(created.ok, true);
+  const saved = readAdminTariff(env);
+  assert.equal(saved.currencyUnit, 'تومان');
+  assert.equal(saved.versions[0].services.home_unit_cleaning.rate, 410000);
+  assert.equal(saved.versions[0].services.staircase_common_areas.exemptFromTierLock, true);
+  assert.equal(saved.versions[0].services.sofa_carpet_washing.pricingMode, null);
+  assert.equal(establishInitialTariff({ requestId: 'setup-01', rates, now: NOW }, env).idempotent, true);
+  assert.equal(establishInitialTariff({ requestId: 'setup-02', rates, now: NOW }, env).code, 'REVISION_CONFLICT');
+  const quoted = quote(validatePolicy(saved), { at: NOW, serviceId: 'home_unit_cleaning', quantity: 2 });
+  assert.equal(quoted.total, 820000);
 });
 
 test('admin tariff read fails closed without a configured, committed and intact tariff', () => {
