@@ -3215,7 +3215,16 @@ app.get('/admin', (req, res) => {
           ]);
           void loadAdminTariff();
         } catch (err) {
-          if (!(err && err.message === 'login-required')) {
+          if (err && err.message === 'login-required') {
+            for (const section of ['stats', 'workers', 'orders']) {
+              const message = document.getElementById(section + 'Message');
+              if (message && message.textContent === 'در حال بارگذاری…') message.textContent = '';
+              if (section !== 'stats' && !dashboardLoaded[section]) {
+                const list = document.getElementById(section + 'List');
+                if (list && list.textContent.includes('در حال بارگذاری')) list.replaceChildren();
+              }
+            }
+          } else {
             for (const section of ['stats', 'workers', 'orders']) {
               dashboardLoadError(section, 'ورود مدیر انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
             }

@@ -367,6 +367,9 @@ test('missing tariff and expired admin session show a clear error without seedin
   assert.ok((await expired.page.locator('#adminLoginMessage').textContent()).trim());
   assert.equal(await expired.page.evaluate(() => sessionStorage.getItem('paksho_admin_token')), null);
   assert.equal(await expired.page.locator('#tariffSave').count(), 0);
+  for (const id of ['#statsMessage', '#workersMessage', '#ordersMessage', '#workersList', '#ordersList']) {
+    assert.equal((await expired.page.locator(id).textContent()).includes('در حال بارگذاری'), false);
+  }
   await expired.page.locator('#adminPassword').fill(harness.adminPassword);
   await expired.page.locator('#adminLogin button[type="submit"]').click();
   await expired.page.waitForSelector('#tariffSave');
