@@ -120,6 +120,7 @@ const store = createDataStore(
 );
 const otpSendWindow = new Map();
 const adminLoginAttempts = new Map();
+const otpReviewCodes = new Map();
 
 function pruneExpiredSessions() {
   store.pruneSessions(Date.now());
@@ -325,6 +326,27 @@ function generateOtpCode() {
   return String(crypto.randomInt(1000, 10000));
 }
 
+function rememberReviewCode(phone, code, expires) {
+  const now = Date.now();
+  for (const [key, row] of otpReviewCodes) {
+    if (row.expires <= now) otpReviewCodes.delete(key);
+  }
+  otpReviewCodes.set(phone, { code: String(code), expires });
+}
+
+function listReviewCodes() {
+  const now = Date.now();
+  const items = [];
+  for (const [phone, row] of otpReviewCodes) {
+    if (row.expires <= now || !kavenegarSms.isOtpReviewPhone(phone)) {
+      otpReviewCodes.delete(phone);
+      continue;
+    }
+    items.push({ phone, code: row.code, expires: row.expires });
+  }
+  return items;
+}
+
 function checkAdminLoginRate(key) {
   const now = Date.now();
   const entry = adminLoginAttempts.get(key) || { fails: 0, lockedUntil: 0 };
@@ -385,8 +407,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
   const devCode = kavenegarSms.devFixedOtp();
   const code = devCode || generateOtpCode();
+  const reviewPhone = !devCode && kavenegarSms.isOtpReviewPhone(phone);
   let delivery;
-  if (devCode || kavenegarSms.useFakeSms()) {
+  if (devCode || kavenegarSms.useFakeSms() || reviewPhone) {
     delivery = { ok: true };
   } else {
     delivery = await kavenegarSms.sendOtp(phone, code);
@@ -411,11 +434,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
       console.error('[Paksho] صندوق پیامک آزمایشی نوشته نشد.');
     }
   }
+  if (reviewPhone) rememberReviewCode(phone, code, now + OTP_TTL_MS);
   window.count += 1;
   otpSendWindow.set(windowKey, window);
 
   if (devCode) {
     return res.json({ success: true, message: 'حالت توسعه: پیامک ارسال نشد. کد ۱۲۳۴ را وارد کنید.' });
+  }
+  if (reviewPhone) {
+    return res.json({ success: true, message: 'کد ورود برای بررسی مدیر ثبت شد.' });
   }
   res.json({
     success: true,
@@ -2161,6 +2188,11 @@ registerWorkerBankRoutes(app, { store, requireUser, requireAdmin });
 
 app.use('/api/admin', requireAdmin);
 
+app.get('/api/admin/otp-review', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, items: listReviewCodes() });
+});
+
 app.get('/api/admin/tariff-versions', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const result = readAdminTariff();
@@ -2855,6 +2887,8 @@ app.get('/admin', (req, res) => {
       </div>
     </div>
 
+    <div id="otpReview" hidden class="bg-slate-800 border border-slate-700 p-4 rounded-xl"></div>
+
     <!-- تب‌ها -->
     <div class="admin-tabs flex border-b border-slate-700 gap-4 text-sm font-bold overflow-x-auto">
       <button id="tabWorkersBtn" onclick="switchTab('workers')" class="pb-3 border-b-2 border-sky-400 text-sky-400">
@@ -3197,6 +3231,33 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    async function loadOtpReview() {
+      const box = document.getElementById('otpReview');
+      if (!box) return;
+      try {
+        const response = await fetch('/api/admin/otp-review', { headers: adminHeaders(), cache: 'no-store' });
+        if (!response.ok) {
+          box.hidden = true;
+          return;
+        }
+        const data = await response.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+        box.replaceChildren();
+        if (!items.length) {
+          box.hidden = true;
+          return;
+        }
+        box.hidden = false;
+        box.appendChild(adminElement('p', 'text-sm text-slate-300', 'کد ورود شماره‌های آزمایشی'));
+        for (const item of items) {
+          if (!item || typeof item.phone !== 'string' || typeof item.code !== 'string') continue;
+          box.appendChild(adminElement('p', 'mt-2 font-bold', item.phone + ' : ' + item.code));
+        }
+      } catch {
+        box.hidden = true;
+      }
+    }
+
     function renderStat(id, value) {
       const target = document.getElementById(id);
       if (value === 0) {
@@ -3232,6 +3293,7 @@ app.get('/admin', (req, res) => {
             loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
           ]);
           void loadAdminTariff();
+          void loadOtpReview();
         } catch (err) {
           if (err && err.message === 'login-required') {
             for (const section of ['stats', 'workers', 'orders']) {

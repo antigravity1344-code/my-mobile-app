@@ -39,6 +39,19 @@ function explicitFakeSms(env = process.env) {
     && env.PAKSHO_SMS_MODE === 'fake';
 }
 
+function smsConfigured(env = process.env) {
+  const config = readConfig(env);
+  return Boolean(config.apiKey && config.template);
+}
+
+function isOtpReviewPhone(phone, env = process.env) {
+  const normalized = normalizeIranMobile(phone);
+  if (!normalized || smsConfigured(env)) return false;
+  const raw = typeof env.PAKSHO_OTP_REVIEW_PHONES === 'string' ? env.PAKSHO_OTP_REVIEW_PHONES : '';
+  const allowed = new Set(raw.split(',').map((item) => normalizeIranMobile(item)).filter(Boolean));
+  return allowed.has(normalized);
+}
+
 function allowlistedFakePhone(phone, env = process.env) {
   if (!explicitFakeSms(env)) return false;
   const raw = typeof env.PAKSHO_FAKE_SMS_PHONES === 'string' ? env.PAKSHO_FAKE_SMS_PHONES : '';
@@ -109,6 +122,8 @@ module.exports = {
   useFakeSms,
   devFixedOtp,
   DEV_FIXED_OTP_CODE,
+  smsConfigured,
+  isOtpReviewPhone,
   allowlistedFakePhone,
   writeFakeSmsOutbox,
   sendOtp,
