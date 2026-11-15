@@ -11,7 +11,7 @@
 **HEAD فعلی:** `dd02e62` — `docs: add PROJECT_STATE handoff snapshot`
 **آخرین commit عملکردی:** `490f9a6` — `feat(orders): ACCEPTED to COMPLETED via complete endpoint`
 **مسیر کاری محلی:** `C:\app` (ماشین `DESKTOP-TI55VSP`)  
-**Package مشتری:** `com.paksho.customer`
+**Package مشتری:** `com.pakshu.customer`
 
 ---
 

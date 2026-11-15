@@ -5,7 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
-const PACKAGES = { customer: 'com.paksho.customer', worker: 'com.paksho.worker' };
+const PACKAGES = { customer: 'com.pakshu.customer', worker: 'com.pakshu.worker' };
 const LAB_API_URL = 'http://127.0.0.1:3000/api';
 function must(ok, message) { if (!ok) throw new Error(message); }
 function parse(argv) {

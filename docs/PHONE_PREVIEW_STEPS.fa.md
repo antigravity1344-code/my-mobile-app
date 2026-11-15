@@ -34,7 +34,7 @@ adb devices
 npm run android:customer
 ```
 
-صبر کنید تا `com.paksho.customer` نصب شود. بعد:
+صبر کنید تا `com.pakshu.customer` نصب شود. بعد:
 
 ```powershell
 npm run android:worker
@@ -70,7 +70,7 @@ $env:EXPO_PUBLIC_PAKSHO_UI_PREVIEW="1"
 npx expo start --port 8081
 ```
 
-اپ `com.paksho.worker` را باز کنید → پیش‌نمایش بدون پیامک.
+اپ `com.pakshu.worker` را باز کنید → پیش‌نمایش بدون پیامک.
 
 - کارتابل با سفارش جدید؛ نشانی دقیق قبل از پذیرش پنهان.
 - «پذیرش سفارش» باید بگوید عملیات در پیش‌نمایش غیرفعال است؛ داده ارسال نشد.

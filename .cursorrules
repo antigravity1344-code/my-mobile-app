@@ -32,8 +32,8 @@ npx expo start --port 8081 --clear
 برای تست همیشه از گزینه پیش‌نمایش (بدون پیامک) استفاده کن.
 
 ## package names
-- اپ مشتری: `com.paksho.customer`
-- اپ متخصص: `com.paksho.worker`
+- اپ مشتری: `com.pakshu.customer`
+- اپ متخصص: `com.pakshu.worker`
 هرگز از suffix دیگری استفاده نکن.
 
 ## ممنوع بدون اجازه مالک

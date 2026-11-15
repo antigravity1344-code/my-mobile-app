@@ -1,24 +1,24 @@
 {
   "expo": {
     "name": "پاکشو - نظافت آنلاین",
-    "slug": "paksho-cleaning",
+    "slug": "pakshu-cleaning",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "scheme": "paksho",
+    "scheme": "pakshu",
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.paksho.customer"
+      "bundleIdentifier": "com.pakshu.customer"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0f172a"
       },
-      "package": "com.paksho.customer",
+      "package": "com.pakshu.customer",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
