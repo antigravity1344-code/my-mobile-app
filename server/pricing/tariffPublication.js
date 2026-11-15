@@ -679,7 +679,7 @@ function establishInitialTariff(input, env = process.env) {
     const replay = sameRequest(records, requestId, bodyHash);
     if (replay) return replay;
     if (latestCommitted(records) || readBytes(tariffFile(env))) return { ok: false, code: 'REVISION_CONFLICT' };
-    const next = { companyId: 'pakshu', currencyUnit: 'تومان', revision: 1, versions: [version] };
+    const next = { companyId: 'paksho', currencyUnit: 'تومان', revision: 1, versions: [version] };
     try {
       validatePolicy(next);
     } catch (error) {

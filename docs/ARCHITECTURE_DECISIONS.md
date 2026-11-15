@@ -647,7 +647,7 @@
   - سرور، بعد از پر کردن `server/.env`: `cd server` و `npm start`
   - اپ مشتری: `npm run android:customer`
   - اپ متخصص: `npm run android:worker`
-  - طعم اندروید از variant گریدل است. از ۱۵ نوامبر ۲۰۲۶ شناسهٔ زنده `com.pakshu.customer` و `com.pakshu.worker` است تا با دامنهٔ pakshu.ir یکی باشد. گزارش‌های قدیمی همان شناسهٔ قبلی را دارند.
+  - طعم اندروید از variant گریدل است: `com.paksho.customer` و `com.paksho.worker`
   - داشبورد وب، که اپ بومی نیست: `npm run web`
   - تست: `npm test` و `npm run typecheck` و در `server` دستور `node --test *.test.js`
 

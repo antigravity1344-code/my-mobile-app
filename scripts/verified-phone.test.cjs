@@ -50,7 +50,7 @@ test('rejects untracked work without deleting or stashing it', () => {
   assert.doesNotThrow(() => validateSource(good, opts));
 });
 test('APK package is parsed from metadata, not filename', () => {
-  assert.equal(packageFromBadging("package: name='com.pakshu.worker' versionCode='1'"), 'com.pakshu.worker');
+  assert.equal(packageFromBadging("package: name='com.paksho.worker' versionCode='1'"), 'com.paksho.worker');
   assert.throws(() => packageFromBadging('app-worker-debug.apk'), /Cannot/);
 });
 test('installed path requires a single base APK and rejects unexpected shell content', () => {
@@ -66,10 +66,10 @@ test('artifact hash mismatch and missing hash fail', () => {
   assert.throws(() => installedHash('Permission denied', hash), /Cannot/);
 });
 test('foreground must be the exact role package under user 0', () => {
-  assert.doesNotThrow(() => checkForeground('customer', 'mResumedActivity: ActivityRecord{abc u0 com.pakshu.customer/.MainActivity}'));
-  for (const value of ['mResumedActivity: u150 com.pakshu.customer/.MainActivity',
-    'mResumedActivity: u0 com.pakshu.customer.uxpreview/.MainActivity',
-    'mResumedActivity: u0 com.pakshu.worker/.MainActivity', 'com.pakshu.customer/.MainActivity']) {
+  assert.doesNotThrow(() => checkForeground('customer', 'mResumedActivity: ActivityRecord{abc u0 com.paksho.customer/.MainActivity}'));
+  for (const value of ['mResumedActivity: u150 com.paksho.customer/.MainActivity',
+    'mResumedActivity: u0 com.paksho.customer.uxpreview/.MainActivity',
+    'mResumedActivity: u0 com.paksho.worker/.MainActivity', 'com.paksho.customer/.MainActivity']) {
     assert.throws(() => checkForeground('customer', value), /foreground/);
   }
 });
@@ -102,14 +102,14 @@ function fixture(overrides = {}) {
   };
   const ops = {
     source: fn('source'), build: fn('build'), fresh: fn('fresh'),
-    badging: fn('badging', "package: name='com.pakshu.customer'"),
+    badging: fn('badging', "package: name='com.paksho.customer'"),
     certificate: fn('certificate', 'certificate SHA-256 digest: ' + 'f'.repeat(64)),
     artifactHash: fn('artifactHash', hash),
     install: fn('install', 'Performing Streamed Install\nSuccess\n'),
     installedPaths: fn('installedPaths', 'package:/data/app/~~abc==/pkg-xyz==/base.apk'),
     installedHash: fn('installedHash', hash + ' /data/app/~~abc==/pkg-xyz==/base.apk'),
-    launch: fn('launch', 'com.pakshu.customer/.MainActivity'),
-    foreground: fn('foreground', 'mResumedActivity: ActivityRecord{abc u0 com.pakshu.customer/.MainActivity}'),
+    launch: fn('launch', 'com.paksho.customer/.MainActivity'),
+    foreground: fn('foreground', 'mResumedActivity: ActivityRecord{abc u0 com.paksho.customer/.MainActivity}'),
     record: value => { calls.push('record'); records.push(value); },
   };
   return { ops, calls, records };
@@ -126,7 +126,7 @@ test('verify-only never builds, installs, launches, checks current Git or writes
 });
 for (const [phase, value] of [
   ['source', new Error('dirty')], ['build', new Error('build failed')],
-  ['fresh', new Error('stale')], ['badging', "package: name='com.pakshu.worker'"],
+  ['fresh', new Error('stale')], ['badging', "package: name='com.paksho.worker'"],
   ['certificate', new Error('bad signature')], ['certificate', 'no signer'],
 ]) {
   test('build workflow halts before install on ' + phase + ' failure: ' + String(value), () => {
@@ -162,7 +162,7 @@ test('installed hash mismatch prevents launching an unverified artifact', () => 
   assert.equal(f.records.at(-1).status, 'installed-not-verified');
 });
 test('wrong foreground cannot receive final acceptance', () => {
-  const f = fixture({ foreground: 'mResumedActivity: u0 com.pakshu.worker/.MainActivity' });
+  const f = fixture({ foreground: 'mResumedActivity: u0 com.paksho.worker/.MainActivity' });
   assert.throws(() => buildInstallWorkflow(opts, f.ops), /foreground/);
   assert.equal(f.records.at(-1).status, 'installed-hash-matched');
 });

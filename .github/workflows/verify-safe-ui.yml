@@ -219,7 +219,7 @@ jobs:
           badging = (pathlib.Path(os.environ['RUNNER_TEMP']) / 'paksho-android-logs/apk-badging.txt').read_text()
           package = re.search(r"^package: name='([^']+)'", badging, re.MULTILINE)
           native_code = re.search(r'^native-code: (.+)$', badging, re.MULTILINE)
-          assert package and package.group(1) == 'com.pakshu.' + flavor, 'Unexpected APK application ID'
+          assert package and package.group(1) == 'com.paksho.' + flavor, 'Unexpected APK application ID'
           assert native_code and native_code.group(1).strip() == "'arm64-v8a'", 'Unexpected APK architecture'
           apk = pathlib.Path('android/app/build/outputs/apk') / flavor / 'debug' / ('app-' + flavor + '-debug.apk')
           with zipfile.ZipFile(apk) as archive:

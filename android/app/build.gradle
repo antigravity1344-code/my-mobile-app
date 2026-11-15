@@ -90,7 +90,7 @@ android {
     // namespace باید با مسیر Java/Kotlin فعلی هم‌خوان باشد؛ شناسه نصب از flavorهاست.
     namespace 'com.anonymous.cleaningmobile'
     defaultConfig {
-        applicationId 'com.pakshu.customer'
+        applicationId 'com.paksho.customer'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -104,13 +104,13 @@ android {
     productFlavors {
         customer {
             dimension "app"
-            applicationId 'com.pakshu.customer'
+            applicationId 'com.paksho.customer'
             manifestPlaceholders = [appName: "پاکشو (مشتریان)"]
             buildConfigField "String", "APP_FLAVOR", "\"customer\""
         }
         worker {
             dimension "app"
-            applicationId 'com.pakshu.worker'
+            applicationId 'com.paksho.worker'
             manifestPlaceholders = [appName: "پاکشو (متخصصین)"]
             buildConfigField "String", "APP_FLAVOR", "\"worker\""
         }

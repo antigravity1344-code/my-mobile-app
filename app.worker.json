@@ -1,24 +1,24 @@
 {
   "expo": {
     "name": "پاکشو - متخصصین",
-    "slug": "pakshu-worker",
+    "slug": "paksho-worker",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "scheme": "pakshu-worker",
+    "scheme": "paksho-worker",
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pakshu.worker"
+      "bundleIdentifier": "com.paksho.worker"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0f172a"
       },
-      "package": "com.pakshu.worker",
+      "package": "com.paksho.worker",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
