@@ -27,7 +27,7 @@
   "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets --rerun :app:createBundleWorkerDebugJsAndAssets --rerun :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
   "apiUrl": "http://37.221.113.61/api",
   "phoneSerial": "R83X900E9CB",
-  "installedAt": null,
-  "installMode": null,
-  "installedHashesMatch": null
+  "installedAt": "2026-11-15T18:35:00Z",
+  "installMode": "adb install -r --user 0",
+  "installedHashesMatch": true
 }
