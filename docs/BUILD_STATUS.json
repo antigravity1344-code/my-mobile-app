@@ -1,28 +1,28 @@
 {
-  "sha": "32b096f",
-  "startedAt": "2026-11-09T19:22:00Z",
+  "sha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c",
+  "startedAt": "2026-11-15T11:55:10Z",
   "status": "done",
-  "finishedAt": "2026-11-09T19:38:14Z",
-  "reason": "Installed debug APKs embed JS. Rebuilt both from current main so the phone can run D-81, D-82, and D-83. Both bundles contain 32b096f and do not contain 682e8f4.",
+  "finishedAt": "2026-11-15T12:06:08Z",
+  "reason": "Both debug APKs were rebuilt from clean main 7cf8104. Each embedded bundle contains that full commit and does not contain 2b8fdfe. These files were not installed on a phone.",
   "apps": [
     {
       "app": "com.paksho.customer",
       "status": "done",
-      "finishedAt": "2026-11-09T19:38:14Z",
+      "finishedAt": "2026-11-15T12:05:43Z",
       "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
-      "bytes": 77349446,
-      "bundleSha": "32b096f"
+      "bytes": 73771030,
+      "bundleSha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c"
     },
     {
       "app": "com.paksho.worker",
       "status": "done",
-      "finishedAt": "2026-11-09T19:38:14Z",
+      "finishedAt": "2026-11-15T12:06:08Z",
       "artifactPath": "android/app/build/outputs/apk/worker/debug/app-worker-debug.apk",
-      "bytes": 76157842,
-      "bundleSha": "32b096f"
+      "bytes": 72469714,
+      "bundleSha": "7cf8104a0d2f18a53969edb5e44382c84bcba53c"
     }
   ],
-  "command": "gradlew.bat :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
-  "gradleUserHome": "C:\\g",
-  "phoneSerial": "R83X900E9CB"
+  "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets --rerun :app:createBundleWorkerDebugJsAndAssets --rerun :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
+  "apiUrl": "http://127.0.0.1:3000/api",
+  "phoneSerial": null
 }
