@@ -2978,7 +2978,7 @@ app.get('/admin', (req, res) => {
   <div class="admin-layout max-w-6xl mx-auto space-y-6">
     
     <!-- هدر -->
-    <header class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
+    <header id="adminHeader" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
       <div>
         <h1 class="text-2xl font-black text-sky-400">داشبورد مدیریت اپ پاکشو</h1>
         <p class="text-xs text-slate-400 mt-1">مدیریت سفارش‌ها، تایید مدارک متخصصین و آمار کل سامانه</p>
@@ -3012,6 +3012,7 @@ app.get('/admin', (req, res) => {
       <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ذخیرهٔ رمز تازه</button>
     </form>
 
+    <div id="adminDesk" hidden>
     <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
     <!-- کارت‌های آمار -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsGrid">
@@ -3240,6 +3241,7 @@ app.get('/admin', (req, res) => {
       <div id="pointsContent" class="space-y-4"></div>
     </section>
 
+    </div>
   </div>
 
   <details class="max-w-6xl mx-auto mt-6 text-xs text-slate-300">
@@ -3271,10 +3273,18 @@ app.get('/admin', (req, res) => {
       '\\nشاخه: ' + identityBranch + '\\nوضعیت: ' + identityState;
     let adminToken = sessionStorage.getItem('paksho_admin_token') || '';
 
+    function setAdminDeskOpen(open) {
+      const header = document.getElementById('adminHeader');
+      const desk = document.getElementById('adminDesk');
+      if (header) header.hidden = !open;
+      if (desk) desk.hidden = !open;
+    }
+
     function showAdminLogin(message) {
       const form = document.getElementById('adminLogin');
       form.hidden = false;
       document.getElementById('adminLoginMessage').textContent = message || '';
+      setAdminDeskOpen(false);
     }
 
     function hideAdminLogin() {
@@ -3282,6 +3292,7 @@ app.get('/admin', (req, res) => {
       form.hidden = true;
       document.getElementById('adminLoginMessage').textContent = '';
       document.getElementById('adminPassword').value = '';
+      setAdminDeskOpen(true);
     }
 
     function clearAdminSession() {
@@ -3307,8 +3318,11 @@ app.get('/admin', (req, res) => {
     }
 
     async function ensureAdmin() {
-      if (adminToken) return true;
-      showAdminLogin('رمز مدیر این اجرای آزمایشی را در کادر زیر وارد کنید.');
+      if (adminToken) {
+        setAdminDeskOpen(true);
+        return true;
+      }
+      showAdminLogin('رمز مدیر را وارد کنید.');
       return false;
     }
 
@@ -3387,6 +3401,7 @@ app.get('/admin', (req, res) => {
     }
 
     let dashboardLoad = null;
+    let adminLoadGeneration = 0;
     const dashboardLoaded = { stats: false, workers: false, orders: false };
 
     function dashboardLoadError(section, message) {
@@ -3398,14 +3413,21 @@ app.get('/admin', (req, res) => {
 
     async function loadDashboardSection(section, url, render) {
       document.getElementById(section + 'Message').textContent = 'در حال بارگذاری…';
+      const tokenUsed = adminToken;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
       try {
-        const response = await fetch(url, { headers: adminHeaders(), cache: 'no-store', signal: controller.signal });
+        const response = await fetch(url, {
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tokenUsed },
+          cache: 'no-store',
+          signal: controller.signal
+        });
         const data = await response.json();
         if (response.status === 401) {
-          clearAdminSession();
-          showAdminLogin(data.message || 'نشست مدیر تمام شده. دوباره وارد شوید.');
+          if (adminToken === tokenUsed) {
+            clearAdminSession();
+            showAdminLogin(data.message || 'نشست مدیر تمام شده. دوباره وارد شوید.');
+          }
           throw new Error('login-required');
         }
         if (!response.ok || !data.success) throw new Error('load-failed');
@@ -3458,12 +3480,13 @@ app.get('/admin', (req, res) => {
     }
 
     function loadAllData() {
-      if (dashboardLoad) return dashboardLoad;
+      const generation = ++adminLoadGeneration;
       const refresh = document.getElementById('dashboardRefresh');
-      refresh.disabled = true;
+      if (refresh) refresh.disabled = true;
       dashboardLoad = (async () => {
         try {
           if (!(await ensureAdmin())) throw new Error('login-required');
+          if (generation !== adminLoadGeneration) return;
           await Promise.all([
             loadDashboardSection('stats', '/api/admin/stats', (data) => {
               const s = data.stats;
@@ -3482,9 +3505,11 @@ app.get('/admin', (req, res) => {
             loadDashboardSection('workers', '/api/admin/users?role=WORKER', (data) => renderWorkers(data.users)),
             loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
           ]);
+          if (generation !== adminLoadGeneration) return;
           void loadAdminTariff();
           void loadOtpReview();
         } catch (err) {
+          if (generation !== adminLoadGeneration) return;
           if (err && err.message === 'login-required') {
             for (const section of ['stats', 'workers', 'orders']) {
               const message = document.getElementById(section + 'Message');
@@ -3496,12 +3521,14 @@ app.get('/admin', (req, res) => {
             }
           } else {
             for (const section of ['stats', 'workers', 'orders']) {
-              dashboardLoadError(section, 'ورود مدیر انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
+              dashboardLoadError(section, 'دریافت اطلاعات انجام نشد. با «بروزرسانی اطلاعات» دوباره تلاش کنید.');
             }
           }
         } finally {
-          refresh.disabled = false;
-          dashboardLoad = null;
+          if (generation === adminLoadGeneration) {
+            if (refresh) refresh.disabled = false;
+            dashboardLoad = null;
+          }
         }
       })();
       return dashboardLoad;
