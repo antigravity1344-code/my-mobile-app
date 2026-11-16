@@ -2087,7 +2087,7 @@ app.post('/api/admin/recover/confirm', (req, res) => {
   }
   adminSessions.clear();
   adminRecovery = null;
-  res.json({ success: true, message: 'رمز مدیر عوض شد. با رمز تازه وارد شوید.' });
+  res.json({ success: true, message: 'رمز مدیر عوض شد.' });
 });
 
 app.get('/api/support/messages', (req, res) => {
@@ -3004,7 +3004,7 @@ app.get('/admin', (req, res) => {
       <p class="text-sm">کد به گوشی ثبت‌شدهٔ مدیر می‌رود. رمز تازه را همین‌جا بگذارید. برای کسی فرستاده نمی‌شود.</p>
       <label for="adminRecoverCode" class="block text-sm">کد گوشی</label>
       <input id="adminRecoverCode" inputmode="numeric" autocomplete="one-time-code" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
-      <label for="adminRecoverPassword" class="block text-sm">رمز تازه، دست‌کم ۱۲ نویسه</label>
+      <label for="adminRecoverPassword" class="block text-sm">رمز تازه، دست‌کم دوازده حرف یا عدد</label>
       <input id="adminRecoverPassword" type="password" autocomplete="new-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
       <label for="adminRecoverAgain" class="block text-sm">تکرار رمز تازه</label>
       <input id="adminRecoverAgain" type="password" autocomplete="new-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
@@ -3354,12 +3354,18 @@ app.get('/admin', (req, res) => {
         })
       });
       const data = await res.json();
-      message.textContent = data.message || 'رمز ذخیره نشد.';
-      if (data.success) {
-        document.getElementById('adminRecoverPassword').value = '';
-        document.getElementById('adminRecoverAgain').value = '';
-        document.getElementById('adminRecoverCode').value = '';
+      if (!data.success) {
+        message.textContent = data.message || 'رمز ذخیره نشد.';
+        return;
       }
+      const password = document.getElementById('adminRecoverPassword').value;
+      document.getElementById('adminRecoverPassword').value = '';
+      document.getElementById('adminRecoverAgain').value = '';
+      document.getElementById('adminRecoverCode').value = '';
+      document.getElementById('adminRecover').hidden = true;
+      if (!(await submitAdminLogin(password))) return;
+      dashboardLoad = null;
+      await loadAllData();
     });
 
     async function logoutAdmin() {
