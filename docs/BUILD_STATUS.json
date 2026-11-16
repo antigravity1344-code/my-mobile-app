@@ -1,33 +1,19 @@
 {
-  "sha": "4f378f2e08a92c5632881890044951ba675cf7c8",
-  "startedAt": "2026-11-15T15:46:46Z",
-  "status": "done",
-  "finishedAt": "2026-11-15T15:54:15Z",
-  "reason": "Both debug APKs were rebuilt from clean main 4f378f2. Each embedded bundle contains that full commit and http://37.221.113.61/api. They do not contain the old computer address http://127.0.0.1:3000/api.",
+  "sha": "1755fee64d52f000e2d71c4e81644937451e32db",
+  "startedAt": "2026-11-16T15:58:00Z",
+  "status": "in_progress",
+  "reason": "Both debug APKs are being rebuilt so the phone apps call https://pakshu.ir/api. The previous files called http://37.221.113.61/api.",
   "apps": [
     {
       "app": "com.paksho.customer",
-      "status": "done",
-      "finishedAt": "2026-11-15T15:54:15Z",
-      "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
-      "bytes": 77359398,
-      "sha256": "afaa60ac83c8d89a0dadd88b67e83fdf09182b6ca65ade520d86f7221c4e7c84",
-      "bundleSha": "4f378f2e08a92c5632881890044951ba675cf7c8"
+      "status": "in_progress"
     },
     {
       "app": "com.paksho.worker",
-      "status": "done",
-      "finishedAt": "2026-11-15T15:54:15Z",
-      "artifactPath": "android/app/build/outputs/apk/worker/debug/app-worker-debug.apk",
-      "bytes": 72469738,
-      "sha256": "000e4ae86c7eeeca1a8fdee3474c17b05a39d1e3c12053d28e2ae446f1ab3d10",
-      "bundleSha": "4f378f2e08a92c5632881890044951ba675cf7c8"
+      "status": "in_progress"
     }
   ],
-  "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets --rerun :app:createBundleWorkerDebugJsAndAssets --rerun :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
-  "apiUrl": "http://37.221.113.61/api",
-  "phoneSerial": "R83X900E9CB",
-  "installedAt": "2026-11-15T18:35:00Z",
-  "installMode": "adb install -r --user 0",
-  "installedHashesMatch": true
+  "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets :app:createBundleWorkerDebugJsAndAssets --rerun-tasks -PreactNativeArchitectures=arm64-v8a --no-daemon && gradlew.bat :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
+  "apiUrl": "https://pakshu.ir/api",
+  "phoneSerial": "R83X900E9CB"
 }
