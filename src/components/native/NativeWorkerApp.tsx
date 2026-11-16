@@ -142,7 +142,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
     return (
       <RNSafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
-        <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} />
+        <WorkerOnboardingScreen user={userData} onUpdateUser={handleUpdateUser} onLogout={() => { void handleLogout(); }} />
       </RNSafeAreaView>
     );
   }

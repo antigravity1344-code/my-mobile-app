@@ -27,6 +27,7 @@ import {
 interface WorkerOnboardingScreenProps {
   user: UserData;
   onUpdateUser: (updatedUser: UserData) => void;
+  onLogout: () => void;
 }
 
 type SelectedIdDoc = PreparedIdDoc & { label: string };
@@ -34,6 +35,7 @@ type SelectedIdDoc = PreparedIdDoc & { label: string };
 export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
   user,
   onUpdateUser,
+  onLogout,
 }) => {
   const [name, setName] = useState(user.name || '');
   const [nationalId, setNationalId] = useState('');
@@ -234,6 +236,9 @@ export const WorkerOnboardingScreen: React.FC<WorkerOnboardingScreenProps> = ({
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
+        <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>خروج از حساب</Text>
+        </Pressable>
         <View style={styles.formCard}>
           <View style={styles.header}>
             <ShieldCheck size={26} color={colors.teal} />
@@ -430,6 +435,25 @@ const styles = StyleSheet.create({
     padding: 20,
     elevation: 6,
 
+  },
+  logoutButton: {
+    width: '100%',
+    maxWidth: 420,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  logoutText: {
+    ...type.bold,
+    ...fa,
+    fontWeight: '400',
+    color: '#b91c1c',
+    fontSize: 16,
   },
   header: {
     flexDirection: 'row-reverse',
