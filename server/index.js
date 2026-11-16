@@ -72,7 +72,7 @@ assertKeyConfigured();
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const ADMIN_PASSWORD =
+let adminPassword =
   typeof process.env.PAKSHO_ADMIN_PASSWORD === 'string' && process.env.PAKSHO_ADMIN_PASSWORD.trim()
     ? process.env.PAKSHO_ADMIN_PASSWORD.trim()
     : '';
@@ -365,7 +365,42 @@ function recordAdminLoginFailure(key, entry) {
   adminLoginAttempts.set(key, entry);
 }
 
-if (!ADMIN_PASSWORD) {
+function sameSecret(left, right) {
+  const a = crypto.createHash('sha256').update(String(left)).digest();
+  const b = crypto.createHash('sha256').update(String(right)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+function adminPasswordFile() {
+  const raw = process.env.PAKSHO_ADMIN_PASSWORD_FILE;
+  if (typeof raw === 'string' && raw.trim()) return path.resolve(raw.trim());
+  return path.join(__dirname, '.env');
+}
+
+function writeAdminPassword(next) {
+  const file = adminPasswordFile();
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const lines = text.split(/\r?\n/);
+  let found = false;
+  const out = lines.map((line) => {
+    if (line.startsWith('PAKSHO_ADMIN_PASSWORD=')) {
+      found = true;
+      return 'PAKSHO_ADMIN_PASSWORD=' + next;
+    }
+    return line;
+  });
+  if (!found) out.push('PAKSHO_ADMIN_PASSWORD=' + next);
+  const body = out.join('\n').replace(/\n*$/, '\n');
+  const tmp = file + '.tmp';
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(tmp, body, { mode: 0o600 });
+  fs.renameSync(tmp, file);
+  try { fs.chmodSync(file, 0o600); } catch { /* ویندوز این حالت را ندارد */ }
+  adminPassword = next;
+  process.env.PAKSHO_ADMIN_PASSWORD = next;
+}
+
+if (!adminPassword) {
   console.warn(
     '[Paksho] PAKSHO_ADMIN_PASSWORD تنظیم نشده؛ ورود مدیر غیرفعال است. مقدار را در server/.env قرار دهید.'
   );
@@ -1928,7 +1963,7 @@ function requireAdmin(req, res, next) {
 }
 
 app.post('/api/admin/login', (req, res) => {
-  if (!ADMIN_PASSWORD) {
+  if (!adminPassword) {
     return res.status(503).json({
       success: false,
       message: 'ورود مدیر پیکربندی نشده است. متغیر PAKSHO_ADMIN_PASSWORD را تنظیم کنید.'
@@ -1943,7 +1978,7 @@ app.post('/api/admin/login', (req, res) => {
     });
   }
   const password = req.body && typeof req.body.password === 'string' ? req.body.password : '';
-  if (!password || password !== ADMIN_PASSWORD) {
+  if (!password || !sameSecret(password, adminPassword)) {
     recordAdminLoginFailure(key, rate.entry);
     return res.status(401).json({ success: false, message: 'رمز مدیر نادرست است.' });
   }
@@ -1957,6 +1992,102 @@ app.post('/api/admin/logout', requireAdmin, (req, res) => {
   const token = bearerToken(req);
   if (token) adminSessions.delete(token);
   res.json({ success: true });
+});
+
+let adminRecovery = null;
+
+function adminRecoveryPhone() {
+  return kavenegarSms.normalizeIranMobile(process.env.PAKSHO_ADMIN_RECOVERY_PHONE);
+}
+
+app.post('/api/admin/recover/send', async (req, res) => {
+  const phone = adminRecoveryPhone();
+  if (!adminPassword || !phone) {
+    return res.status(503).json({ success: false, message: 'بازیابی رمز مدیر روی این سرور آماده نیست.' });
+  }
+  const key = 'recover:' + clientKey(req);
+  const rate = checkAdminLoginRate(key);
+  if (!rate.ok) {
+    return res.status(429).json({ success: false, message: `تلاش بیش از حد. ${rate.waitSec} ثانیه صبر کنید.` });
+  }
+  const now = Date.now();
+  if (adminRecovery && now - adminRecovery.lastSent < OTP_RESEND_MS) {
+    const waitSec = Math.ceil((OTP_RESEND_MS - (now - adminRecovery.lastSent)) / 1000);
+    return res.status(429).json({ success: false, message: `لطفاً ${waitSec} ثانیه دیگر دوباره بخواهید.` });
+  }
+  if (adminRecovery && adminRecovery.windowStart && now - adminRecovery.windowStart < 60 * 60 * 1000 && adminRecovery.sends >= 8) {
+    return res.status(429).json({ success: false, message: 'تعداد درخواست کد بیش از حد مجاز است. یک ساعت دیگر تلاش کنید.' });
+  }
+  const fake = kavenegarSms.useFakeSms();
+  if (!fake && !kavenegarSms.smsConfigured()) {
+    return res.status(503).json({ success: false, message: 'فرستادن کد بازیابی ممکن نیست.' });
+  }
+  const code = generateOtpCode();
+  let delivery = { ok: true };
+  if (fake) {
+    try {
+      delivery = { ok: kavenegarSms.writeFakeSmsOutbox(phone, code) };
+    } catch {
+      delivery = { ok: false };
+    }
+  } else {
+    delivery = await kavenegarSms.sendOtp(phone, code);
+  }
+  if (!delivery.ok) {
+    return res.status(503).json({ success: false, message: 'کد بازیابی فرستاده نشد.' });
+  }
+  const windowStart = adminRecovery && adminRecovery.windowStart && now - adminRecovery.windowStart < 60 * 60 * 1000
+    ? adminRecovery.windowStart
+    : now;
+  const sends = windowStart === (adminRecovery && adminRecovery.windowStart) ? adminRecovery.sends + 1 : 1;
+  adminRecovery = {
+    hash: crypto.createHash('sha256').update(code).digest('hex'),
+    expires: now + OTP_TTL_MS,
+    attempts: 0,
+    lastSent: now,
+    windowStart,
+    sends,
+  };
+  res.json({ success: true, message: 'کد بازیابی به گوشی مدیر فرستاده شد.' });
+});
+
+app.post('/api/admin/recover/confirm', (req, res) => {
+  const phone = adminRecoveryPhone();
+  if (!adminPassword || !phone) {
+    return res.status(503).json({ success: false, message: 'بازیابی رمز مدیر روی این سرور آماده نیست.' });
+  }
+  const code = req.body && typeof req.body.code === 'string' ? req.body.code.trim() : '';
+  const password = req.body && typeof req.body.password === 'string' ? req.body.password : '';
+  const again = req.body && typeof req.body.again === 'string' ? req.body.again : '';
+  const now = Date.now();
+  if (!adminRecovery || adminRecovery.expires < now) {
+    adminRecovery = null;
+    return res.status(401).json({ success: false, message: 'کد بازیابی نیست یا تمام شده. دوباره بخواهید.' });
+  }
+  const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+  if (!/^\d{4}$/.test(code) || !sameSecret(codeHash, adminRecovery.hash)) {
+    adminRecovery.attempts += 1;
+    if (adminRecovery.attempts >= OTP_MAX_ATTEMPTS) adminRecovery = null;
+    return res.status(401).json({ success: false, message: 'کد بازیابی نادرست است.' });
+  }
+  if (password.length < 12 || password.length > 128 || /[\r\n]/.test(password)) {
+    return res.status(400).json({ success: false, message: 'رمز تازه باید دست‌کم ۱۲ نویسه باشد و خط تازه نداشته باشد.' });
+  }
+  if (password !== again) {
+    return res.status(400).json({ success: false, message: 'تکرار رمز با رمز تازه یکی نیست.' });
+  }
+  if (sameSecret(password, adminPassword)) {
+    return res.status(400).json({ success: false, message: 'رمز تازه باید با رمز فعلی فرق داشته باشد.' });
+  }
+  try {
+    writeAdminPassword(password);
+  } catch (err) {
+    console.error('[Paksho] ذخیرهٔ رمز تازهٔ مدیر ناموفق بود.');
+    return res.status(500).json({ success: false, message: 'رمز تازه ذخیره نشد. رمز قبلی هنوز کار می‌کند.' });
+  }
+  adminSessions.clear();
+  adminRecovery = null;
+  res.json({ success: true, message: 'رمز مدیر عوض شد. با رمز تازه وارد شوید.' });
 });
 
 app.get('/api/support/messages', (req, res) => {
@@ -2864,6 +2995,21 @@ app.get('/admin', (req, res) => {
       <label for="adminPassword" class="block text-sm">رمز مدیر</label>
       <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
       <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ورود</button>
+      <button type="button" id="adminRecoverOpen" class="bg-slate-700 text-white font-bold px-4 py-2 rounded-xl">رمزم را گم کرده‌ام</button>
+    </form>
+
+    <form id="adminRecover" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-3 max-w-md">
+      <h2 class="text-lg font-bold">رمز تازه</h2>
+      <p id="adminRecoverMessage" role="alert" class="text-sm text-amber-300"></p>
+      <p class="text-sm">کد به گوشی ثبت‌شدهٔ مدیر می‌رود. رمز تازه را همین‌جا بگذارید. برای کسی فرستاده نمی‌شود.</p>
+      <label for="adminRecoverCode" class="block text-sm">کد گوشی</label>
+      <input id="adminRecoverCode" inputmode="numeric" autocomplete="one-time-code" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
+      <label for="adminRecoverPassword" class="block text-sm">رمز تازه، دست‌کم ۱۲ نویسه</label>
+      <input id="adminRecoverPassword" type="password" autocomplete="new-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
+      <label for="adminRecoverAgain" class="block text-sm">تکرار رمز تازه</label>
+      <input id="adminRecoverAgain" type="password" autocomplete="new-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
+      <button type="button" id="adminRecoverSend" class="bg-sky-700 text-white font-bold px-4 py-2 rounded-xl">فرستادن کد</button>
+      <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ذخیرهٔ رمز تازه</button>
     </form>
 
     <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
@@ -3176,6 +3322,44 @@ app.get('/admin', (req, res) => {
       if (!(await submitAdminLogin(password))) return;
       dashboardLoad = null;
       await loadAllData();
+    });
+
+    document.getElementById('adminRecoverOpen').addEventListener('click', () => {
+      document.getElementById('adminRecover').hidden = false;
+      document.getElementById('adminRecoverMessage').textContent = '';
+    });
+
+    document.getElementById('adminRecoverSend').addEventListener('click', async () => {
+      const message = document.getElementById('adminRecoverMessage');
+      message.textContent = 'در حال فرستادن کد…';
+      try {
+        const res = await fetch('/api/admin/recover/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await res.json();
+        message.textContent = data.message || 'کد فرستاده نشد.';
+      } catch (e) {
+        message.textContent = 'کد فرستاده نشد.';
+      }
+    });
+
+    document.getElementById('adminRecover').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = document.getElementById('adminRecoverMessage');
+      const res = await fetch('/api/admin/recover/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: document.getElementById('adminRecoverCode').value,
+          password: document.getElementById('adminRecoverPassword').value,
+          again: document.getElementById('adminRecoverAgain').value
+        })
+      });
+      const data = await res.json();
+      message.textContent = data.message || 'رمز ذخیره نشد.';
+      if (data.success) {
+        document.getElementById('adminRecoverPassword').value = '';
+        document.getElementById('adminRecoverAgain').value = '';
+        document.getElementById('adminRecoverCode').value = '';
+      }
     });
 
     async function logoutAdmin() {
