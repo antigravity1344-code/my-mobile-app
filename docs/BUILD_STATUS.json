@@ -1,19 +1,33 @@
 {
-  "sha": "c4f71f8b1aaf25de98b2d42d7afda6c53e3cf9ec",
+  "sha": "258b828",
   "startedAt": "2026-11-16T16:46:00Z",
-  "status": "in_progress",
-  "reason": "Both debug APKs are being rebuilt so the specialist registration page has an exit button. The address stays https://pakshu.ir/api.",
+  "status": "done",
+  "finishedAt": "2026-11-16T16:58:56Z",
+  "reason": "Both debug APKs were rebuilt so the specialist registration page has an exit button. The address stays https://pakshu.ir/api.",
   "apps": [
     {
       "app": "com.paksho.customer",
-      "status": "in_progress"
+      "status": "done",
+      "finishedAt": "2026-11-16T16:58:56Z",
+      "artifactPath": "android/app/build/outputs/apk/customer/debug/app-customer-debug.apk",
+      "bytes": 77359410,
+      "sha256": "834a98fcf38ab2f6201dfc07717b1a6bdbcf2094a3d662ee77db5f4d91aece9e",
+      "bundleSha": "258b828"
     },
     {
       "app": "com.paksho.worker",
-      "status": "in_progress"
+      "status": "done",
+      "finishedAt": "2026-11-16T16:58:56Z",
+      "artifactPath": "android/app/build/outputs/apk/worker/debug/app-worker-debug.apk",
+      "bytes": 72470034,
+      "sha256": "d263e1a097df8d48699f2794cacb63fa93df62547e915a92a238750506635868",
+      "bundleSha": "258b828"
     }
   ],
   "command": "gradlew.bat :app:createBundleCustomerDebugJsAndAssets :app:createBundleWorkerDebugJsAndAssets --rerun-tasks -PreactNativeArchitectures=arm64-v8a --no-daemon && gradlew.bat :app:assembleCustomerDebug :app:assembleWorkerDebug -PreactNativeArchitectures=arm64-v8a --no-daemon",
   "apiUrl": "https://pakshu.ir/api",
-  "phoneSerial": "R83X900E9CB"
+  "phoneSerial": "R83X900E9CB",
+  "installedAt": "2026-11-16T17:00:12Z",
+  "installMode": "adb install -r --user 0",
+  "installedHashesMatch": true
 }
