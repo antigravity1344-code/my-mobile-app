@@ -6,6 +6,7 @@ ios
 .claude
 .vscode
 .env
+.env.local
 dist
 android/.kotlin
 
