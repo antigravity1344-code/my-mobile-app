@@ -21,7 +21,7 @@ function renderAdminServices(services) {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.serviceId = service.id;
-    button.className = service.enabled ? 'admin-service-toggle bg-rose-700 px-4 py-2 rounded-xl' : 'admin-service-toggle bg-emerald-700 px-4 py-2 rounded-xl';
+    button.className = service.enabled ? 'admin-service-toggle bg-emerald-700 px-4 py-2 rounded-xl' : 'admin-service-toggle bg-rose-700 px-4 py-2 rounded-xl';
     button.textContent = service.enabled ? 'خاموش کن' : 'روشن کن';
     button.disabled = servicesBusy;
     button.addEventListener('click', () => toggleAdminService(service.id, !service.enabled));
