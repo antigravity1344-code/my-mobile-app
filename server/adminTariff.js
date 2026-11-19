@@ -13,6 +13,8 @@ const tariffServiceLabels = {
   hourly_labor: 'کارگر ساعتی', patient_companion: 'همراه مریض', building_painting: 'نقاشی ساختمان',
 };
 const tariffInputClass = 'block w-full bg-slate-900 border border-slate-600 rounded-lg p-2 mt-1';
+// خدماتی که پکیج مواد شوینده برایشان قابل قیمت‌گذاری است (تصمیم مالک، ۱۹ نوامبر ۲۰۲۶). مبل‌شویی جزو اینها نیست.
+const tariffDetergentServiceIds = new Set(['home_unit_cleaning', 'office_company_cleaning', 'staircase_common_areas']);
 
 function tariffMessage(text) {
   document.getElementById('tariffMessage').textContent = text;
@@ -268,12 +270,21 @@ function renderAdminTariff() {
         seat7 = tariffField(row, 'ضریب نشیمن ۷ نفره (۱ = بدون تغییر)', 'tariffSofaSeat7_' + index, 'text', String(factors['7'] / 10000));
         seat9 = tariffField(row, 'ضریب نشیمن ۹ نفره (مثلاً ۱٫۳)', 'tariffSofaSeat9_' + index, 'text', String(factors['9'] / 10000));
       }
+      let detergent = null;
+      if (tariffDetergentServiceIds.has(id)) {
+        const existing = service.surcharges.find((item) => item.optionId === 'detergent');
+        detergent = tariffField(row, 'قیمت افزودنی پکیج مواد شوینده — ' + (tariffServiceLabels[id] || id) +
+          ' (خالی یا صفر = این افزودنی برای این خدمت غیرفعال بماند)',
+          'tariffDetergent' + index, 'text', existing ? String(existing.amount) : '');
+        detergent.inputMode = 'numeric';
+        detergent.autocomplete = 'off';
+      }
       if (version.status === 'published') {
         row.append(adminElement('p', 'text-xs', exempt.checked ? 'معاف از قفل سطح' : 'مشمول قفل سطح'));
       }
       tariffAdjustments(row, service);
       rates.append(row);
-      return { id, input, exempt, modeSelect, seat7, seat9 };
+      return { id, input, exempt, modeSelect, seat7, seat9, detergent };
     });
     start.value = '';
     end.value = tariffLocalInput(version.validTo);
@@ -281,7 +292,7 @@ function renderAdminTariff() {
   source.onchange = selectSource;
   source.value = tariffState.versions[tariffState.versions.length - 1].id;
   selectSource();
-  editor.append(adminElement('p', 'text-xs text-slate-300', 'نرخ پایه و معافیت هر خدمت از قفل سطح قابل تغییر است. سایر شرایط از نسخه مبنا حفظ می‌شوند.'));
+  editor.append(adminElement('p', 'text-xs text-slate-300', 'نرخ پایه، معافیت هر خدمت از قفل سطح و قیمت افزودنی پکیج مواد شوینده قابل تغییرند. سایر شرایط از نسخه مبنا حفظ می‌شوند. هر شرکت می‌تواند قیمت متفاوتی برای افزودنی‌ها ثبت کند؛ این قیمت در هر نسخه تعرفه جدا تنظیم می‌شود.'));
   const save = adminElement('button', 'bg-sky-700 px-4 py-2 rounded-xl', 'ذخیره پیش‌نویس');
   save.id = 'tariffSave';
   save.type = 'button';
@@ -292,9 +303,15 @@ function renderAdminTariff() {
       delete version.status;
       version.validFrom = tariffInstant(start.value);
       version.validTo = end.value ? tariffInstant(end.value) : null;
-      for (const { id, input, exempt, modeSelect, seat7, seat9 } of serviceInputs) {
+      for (const { id, input, exempt, modeSelect, seat7, seat9, detergent } of serviceInputs) {
         version.services[id].rate = tariffRate(input.value);
         version.services[id].exemptFromTierLock = exempt.checked;
+        if (detergent) {
+          const surcharges = (version.services[id].surcharges || []).filter((item) => item.optionId !== 'detergent');
+          const amount = detergent.value.trim() === '' ? 0 : tariffRate(detergent.value);
+          if (amount > 0) surcharges.push({ id: 'detergent', optionId: 'detergent', amount });
+          version.services[id].surcharges = surcharges;
+        }
         if (modeSelect) {
           const mode = modeSelect.value || null;
           version.services[id].pricingMode = mode;

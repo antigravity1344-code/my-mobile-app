@@ -18,7 +18,8 @@ const seeded = seedCommittedPolicy(process.env, {
     validTo: '2099-01-01T00:00:00.000Z',
     services: {
       fixed_job: { model: 'fixed', rate: 1000000 },
-      hourly_job: { model: 'hourly', rate: 1000, minQuantity: 1 },
+      hourly_job: { model: 'hourly', rate: 1000, minQuantity: 1,
+        surcharges: [{ id: 'detergent', optionId: 'detergent', amount: 30000 }] },
       exempt_hourly: { model: 'hourly', rate: 1000, minQuantity: 1, exemptFromTierLock: true },
     },
   }],
@@ -57,10 +58,19 @@ test('pricing rules expose the tariff model and exemption flag without a rate', 
   const rules = currentPricingRules();
   const fixed = rules.find((rule) => rule.serviceId === 'fixed_job');
   const exempt = rules.find((rule) => rule.serviceId === 'exempt_hourly');
-  assert.deepEqual(fixed, { serviceId: 'fixed_job', model: 'fixed', exemptFromTierLock: false, pricingMode: null, seatSizes: null });
+  assert.deepEqual(fixed, { serviceId: 'fixed_job', model: 'fixed', exemptFromTierLock: false, pricingMode: null, seatSizes: null, detergentAvailable: false });
   assert.equal(exempt.exemptFromTierLock, true);
   assert.equal(exempt.model, 'hourly');
   assert.equal(Object.hasOwn(fixed, 'rate'), false);
+});
+
+test('pricing rules flag detergent availability per service without revealing its price', () => {
+  const rules = currentPricingRules();
+  const hourly = rules.find((rule) => rule.serviceId === 'hourly_job');
+  const exempt = rules.find((rule) => rule.serviceId === 'exempt_hourly');
+  assert.equal(hourly.detergentAvailable, true);
+  assert.equal(exempt.detergentAvailable, false);
+  assert.equal(Object.hasOwn(hourly, 'surcharges'), false);
 });
 
 test('pricing rules expose the sofa mattress_seat mode and its seat sizes', () => {

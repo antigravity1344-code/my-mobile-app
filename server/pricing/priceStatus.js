@@ -45,6 +45,8 @@ function currentPricingRules(now = new Date()) {
         exemptFromTierLock: service.exemptFromTierLock === true,
         pricingMode: service.pricingMode == null ? null : service.pricingMode,
         seatSizes: service.pricingMode === 'mattress_seat' ? ['7', '9'] : null,
+        // آیا تعرفهٔ همین خدمت هم‌اکنون قیمت پکیج مواد شوینده دارد؛ بدون افشای مبلغ.
+        detergentAvailable: service.surcharges.some((item) => item.optionId === 'detergent'),
       };
     });
   } catch (error) {

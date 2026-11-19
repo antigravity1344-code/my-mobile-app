@@ -421,3 +421,32 @@ test('sofa pricing mode rejects a seat factor that is not a positive number', as
   await page.locator('#tariffSave').click();
   await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('ضریب نشیمن'));
 });
+
+test('admin can set, change and clear the detergent add-on price per service at any time', async (t) => {
+  fixture();
+  const { page } = await pageFor(t);
+  // ترتیب الفبایی: building_painting(0)، fixed(1)، home_unit_cleaning(2)، sofa_carpet_washing(3).
+  const home = 2;
+  // مقدار اولیهٔ fixture (۱۰۰) باید از پیش در فیلد نشان داده شود.
+  assert.equal(await page.locator('#tariffDetergent' + home).inputValue(), '100');
+  await page.locator('#tariffDetergent' + home).fill('30000');
+  const start = Math.ceil((Date.now() + 120_000) / 60_000) * 60_000;
+  await page.locator('#tariffDraftFrom').fill(new Date(start + 210 * 60_000).toISOString().slice(0, 16));
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
+  let draft = readAdminTariff().versions.find((version) => version.status === 'draft');
+  assert.deepEqual(draft.services.home_unit_cleaning.surcharges, [{ id: 'detergent', optionId: 'detergent', amount: 30000 }]);
+  // خدمتی که در فهرست پکیج شوینده نیست (مثلاً مبل‌شویی) چنین فیلدی ندارد.
+  assert.equal(await page.locator('#tariffDetergent3').count(), 0);
+
+  await page.reload();
+  await page.locator('#tabTariffsBtn').click();
+  await page.locator('#tariffSource').selectOption(draft.id);
+  assert.equal(await page.locator('#tariffDetergent' + home).inputValue(), '30000');
+  await page.locator('#tariffDetergent' + home).fill('');
+  await page.locator('#tariffDraftFrom').fill(new Date(start + 220 * 60_000).toISOString().slice(0, 16));
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
+  draft = readAdminTariff().versions.filter((version) => version.status === 'draft').pop();
+  assert.deepEqual(draft.services.home_unit_cleaning.surcharges, []);
+});
