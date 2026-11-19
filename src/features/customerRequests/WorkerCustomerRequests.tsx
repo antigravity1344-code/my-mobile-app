@@ -44,7 +44,7 @@ function errorText(result: unknown, fallback: string): string {
   return fallback;
 }
 
-/** درخواست‌های باز مشتری‌ها برای متخصص آماده؛ آدرس تا پیش از پذیرش نشان داده نمی‌شود. */
+/** «درخواست‌های مشتری به من»: درخواست‌های باز مشتری‌ها برای متخصص آماده؛ آدرس تا پیش از پذیرش نشان داده نمی‌شود. */
 export function WorkerCustomerRequests() {
   const [requests, setRequests] = useState<WorkerCustomerRequest[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function WorkerCustomerRequests() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.title}>درخواست‌های باز مشتری‌ها</Text>
+      <Text style={styles.title}>درخواست‌های مشتری به من</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
       {requests.length === 0 ? <Text style={styles.note}>فعلاً درخواست بازی برای شما نیست.</Text> : null}
       {requests.map((request) => (

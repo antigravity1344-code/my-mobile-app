@@ -82,7 +82,7 @@ export function WorkerOffersScreen({ onBack }: { onBack: () => void }) {
   return <ScrollView contentContainerStyle={styles.content}>
     <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت به حساب متخصص</Text></Pressable>
     <WorkerCustomerRequests />
-    <Text style={styles.title}>ساعت‌های پیشنهادی من</Text>
+    <Text style={styles.title}>پیشنهاد من به مشتری</Text>
     <Text style={styles.note}>بازهٔ هزینهٔ خدمت را حتی‌المقدور کمتر انتخاب کنید تا مشتری به قبول خدمت تشویق شود. حداقل و حداکثر تعیین قیمت توسط متخصص و حتی مشتری در سند ذکر شده است.</Text>
     {preview && <Text style={styles.note}>این بخش در پیش‌نمایش فقط نمایشی است؛ ثبت غیرفعال است.</Text>}
     {!!data && !data.enabled && <Text accessibilityLiveRegion="polite" style={styles.note}>{data.disabledMessage || 'ثبت قیمت پیشنهاد برای حساب شما غیرفعال است.'}</Text>}

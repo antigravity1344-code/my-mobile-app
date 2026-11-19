@@ -59,8 +59,8 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
   { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
   { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
-  { label: 'ساعت‌های پیشنهادی', serviceId: 'offer_slots', Icon: IconServiceWorker },
-  { label: 'درخواست ساعت دلخواه', serviceId: 'custom_request', Icon: IconServiceHome },
+  { label: 'پیشنهاد متخصص', serviceId: 'offer_slots', Icon: IconServiceWorker },
+  { label: 'درخواست به متخصص', serviceId: 'custom_request', Icon: IconServiceHome },
 ];
 
 // پیام وقتی خدمتی دیده می‌شود ولی متخصص آماده ندارد.
@@ -178,7 +178,7 @@ export function CustomerHomeScreen({
   );
 
   const openService = (serviceId: string) => {
-    // کاشی‌های ویژه: پیشنهادهای متخصص و درخواست ساعت دلخواه (صفحه‌های جدا، نه رزرو خدمت).
+    // کاشی‌های ویژه: «پیشنهاد متخصص» و «درخواست به متخصص» (صفحه‌های جدا، نه رزرو خدمت).
     if (serviceId === 'offer_slots') { onOpenOffers?.(); return; }
     if (serviceId === 'custom_request') { onOpenRequest?.(); return; }
     if (isServiceUnavailable(serviceId)) {

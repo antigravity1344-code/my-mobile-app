@@ -91,7 +91,7 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت</Text></Pressable>
-      <Text style={styles.title}>درخواست ساعت دلخواه</Text>
+      <Text style={styles.title}>درخواست شما به متخصص</Text>
       <Text style={styles.body}>{serviceTitle}. زمان و درصد قیمت را انتخاب کنید؛ قیمت فقط در بازه‌ی مجاز پذیرفته می‌شود.</Text>
 
       <Text style={styles.label}>خدمت</Text>
