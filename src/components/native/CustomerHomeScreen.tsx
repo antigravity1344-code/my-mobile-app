@@ -55,12 +55,12 @@ const SERVICE_SHORTCUTS: Shortcut[] = [
   { label: 'نظافت منزل', serviceId: 'home_unit_cleaning', Icon: IconServiceHome },
   { label: 'راه‌پله و مشاعات', serviceId: 'staircase_common_areas', Icon: IconServiceStairs },
   { label: 'نظافت محل کار', serviceId: 'office_company_cleaning', Icon: IconServiceOffice },
-  { label: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', Icon: IconServiceSofa },
-  { label: 'کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
-  { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
   { label: 'نقاشی ساختمان', serviceId: 'building_painting', Icon: IconServicePaint },
-  { label: 'پیشنهاد متخصص', serviceId: 'offer_slots', Icon: IconServiceWorker },
-  { label: 'درخواست به متخصص', serviceId: 'custom_request', Icon: IconServiceHome },
+  { label: 'مبل‌شویی', serviceId: 'sofa_carpet_washing', Icon: IconServiceSofa },
+  { label: 'همراه مریض', serviceId: 'patient_companion', Icon: IconServiceWorker },
+  { label: 'درخواست از طرف متخصص', serviceId: 'offer_slots', Icon: IconServiceWorker },
+  { label: 'درخواست خودم', serviceId: 'custom_request', Icon: IconServiceHome },
+  { label: 'درخواست کارگر ساعتی', serviceId: 'hourly_labor', Icon: IconServiceWorker },
 ];
 
 // پیام وقتی خدمتی دیده می‌شود ولی متخصص آماده ندارد.
@@ -178,7 +178,7 @@ export function CustomerHomeScreen({
   );
 
   const openService = (serviceId: string) => {
-    // کاشی‌های ویژه: «پیشنهاد متخصص» و «درخواست به متخصص» (صفحه‌های جدا، نه رزرو خدمت).
+    // کاشی‌های ویژه: «درخواست از طرف متخصص» و «درخواست خودم» (صفحه‌های جدا، نه رزرو خدمت).
     if (serviceId === 'offer_slots') { onOpenOffers?.(); return; }
     if (serviceId === 'custom_request') { onOpenRequest?.(); return; }
     if (isServiceUnavailable(serviceId)) {

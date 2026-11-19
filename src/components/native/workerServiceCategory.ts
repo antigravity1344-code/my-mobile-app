@@ -8,6 +8,12 @@ const GENDER_LABELS: Record<string, string> = {
 
 export type WorkerServiceCategory = 'cleaner' | 'hourly_laborer' | 'painter' | 'sofa_cleaner';
 
+// عنوان‌های قدیمی خدماتی که بعداً در کاتالوگ عوض شده؛ فقط برای طبقه‌بندی سفارش‌های قدیمیِ بدون serviceId
+// که عنوانشان را از زمان ثبت با خود دارند (تطبیق دقیق، بدون trim).
+const LEGACY_SERVICE_TITLES: Record<string, string> = {
+  'کارگر ساعتی': 'hourly_labor',
+};
+
 export function categoryForServiceId(serviceId: string): WorkerServiceCategory {
   if (serviceId === 'hourly_labor') return 'hourly_laborer';
   if (serviceId === 'building_painting') return 'painter';
@@ -31,7 +37,10 @@ export function classifyWorkerOrder(order: {
   const title = typeof order.serviceTitle === 'string' ? order.serviceTitle : '';
   const matched = SERVICES_CATALOG.find((item) => item.title === title);
   if (!matched) {
-    return { category: null, badge: '' };
+    const legacyId = LEGACY_SERVICE_TITLES[title];
+    if (!legacyId) return { category: null, badge: '' };
+    const legacyService = SERVICES_CATALOG.find((item) => item.id === legacyId);
+    return { category: categoryForServiceId(legacyId), badge: legacyService?.badge || '' };
   }
   return {
     category: categoryForServiceId(matched.id),

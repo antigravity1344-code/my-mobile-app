@@ -29,7 +29,7 @@ export function CustomerOffersScreen({ onBack, onBook }: { onBack: () => void; o
   useEffect(() => { void load(); return () => { request.current?.abort(); request.current = null; }; }, [load]);
   return <ScrollView contentContainerStyle={styles.content}>
     <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.link}>بازگشت</Text></Pressable>
-    <Text style={styles.title}>پیشنهاد متخصص‌ها به شما</Text>
+    <Text style={styles.title}>درخواست از طرف متخصص</Text>
     <Text style={styles.note}>متخصصان ساعت‌های آزاد خود را با قیمت مشخص ثبت کرده‌اند. هر کدام را بخواهید رزرو کنید؛ سفارش مستقیماً برای همان متخصص ثبت می‌شود.</Text>
     {phase === 'loading' && <ActivityIndicator color={colors.teal} />}
     {phase === 'ready' && offers && !offers.length && <Text style={styles.note}>فعلاً هیچ متخصصی پیشنهادی ثبت نکرده است. می‌توانید سفارش عادی ثبت کنید.</Text>}

@@ -90,7 +90,7 @@ export function WorkerCustomerRequests() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.title}>درخواست‌های مشتری به من</Text>
+      <Text style={styles.title}>درخواست از طرف مشتری</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
       {requests.length === 0 ? <Text style={styles.note}>فعلاً درخواست بازی برای شما نیست.</Text> : null}
       {requests.map((request) => (

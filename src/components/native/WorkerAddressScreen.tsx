@@ -54,7 +54,7 @@ export function WorkerAddressScreen({ name, onLogout, onOpenArea, onOpenBank, on
           <Text style={styles.description}>ثبت شبا و مدیریت رمز مخصوص آن</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={onOpenOffers} style={styles.card}>
-          <Text style={styles.heading}>پیشنهاد من به مشتری</Text>
+          <Text style={styles.heading}>درخواست خودم</Text>
           <Text style={styles.description}>ثبت بازهٔ آزاد با قیمت دلخواه، برای رزرو مشتری</Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={onOpenArea} style={styles.card}>

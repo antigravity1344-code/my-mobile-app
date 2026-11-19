@@ -81,7 +81,7 @@ export const SERVICES_CATALOG: CleaningService[] = [
   },
   {
     id: 'hourly_labor',
-    title: 'کارگر ساعتی',
+    title: 'درخواست کارگر ساعتی',
     subtitle: 'خدمت ساعتی، حداقل ۳ ساعت',
     description: 'نیروی کمکی ساعتی برای جابجایی اثاثیه، بارگیری، تخلیه انبار، کارهای سنگین و خدمات متفرقه.',
     iconName: 'hammer-outline',
