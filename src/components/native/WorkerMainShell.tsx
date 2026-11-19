@@ -40,13 +40,14 @@ type Props = {
   mainView: WorkerMainView;
   onChangeView: (view: WorkerMainView) => void;
   onLogout: () => void;
+  onUpdateUser?: (user: WorkerSessionUser) => void;
 };
 
 /**
  * پوستهٔ اصلی اپ متخصص پس از تأیید. سفارش‌ها یک‌بار اینجا بارگذاری و هر ۱۰ ثانیه تازه می‌شوند
  * تا خانه، نشان نوار پایین و پنل سفارش‌ها یک منبع داشته باشند.
  */
-export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Props) {
+export function WorkerMainShell({ user, mainView, onChangeView, onLogout, onUpdateUser }: Props) {
   const contentBackRef = useRef<(() => boolean) | null>(null);
   useEffect(() => installWorkerBackNavigation(BackHandler, mainView, onChangeView, () => contentBackRef.current?.() ?? false), [mainView, onChangeView]);
   const orders = useWorkerOrders<NativeOrder>(user.id, mapWorkerOrder);
@@ -177,7 +178,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout }: Prop
         ) : mainView === 'my_jobs' ? (
           <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'profile' ? (
-          <WorkerAddressScreen key={user.id} name={user.name} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} onOpenBank={() => onChangeView('bank_details')} onOpenOffers={() => onChangeView('offers')} />
+          <WorkerAddressScreen key={user.id} name={user.name} avatar={user.avatar} onUpdateUser={onUpdateUser} onLogout={onLogout} onOpenArea={() => onChangeView('work_area')} onOpenBank={() => onChangeView('bank_details')} onOpenOffers={() => onChangeView('offers')} />
         ) : mainView === 'work_area' ? (
           <WorkerServiceAreaScreen key={user.id} onBack={() => onChangeView('profile')} />
         ) : mainView === 'offers' ? (

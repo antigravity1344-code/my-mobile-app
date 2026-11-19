@@ -734,6 +734,29 @@ app.put('/api/users/customer-profile', (req, res) => {
   res.json({ success: true, user: publicUser(user) });
 });
 
+// 3b. عکس پروفایل (مشترک بین مشتری و متخصص)
+app.put('/api/users/avatar', (req, res) => {
+  const authUser = requireUser(req, res);
+  if (!authUser) return;
+  const { avatar } = req.body || {};
+  const nextAvatar = typeof avatar === 'string' ? avatar.trim() : '';
+  if (!nextAvatar) {
+    return res.status(400).json({ success: false, message: 'تصویر پروفایل الزامی است.' });
+  }
+  if (nextAvatar.length > MAX_DOC_CHARS) {
+    return res.status(400).json({ success: false, message: 'حجم تصویر پروفایل بیش از حد مجاز است.' });
+  }
+  if (!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(nextAvatar)) {
+    return res.status(400).json({ success: false, message: 'فرمت تصویر پروفایل مجاز نیست.' });
+  }
+  const user = store.transaction(() => {
+    const current = store.getUser(authUser.id);
+    current.avatar = nextAvatar;
+    return store.updateUser(current);
+  });
+  res.json({ success: true, user: publicUser(user) });
+});
+
 // 4. آنبوردینگ متخصص
 function sanitizeSavedAddress(raw) {
   if (!raw || typeof raw !== 'object') return null;

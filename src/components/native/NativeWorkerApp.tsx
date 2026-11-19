@@ -147,7 +147,7 @@ export const NativeWorkerApp: React.FC<{ onPreviewExit?: () => void }> = ({ onPr
     );
   }
 
-  return <WorkerMainShell user={userData} mainView={mainView} onChangeView={setMainView} onLogout={handleLogout} />;
+  return <WorkerMainShell user={userData} mainView={mainView} onChangeView={setMainView} onLogout={handleLogout} onUpdateUser={(u) => void handleUpdateUser(u)} />;
 };
 
 const styles = StyleSheet.create({

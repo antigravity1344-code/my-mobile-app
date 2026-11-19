@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, TextInput, ActivityIndicator, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { RTL_SINGLE_LINE_INPUT } from '../../../components/native/rtlInput';
 import { type, colors } from '../../../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound } from 'lucide-react-native';
+import { Wallet, Crown, MapPin, Plus, Trash2, LogOut, UserRound, Camera } from 'lucide-react-native';
 import { useProfile } from '../context/ProfileContext';
 import { NativeAddressManagerModal } from './NativeAddressManagerModal';
 import { findMainAddress } from '../mainAddress';
@@ -36,9 +37,60 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
   const [editNationalId, setEditNationalId] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fa-IR').format(amount) + ' تومان';
+
+  const pickAvatar = async () => {
+    setProfileMessage(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setProfileMessage(
+        permission.canAskAgain === false
+          ? 'دسترسی گالری غیرفعال است. از تنظیمات گوشی اجازهٔ تصاویر را برای این اپ فعال کنید.'
+          : 'برای انتخاب عکس پروفایل، اجازهٔ دسترسی به تصاویر لازم است.'
+      );
+      return;
+    }
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+        base64: true,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+    } catch {
+      setProfileMessage('باز کردن گالری ممکن نشد. دوباره تلاش کنید.');
+      return;
+    }
+    if (result.canceled || !result.assets[0] || !result.assets[0].base64) return;
+    const asset = result.assets[0];
+    const mime = asset.mimeType && /^image\/(png|jpeg|jpg|webp)$/i.test(asset.mimeType) ? asset.mimeType : 'image/jpeg';
+    const dataUri = `data:${mime};base64,${asset.base64}`;
+
+    setAvatarUploading(true);
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/users/avatar', {
+      method: 'PUT',
+      body: JSON.stringify({ avatar: dataUri }),
+    });
+    setAvatarUploading(false);
+    if (!res.success || !res.user) {
+      setProfileMessage(res.message || 'ذخیرهٔ عکس پروفایل ناموفق بود.');
+      return;
+    }
+    syncAuthenticatedUser({
+      id: res.user.id,
+      name: res.user.name || '',
+      phone: res.user.phone,
+      avatar: res.user.avatar,
+    });
+    await saveCustomerSession(appStorage, res.user);
+    setProfileMessage('عکس پروفایل ذخیره شد.');
+  };
 
   const saveIdentity = async () => {
     if (!editName.trim()) {
@@ -76,9 +128,16 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 16 + bottomInset }]}>
         <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{profile.fullName ? profile.fullName.charAt(0) : 'ک'}</Text>
-          </View>
+          <Pressable onPress={() => void pickAvatar()} disabled={avatarUploading} style={styles.avatar}>
+            {profile.avatarUrl ? (
+              <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{profile.fullName ? profile.fullName.charAt(0) : 'ک'}</Text>
+            )}
+            <View style={styles.avatarBadge}>
+              {avatarUploading ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={12} color="#fff" />}
+            </View>
+          </Pressable>
           <View style={styles.userMeta}>
             <Text style={styles.name}>{profile.fullName || ''}</Text>
             <Text style={styles.phone}>{toPersianDigits(profile.phoneNumber || '')}</Text>
@@ -216,8 +275,14 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f8fafc' },
   content: { padding: 16, gap: 14 },
   profileCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: 52, height: 52, borderRadius: 26 },
   avatarText: { ...type.bold, fontWeight: '400', color: '#fff', fontSize: 20 },
+  avatarBadge: {
+    position: 'absolute', bottom: -2, left: -2, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: colors.tealDark, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+  },
   userMeta: { flex: 1, alignItems: 'flex-end', gap: 2 },
   name: { ...type.bold, ...fa, fontWeight: '400', color: '#0f172a', fontSize: 16, textAlign: 'right' },
   phone: { ...type.regular, ...fa, fontWeight: '400', color: '#475569', fontSize: 13, textAlign: 'right' },
