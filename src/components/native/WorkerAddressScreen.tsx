@@ -11,6 +11,7 @@ import { apiFetch } from '../../api/apiClient';
 import { attachStoredAuthToken } from '../../api/authToken';
 import { appStorage } from '../../utils/storage';
 import { WORKER_TOKEN_KEY, type WorkerSessionUser } from './workerLoginStorage';
+import { resolveAssetBase64 } from '../../utils/imagePickerBase64';
 
 type Props = {
   name?: string;
@@ -55,10 +56,15 @@ export function WorkerAddressScreen({ name, avatar, onUpdateUser, onLogout, onOp
       setAvatarMessage('باز کردن گالری ممکن نشد. دوباره تلاش کنید.');
       return;
     }
-    if (result.canceled || !result.assets[0] || !result.assets[0].base64) return;
+    if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    const base64 = await resolveAssetBase64(asset);
+    if (!base64) {
+      setAvatarMessage('خواندن عکس انتخاب‌شده ممکن نشد. لطفاً دوباره تلاش کنید.');
+      return;
+    }
     const mime = asset.mimeType && /^image\/(png|jpeg|jpg|webp)$/i.test(asset.mimeType) ? asset.mimeType : 'image/jpeg';
-    const dataUri = `data:${mime};base64,${asset.base64}`;
+    const dataUri = `data:${mime};base64,${base64}`;
 
     setAvatarUploading(true);
     await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);

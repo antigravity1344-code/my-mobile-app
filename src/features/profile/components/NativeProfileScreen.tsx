@@ -14,6 +14,7 @@ import { attachStoredAuthToken } from '../../../api/authToken';
 import { appStorage } from '../../../utils/storage';
 import { toPersianDigits } from '../../../utils/jalaliDateOptions';
 import { CUSTOMER_TOKEN_KEY, saveCustomerSession } from '../../../components/native/customerLoginStorage';
+import { resolveAssetBase64 } from '../../../utils/imagePickerBase64';
 
 interface Props {
   onLogout: () => void;
@@ -66,10 +67,15 @@ export const NativeProfileScreen: React.FC<Props> = ({ onLogout }) => {
       setProfileMessage('باز کردن گالری ممکن نشد. دوباره تلاش کنید.');
       return;
     }
-    if (result.canceled || !result.assets[0] || !result.assets[0].base64) return;
+    if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    const base64 = await resolveAssetBase64(asset);
+    if (!base64) {
+      setProfileMessage('خواندن عکس انتخاب‌شده ممکن نشد. لطفاً دوباره تلاش کنید.');
+      return;
+    }
     const mime = asset.mimeType && /^image\/(png|jpeg|jpg|webp)$/i.test(asset.mimeType) ? asset.mimeType : 'image/jpeg';
-    const dataUri = `data:${mime};base64,${asset.base64}`;
+    const dataUri = `data:${mime};base64,${base64}`;
 
     setAvatarUploading(true);
     await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
