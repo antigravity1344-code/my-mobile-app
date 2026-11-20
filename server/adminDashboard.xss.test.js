@@ -414,7 +414,7 @@ test('ordinary content, dashboard classes, empty states and existing button oper
     await page.evaluate((row) => renderOrders([row]), o);
     await page.locator('#tabOrdersBtn').click();
     const cancelled = page.waitForResponse((response) => response.url() === origin + '/api/admin/orders/ORDER-NORMAL' && response.request().method() === 'PUT');
-    await page.locator('#ordersList button').click();
+    await page.locator('#ordersList > div', { hasText: 'ORDER-NORMAL' }).getByRole('button', { name: 'تأیید لغو', exact: true }).click();
     assert.equal((await cancelled).status(), 200);
     assert.equal(store.getOrder(o.id).status, 'CANCELLED');
     // Each mutation starts an asynchronous refresh. Finish those refreshes

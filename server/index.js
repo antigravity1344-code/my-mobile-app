@@ -3739,6 +3739,12 @@ app.get('/admin', (req, res) => {
           button.dataset.adminAction = 'order:' + o.id;
           button.disabled = adminActions.has(button.dataset.adminAction);
           actions.append(button);
+        } else if (['PENDING', 'ACCEPTED', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS'].includes(o.status)) {
+          const button = adminElement('button', 'bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold px-3 py-2 rounded-xl', 'لغو سفارش');
+          button.addEventListener('click', () => cancelOrderAdmin(o.id));
+          button.dataset.adminAction = 'order-cancel:' + o.id;
+          button.disabled = adminActions.has(button.dataset.adminAction);
+          actions.append(button);
         }
         actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' ' + ((o.pricing && typeof o.pricing.currencyUnit === 'string' && o.pricing.currencyUnit.trim()) || 'تومان')));
         card.append(details, actions);
@@ -3749,6 +3755,12 @@ app.get('/admin', (req, res) => {
 
     function confirmCustomerCancel(orderId) {
       return runAdminStatusAction('orders', 'order:' + orderId,
+        '/api/admin/orders/' + encodeURIComponent(orderId), 'CANCELLED');
+    }
+
+    function cancelOrderAdmin(orderId) {
+      if (!window.confirm('این سفارش لغو شود؟ این کار قابل بازگشت نیست.')) return;
+      return runAdminStatusAction('orders', 'order-cancel:' + orderId,
         '/api/admin/orders/' + encodeURIComponent(orderId), 'CANCELLED');
     }
 
