@@ -188,6 +188,28 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     }
   };
 
+  // پایان کارِ منتظر پاسخ مشتری، مثل تأیید شروع، بیرون از اسکرول و همیشه دیدنی است؛
+  // پس از پاسخ، همان کادر به‌عنوان اطلاعات داخل اسکرول می‌ماند (تست گوشی ۲۱ نوامبر ۲۰۲۶).
+  const completionNeedsAnswer = order.completion?.status === 'pending' && order.status !== 'CANCEL_REQUESTED';
+  const completionBox = order.completion ? (
+    <View style={styles.startPromptBox}>
+      <Text style={styles.startPromptTitle}>پایان کار و مبلغ نهایی</Text>
+      {order.completion.actualHours !== null ? <Text style={styles.startPromptDescription}>ساعات واقعی اعلام‌شده: {toPersianDigits(order.completion.actualHours)}</Text> : null}
+      <Text style={styles.startPromptDescription}>مبلغ نهایی اعلام‌شده: {formatStoredAmount(order.completion.finalAmount, order.quoteCurrencyUnit)}</Text>
+      <Text style={styles.startPromptDescription}>{completionStatusText(order.completion.status)}</Text>
+      {completionNeedsAnswer ? (
+        <View style={styles.completionPromptActions}>
+          <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('yes')} style={styles.completionPromptYes}>
+            <Text style={styles.startPromptYesText}>{isRespondingToCompletion ? 'در حال ثبت...' : 'تأیید پایان کار و مبلغ'}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('no')} style={styles.completionPromptNo}>
+            <Text style={styles.startPromptNoText}>موافق نیستم؛ بررسی مدیر</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
   return (
     <BottomSheetModal visible={visible} onRequestClose={onClose}>
       {(bottomInset) => {
@@ -474,24 +496,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                 </View>
               </View>
             )}
-            {order.completion ? (
-              <View style={styles.startPromptBox}>
-                <Text style={styles.startPromptTitle}>پایان کار و مبلغ نهایی</Text>
-                {order.completion.actualHours !== null ? <Text style={styles.startPromptDescription}>ساعات واقعی اعلام‌شده: {toPersianDigits(order.completion.actualHours)}</Text> : null}
-                <Text style={styles.startPromptDescription}>مبلغ نهایی اعلام‌شده: {formatStoredAmount(order.completion.finalAmount, order.quoteCurrencyUnit)}</Text>
-                <Text style={styles.startPromptDescription}>{completionStatusText(order.completion.status)}</Text>
-                {order.completion.status === 'pending' && order.status !== 'CANCEL_REQUESTED' ? (
-                  <View style={styles.completionPromptActions}>
-                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('yes')} style={styles.completionPromptYes}>
-                      <Text style={styles.startPromptYesText}>{isRespondingToCompletion ? 'در حال ثبت...' : 'تأیید پایان کار و مبلغ'}</Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="button" disabled={isRespondingToCompletion} onPress={() => void respondToCompletion('no')} style={styles.completionPromptNo}>
-                      <Text style={styles.startPromptNoText}>موافق نیستم؛ بررسی مدیر</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
+            {completionNeedsAnswer ? null : completionBox}
           </ScrollView>
 
           {/* Customer confirmation is independent of cancellation and completion. */}
@@ -525,6 +530,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               </View>
             </View>
           ) : null}
+          {completionNeedsAnswer ? completionBox : null}
           {/* Footer Actions */}
           <View style={styles.footer}>
             {isCompleted && (
