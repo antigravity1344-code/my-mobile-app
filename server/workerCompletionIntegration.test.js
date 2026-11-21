@@ -250,3 +250,30 @@ test('missing order returns404 and customer view never discloses the assigned wo
   assert.equal(customerView.cleanerPhone, undefined);
   assert.equal(orders.text.includes(store.getUser(worker.user.id).phone), false);
 });
+
+// رگرسیون تست گوشی ۲۱ نوامبر ۲۰۲۶: بعد از تکمیل قطعی، کارت متخصص «مبلغ نهایی هنوز مشخص نشده» می‌نوشت،
+// چون نمای سفارش‌های خودِ متخصص اصلاً priceStatus نداشت و priceStatus مبلغ تکمیل را نمی‌دید.
+test('after a final completion both worker and customer views lock the settled amount, not the booked estimate', async (t) => {
+  const server = await harness.serverFor(t);
+  const { customer, worker } = await actors(server);
+  const order = await createOrder(server, customer);
+  await acceptOrder(server, worker, order.id);
+
+  const before = (await request(server, { pathname: '/api/orders', token: worker.token })).json.orders.find((o) => o.id === order.id);
+  assert.equal(Object.hasOwn(before, 'priceStatus'), true, 'worker assigned view must carry priceStatus');
+  assert.notEqual(before.priceStatus.status, 'locked', 'an hourly estimate is not final before completion');
+
+  const settled = 1350000; // عمداً متفاوت از برآورد ۱٬۰۰۰٬۰۰۰
+  const completed = await request(server, {
+    method: 'PUT', pathname: '/api/orders/' + order.id + '/complete', token: worker.token,
+    body: { ...completionPayload(order.id), finalAmount: settled },
+  });
+  assert.equal(completed.status, 200);
+  assert.equal(store.getOrder(order.id).status, 'COMPLETED');
+
+  for (const actor of [worker, customer]) {
+    const view = (await request(server, { pathname: '/api/orders', token: actor.token })).json.orders.find((o) => o.id === order.id);
+    assert.deepEqual(view.priceStatus, { status: 'locked', lockedAmount: settled }, actor === worker ? 'worker' : 'customer');
+    assert.equal(view.completion.finalAmount, settled);
+  }
+});

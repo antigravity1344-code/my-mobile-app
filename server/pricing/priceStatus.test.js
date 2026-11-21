@@ -48,6 +48,29 @@ test('an ordinary hourly service, even when exempt from tier lock, stays pending
   assert.deepEqual(orderPriceStatus({ serviceId: 'exempt_hourly', price: 1750000 }), { status: 'hourly_pending' });
 });
 
+test('a completed completion locks its final amount, even when it differs from the booked estimate', () => {
+  const completion = { status: 'completed', finalAmount: 2000000, actualHours: 8 };
+  assert.deepEqual(orderPriceStatus({ serviceId: 'hourly_job', price: 1200000 }, undefined, completion),
+    { status: 'locked', lockedAmount: 2000000 });
+  // تکمیل قطعی حتی بر قیمت ثابت تعرفه مقدم است؛ مبلغ واقعی تسویه همین است.
+  assert.deepEqual(orderPriceStatus({ serviceId: 'fixed_job', price: 1000000 }, undefined, { status: 'completed', finalAmount: 900000 }),
+    { status: 'locked', lockedAmount: 900000 });
+});
+
+test('a completion that is not yet final does not lock the amount', () => {
+  for (const status of ['pending', 'disputed', 'rejected']) {
+    assert.deepEqual(orderPriceStatus({ serviceId: 'hourly_job', price: 1750000 }, undefined, { status, finalAmount: 2000000 }),
+      { status: 'hourly_pending' }, status);
+  }
+});
+
+test('a completed completion with an invalid amount falls back to the ordinary rule', () => {
+  for (const finalAmount of [0, -5, 1.5, null, '2000000']) {
+    assert.deepEqual(orderPriceStatus({ serviceId: 'hourly_job', price: 1750000 }, undefined, { status: 'completed', finalAmount }),
+      { status: 'hourly_pending' }, String(finalAmount));
+  }
+});
+
 test('an invalid or zero amount is unknown', () => {
   assert.deepEqual(orderPriceStatus({ serviceId: 'fixed_job', price: 0 }), { status: 'unknown' });
   assert.deepEqual(orderPriceStatus({ serviceId: 'hourly_job', price: null }), { status: 'unknown' });

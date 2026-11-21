@@ -17,9 +17,15 @@ function tariffService(serviceId, now) {
 }
 
 /**
+ * @param completion خلاصهٔ درخواست تکمیل (store.completionFor)؛ وقتی قطعی شده، مبلغ نهایی همان است.
  * @returns {{status: 'locked', lockedAmount: number} | {status: 'hourly_pending'} | {status: 'unknown'}}
  */
-function orderPriceStatus(order, now = new Date()) {
+function orderPriceStatus(order, now = new Date(), completion = null) {
+  // مبلغ نهایی تکمیلِ قطعی‌شده بر برآورد رزرو مقدم است (حتی اگر با آن فرق کند).
+  if (completion && completion.status === 'completed' &&
+      Number.isSafeInteger(completion.finalAmount) && completion.finalAmount > 0) {
+    return { status: 'locked', lockedAmount: completion.finalAmount };
+  }
   const price = order && order.price;
   if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
     return { status: 'unknown' };

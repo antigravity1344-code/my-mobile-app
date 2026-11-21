@@ -1630,7 +1630,8 @@ app.post('/api/orders', (req, res) => {
 function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  return { ...rest, priceStatus: orderPriceStatus(order), completion: store.completionFor(order), startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
+  const completion = store.completionFor(order);
+  return { ...rest, priceStatus: orderPriceStatus(order, undefined, completion), completion, startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -1696,7 +1697,9 @@ function workerAssignedOrderView(order) {
   // notes (یادداشت آزاد مشتری) در نمای کاری متخصص، حتی بعد از پذیرش، فرستاده نمی‌شود (D-05).
   // سطح و ریز قیمت مشتری، شناسه مشتری و شناسه لغوکننده به متخصص فرستاده نمی‌شود (D-05، D-41، D-06).
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
-  const workerVisible = { ...rest, ...workerOrderCurrencyView(order), completion: store.completionFor(order), completionAcceptanceKey: store.completionAcceptanceKey(order) };
+  // priceStatus همان مبلغی را نشان می‌دهد که completion.finalAmount (ورودی خود متخصص) یا فهرست سفارش‌های باز از قبل برای او دارد.
+  const completion = store.completionFor(order);
+  const workerVisible = { ...rest, ...workerOrderCurrencyView(order), priceStatus: orderPriceStatus(order, undefined, completion), completion, completionAcceptanceKey: store.completionAcceptanceKey(order) };
   if (ratings !== undefined) workerVisible.ratings = workerVisibleRatings(ratings);
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area, startReported: store.workerStartReported(order), startAcceptanceKey: store.startAcceptanceKey(order) };
