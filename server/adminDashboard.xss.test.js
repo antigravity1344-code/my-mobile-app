@@ -39,7 +39,7 @@ test('manual topup admin form persists receipt, handles lost response and reject
     await page.getByRole('button',{name:'ثبت شارژ دستی',exact:true}).click();
     const panel=page.locator('[data-manual-topup]');
     await panel.locator('[name=amount]').fill('150000');
-    await panel.locator('[name=paidOn]').fill('2026-10-25');
+    await panel.locator('[name=paidOn]').fill('۱۴۰۵/۰۸/۰۳');
     await panel.locator('[name=trackingNumber]').fill('987654321');
     await panel.locator('[name=note]').fill('تطبیق واریز آزمایشی');
     // Server commits but client loses the response: retain form and safely retry same reference.
@@ -52,6 +52,7 @@ test('manual topup admin form persists receipt, handles lost response and reject
     assert.equal(await panel.locator('[name=trackingNumber]').inputValue(),'987654321');
     await panel.getByRole('button',{name:'بازخوانی رسیدهای ثبت‌شده'}).click();
     await page.waitForFunction(()=>document.querySelector('[data-manual-topup] pre').textContent.includes('987654321'));
+    assert.match(await panel.locator('pre').textContent(), /۱۴۰۵\/۰۸\/۰۳/);
     await panel.getByRole('button',{name:'تأیید و ثبت شارژ',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('[data-manual-topup] [role=status]').textContent.includes('قبلاً ثبت'));
     assert.equal(store.workerWallet.read(w.id).balances[0].balance,150000);

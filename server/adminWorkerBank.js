@@ -1,5 +1,66 @@
 'use strict';
 
+function normalizeDateDigits(value) {
+  return String(value || '').replace(/[۰-۹٠-٩]/g, (digit) => String(digit.charCodeAt(0) >= 1776
+    ? digit.charCodeAt(0) - 1776
+    : digit.charCodeAt(0) - 1632));
+}
+
+function toPersianDigits(value) {
+  return String(value).replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]);
+}
+
+function gregorianToJalali(year, month, day) {
+  const monthDayTotals = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  let jalaliYear;
+  let adjustedYear = year;
+  if (adjustedYear > 1600) { jalaliYear = 979; adjustedYear -= 1600; } else { jalaliYear = 0; adjustedYear -= 621; }
+  const gregorianYear2 = month > 2 ? adjustedYear + 1 : adjustedYear;
+  let days = 365 * adjustedYear + Math.floor((gregorianYear2 + 3) / 4) - Math.floor((gregorianYear2 + 99) / 100)
+    + Math.floor((gregorianYear2 + 399) / 400) - 80 + day + monthDayTotals[month - 1];
+  jalaliYear += 33 * Math.floor(days / 12053); days %= 12053;
+  jalaliYear += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { jalaliYear += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  return [jalaliYear, days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30),
+    1 + (days < 186 ? days % 31 : (days - 186) % 30)];
+}
+
+function jalaliToGregorian(year, month, day) {
+  let gregorianYear;
+  let adjustedYear = year;
+  if (adjustedYear > 979) { gregorianYear = 1600; adjustedYear -= 979; } else { gregorianYear = 621; }
+  let days = 365 * adjustedYear + Math.floor(adjustedYear / 33) * 8 + Math.floor(((adjustedYear % 33) + 3) / 4)
+    + 78 + day + (month < 7 ? (month - 1) * 31 : (month - 1) * 30 + 6);
+  gregorianYear += 400 * Math.floor(days / 146097); days %= 146097;
+  if (days > 36524) { gregorianYear += 100 * Math.floor(--days / 36524); days %= 36524; if (days >= 365) days += 1; }
+  gregorianYear += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { gregorianYear += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  let gregorianDay = days + 1;
+  const monthLengths = [31, (gregorianYear % 4 === 0 && gregorianYear % 100 !== 0) || gregorianYear % 400 === 0 ? 29 : 28,
+    31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gregorianMonth = 0;
+  while (gregorianMonth < monthLengths.length && gregorianDay > monthLengths[gregorianMonth]) gregorianDay -= monthLengths[gregorianMonth++];
+  return [gregorianYear, gregorianMonth + 1, gregorianDay];
+}
+
+function jalaliDateToIso(value) {
+  const match = normalizeDateDigits(value).trim().match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (!match) return null;
+  const [year, month, day] = match.slice(1).map(Number);
+  if (year < 1200 || year > 1600 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const gregorian = jalaliToGregorian(year, month, day);
+  const roundTrip = gregorianToJalali(...gregorian);
+  if (roundTrip[0] !== year || roundTrip[1] !== month || roundTrip[2] !== day) return null;
+  return gregorian.map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0')).join('-');
+}
+
+function isoToJalaliDate(value) {
+  const match = typeof value === 'string' && value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value || '';
+  const jalali = gregorianToJalali(...match.slice(1).map(Number));
+  return toPersianDigits(jalali.map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0')).join('/'));
+}
+
 function openWorkerManualTopup(worker, card) {
   if (card.querySelector('[data-manual-topup]')) return;
   const panel = document.createElement('section');
@@ -18,7 +79,8 @@ function openWorkerManualTopup(worker, card) {
   const unit = document.createElement('select'); unit.name = 'currencyUnit';
   for (const value of ['تومان', 'ریال']) { const option = document.createElement('option'); option.value = value; option.textContent = value; unit.append(option); }
   unitLabel.append(unit); form.append(unitLabel);
-  const paidOn = field('تاریخ واریز (میلادی)', 'date', 'paidOn');
+  const paidOn = field('تاریخ واریز (شمسی؛ مانند ۱۴۰۵/۰۸/۲۶)', 'text', 'paidOn');
+  paidOn.inputMode = 'numeric'; paidOn.placeholder = '۱۴۰۵/۰۸/۲۶'; paidOn.autocomplete = 'off';
   const tracking = field('شماره پیگیری بانکی', 'text', 'trackingNumber'); tracking.maxLength = 64;
   const note = field('توضیح بررسی واریز', 'text', 'note'); note.maxLength = 300;
   const submit = document.createElement('button'); submit.type = 'submit'; submit.textContent = 'تأیید و ثبت شارژ';
@@ -43,18 +105,20 @@ function openWorkerManualTopup(worker, card) {
     busy = true; reload.disabled = submit.disabled = close.disabled = true;
     try {
       const data = await request('GET');
-      history.textContent = data.receipts.map(r => r.trackingNumber + ' | ' + r.amount + ' ' + r.currencyUnit + ' | ' + r.paidOn).join('\n') || 'رسیدی ثبت نشده است.';
+      history.textContent = data.receipts.map(r => r.trackingNumber + ' | ' + r.amount + ' ' + r.currencyUnit + ' | ' + isoToJalaliDate(r.paidOn)).join('\n') || 'رسیدی ثبت نشده است.';
       status.textContent = 'رسیدها بازخوانی شدند؛ پیش از ثبت دوباره شماره پیگیری را بررسی کنید.';
     } catch (error) { status.textContent = error.message; }
     finally { busy = false; reload.disabled = submit.disabled = close.disabled = false; }
   });
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (busy) return;
+    const paidOnIso = jalaliDateToIso(paidOn.value);
+    if (!paidOnIso) { status.textContent = 'تاریخ واریز را به شمسی، مانند ۱۴۰۵/۰۸/۲۶ وارد کنید.'; paidOn.focus(); return; }
     busy = true; reload.disabled = submit.disabled = close.disabled = true;
     for (const input of [amount, unit, paidOn, tracking, note]) input.disabled = true;
     status.textContent = 'در حال ثبت…';
     try {
-      const data = await request('POST', { amount: Number(amount.value), currencyUnit: unit.value, paidOn: paidOn.value, trackingNumber: tracking.value, note: note.value });
+      const data = await request('POST', { amount: Number(amount.value), currencyUnit: unit.value, paidOn: paidOnIso, trackingNumber: tracking.value, note: note.value });
       status.textContent = 'شارژ ثبت شد؛ شماره پیگیری: ' + data.receipt.trackingNumber;
       form.reset();
     } catch (error) { status.textContent = error.message + ' اطلاعات فرم محفوظ است؛ رسیدها را بازخوانی کنید. شماره پیگیری را برای تکرار درخواست تغییر ندهید.'; }
