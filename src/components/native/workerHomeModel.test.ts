@@ -86,6 +86,7 @@ describe('worker home model', () => {
   it('time label uses امروز/فردا and Persian digits', () => {
     expect(workerOrderTimeLabel(fa(todayJ), '۱۴:۰۰', now)).toBe('امروز، ساعت ۱۴:۰۰');
     expect(workerOrderTimeLabel('2026-10-25', '9:30', now)).toBe('فردا، ساعت ۰۹:۳۰');
+    expect(workerOrderTimeLabel(fa(todayJ), 'صبح (۱۰:۰۰ تا ۱۲:۰۰)', now)).toBe('امروز، ساعت ۱۰:۰۰');
     expect(workerOrderTimeLabel('', '', now)).toBe('');
   });
 

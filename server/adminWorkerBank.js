@@ -65,28 +65,28 @@ function openWorkerManualTopup(worker, card) {
   if (card.querySelector('[data-manual-topup]')) return;
   const panel = document.createElement('section');
   panel.setAttribute('data-manual-topup', worker.id);
-  panel.className = 'w-full space-y-3 bg-slate-900 p-4 rounded-xl';
-  const title = document.createElement('h4'); title.textContent = 'ثبت واریز بررسی‌شده برای ' + (worker.name || worker.id);
-  const status = document.createElement('p'); status.setAttribute('role', 'status');
-  const form = document.createElement('form');
+  panel.className = 'w-full space-y-4 bg-slate-900 p-4 rounded-xl text-center';
+  const title = document.createElement('h4'); title.className = 'font-bold text-center'; title.textContent = 'ثبت واریز بررسی‌شده برای ' + (worker.name || worker.id);
+  const status = document.createElement('p'); status.className = 'min-h-5 text-center text-sm text-slate-300'; status.setAttribute('role', 'status');
+  const form = document.createElement('form'); form.className = 'grid grid-cols-1 md:grid-cols-2 gap-3 text-right';
   function field(label, type, name) {
-    const wrap = document.createElement('label'); wrap.textContent = label;
+    const wrap = document.createElement('label'); wrap.className = 'flex flex-col gap-1 text-sm font-medium'; wrap.textContent = label;
     const input = document.createElement('input'); input.type = type; input.name = name; input.required = true;
-    input.className = 'block bg-slate-800 border p-2 rounded-xl'; wrap.append(input); form.append(wrap); return input;
+    input.className = 'w-full bg-slate-800 border border-slate-700 p-2 rounded-xl text-right'; wrap.append(input); form.append(wrap); return input;
   }
   const amount = field('مبلغ واریز', 'number', 'amount'); amount.min = '1'; amount.step = '1';
-  const unitLabel = document.createElement('label'); unitLabel.textContent = 'واحد مبلغ (مطابق بدهی کیف پول)';
-  const unit = document.createElement('select'); unit.name = 'currencyUnit';
+  const unitLabel = document.createElement('label'); unitLabel.className = 'flex flex-col gap-1 text-sm font-medium text-right'; unitLabel.textContent = 'واحد مبلغ (مطابق بدهی کیف پول)';
+  const unit = document.createElement('select'); unit.name = 'currencyUnit'; unit.className = 'w-full bg-slate-800 border border-slate-700 p-2 rounded-xl text-right';
   for (const value of ['تومان', 'ریال']) { const option = document.createElement('option'); option.value = value; option.textContent = value; unit.append(option); }
   unitLabel.append(unit); form.append(unitLabel);
   const paidOn = field('تاریخ واریز (شمسی؛ مانند ۱۴۰۵/۰۸/۲۶)', 'text', 'paidOn');
   paidOn.inputMode = 'numeric'; paidOn.placeholder = '۱۴۰۵/۰۸/۲۶'; paidOn.autocomplete = 'off';
   const tracking = field('شماره پیگیری بانکی', 'text', 'trackingNumber'); tracking.maxLength = 64;
   const note = field('توضیح بررسی واریز', 'text', 'note'); note.maxLength = 300;
-  const submit = document.createElement('button'); submit.type = 'submit'; submit.textContent = 'تأیید و ثبت شارژ';
-  const reload = document.createElement('button'); reload.type = 'button'; reload.textContent = 'بازخوانی رسیدهای ثبت‌شده';
-  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'بستن';
-  const history = document.createElement('pre'); history.className = 'whitespace-pre-wrap';
+  const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'w-full md:col-span-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-3 py-2 rounded-xl transition'; submit.textContent = 'تأیید و ثبت شارژ';
+  const reload = document.createElement('button'); reload.type = 'button'; reload.className = 'w-full bg-sky-700 hover:bg-sky-600 text-white px-3 py-2 rounded-xl transition'; reload.textContent = 'بازخوانی رسیدهای ثبت‌شده';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'w-full bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-xl transition'; close.textContent = 'بستن';
+  const history = document.createElement('pre'); history.className = 'whitespace-pre-wrap text-right text-xs bg-slate-950/50 rounded-xl p-3';
   form.append(submit); panel.append(title, status, form, reload, history, close); card.append(panel);
   let busy = false;
   const url = '/api/admin/workers/' + encodeURIComponent(worker.id) + '/wallet/manual-topups';

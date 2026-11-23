@@ -74,7 +74,9 @@ export function workerOrderTimeLabel(rawDate: string, rawTime: string, now: Date
   if (day && sameDay(day, today)) dayText = 'امروز';
   else if (day && sameDay(day, jalaliDayOf(tomorrowDate))) dayText = 'فردا';
   else if ((rawDate || '').trim()) dayText = toPersianDigits(rawDate.trim());
-  const t = toLatin((rawTime || '').trim()).match(/^(\d{1,2}):(\d{2})/);
+  // API time slots may begin with a label, e.g. «صبح (۱۰:۰۰ تا ۱۲:۰۰)».
+  // Keep showing the first clock value instead of requiring the string to begin with it.
+  const t = toLatin((rawTime || '').trim()).match(/(\d{1,2}):(\d{2})/);
   const timeText = t ? `ساعت ${toPersianDigits(`${t[1].padStart(2, '0')}:${t[2]}`)}` : '';
   return [dayText, timeText].filter(Boolean).join('، ');
 }

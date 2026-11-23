@@ -359,7 +359,8 @@ function checkAdminLoginRate(key) {
 function recordAdminLoginFailure(key, entry) {
   entry.fails += 1;
   if (entry.fails >= 5) {
-    entry.lockedUntil = Date.now() + 15 * 60 * 1000;
+    // Slow automated guessing without making a legitimate typo a 15-minute dead end.
+    entry.lockedUntil = Date.now() + 5 * 60 * 1000;
     entry.fails = 0;
   }
   adminLoginAttempts.set(key, entry);
@@ -3019,7 +3020,10 @@ app.get('/admin', (req, res) => {
       <h2 class="text-lg font-bold">ورود مدیر</h2>
       <p id="adminLoginMessage" role="alert" class="text-sm text-amber-300"></p>
       <label for="adminPassword" class="block text-sm">رمز مدیر</label>
-      <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="block w-full border border-slate-600 rounded-xl p-2" />
+      <div class="flex gap-2">
+        <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="block min-w-0 flex-1 border border-slate-600 rounded-xl p-2" />
+        <button type="button" id="adminPasswordToggle" aria-pressed="false" class="bg-slate-700 text-white px-3 py-2 rounded-xl">نمایش</button>
+      </div>
       <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ورود</button>
       <button type="button" id="adminRecoverOpen" class="bg-slate-700 text-white font-bold px-4 py-2 rounded-xl">رمزم را گم کرده‌ام</button>
     </form>
@@ -3352,6 +3356,15 @@ app.get('/admin', (req, res) => {
       return false;
     }
 
+    document.getElementById('adminPasswordToggle').addEventListener('click', () => {
+      const input = document.getElementById('adminPassword');
+      const button = document.getElementById('adminPasswordToggle');
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      button.textContent = showing ? 'نمایش' : 'پنهان';
+      button.setAttribute('aria-pressed', String(!showing));
+    });
+
     document.getElementById('adminLogin').addEventListener('submit', async (event) => {
       event.preventDefault();
       const password = document.getElementById('adminPassword').value;
@@ -3644,8 +3657,8 @@ app.get('/admin', (req, res) => {
       for (const w of workers) {
         const card = adminElement('div', 'bg-slate-800 border ' +
           (w.status === 'PENDING_VERIFICATION' ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-700') +
-          ' rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
-        const identity = adminElement('div', 'flex items-center gap-3');
+          ' rounded-2xl p-4 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4');
+        const identity = adminElement('div', 'flex items-center gap-3 min-w-0');
         const avatar = adminElement('img', 'w-12 h-12 rounded-full border-2 border-emerald-500 object-cover');
         avatar.src = safeWorkerAvatar(w.avatar);
         const details = adminElement('div', '');
@@ -3660,7 +3673,7 @@ app.get('/admin', (req, res) => {
           adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + (w.address || 'ثبت نشده'))
         );
         identity.append(avatar, details);
-        const actions = adminElement('div', 'flex gap-2');
+        const actions = adminElement('div', 'grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto md:min-w-[15rem]');
         const approve = w.status !== 'APPROVED';
         const button = adminElement('button',
           (approve ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500') +
