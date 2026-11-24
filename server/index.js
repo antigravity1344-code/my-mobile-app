@@ -3017,15 +3017,14 @@ app.get('/admin', (req, res) => {
     </header>
 
     <form id="adminLogin" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-3 max-w-md">
-      <h2 class="text-lg font-bold">ورود مدیر</h2>
+      <h2 class="my-5 mb-8 text-2xl font-black text-center">ورود مدیر</h2>
       <p id="adminLoginMessage" role="alert" class="text-sm text-amber-300"></p>
-      <label for="adminPassword" class="block text-sm">رمز مدیر</label>
-      <div class="flex gap-2">
-        <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" class="block min-w-0 flex-1 border border-slate-600 rounded-xl p-2" />
-        <button type="button" id="adminPasswordToggle" aria-pressed="false" class="bg-slate-700 text-white px-3 py-2 rounded-xl">نمایش</button>
+      <div class="grid grid-cols-2 gap-2">
+        <input id="adminPassword" name="password" type="password" autocomplete="current-password" dir="ltr" aria-label="رمز مدیر" placeholder="رمز را وارد کنید" class="block w-full border border-slate-600 rounded-xl p-2 placeholder:text-slate-400" />
+        <button type="button" id="adminPasswordToggle" aria-pressed="false" class="w-full bg-slate-700 text-white px-3 py-2 rounded-xl">نمایش</button>
+        <button type="submit" class="w-full bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ورود</button>
+        <button type="button" id="adminRecoverOpen" class="w-full bg-slate-700 text-white font-bold px-4 py-2 rounded-xl">رمزم را گم کرده‌ام</button>
       </div>
-      <button type="submit" class="bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl">ورود</button>
-      <button type="button" id="adminRecoverOpen" class="bg-slate-700 text-white font-bold px-4 py-2 rounded-xl">رمزم را گم کرده‌ام</button>
     </form>
 
     <form id="adminRecover" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-3 max-w-md">
@@ -3045,32 +3044,31 @@ app.get('/admin', (req, res) => {
     <div id="adminDesk" hidden>
     <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
     <!-- کارت‌های آمار -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsGrid">
-      <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
-        <span class="text-xs text-slate-400">کل سفارش‌ها</span>
-        <h2 id="totalOrders" class="text-2xl font-black text-sky-400 mt-1">-</h2>
+    <div class="grid gap-2" id="statsGrid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="bg-slate-800 border border-slate-700 p-2 rounded-lg text-center">
+        <span class="block text-[9px] leading-tight text-slate-400">کل سفارش‌ها</span>
+        <h2 id="totalOrders" class="text-base font-black text-sky-400 mt-0">-</h2>
       </div>
-      <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
-        <span class="text-xs text-slate-400">در انتظار بررسی مدارک</span>
-        <h2 id="pendingWorkers" class="text-2xl font-black text-amber-400 mt-1">-</h2>
+      <div class="bg-slate-800 border border-slate-700 p-2 rounded-lg text-center">
+        <span class="block text-[9px] leading-tight text-slate-400">در انتظار بررسی مدارک</span>
+        <h2 id="pendingWorkers" class="text-base font-black text-amber-400 mt-0">-</h2>
       </div>
-      <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
-        <span class="text-xs text-slate-400">تعداد متخصصین</span>
-        <h2 id="totalWorkers" class="text-2xl font-black text-emerald-400 mt-1">-</h2>
+      <div class="bg-slate-800 border border-slate-700 p-2 rounded-lg text-center">
+        <span class="block text-[9px] leading-tight text-slate-400">تعداد متخصصین</span>
+        <h2 id="totalWorkers" class="text-base font-black text-emerald-400 mt-0">-</h2>
       </div>
-      <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl text-center">
-        <span id="revenueLabel" class="text-xs text-slate-400">درآمد کل (تومان)</span>
-        <h2 id="totalRevenue" class="text-xl font-black text-purple-400 mt-1">-</h2>
+      <div class="bg-slate-800 border border-slate-700 p-2 rounded-lg text-center">
+        <span id="revenueLabel" class="block text-[9px] leading-tight text-slate-400">درآمد کل (تومان)</span>
+        <h2 id="totalRevenue" class="text-base font-black text-purple-400 mt-0">-</h2>
       </div>
     </div>
 
     <div id="otpReview" hidden class="bg-slate-800 border border-slate-700 p-4 rounded-xl"></div>
 
     <!-- تب‌ها -->
-    <div class="admin-tabs flex border-b border-slate-700 gap-4 text-sm font-bold overflow-x-auto">
-      <button id="tabWorkersBtn" onclick="switchTab('workers')" class="pb-3 border-b-2 border-sky-400 text-sky-400">
-        👨‍🔧 مدیریت متخصصین و تایید مدارک
-      </button>
+    <div class="admin-tabs mt-6 flex border-b border-slate-700 gap-4 text-sm font-bold overflow-x-auto">
+      <button id="tabWorkersBtn" onclick="showWorkerManagement()" class="pb-3 border-b-2 border-sky-400 text-sky-400 text-xs whitespace-nowrap">مدیریت متخصصین</button>
+      <button id="tabWorkerVerificationBtn" onclick="showWorkerVerification()" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white text-xs whitespace-nowrap">تأیید مدارک</button>
       <button id="tabOrdersBtn" onclick="switchTab('orders')" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">
         📦 مدیریت سفارش‌ها
       </button>
@@ -3313,7 +3311,9 @@ app.get('/admin', (req, res) => {
     function showAdminLogin(message) {
       const form = document.getElementById('adminLogin');
       form.hidden = false;
-      document.getElementById('adminLoginMessage').textContent = message || '';
+      const messageBox = document.getElementById('adminLoginMessage');
+      messageBox.textContent = message || '';
+      messageBox.hidden = !message;
       setAdminDeskOpen(false);
     }
 
@@ -3352,7 +3352,7 @@ app.get('/admin', (req, res) => {
         setAdminDeskOpen(true);
         return true;
       }
-      showAdminLogin('رمز مدیر را وارد کنید.');
+      showAdminLogin('');
       return false;
     }
 
@@ -3646,15 +3646,22 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    let allAdminWorkers = [];
+    let workerView = 'all';
+
     function renderWorkers(workers) {
+      allAdminWorkers = Array.isArray(workers) ? workers : [];
+      const shownWorkers = workerView === 'verification'
+        ? allAdminWorkers.filter((worker) => worker.status === 'PENDING_VERIFICATION')
+        : allAdminWorkers;
       const container = document.getElementById('workersList');
-      if (!workers || workers.length === 0) {
+      if (shownWorkers.length === 0) {
         container.replaceChildren(adminElement('p', 'text-xs text-slate-400', 'هیچ متخصصی ثبت‌نام نکرده است.'));
         return;
       }
 
       const rows = document.createDocumentFragment();
-      for (const w of workers) {
+      for (const w of shownWorkers) {
         const card = adminElement('div', 'bg-slate-800 border ' +
           (w.status === 'PENDING_VERIFICATION' ? 'border-amber-500/50 bg-amber-950/10' : 'border-slate-700') +
           ' rounded-2xl p-4 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4');
@@ -3676,7 +3683,7 @@ app.get('/admin', (req, res) => {
         const actions = adminElement('div', 'grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto md:min-w-[15rem]');
         const approve = w.status !== 'APPROVED';
         const button = adminElement('button',
-          (approve ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500') +
+          (approve ? 'bg-amber-700 hover:bg-amber-600' : 'bg-emerald-700 hover:bg-emerald-600') +
           ' text-white text-xs font-bold px-3 py-2 rounded-xl transition',
           approve ? '✅ تایید مدارک و فعال‌سازی' : '⛔ غیرفعال‌سازی');
         button.addEventListener('click', () => updateWorkerStatus(w.id, approve ? 'APPROVED' : 'BLOCKED'));
@@ -3690,7 +3697,7 @@ app.get('/admin', (req, res) => {
         actions.append(bankReset);
         if (w.features && Object.prototype.hasOwnProperty.call(w.features, 'offers')) {
           const offersOn = w.features.offers !== false;
-          const offersButton = adminElement('button', (offersOn ? 'bg-amber-700' : 'bg-emerald-700') + ' text-white text-xs px-3 py-2 rounded-xl',
+          const offersButton = adminElement('button', (offersOn ? 'bg-emerald-700' : 'bg-amber-700') + ' text-white text-xs px-3 py-2 rounded-xl',
             offersOn ? 'غیرفعال‌سازی قیمت پیشنهاد' : 'فعال‌سازی قیمت پیشنهاد');
           offersButton.type = 'button';
           offersButton.setAttribute('data-action', 'worker-offers-feature');
@@ -3699,7 +3706,7 @@ app.get('/admin', (req, res) => {
         }
         if (w.features && Object.prototype.hasOwnProperty.call(w.features, 'patient_companion')) {
           const qualified = w.features.patient_companion === true;
-          const qualButton = adminElement('button', (qualified ? 'bg-amber-700' : 'bg-emerald-700') + ' text-white text-xs px-3 py-2 rounded-xl',
+          const qualButton = adminElement('button', (qualified ? 'bg-emerald-700' : 'bg-amber-700') + ' text-white text-xs px-3 py-2 rounded-xl',
             qualified ? 'لغو صلاحیت همراه مریض' : 'تأیید صلاحیت همراه مریض');
           qualButton.type = 'button';
           qualButton.setAttribute('data-action', 'worker-patient-companion');
@@ -3819,6 +3826,21 @@ app.get('/admin', (req, res) => {
         '/api/admin/users/' + encodeURIComponent(userId) + '/status', status);
     }
 
+    function setWorkerView(mode) {
+      workerView = mode;
+      switchTab('workers');
+      renderWorkers(allAdminWorkers);
+      document.getElementById('tabWorkersBtn').className = mode === 'all'
+        ? 'pb-3 border-b-2 border-sky-400 text-sky-400 text-xs whitespace-nowrap'
+        : 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white text-xs whitespace-nowrap';
+      document.getElementById('tabWorkerVerificationBtn').className = mode === 'verification'
+        ? 'pb-3 border-b-2 border-sky-400 text-sky-400 text-xs whitespace-nowrap'
+        : 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white text-xs whitespace-nowrap';
+    }
+
+    function showWorkerManagement() { setWorkerView('all'); }
+    function showWorkerVerification() { setWorkerView('verification'); }
+
     function switchTab(tab) {
       for (const name of ['workers', 'orders', 'tariffs', 'tiers', 'points', 'commission', 'offerPolicy', 'tierLock', 'services', 'completion', 'payment', 'areas', 'siteFeatures', 'discountCodes']) {
         const suffix = name[0].toUpperCase() + name.slice(1);
@@ -3828,6 +3850,10 @@ app.get('/admin', (req, res) => {
         document.getElementById('tab' + suffix + 'Btn').className = name === tab
           ? 'pb-3 border-b-2 border-sky-400 text-sky-400'
           : 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white';
+      }
+      const verificationButton = document.getElementById('tabWorkerVerificationBtn');
+      if (verificationButton && tab !== 'workers') {
+        verificationButton.className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white text-xs whitespace-nowrap';
       }
     }
 
