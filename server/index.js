@@ -1792,7 +1792,10 @@ app.get('/api/orders', (req, res) => {
     return res.json({ success: true, orders: store.getOrders({ customerId: authUser.id }).map(customerOrderView) });
   }
   if (authUser.role === 'WORKER') {
-    return res.json({ success: true, orders: store.getOrders({ cleanerId: authUser.id }).map(workerAssignedOrderView) });
+    const orders = store.getOrders({ cleanerId: authUser.id }).map((order) =>
+      workerAssignedOrderView({ ...order, customerAvatar: '', cleanerAvatar: null })
+    );
+    return res.json({ success: true, orders });
   }
   return res.status(403).json({ success: false, message: 'دسترسی مجاز نیست.', orders: [] });
 });

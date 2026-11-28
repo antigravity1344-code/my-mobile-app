@@ -58,6 +58,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
       },
     );
     let response: Response;
+    let text: string;
     try {
       // headers را بعد از rest می‌گذاریم تا Authorization با options.headers پاک نشود.
       response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -65,11 +66,10 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
         signal: timeout.signal,
         headers,
       });
+      text = await response.text();
     } finally {
       timeout.clear();
     }
-
-    const text = await response.text();
     if (!text) {
       return {
         success: false,

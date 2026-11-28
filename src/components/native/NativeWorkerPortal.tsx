@@ -412,9 +412,10 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   });
 
   const selectedOrder = availableOrders.find((order) => order.id === selectedOrderId);
-  const ordersError = ordersState.error ? (
+  const listError = ordersState.sessionExpired ? ordersState.error : activeTab === 'available' ? ordersState.availableError : activeTab === 'my_jobs' ? ordersState.mineError : null;
+  const ordersError = listError ? (
         <View style={styles.alertError}>
-          <Text style={styles.alertErrorText}>{ordersState.error}</Text>
+          <Text style={styles.alertErrorText}>{listError}</Text>
           {ordersState.sessionExpired ? (
             onSessionExpired ? (
               <Pressable onPress={onSessionExpired} style={styles.retryButton} accessibilityRole="button">
@@ -558,7 +559,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
       <ScrollView contentContainerStyle={[styles.listContent, activeTab === 'available' && styles.availableListContent]} showsVerticalScrollIndicator={false}>
         {!loading && activeTab === 'available' ? (
           filteredOrders.length === 0 ? (
-            ordersState.error ? null : <View style={styles.emptyBox}>
+            listError ? null : <View style={styles.emptyBox}>
               <CheckCircle size={40} color={colors.teal} />
               <Text style={styles.emptyTitle}>سفارشی برای پذیرش موجود نیست</Text>
             </View>
@@ -569,7 +570,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           )
         ) : !loading && activeTab === 'my_jobs' ? (
           myAcceptedOrders.length === 0 ? (
-            ordersState.error ? null : <View style={styles.emptyBox}>
+            listError ? null : <View style={styles.emptyBox}>
               <Briefcase size={40} color={colors.teal} />
               <Text style={styles.emptyTitle}>هنوز سفارشی نپذیرفته‌اید</Text>
             </View>

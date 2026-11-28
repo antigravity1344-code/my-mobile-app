@@ -237,11 +237,16 @@ test('worker order views hide customer contact data until an active accept', asy
   assert.equal(acceptedTwice.status, 400);
   assert.equal(acceptedTwice.json.message, 'این سفارش قبلاً توسط شما پذیرفته شده است.');
 
-  // --- worker GET /orders: active job carries contact data ---
+  // --- worker GET /orders: active job carries contact data without unused images ---
+  const image = 'data:image/png;base64,' + 'A'.repeat(96 * 1024);
+  store.updateOrder({ ...store.getOrder(order.id), customerAvatar: image, cleanerAvatar: image });
   let mine = await request(server, { pathname: '/api/orders', token: workerA.token });
   assert.equal(mine.status, 200);
   let job = mine.json.orders.find((item) => item.id === order.id);
   assert.equal(job.status, 'ACCEPTED');
+  assert.equal(job.customerAvatar, '');
+  assert.equal(job.cleanerAvatar, null);
+  assert.ok(mine.text.length < image.length);
   assert.equal(job.customerPhone, CUSTOMER_PHONE);
   assert.equal(job.address, FULL_ADDRESS);
   assert.equal(job.addressNotes, ADDRESS_NOTE);

@@ -21,6 +21,8 @@ export type WorkerOrdersState<T> = {
   available: T[];
   mine: T[];
   error: string | null;
+  availableError: string | null;
+  mineError: string | null;
   sessionExpired: boolean;
 };
 
@@ -57,7 +59,7 @@ export function classifyWorkerOrdersResponse(res: unknown): WorkerOrdersResponse
 
 /**
  * اعمال نتیجه یک دور بارگذاری. خطا هیچ‌وقت فهرست قبلی را خالی نمی‌کند؛
- * خطای پولینگ پس‌زمینه بی‌صدا نادیده گرفته می‌شود، ولی پایان نشست همیشه نمایش داده می‌شود.
+ * پولینگ موفقیت هر فهرست را مستقل اعمال می‌کند و خطای تازه‌ای روی صفحه نمی‌آورد.
  */
 export function applyWorkerOrdersLoad<T>(
   state: WorkerOrdersState<T>,
@@ -70,14 +72,23 @@ export function applyWorkerOrdersLoad<T>(
   if (parts.some((p) => p.kind === 'expired')) {
     return { ...state, error: WORKER_SESSION_EXPIRED_MESSAGE, sessionExpired: true };
   }
-  const firstError = parts.find((p): p is { kind: 'error'; message: string } => p.kind === 'error');
-  if (firstError && mode === 'poll') return state;
+  if (mode === 'poll' && !parts.some((part) => part.kind === 'ok')) return state;
+
+  const listError = (response: WorkerOrdersResponse | null, previous: string | null) => {
+    if (response?.kind === 'ok') return null;
+    if (response?.kind === 'error' && mode !== 'poll') return response.message;
+    return previous;
+  };
+  const availableError = listError(load.available, state.availableError);
+  const mineError = listError(load.mine, state.mineError);
 
   const map = load.map ?? ((orders: unknown[]) => orders as T[]);
   return {
     available: load.available?.kind === 'ok' ? map(load.available.orders) : state.available,
     mine: load.mine?.kind === 'ok' ? map(load.mine.orders) : state.mine,
-    error: firstError ? firstError.message : null,
+    error: availableError ?? mineError,
+    availableError,
+    mineError,
     sessionExpired: false,
   };
 }

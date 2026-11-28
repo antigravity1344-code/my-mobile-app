@@ -12,8 +12,8 @@ import {
   type WorkerOrdersState,
 } from './workerOrdersFetch';
 
-const empty: WorkerOrdersState<string> = { available: [], mine: [], error: null, sessionExpired: false };
-const loaded: WorkerOrdersState<string> = { available: ['a1'], mine: ['m1'], error: null, sessionExpired: false };
+const empty: WorkerOrdersState<string> = { available: [], mine: [], error: null, availableError: null, mineError: null, sessionExpired: false };
+const loaded: WorkerOrdersState<string> = { available: ['a1'], mine: ['m1'], error: null, availableError: null, mineError: null, sessionExpired: false };
 
 describe('worker orders fetch (#5 #6 #8)', () => {
   it('shows the spinner only for the initial and manual loads, never for background polls (#5)', () => {
@@ -43,15 +43,18 @@ describe('worker orders fetch (#5 #6 #8)', () => {
     const next = applyWorkerOrdersLoad(loaded, { available: { kind: 'error', message: 'قطع' }, mine: { kind: 'ok', orders: ['m2'] } }, 'manual');
     expect(next.available).toEqual(['a1']);
     expect(next.mine).toEqual(['m2']);
-    expect(next.error).toBe('قطع');
+    expect(next.availableError).toBe('قطع');
+    expect(next.mineError).toBeNull();
   });
 
   it('a failed background poll changes nothing; a later success clears the error', () => {
     const failed = { available: { kind: 'error', message: 'قطع' }, mine: { kind: 'error', message: 'قطع' } } as const;
     expect(applyWorkerOrdersLoad(loaded, failed, 'poll')).toBe(loaded);
-    const withError = { ...loaded, error: 'قطع' };
+    const withError = { ...loaded, error: 'قطع', availableError: 'قطع' };
+    const partial = applyWorkerOrdersLoad(withError, { available: { kind: 'ok', orders: ['a2'] }, mine: failed.mine }, 'poll');
+    expect(partial).toEqual({ ...loaded, available: ['a2'] });
     const ok = applyWorkerOrdersLoad(withError, { available: { kind: 'ok', orders: [] }, mine: { kind: 'ok', orders: ['m1'] } }, 'poll');
-    expect(ok).toEqual({ available: [], mine: ['m1'], error: null, sessionExpired: false });
+    expect(ok).toEqual({ ...loaded, available: [] });
   });
 
   it('an expired session is reported even from a poll (#6 401)', () => {

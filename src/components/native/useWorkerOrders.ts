@@ -17,6 +17,9 @@ import {
 
 export const WORKER_ORDERS_POLL_MS = 10000;
 
+// The order lists need a full response even when Android has a cached version.
+const orderReadOptions = { headers: { 'Cache-Control': 'no-cache, no-store' } };
+
 /**
  * بارگذاری و پولینگ سفارش‌های متخصص؛ مشترک بین خانهٔ متخصص و پنل سفارش‌ها.
  * فقط یکی از این دو صفحه در هر لحظه نصب است، پس فقط یک پولینگ فعال است.
@@ -26,6 +29,8 @@ export function useWorkerOrders<T>(userId: string | undefined, mapOrder: (o: Api
     available: [],
     mine: [],
     error: null,
+    availableError: null,
+    mineError: null,
     sessionExpired: false,
   });
   const [loading, setLoading] = useState(false);
@@ -45,12 +50,12 @@ export function useWorkerOrders<T>(userId: string | undefined, mapOrder: (o: Api
     if (showsWorkerOrdersSpinner(mode)) setLoading(true);
     try {
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-      const available = classifyWorkerOrdersResponse(await apiFetch('/orders/available'));
+      const available = classifyWorkerOrdersResponse(await apiFetch('/orders/available', orderReadOptions));
       let mine: WorkerOrdersResponse | null = null;
       if (userId && available.kind !== 'expired' && available.kind !== 'blocked') {
         // توکن سراسری است؛ پیش از درخواست دوم دوباره توکن متخصص گذاشته می‌شود.
         await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
-        mine = classifyWorkerOrdersResponse(await apiFetch('/orders'));
+        mine = classifyWorkerOrdersResponse(await apiFetch('/orders', orderReadOptions));
       }
       if (fetchId !== latestFetchId.current) return;
       const map = mapRef.current;
