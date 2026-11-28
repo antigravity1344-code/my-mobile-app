@@ -3,16 +3,22 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { colors, shadowSm, type } from '../../theme/customerHome';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { formatStoredAmount } from '../../features/orders/services/money';
+import { workerTierBadge } from './workerTier';
 import { workerPriceLine } from './workerHomeModel';
 import { canAcceptWorkerOrder, workerStatusLabel } from './workerOrderStatus';
 import type { NativeOrder } from './workerOrderMapper';
 
 function availableOrderText(order: NativeOrder) {
+  const formatAmount = (amount: number) => formatStoredAmount(amount, order.currencyUnit);
+  const minimum = order.minimumBaseAmount;
   return {
+    minimum: order.priceStatus?.status === 'hourly_pending' && typeof minimum === 'number' && Number.isSafeInteger(minimum) && minimum > 0
+      ? 'حداقل دستمزد پایه: ' + formatAmount(minimum)
+      : null,
     service: order.serviceTitle,
     district: order.district || 'محدوده نامشخص',
     time: toPersianDigits(`${order.date} | ${order.timeSlot}`),
-    price: workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit), order.priceStatus),
+    price: workerPriceLine(order.serviceId, order.rawPrice, formatAmount, order.priceStatus),
   };
 }
 
@@ -21,10 +27,11 @@ export function WorkerAvailableOrderCard({ order, onOpen }: {
   onOpen: (id: string) => void;
 }) {
   const text = availableOrderText(order);
+  const tier = workerTierBadge(order.publicTierBadge?.tier);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${text.service}، ${text.district}، ${text.time}، ${text.price}`}
+      accessibilityLabel={[text.service, text.district, text.time, order.publicTierBadge?.label, text.minimum, text.price].filter(Boolean).join('، ')}
       accessibilityHint="نمایش جزئیات سفارش"
       onPress={() => onOpen(order.id)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -34,6 +41,8 @@ export function WorkerAvailableOrderCard({ order, onOpen }: {
         <Text style={styles.summaryDistrict} numberOfLines={1}>{text.district}</Text>
       </View>
       <Text style={styles.summaryTime} numberOfLines={1}>{text.time}</Text>
+      {tier ? <Text style={[styles.summaryTier, { backgroundColor: tier.background, color: tier.color, borderColor: tier.border, borderWidth: tier.borderWidth }]}>سطح مشتری: {tier.label}</Text> : null}
+      {text.minimum ? <Text style={styles.summaryPrice}>{text.minimum}</Text> : null}
       <Text style={styles.summaryPrice} numberOfLines={1} ellipsizeMode="tail">{text.price}</Text>
     </Pressable>
   );
@@ -55,7 +64,7 @@ export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBa
         <Pressable accessibilityRole="button" accessibilityLabel="بازگشت به سفارش‌های جدید" onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>بازگشت</Text>
         </Pressable>
-        <Text style={styles.heading}>جزئیات سفارش</Text>
+        <Text accessibilityRole="header" style={styles.heading}>جزئیات سفارش</Text>
       </View>
       {notice}
       <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
@@ -63,9 +72,12 @@ export function WorkerAvailableOrderDetails({ order, busy, loading, notice, onBa
         {order && text ? (
           <View style={styles.detailCard}>
             <Text style={styles.title}>{text.service}</Text>
+            {order.publicTierBadge ? <Text style={styles.meta}>سطح مشتری: {order.publicTierBadge.label}</Text> : null}
+            {order.publicTierBadge?.summary ? <Text style={styles.note}>{order.publicTierBadge.summary}</Text> : null}
             {order.badge ? <Text style={styles.meta}>{order.badge}</Text> : null}
             <Text style={styles.meta}>محله: {text.district}</Text>
             <Text style={styles.meta}>{text.time}</Text>
+            {text.minimum ? <Text style={styles.price}>{text.minimum}</Text> : null}
             <Text style={styles.price}>{text.price}</Text>
             {order.detailsNote ? <Text style={styles.meta}>{toPersianDigits(order.detailsNote)}</Text> : null}
             <Text style={styles.note}>آدرس دقیق و تماس پس از پذیرش نمایش داده می‌شود.</Text>
@@ -109,20 +121,21 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
   summaryTitle: { ...type.bold, ...fa, flex: 3, fontSize: 14, lineHeight: 20, color: colors.text },
   summaryDistrict: { ...type.regular, ...fa, flex: 2, fontSize: 12, lineHeight: 20, color: colors.muted },
+  summaryTier: { ...type.semibold, ...fa, alignSelf: 'flex-end', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, fontSize: 12 },
   summaryTime: { ...type.regular, ...fa, fontSize: 12, lineHeight: 18, color: colors.muted },
   summaryPrice: { ...type.medium, ...fa, fontSize: 12, lineHeight: 18, color: colors.teal },
-  header: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 16 },
-  back: { minHeight: 44, minWidth: 48, justifyContent: 'center' },
+  header: { minHeight: 60, justifyContent: 'center', paddingHorizontal: 80, paddingVertical: 8 },
+  back: { position: 'absolute', right: 16, top: 8, bottom: 8, minWidth: 48, maxWidth: 64, justifyContent: 'center' },
   backText: { ...type.semibold, ...fa, fontSize: 14, color: colors.teal },
-  heading: { ...type.bold, ...fa, flex: 1, fontSize: 17, lineHeight: 26, color: colors.text },
+  heading: { ...type.bold, ...fa, fontSize: 17, lineHeight: 26, color: colors.text, textAlign: 'center' },
   detailContent: { padding: 16, paddingBottom: 32, gap: 12 },
   detailCard: { backgroundColor: colors.white, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 14, ...shadowSm },
-  title: { ...type.bold, ...fa, fontSize: 17, lineHeight: 26, color: colors.text },
+  title: { ...type.bold, ...fa, fontSize: 17, lineHeight: 26, color: colors.text, textAlign: 'center' },
   meta: { ...type.regular, ...fa, fontSize: 14, lineHeight: 24, color: colors.text },
   price: { ...type.bold, ...fa, fontSize: 14, lineHeight: 24, color: colors.teal },
   note: { ...type.regular, ...fa, fontSize: 12, lineHeight: 22, color: colors.muted },
-  acceptButton: { minHeight: 48, padding: 12, borderRadius: 12, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
-  acceptText: { ...type.bold, ...fa, fontSize: 14, color: colors.white },
+  acceptButton: { alignSelf: 'center', maxWidth: '100%', minHeight: 48, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center' },
+  acceptText: { ...type.bold, ...fa, fontSize: 14, color: colors.white, textAlign: 'center' },
   declineButton: { minHeight: 48, padding: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   declineText: { ...type.bold, ...fa, fontSize: 14, color: colors.text },
   disabled: { opacity: 0.6 },

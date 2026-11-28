@@ -29,7 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import type { OrderItem } from '../types/order';
-import { isOrderCancellable, type CancelQuote } from '../services/orderService';
+import { isOrderCancellable, orderService, type CancelQuote } from '../services/orderService';
 import { formatStoredAmount } from '../services/money';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
@@ -53,6 +53,7 @@ interface OrderDetailModalProps {
   onRespondToStart: (orderId: string, answer: 'yes' | 'no', promptEventId: string) => Promise<{ success: boolean; error?: string }>;
   /** Opened from the card's «لغو»: start with the cancel prompt open. */
   openCancelPrompt?: boolean;
+  onExtensionAnswered?: () => void;
 }
 
 const RECURRING_TITLES: Record<string, string> = {
@@ -77,10 +78,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   onRespondToStart,
   onRespondToCompletion,
   openCancelPrompt,
+  onExtensionAnswered,
 }) => {
   const [showCancelPrompt, setShowCancelPrompt] = useState(Boolean(openCancelPrompt) && isOrderCancellable(order?.status ?? 'UNKNOWN'));
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isRespondingToExtension, setIsRespondingToExtension] = useState(false);
   const [isRespondingToCompletion, setIsRespondingToCompletion] = useState(false);
   const [isRespondingToStart, setIsRespondingToStart] = useState(false);
   const [cancelPreview, setCancelPreview] = useState('');
@@ -113,7 +116,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   const tierAmount = pricing?.tierDiscountAmount ?? 0;
   const recurringAmount = pricing?.recurringDiscountAmount ?? 0;
   const totalAmount = pricing?.total ?? subtotal;
-  const dateLabel = [
+  const dateLabel = order.dateLabel || [
     order.date?.dayOfWeek,
     order.date?.dayOfMonth,
     order.date?.monthName,
@@ -166,6 +169,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
     } catch {
       Alert.alert('خطای ارتباط', 'نتیجه ثبت پاسخ مشخص نیست. سفارش را بازخوانی کنید.');
     } finally { setIsRespondingToCompletion(false); }
+  };
+
+  const extension = order.extension;
+  const pendingExtension = extension?.pending;
+  const requestExtension = async () => {
+    if (!extension?.canRequest || pendingExtension || isRespondingToExtension) return;
+    setIsRespondingToExtension(true);
+    try {
+      const result = await orderService.requestExtension(order.id, extension.version, extension.total + extension.rate);
+      if (!result.success) Alert.alert('ارسال درخواست انجام نشد', result.error);
+      onExtensionAnswered?.();
+    } catch {
+      Alert.alert('خطای ارتباط', 'نتیجه مشخص نیست. سفارش را بازخوانی کنید.');
+    } finally { setIsRespondingToExtension(false); }
   };
 
   const handleConfirmCancel = async () => {
@@ -323,7 +340,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
               {describeServiceOptions(order.serviceId, order.serviceOptions).map((option) => (
                   <View key={option.key} style={styles.infoRow}>
                     <Sparkles size={15} color={colors.teal} />
-                    <Text style={styles.infoLabel}>{option.label}:</Text>
+                    <Text style={styles.infoLabel}>{option.label}{option.label.endsWith('؟') ? '' : ':'}</Text>
                     <Text style={styles.infoValue}>{option.value}</Text>
                   </View>
                 ))}
@@ -528,6 +545,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                   <Text style={styles.startPromptNoText}>خیر، شروع نشده</Text>
                 </Pressable>
               </View>
+            </View>
+          ) : null}
+          {extension && (extension.canRequest || pendingExtension) ? (
+            <View style={styles.startPromptBox}>
+              <Text style={styles.startPromptTitle}>یک ساعت اضافه</Text>
+              <Text style={styles.startPromptDescription}>هزینهٔ تمدید: {formatStoredAmount(pendingExtension?.amount ?? extension.rate, order.quoteCurrencyUnit)}</Text>
+              <Text style={styles.startPromptDescription}>جمع با تمدید: {formatStoredAmount(pendingExtension?.total ?? extension.total + extension.rate, order.quoteCurrencyUnit)}</Text>
+              {extension.lastStatus === "approved" && !pendingExtension ? <Text style={styles.startPromptDescription}>متخصص تمدید قبلی را پذیرفت.</Text> : null}
+              {extension.lastStatus === "denied" && !pendingExtension ? <Text style={styles.startPromptDescription}>متخصص تمدید قبلی را نپذیرفت.</Text> : null}
+              {pendingExtension ? <Text style={styles.startPromptDescription}>در انتظار پاسخ متخصص</Text> : (
+                <Pressable accessibilityRole="button" disabled={isRespondingToExtension} onPress={() => void requestExtension()} style={styles.completionPromptYes}>
+                  <Text style={styles.startPromptYesText}>درخواست یک ساعت اضافه</Text>
+                </Pressable>
+              )}
             </View>
           ) : null}
           {completionNeedsAnswer ? completionBox : null}

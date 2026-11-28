@@ -1,3 +1,5 @@
+import { STAIR_SERVICE, buildingOptions, calculateStaircase } from '../../../../server/pricing/staircase';
+import { getStaircaseRates } from '../../../config/serviceAvailability';
 import type { FinalPrice } from '../../../utils/pricing';
 import type { PricingType } from '../../../types/service';
 import { isTierExempt, servicePricingMode } from '../../../config/serviceAvailability';
@@ -10,12 +12,7 @@ export const QUOTE_STALE_MESSAGE = 'قیمت معتبر نیست. مبلغ جد�
 
 const NON_OPTION_KEYS = new Set(['durationHours', 'price', 'total', 'basePrice', 'confirmedTotal', 'quoteToken']);
 
-export const CUSTOMER_WORKER_TIERS = [
-  { id: 'gray', label: 'خاکستری' },
-  { id: 'silver', label: 'نقره‌ای' },
-  { id: 'gold', label: 'طلایی' },
-] as const;
-export type CustomerWorkerTier = (typeof CUSTOMER_WORKER_TIERS)[number]['id'];
+export type CustomerWorkerTier = 'gray' | 'silver' | 'gold';
 export function tierLockApplies(serviceId: string | undefined, offerMode: boolean): boolean {
   return !offerMode && !!serviceId && !isTierExempt(serviceId);
 }
@@ -46,6 +43,7 @@ export type ServerQuote = {
   discounts: ServerQuoteLine[];
   total: number;
   currencyUnit: string;
+  extraHourlyRate?: number;
   tariffVersionId: string;
   expiresAt: string;
 };
@@ -99,6 +97,14 @@ function withWorkerTier(body: QuoteRequestBody, selection: QuoteSelection, optio
 export function buildQuoteRequest(selection: QuoteSelection): { ok: true; body: QuoteRequestBody } | { ok: false; message: string } {
   const serviceId = selection.serviceId.trim();
   if (!serviceId) return { ok: false, message: 'خدمت را انتخاب کنید.' };
+  if (serviceId === STAIR_SERVICE) {
+    const rates = getStaircaseRates();
+    if (!rates) return { ok: false, message: 'تعرفهٔ محاسباتی راه‌پله هنوز در دسترس نیست.' };
+    const options = buildingOptions(selection.serviceOptions);
+    if (!calculateStaircase(rates, options)) return { ok: false, message: 'تعدادهای ساختمان را کامل کنید.' };
+    if (selection.serviceOptions.offerId) options.offerId = selection.serviceOptions.offerId;
+    return { ok: true, body: withWorkerTier({ serviceId, quantity: 1, options }, selection, options) };
+  }
   if (serviceId === SOFA_SERVICE_ID) {
     const mode = servicePricingMode(serviceId);
     const shaped = sofaQuoteShape(mode, quoteOptions(selection.serviceOptions));
@@ -159,6 +165,7 @@ export function parseServerQuote(raw: unknown): ServerQuote | null {
     discounts,
     total: quote.total,
     currencyUnit: quote.currencyUnit,
+    ...(isInteger(quote.extraHourlyRate) && quote.extraHourlyRate > 0 ? { extraHourlyRate: quote.extraHourlyRate } : {}),
     tariffVersionId: quote.tariffVersionId,
     expiresAt: quote.expiresAt,
   };

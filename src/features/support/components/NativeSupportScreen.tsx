@@ -229,18 +229,22 @@ export const NativeSupportScreen: React.FC<Props> = ({ user, appearance = 'custo
               </Pressable>
             </View>
             {senderLine ? <Text style={styles.modalHint}>{supportSenderLine(user.phone)}</Text> : null}
+            {workerAppearance && <Text style={workerStyles.fieldLabel}>موضوع</Text>}
             <TextInput
               {...RTL_SINGLE_LINE_INPUT}
+              accessibilityLabel="موضوع"
               value={subject}
               onChangeText={setSubject}
-              placeholder="موضوع"
+              placeholder={workerAppearance ? undefined : "موضوع"}
               placeholderTextColor="#94a3b8"
               style={[styles.input, workerAppearance && workerStyles.input]}
             />
+            {workerAppearance && <Text style={workerStyles.fieldLabel}>متن پیام</Text>}
             <TextInput
+              accessibilityLabel="متن پیام"
               value={body}
               onChangeText={setBody}
-              placeholder="متن پیام"
+              placeholder={workerAppearance ? undefined : "متن پیام"}
               placeholderTextColor="#94a3b8"
               style={[styles.input, workerAppearance && workerStyles.input, styles.textArea]}
               multiline
@@ -271,7 +275,8 @@ const workerStyles = StyleSheet.create({
   secondaryBtn: { backgroundColor: wc.tealSoft, borderRadius: wr.button },
   secondaryBtnText: { color: wc.tealDark },
   phoneHint: { color: wc.muted },
-  sectionTitle: { color: wc.text },
+  sectionTitle: { color: wc.text, textAlign: 'center' },
+  fieldLabel: { ...type.semibold, writingDirection: 'rtl', color: wc.text, textAlign: 'center' },
   empty: { color: wc.muted },
   faqCard: { backgroundColor: wc.white, borderRadius: wr.card, padding: 16, minHeight: 44, borderColor: wc.border, ...wShadowSm },
   faqOpen: { backgroundColor: wc.white, borderColor: wc.teal },

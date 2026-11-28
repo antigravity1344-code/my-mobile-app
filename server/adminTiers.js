@@ -99,7 +99,7 @@ function renderAdminTiers(data) {
   root.appendChild(current);
 
   const form = tierEl('form', 'bg-slate-800 border border-slate-700 rounded-2xl p-4');
-  const fieldset = tierEl('fieldset', 'space-y-3');
+  const fieldset = tierEl('fieldset', 'admin-field-grid');
   fieldset.appendChild(tierEl('h4', 'font-bold', 'ثبت نسخهٔ جدید'));
   const silver = tierLevel(value, 'silver');
   const gold = tierLevel(value, 'gold');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyWorkerOrder, describeWorkerServiceFacts } from './workerServiceCategory';
+import { classifyWorkerOrder, describeServiceOptions, describeWorkerServiceFacts } from './workerServiceCategory';
 
 describe('worker service category', () => {
   it('maps a stored service id to the specialist category and catalog badge', () => {
@@ -43,6 +43,13 @@ describe('worker service category', () => {
       category: null,
       badge: '',
     });
+  });
+
+  it('shows the saved elevator choice as a positive question', () => {
+    expect(describeServiceOptions('staircase_common_areas', { noLift: true })).toEqual([
+      { key: 'noLift', label: 'آسانسور دارد؟', value: 'خیر' },
+    ]);
+    expect(describeServiceOptions('staircase_common_areas', { noLift: false })[0].value).toBe('بله');
   });
 
   it('describes stored service facts without inventing a duration', () => {

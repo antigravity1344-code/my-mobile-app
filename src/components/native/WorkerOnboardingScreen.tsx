@@ -456,6 +456,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
+    justifyContent: 'center',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -468,7 +469,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 17,
     color: '#0f172a',
-    textAlign: 'right',
+    textAlign: 'center',
 
   },
   subtitle: {
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 12,
     color: '#64748b',
-    textAlign: 'right',
+    textAlign: 'center',
     marginBottom: 16,
     lineHeight: 18,
 
@@ -510,7 +511,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 12,
     color: '#334155',
-    textAlign: 'right',
+    textAlign: 'center',
     marginBottom: 6,
 
   },
@@ -609,7 +610,7 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.55 },
   financeDisclosure: { borderWidth: 1, borderColor: '#B9DCD9', borderRadius: 12, backgroundColor: colors.tealSoft, padding: 12, gap: 6 },
-  financeDisclosureTitle: { ...type.bold, textAlign: 'right', color: '#0c4a6e' },
+  financeDisclosureTitle: { ...type.bold, textAlign: 'center', color: '#0c4a6e' },
   financeDisclosureText: { ...type.regular, textAlign: 'right', color: '#334155', lineHeight: 22 },
   financeDisclosureError: { ...type.regular, textAlign: 'right', color: '#b91c1c' },
   financeRetry: { ...type.bold, textAlign: 'right', color: colors.tealDark, paddingVertical: 6 },

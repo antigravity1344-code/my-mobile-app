@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react';
 import { Calendar, Clock, FileText } from 'lucide-react';
 import { JalaliDateOption, TimeSlot } from '../../types/booking';
-import { buildJalaliDateOptions } from '../../utils/jalaliDateOptions';
+import { BOOKING_START_SLOTS } from './bookingStartSlots';
+import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 
 interface DateTimeSelectorProps {
   selectedDate: JalaliDateOption | null;
   selectedTimeSlot: TimeSlot | null;
   durationHours: number;
+  showDuration?: boolean;
+  durationOptions?: readonly number[];
   genderPreference: 'FEMALE' | 'MALE' | 'NO_PREFERENCE';
   notes: string;
   onSelectDate: (date: JalaliDateOption) => void;
@@ -21,19 +24,12 @@ interface DateTimeSelectorProps {
 // تبدیل خالص میلادی→شمسی (Intl تقویم پارسی روی برخی موتورها سال خالی برمی‌گرداند).
 const generateDateOptions = () => buildJalaliDateOptions();
 
-const TIME_SLOTS = [
-  { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود (۸:۰۰ - ۱۰:۰۰)', period: 'MORNING' as const, isAvailable: true },
-  { id: 'morning-2', startTime: '10:00', endTime: '12:00', label: 'صبح (۱۰:۰۰ - ۱۲:۰۰)', period: 'MORNING' as const, isAvailable: true },
-  { id: 'afternoon-1', startTime: '14:00', endTime: '16:00', label: 'ظهر (۱۴:۰۰ - ۱۶:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
-  { id: 'afternoon-2', startTime: '16:00', endTime: '18:00', label: 'عصر (۱۶:۰۰ - ۱۸:۰۰)', period: 'AFTERNOON' as const, isAvailable: true },
-  { id: 'evening-1', startTime: '18:00', endTime: '20:00', label: 'شب (۱۸:۰۰ - ۲۰:۰۰)', period: 'EVENING' as const, isAvailable: false },
-  { id: 'evening-2', startTime: '20:00', endTime: '22:00', label: 'شب دیر (۲۰:۰۰ - ۲۲:۰۰)', period: 'EVENING' as const, isAvailable: false },
-];
-
 export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
   selectedDate,
   selectedTimeSlot,
   durationHours,
+  showDuration = true,
+  durationOptions = [4, 5, 6, 7, 8],
   genderPreference,
   notes,
   onSelectDate,
@@ -133,10 +129,10 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-700 block">
-              ساعت اعزام متخصص
+              ساعت شروع کار
             </label>
-            <div className="space-y-2">
-              {TIME_SLOTS.map((slot) => {
+            <div className="grid grid-cols-2 gap-2">
+              {BOOKING_START_SLOTS.map((slot) => {
                 const isSelected = selectedTimeSlot?.id === slot.id;
                 const isAvailable = slot.isAvailable;
 
@@ -153,11 +149,8 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className={`text-sm font-bold ${isAvailable ? 'text-slate-800' : 'text-slate-400'}`}>
-                        {slot.label}
+                        {toPersianDigits(slot.startTime)}
                       </span>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {slot.startTime} - {slot.endTime}
-                      </div>
                     </div>
                     {isSelected && (
                       <div className="w-5 h-5 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
@@ -174,13 +167,13 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
         </>
       )}
 
-      <div className="space-y-3">
+      {showDuration && <div className="space-y-3">
         <label className="text-xs font-bold text-slate-700 block">
           <Clock className="w-3.5 h-3.5 inline mr-1.5" />
           مدت زمان نظافت (ساعت):
         </label>
-        <div className="flex gap-2">
-          {[4, 5, 6, 8].map((hours) => (
+        <div className="flex flex-wrap gap-2">
+          {durationOptions.map((hours) => (
             <button
               key={hours}
               type="button"
@@ -192,7 +185,7 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
           ))}
         </div>
         <p className="text-[11px] text-slate-400">مبلغ این مدت را سرور اعلام می‌کند.</p>
-      </div>
+      </div>}
 
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-700 block">

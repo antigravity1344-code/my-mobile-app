@@ -39,6 +39,23 @@ function orderPriceStatus(order, now = new Date(), completion = null) {
   return { status: 'hourly_pending' };
 }
 
+/** حداقل دستمزد پایه، بر اساس همان نسخهٔ تعرفه که سفارش با آن ثبت شد. */
+function workerMinimumBaseAmount(order) {
+  const pricing = order.pricing;
+  if (pricing?.source !== 'server' || !pricing.tariffVersionId) return null;
+  try {
+    const policy = loadCommittedTariff();
+    if (policy.currencyUnit !== pricing.currencyUnit) return null;
+    const version = policy.versions.find((item) => item.id === pricing.tariffVersionId);
+    const service = version?.services[order.serviceId];
+    if (service?.model !== 'hourly') return null;
+    const minimum = Math.max(service.minCharge ?? 0, service.rate * (service.minQuantity ?? 1));
+    return Number.isSafeInteger(minimum) && minimum > 0 ? minimum : null;
+  } catch {
+    return null;
+  }
+}
+
 /** مدل و پرچم معافیت هر خدمت در تعرفهٔ معتبر الان؛ برای نمایش اپ، بدون نرخ. */
 function currentPricingRules(now = new Date()) {
   try {
@@ -48,11 +65,13 @@ function currentPricingRules(now = new Date()) {
       return {
         serviceId,
         model: service.model,
+        ...(service.model === 'hourly' && service.minQuantity != null ? { minQuantity: service.minQuantity } : {}),
+        ...(service.staircaseKey ? { staircaseKey: service.staircaseKey } : {}),
         exemptFromTierLock: service.exemptFromTierLock === true,
         pricingMode: service.pricingMode == null ? null : service.pricingMode,
         seatSizes: service.pricingMode === 'mattress_seat' ? ['7', '9'] : null,
         // آیا تعرفهٔ همین خدمت هم‌اکنون قیمت پکیج مواد شوینده دارد؛ بدون افشای مبلغ.
-        detergentAvailable: service.surcharges.some((item) => item.optionId === 'detergent'),
+        detergentAvailable: Boolean(service.staircaseKey) || service.surcharges.some((item) => item.optionId === 'detergent'),
       };
     });
   } catch (error) {
@@ -60,4 +79,4 @@ function currentPricingRules(now = new Date()) {
   }
 }
 
-module.exports = { orderPriceStatus, currentPricingRules };
+module.exports = { orderPriceStatus, currentPricingRules, workerMinimumBaseAmount };

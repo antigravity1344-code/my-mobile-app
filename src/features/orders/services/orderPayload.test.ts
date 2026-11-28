@@ -6,6 +6,7 @@ import {
   selectCustomerOrders,
   submittedDurationHours,
   submittedOrderPrice,
+  submittedTimeText,
 } from './orderPayload';
 
 function order(partial: Partial<OrderItem> & Pick<OrderItem, 'id' | 'serviceTitle' | 'createdAt'>): OrderItem {
@@ -96,4 +97,9 @@ describe('order submit payload', () => {
     ];
     expect(selectCustomerOrders(rows, 'ALL', 'رضا', 'NEWEST').map((item) => item.id)).toEqual(['A']);
   });
+});
+
+it('serializes an exact booking start and preserves legacy or offered ranges', () => {
+  expect(submittedTimeText({ label: 'صبح زود', startTime: '08:00', endTime: '' })).toBe('ساعت ۰۸:۰۰');
+  expect(submittedTimeText({ label: 'صبح زود', startTime: '08:00', endTime: '10:00' })).toBe('صبح زود (۰۸:۰۰ تا ۱۰:۰۰)');
 });

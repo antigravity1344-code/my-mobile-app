@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { STAIR_SERVICE, BASE_BUILDING } from '../../../server/pricing/staircase';
+import { StaircaseForm } from './StaircaseForm';
 import { SOFA_SERVICE_ID, sofaInputsFor } from '../../config/sofaPricingMode';
 import {
   Alert,
@@ -14,19 +16,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Check, Clock, MapPin, Sparkles, X } from 'lucide-react-native';
+import { Check, MapPin, Sparkles, X } from 'lucide-react-native';
 import { useBooking } from '../../context/BookingContext';
 import { AddressCityPicker } from './AddressCityPicker';
 import { addressCityFields } from '../../api/serviceAreas';
-import { PricingTable } from './PricingTable';
 import { SERVICES_CATALOG } from '../../config/servicesData';
-import { isServiceEnabled, servicePricingMode, useServiceAvailability } from '../../config/serviceAvailability';
+import { getStaircaseRates, hourlyDurationChoices, isDetergentBookable, isServiceEnabled, serviceMinimumHours, servicePricingMode, useServiceAvailability } from '../../config/serviceAvailability';
 import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
 import { buildJalaliDateOptions, toPersianDigits } from '../../utils/jalaliDateOptions';
 import { getCurrentPosition } from '../../services/location';
-import { JalaliDateOption, TimeSlot } from '../../types/booking';
+import type { JalaliDateOption } from '../../types/booking';
 import { CleaningService } from '../../types/service';
-import { isValidAddress, normalizePersianDigits, getAddressValidationErrors } from '../../utils/bookingValidation';
+import { normalizePersianDigits, getAddressValidationErrors } from '../../utils/bookingValidation';
+import { refreshServiceAvailability } from '../../config/serviceAvailabilityApi';
+import { BOOKING_START_SLOTS } from './bookingStartSlots';
+import { submittedTimeText } from '../../features/orders/services/orderPayload';
+import { getBookingTimingErrors, type BookingTimingErrors } from './bookingTimingValidation';
 import { useOrders, type OrderItem } from '../../features/orders';
 import { getDirectRequestDraft, setDirectRequestDraft } from '../../features/orders/services/directRequestDraft';
 import { useProfile, type SavedAddress } from '../../features/profile';
@@ -47,26 +52,71 @@ import {
 import {
   QUOTE_STALE_MESSAGE,
   buildQuoteRequest,
-  CUSTOMER_WORKER_TIERS,
   tierLockApplies,
   type CustomerWorkerTier,
   confirmableServerQuote,
   formatServerAmount,
+  requestServerQuote,
   isQuoteRefreshCode,
   serverQuoteAsFinalPrice,
 } from '../../features/orders/services/serverQuote';
 import { useCustomerPriceQuote } from '../../features/orders/services/useCustomerPriceQuote';
 import { getOfferBookingDraft, offerDurationChoices } from '../../features/offers/offerBookingDraft';
-import { colors, fontFamily, radius, ui, TOUCH_MIN } from '../../theme';
-
-const TIME_SLOTS: TimeSlot[] = [
-  { id: 'morning-1', startTime: '08:00', endTime: '10:00', label: 'صبح زود', period: 'MORNING', isAvailable: true },
-  { id: 'morning-2', startTime: '10:00', endTime: '12:00', label: 'صبح', period: 'MORNING', isAvailable: true },
-  { id: 'afternoon-1', startTime: '14:00', endTime: '16:00', label: 'ظهر', period: 'AFTERNOON', isAvailable: true },
-  { id: 'afternoon-2', startTime: '16:00', endTime: '18:00', label: 'عصر', period: 'AFTERNOON', isAvailable: true },
-];
+import { colors, fontFamily, radius, shadowSm, ui, TOUCH_MIN } from '../../theme';
 
 const makeDates = (): JalaliDateOption[] => buildJalaliDateOptions();
+
+function ServiceStartingPrice({ service }: { service: CleaningService }) {
+  const hourly = service.pricingType === 'hourly';
+  const quantity = hourly ? serviceMinimumHours(service.id) : 1;
+  const stairs = service.id === STAIR_SERVICE;
+  const stairRates = stairs ? getStaircaseRates() : null;
+  const sofa = service.id === SOFA_SERVICE_ID;
+  const mode = sofa ? servicePricingMode(service.id) : null;
+  const tiered = tierLockApplies(service.id, false);
+  const [label, setLabel] = useState('در حال دریافت قیمت…');
+
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      if (stairs && !stairRates) {
+        setLabel('در انتظار انتشار تعرفهٔ محاسباتی');
+        return;
+      }
+      if (sofa && !mode) {
+        setLabel('قیمت فعلاً در دسترس نیست');
+        return;
+      }
+      setLabel('در حال دریافت قیمت…');
+      const options: Record<string, string | number>[] = stairs && stairRates ? [{ ...BASE_BUILDING, floors: 1 }] : mode === 'mattress_seat'
+        ? [{ seatSize: '7' }, { seatSize: '9' }] : [{}];
+      const results = await Promise.all(options.map(option => requestServerQuote({
+        serviceId: service.id, quantity, options: option, ...(tiered ? { workerTier: 'gray' } : {}),
+      })));
+      if (!active) return;
+      const quotes = results.flatMap(result => result.status === 'ready' ? [result.quote] : []);
+      const expiry = Math.min(...quotes.map(quote => Date.parse(quote.expiresAt)));
+      if (quotes.length !== results.length || !Number.isFinite(expiry) || expiry <= Date.now()) {
+        setLabel('قیمت فعلاً در دسترس نیست');
+        return;
+      }
+      const lowest = quotes.reduce((a, b) => a.total <= b.total ? a : b);
+      const basis = hourly ? ' برای ' + toPersianDigits(quantity) + ' ساعت'
+        : service.pricingType === 'per_sqm' ? ' برای ۱ متر مربع' : sofa ? ' برای ۱ واحد' : '';
+      setLabel('از ' + formatServerAmount(lowest.total, lowest.currencyUnit) + basis);
+      timer = setTimeout(() => { void refresh(); }, Math.max(1, expiry - Date.now()));
+    }
+    void refresh();
+    return () => { active = false; clearTimeout(timer); };
+  }, [service.id, service.pricingType, hourly, quantity, sofa, mode, tiered, stairs, stairRates]);
+
+  return <Text style={styles.price}>{label}</Text>;
+}
+
+function FieldFeedback({ message }: { message?: string | null }) {
+  return message ? <Text style={styles.fieldFeedback} accessibilityLiveRegion="polite">{message}</Text> : null;
+}
 
 const StepHeader = ({ step }: { step: number }) => (
   <View style={styles.stepRow}>
@@ -93,6 +143,10 @@ interface NativeBookingWizardProps {
 export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWizardProps) => {
   useServiceAvailability();
   const booking = useBooking();
+  useEffect(() => {
+    if (booking.step === 2) void refreshServiceAvailability();
+  }, [booking.step]);
+  const canBookDetergent = isDetergentBookable(booking.selectedService?.id);
   const offerDraft = getOfferBookingDraft();
   const offerMode = !!offerDraft && booking.serviceOptions.offerId === offerDraft.offerId;
   const [workerTier, setWorkerTier] = useState<CustomerWorkerTier>('gray');
@@ -113,7 +167,8 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       serviceId: booking.selectedService.id,
       pricingType: booking.selectedService.pricingType,
       durationHours: booking.durationHours,
-      serviceOptions: booking.serviceOptions,
+      serviceOptions: booking.selectedService.id !== STAIR_SERVICE && booking.serviceOptions.detergent && !canBookDetergent
+        ? { ...booking.serviceOptions, detergent: false } : booking.serviceOptions,
       ...(tierLock ? { workerTier } : {}),
       ...(directDraft ? { directRequestWorkerId: directDraft.workerId } : {}),
     }
@@ -184,7 +239,6 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [pricingVisible, setPricingVisible] = useState(false);
   const { profile, addSavedAddress } = useProfile();
   const savedAddresses = profile.savedAddresses ?? [];
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
@@ -279,9 +333,11 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
   }, [submissionState]);
 
   const selectService = (service: CleaningService, options: Record<string, string | number | boolean> = {}) => {
+    if (booking.selectedService?.id !== service.id) setWorkerTier('gray');
     booking.setSelectedService(service);
     Object.entries(options).forEach(([id, value]) => booking.setServiceOption(id, value));
     if (typeof options.durationHours === 'number') booking.setDurationHours(options.durationHours);
+    else if (service.pricingType === 'hourly') booking.setDurationHours(serviceMinimumHours(service.id));
     booking.setStep(2);
   };
 
@@ -487,13 +543,25 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
     return () => subscription.remove();
   }, []);
 
-  const canContinue = booking.step === 1 ? Boolean(booking.selectedService) : booking.step === 2 ? Boolean(booking.selectedDate && booking.selectedTimeSlot) : booking.step === 3 ? isValidAddress(booking.addressDetails) : true;
+  const timingErrors = getBookingTimingErrors({
+    serviceId: booking.selectedService?.id,
+    pricingType: booking.selectedService?.pricingType,
+    hasDate: Boolean(booking.selectedDate),
+    hasTime: Boolean(booking.selectedTimeSlot),
+    durationHours: booking.durationHours,
+    minimumHours: offerMode && offerDraft ? offerDraft.minHours : serviceMinimumHours(booking.selectedService?.id ?? ''),
+    options: booking.serviceOptions,
+    sofaMode: servicePricingMode(SOFA_SERVICE_ID),
+  });
+  const timingHint = Object.values(timingErrors)[0];
+  const canContinue = booking.step === 1 ? Boolean(booking.selectedService)
+    : booking.step === 2 ? !timingHint : booking.step === 3 ? !addressHint : true;
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, booking.step === 1 && styles.servicesContent]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         scrollEventThrottle={16}
@@ -501,7 +569,7 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
       >
         <View style={styles.brandRow}>
           <View style={styles.brandIcon}><Sparkles size={22} color={colors.white} /></View>
-          <View><Text style={styles.title}>پاکشو</Text><Text style={styles.subtitle}>رزرو سرویس نظافت</Text></View>
+          <View><Text style={styles.title}>پاکشو</Text><Text style={styles.subtitle}>رزرو خدمات</Text></View>
           <View style={styles.flex} />
           <Pressable
             onPress={handleClosePress}
@@ -518,15 +586,22 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         <StepHeader step={booking.step} />
 
         {booking.step === 1 && <View style={styles.section}>
-          <Text style={styles.heading}>نوع سرویس را انتخاب کنید</Text>
-          <Pressable onPress={() => setPricingVisible(true)} style={styles.pricingButton}><Text style={styles.pricingButtonText}>مشاهده جدول شفاف تعرفه‌ها</Text></Pressable>
-          {SERVICES_CATALOG.filter((service) => service.isVisible && isServiceEnabled(service.id)).map((service) => (
-            <Pressable key={service.id} onPress={() => selectService(service)} style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}>
-              <View style={styles.cardIcon}><Sparkles size={20} color={colors.teal} /></View>
-              <View style={styles.flex}><Text style={styles.cardTitle}>{service.title}</Text><Text style={styles.muted}>{service.subtitle}</Text><Text style={styles.configuration}>{service.configuration.pricingLabel}</Text><Text style={styles.price}>قیمت را سرور اعلام می‌کند</Text></View>
-            </Pressable>
-          ))}
-          <PricingTable visible={pricingVisible} onClose={() => setPricingVisible(false)} onSelect={selectService} />
+          <Text style={styles.heading}>خدمت را انتخاب کنید</Text>
+          {!booking.selectedService && <FieldFeedback message="برای ادامه یکی از خدمات را انتخاب کنید." />}
+          <View style={styles.serviceGrid}>
+            {SERVICES_CATALOG.filter((service) => service.isVisible && isServiceEnabled(service.id)).map((service) => (
+              <Pressable
+                key={service.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: booking.selectedService?.id === service.id }}
+                onPress={() => selectService(service)}
+                style={[styles.card, booking.selectedService?.id === service.id && styles.cardSelected]}
+              >
+                <Text style={styles.cardTitle}>{service.title}</Text>
+                <ServiceStartingPrice service={service} />
+              </Pressable>
+            ))}
+          </View>
         </View>}
 
         {booking.step === 2 && <View style={styles.section}>
@@ -539,21 +614,48 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           </View>}
           {!offerMode && <>
           <Text style={styles.label}>تاریخ اعزام</Text>
+          <FieldFeedback message={timingErrors.date} />
           <ScrollView ref={dateStripRef} horizontal showsHorizontalScrollIndicator={false} onContentSizeChange={dateStripScroll.onContentSizeChange} contentContainerStyle={[styles.horizontalList, styles.rtlStrip]}>
-            {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.isToday ? 'امروز' : date.dayOfWeek}</Text><Text style={styles.dateNumber}>{toPersianDigits(date.dayOfMonth)}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
+            {rtlOrder(dates).map((date) => <Pressable key={date.dateString} onPress={() => { booking.setSelectedDate(date); booking.setSelectedTimeSlot(null); }} style={[styles.dateCard, booking.selectedDate?.dateString === date.dateString && styles.dateSelected]}><Text style={styles.dateDay}>{date.dayOfWeek}</Text><Text style={styles.dateNumber}>{toPersianDigits(date.dayOfMonth)}</Text><Text style={styles.muted}>{date.monthName}</Text></Pressable>)}
           </ScrollView>
-          <Text style={styles.label}>بازه زمانی</Text>
-          {TIME_SLOTS.map((slot) => <Pressable key={slot.id} disabled={!booking.selectedDate} onPress={() => booking.setSelectedTimeSlot(slot)} style={[styles.slot, booking.selectedTimeSlot?.id === slot.id && styles.cardSelected]}><Clock size={18} color={colors.teal} /><Text style={[styles.flex, styles.slotText]}>{slot.label} ({toPersianDigits(slot.startTime)} تا {toPersianDigits(slot.endTime)})</Text>{booking.selectedTimeSlot?.id === slot.id && <Check size={18} color={colors.teal} />}</Pressable>)}
+          <Text style={styles.label}>ساعت شروع کار</Text>
+          <FieldFeedback message={timingErrors.time} />
+          <View style={styles.slotGrid}>
+            {BOOKING_START_SLOTS.map(slot => {
+              const selected = booking.selectedTimeSlot?.id === slot.id;
+              const disabled = !booking.selectedDate;
+              return <Pressable
+                key={slot.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected, disabled }}
+                disabled={disabled}
+                onPress={() => booking.setSelectedTimeSlot(slot)}
+                style={[styles.slot, selected && styles.cardSelected, disabled && styles.disabled]}
+              >
+                <Text style={styles.slotText}>{toPersianDigits(slot.startTime)}</Text>
+              </Pressable>;
+            })}
+          </View>
           </>}
-          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.choiceRow}>{(offerMode && offerDraft ? offerDurationChoices(offerDraft.startAt, offerDraft.endAt, offerDraft.minHours) : [4, 5, 6, 8]).map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.choice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          {booking.selectedService?.pricingType === 'hourly' && <><Text style={styles.label}>مدت زمان</Text><View style={styles.durationGrid}>{(offerMode && offerDraft ? offerDurationChoices(offerDraft.startAt, offerDraft.endAt, offerDraft.minHours) : hourlyDurationChoices(booking.selectedService.id)).map((hours) => <Pressable key={hours} onPress={() => booking.setDurationHours(hours)} style={[styles.durationChoice, booking.durationHours === hours && styles.choiceSelected]}><Text style={booking.durationHours === hours ? styles.choiceTextSelected : styles.choiceText}>{toPersianDigits(hours)} ساعت</Text></Pressable>)}</View></>}
+          <FieldFeedback message={timingErrors.duration} />
           {directDraft && <Text style={styles.muted}>درخواست طلایی برای {directDraft.workerName || 'این متخصص'}. قیمتش جدا از سطح متخصص است و فقط همان متخصص آن را می‌بیند.</Text>}
-          {tierLock && <>
-            <Text style={styles.label}>سطح متخصص</Text>
-            <Text style={styles.muted}>قیمت همین سطح در لحظهٔ ثبت قفل می‌شود. هزینهٔ ثابت جانبی جدا می‌ماند.</Text>
-            <View style={styles.choiceRow}>
-              {CUSTOMER_WORKER_TIERS.map((tier) => <Pressable key={tier.id} onPress={() => setWorkerTier(tier.id)} style={[styles.choice, workerTier === tier.id && styles.choiceSelected]}><Text style={workerTier === tier.id ? styles.choiceTextSelected : styles.choiceText}>{tier.label}</Text></Pressable>)}
-            </View>
-          </>}
+          {tierLock && <View style={styles.optionBlock}>
+            <Text style={styles.label}>متخصص طلایی (اختیاری)</Text>
+            <Text style={[styles.muted, styles.centeredText]}>برای کارهای حساس و دقیق می‌توانید متخصص طلایی انتخاب کنید. تعرفهٔ طلایی بالاتر است.</Text>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: workerTier === 'gold' }}
+              onPress={() => setWorkerTier(workerTier === 'gold' ? 'gray' : 'gold')}
+              style={[styles.slot, styles.goldenOption, workerTier === 'gold' && styles.cardSelected]}
+            >
+              <Text style={styles.slotText}>{workerTier === 'gold' ? '☑ ' : '☐ '}انتخاب متخصص طلایی</Text>
+            </Pressable>
+            <Text style={[styles.muted, styles.centeredText]} accessibilityLiveRegion="polite">
+              {workerTier === 'gold' ? 'تعرفهٔ طلایی' : 'تعرفهٔ عادی'}
+              {quoteView.status === 'ready' ? ' · ' + formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit) : ''}
+            </Text>
+          </View>}
           {!offerMode && <>
           <Text style={styles.label}>تکرار سفارش</Text>
           <View style={styles.choiceRow}>
@@ -587,15 +689,47 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             placeholderTextColor="#94a3b8"
             style={[styles.input, styles.textArea]}
           />
-          {(booking.selectedService?.id === SOFA_SERVICE_ID
+          {booking.selectedService?.id === STAIR_SERVICE && <StaircaseForm confirmedTotal={quoteView.status === 'ready' ? quoteView.quote.total : undefined} rates={getStaircaseRates()} values={booking.serviceOptions} change={booking.setServiceOption} errors={timingErrors} />}
+          {(booking.selectedService?.id === STAIR_SERVICE ? [] : booking.selectedService?.id === SOFA_SERVICE_ID
             ? sofaInputsFor(servicePricingMode(SOFA_SERVICE_ID))
             : booking.selectedService?.configuration.inputs
           )?.map((input) => (
             <View key={input.id} style={styles.optionBlock}>
               <Text style={styles.label}>{input.label}</Text>
-              {input.type === 'number' && <TextInput keyboardType="numeric" placeholder={input.id === 'floors' ? 'مثال: ۴' : 'مثال: ۰'} placeholderTextColor="#94a3b8" value={String(booking.serviceOptions[input.id] ?? '')} onChangeText={(value) => booking.setServiceOption(input.id, Number(value.replace(/[^0-9]/g, '')) || 0)} style={styles.input} />}
+              {input.type === 'number' && <TextInput keyboardType="numeric" placeholder={input.id === 'floors' ? 'مثال: ۴' : 'مثال: ۰'} placeholderTextColor="#94a3b8" value={String(booking.serviceOptions[input.id] ?? '')} onChangeText={(value) => { const digits = normalizePersianDigits(value).replace(/\D/g, ''); booking.setServiceOption(input.id, digits ? Number(digits) : ''); }} style={styles.input} />}
               {input.type === 'select' && <View style={styles.choiceRow}>{input.options?.map((option) => <Pressable key={option} onPress={() => booking.setServiceOption(input.id, option)} style={[styles.choice, booking.serviceOptions[input.id] === option && styles.choiceSelected]}><Text style={booking.serviceOptions[input.id] === option ? styles.choiceTextSelected : styles.choiceText}>{option}</Text></Pressable>)}</View>}
-              {input.type === 'boolean' && <Pressable onPress={() => booking.setServiceOption(input.id, !booking.serviceOptions[input.id])} style={[styles.toggle, booking.serviceOptions[input.id] === true && styles.toggleSelected]}><Text style={booking.serviceOptions[input.id] === true ? styles.choiceTextSelected : styles.choiceText}>{booking.serviceOptions[input.id] === true ? 'بله' : 'خیر'}</Text></Pressable>}
+              {input.type === 'boolean' && (
+                <View style={styles.choiceRow} accessibilityRole="radiogroup" accessibilityLabel={input.label}>
+                  {[true, false].map((value) => {
+                    const label = value ? "بله" : "خیر";
+                    const unavailable = input.id === "detergent" && !canBookDetergent;
+                    const disabled = unavailable && value;
+                    const selected = (!unavailable && booking.serviceOptions[input.id] === true) === value;
+                    return (
+                      <Pressable
+                        key={label}
+                        accessibilityRole="radio"
+                        accessibilityLabel={label}
+                        accessibilityState={{ checked: selected, disabled }}
+                        disabled={disabled}
+                        onPress={() => booking.setServiceOption(input.id, value)}
+                        style={[styles.choice, selected && styles.choiceSelected, disabled && styles.disabled]}
+                      >
+                        <Text style={selected ? styles.choiceTextSelected : styles.choiceText}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              {input.id === "detergent" && !canBookDetergent ? (
+                <>
+                  <Text style={styles.muted}>پک مواد شوینده فعلاً برای این خدمت قابل سفارش نیست.</Text>
+                  <Pressable accessibilityRole="button" style={styles.back} onPress={() => void refreshServiceAvailability()}>
+                    <Text style={styles.backText}>بازخوانی وضعیت پک</Text>
+                  </Pressable>
+                </>
+              ) : null}
+              <FieldFeedback message={timingErrors[input.id as keyof BookingTimingErrors]} />
             </View>
           ))}
         </View>}
@@ -645,12 +779,14 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
               ...(prev.cityId !== city.id ? { district: '', coordinates: { latitude: 0, longitude: 0 } } : {}) }));
           }} onSelectDistrict={district => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} />
           <TextInput value={booking.addressDetails.district} onChangeText={district => { setSelectedSavedAddressId(null); booking.updateAddressField('district', district); }} onFocus={scrollFocusedFieldIntoView} placeholder="نام محله" placeholderTextColor="#94a3b8" style={[styles.input, getInputStyle('district')]} />
+          <FieldFeedback message={addressErrors.district && 'نام محله را وارد یا انتخاب کنید.'} />
           <Text style={styles.label}>نشانی دقیق</Text><TextInput multiline value={booking.addressDetails.fullAddress} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('fullAddress', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً خیابان آزادی، کوچه ۵" placeholderTextColor="#94a3b8" style={[styles.input, styles.textArea, getInputStyle('fullAddress')]} />
-          <View style={styles.choiceRow}>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>پلاک</Text><TextInput {...RTL_SINGLE_LINE_INPUT} value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('plaque')]} /></View>
-            <View style={styles.labeledInput}><Text style={styles.inputLabel}>واحد</Text><TextInput {...RTL_SINGLE_LINE_INPUT} value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۳" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.smallInput, getInputStyle('unit')]} /></View>
+          <FieldFeedback message={addressErrors.fullAddress} />
+          <View style={styles.addressNumbers}>
+            <View style={styles.addressNumberField}><Text style={[styles.inputLabel, styles.centeredText]}>پلاک</Text><TextInput textAlign="center" value={booking.addressDetails.plaque} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('plaque', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۱۲" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.addressNumberInput, getInputStyle('plaque'), shadowSm]} /><FieldFeedback message={addressErrors.plaque} /></View>
+            <View style={styles.addressNumberField}><Text style={[styles.inputLabel, styles.centeredText]}>واحد (اختیاری)</Text><TextInput textAlign="center" value={booking.addressDetails.unit} onChangeText={(value) => { setSelectedSavedAddressId(null); booking.updateAddressField('unit', value); }} onFocus={scrollFocusedFieldIntoView} placeholder="مثلاً ۳" placeholderTextColor="#94a3b8" keyboardType="number-pad" style={[styles.input, styles.addressNumberInput, getInputStyle('unit'), shadowSm]} /></View>
           </View>
-          <Text style={styles.label}>نام مشتری</Text>
+          <Text style={[styles.label, styles.centeredText]}>نام مشتری</Text>
           <TextInput
             {...RTL_SINGLE_LINE_INPUT}
             value={booking.addressDetails.recipientName}
@@ -658,9 +794,10 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             onFocus={scrollFocusedFieldIntoView}
             placeholder="مثلاً علی رضایی"
             placeholderTextColor="#94a3b8"
-            style={[styles.input, getInputStyle('recipientName')]}
+            style={[styles.input, getInputStyle('recipientName'), shadowSm, styles.centeredText]}
           />
-          <Text style={styles.label}>موبایل مشتری</Text>
+          <FieldFeedback message={addressErrors.recipientName} />
+          <Text style={[styles.label, styles.centeredText]}>موبایل مشتری</Text>
           <TextInput
             {...RTL_SINGLE_LINE_INPUT}
             value={booking.addressDetails.contactPhone}
@@ -669,8 +806,9 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
             placeholderTextColor="#94a3b8"
             keyboardType="phone-pad"
-            style={[styles.input, getInputStyle('contactPhone')]}
+            style={[styles.input, getInputStyle('contactPhone'), shadowSm, styles.centeredText]}
           />
+          <FieldFeedback message={addressErrors.contactPhone} />
           <Pressable onPress={saveCurrentAddressToProfile} style={styles.saveAddressButton}>
             <Text style={styles.saveAddressButtonText}>ذخیره این آدرس در پروفایل</Text>
           </Pressable>
@@ -678,10 +816,12 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
         </View>}
 
         {booking.step === 4 && <View style={styles.section}>
-          <Text style={styles.heading}>بازبینی و ثبت سفارش</Text>
+          <Text style={[styles.heading, styles.centeredText]}>بازبینی و ثبت سفارش</Text>
           <View style={styles.summary}>
             <Text style={styles.summaryTitle}>{booking.selectedService?.title}</Text>
-            <Text style={styles.summaryLine}>زمان: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedTimeSlot?.label}</Text>
+            {tierLock && workerTier === 'gold' && <Text style={[styles.summaryLine, styles.centeredText]}>متخصص طلایی · تعرفهٔ طلایی</Text>}
+            <Text style={styles.summaryLine}>روز رزرو: {booking.selectedDate?.dayOfWeek} {toPersianDigits(booking.selectedDate?.dayOfMonth ?? '')} {booking.selectedDate?.monthName}</Text>
+            <Text style={styles.summaryLine}>زمان مراجعه: {submittedTimeText(booking.selectedTimeSlot)}</Text>
             <Text style={styles.summaryLine}>آدرس: {booking.addressDetails.city ? `${booking.addressDetails.city}، ` : ''}{booking.addressDetails.district}، {booking.addressDetails.fullAddress}</Text>
             {booking.notes.trim() ? <Text style={styles.summaryLine}>یادداشت سفارش: {booking.notes.trim()}</Text> : null}
             {review.kind === 'none' && (quoteView.status === 'loading' || quoteView.status === 'idle') ? <Text style={styles.summaryLine}>در حال دریافت قیمت از سرور...</Text> : null}
@@ -691,12 +831,20 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
             {review.kind === 'fresh' ? (
               <>
                 <View style={styles.invoiceLine}><Text style={styles.summaryLine}>مبلغ جزء</Text><Text style={styles.summaryLine}>{formatServerAmount(review.subtotal, review.currencyUnit)}</Text></View>
-                {review.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{quoteLineLabel(line.id, 'surcharge')}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, review.currencyUnit)}</Text></View>)}
+                {review.surcharges.map((line) => <View key={line.id} style={styles.invoiceLine}><Text style={styles.summaryLine}>{quoteLineLabel(line.id, 'surcharge', booking.selectedService?.id)}</Text><Text style={styles.summaryLine}>{formatServerAmount(line.amount, review.currencyUnit)}</Text></View>)}
                 {review.discounts.map((line) => <View key={line.id} style={styles.discountLine}><Text style={styles.discountLabel}>{quoteLineLabel(line.id, 'discount')}</Text><Text style={styles.discountAmount}>{`-${formatServerAmount(line.amount, review.currencyUnit)}`}</Text></View>)}
+                {freshQuote?.extraHourlyRate ? <Text style={styles.summaryLine}>هر ساعت اضافه با تأیید شما: {formatServerAmount(freshQuote.extraHourlyRate, freshQuote.currencyUnit)}</Text> : null}
                 <View style={styles.totalLine}><Text style={styles.totalLabel}>مبلغ قابل تأیید</Text><Text style={styles.total}>{formatServerAmount(review.total, review.currencyUnit)}</Text></View>
               </>
             ) : null}
-            {review.kind !== 'recovery' && (quoteView.status === 'unavailable' || quoteView.status === 'network') ? <Text style={styles.errorMessage}>{quoteView.message}</Text> : null}
+            {review.kind !== 'recovery' && (quoteView.status === 'unavailable' || quoteView.status === 'network') ? (
+              <>
+                <Text accessibilityLiveRegion="polite" style={styles.errorMessage}>{quoteView.message}</Text>
+                {builtSelection?.ok && <Pressable accessibilityRole="button" onPress={refreshQuote} style={styles.back}>
+                  <Text style={styles.gpsText}>دریافت دوبارهٔ قیمت</Text>
+                </Pressable>}
+              </>
+            ) : null}
           </View>
           <Text style={styles.mockHint}>پرداخت بعد از انجام کار انجام می‌شود. الان فقط درخواست ثبت می‌شود.</Text>
           {submissionState === 'success' ? (
@@ -725,7 +873,9 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
               <Pressable
                 disabled={!confirmEnabled}
                 onPress={submitCurrentBooking}
-                style={[styles.primary, !confirmEnabled && styles.disabled]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !confirmEnabled, busy: isSubmitting }}
+                style={[styles.primary, styles.confirmButton, !confirmEnabled && styles.disabled]}
               >
                 {submissionState === 'submitting' && <ActivityIndicator color={colors.white} />}
                 <Text style={styles.primaryText}>{submissionState === 'submitting' ? 'در حال ثبت سفارش...' : 'تأیید و ثبت سفارش'}</Text>
@@ -734,8 +884,9 @@ export const NativeBookingWizard = ({ onOrderCreated, onExit }: NativeBookingWiz
           )}
         </View>}
 
-        {booking.step === 3 && !canContinue && addressHint ? <Text style={[styles.muted, styles.addressHint]}>{addressHint}</Text> : null}
-        {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} accessibilityRole="button" accessibilityState={{ disabled: booking.step === 1 }} style={[styles.back, booking.step === 1 && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
+        {booking.step === 2 && timingHint ? <FieldFeedback message={timingHint} /> : null}
+        {booking.step === 3 && !canContinue && addressHint ? <FieldFeedback message={addressHint} /> : null}
+        {booking.step < 4 && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={booking.step === 1} accessibilityRole="button" accessibilityState={{ disabled: booking.step === 1 }} style={[styles.back, booking.step === 1 && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable><Pressable onPress={booking.nextStep} accessibilityRole="button" accessibilityState={{ disabled: !canContinue }} disabled={!canContinue} style={[styles.primary, !canContinue && styles.disabled]}><Text style={styles.primaryText}>ادامه</Text></Pressable></View>}
         {booking.step === 4 && !isSubmitted && <View style={styles.navigation}><Pressable onPress={booking.prevStep} disabled={isSubmitting} accessibilityRole="button" accessibilityState={{ disabled: isSubmitting }} style={[styles.back, isSubmitting && styles.backDisabled]}><Text style={styles.backText}>مرحله قبل</Text></Pressable></View>}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -758,8 +909,29 @@ const styles = StyleSheet.create({
   discountLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.tealSoft, borderRadius: 10, padding: 10 },
   discountLabel: { color: colors.tealDark, fontSize: 12, fontFamily: fontFamily.bold, textAlign: 'right' },
   discountAmount: { color: colors.teal, fontSize: 13, fontFamily: fontFamily.bold },
-  slotText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text, textAlign: 'right' },
-  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 20, paddingTop: 16, paddingBottom: 160 }, brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal }, title: { textAlign: 'right', color: colors.text, fontSize: 22, fontFamily: fontFamily.bold }, subtitle: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: ui.neutralBg, alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: colors.teal }, stepNumber: { color: colors.muted, fontFamily: fontFamily.bold }, stepNumberActive: { color: colors.white }, stepLabel: { fontFamily: fontFamily.regular, color: colors.mutedLight, fontSize: 12 }, stepLabelActive: { color: colors.teal, fontFamily: fontFamily.bold }, section: { gap: 12 }, pricingButton: { alignItems: 'center', padding: 13, borderRadius: 13, backgroundColor: colors.tealSoft }, pricingButtonText: { color: colors.tealDark, fontFamily: fontFamily.bold }, optionBlock: { gap: 8 }, toggle: { justifyContent: 'center', minHeight: TOUCH_MIN, alignSelf: 'flex-end', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: ui.divider, backgroundColor: '#fff' }, toggleSelected: { backgroundColor: colors.teal, borderColor: colors.teal }, heading: { textAlign: 'right', color: colors.text, fontSize: 20, fontFamily: fontFamily.bold, marginBottom: 6 }, label: { textAlign: 'right', color: colors.text, fontSize: 13, fontFamily: fontFamily.bold, marginTop: 8 }, labeledInput: { fontFamily: fontFamily.regular, flex: 1, gap: 6 }, inputLabel: { textAlign: 'right', color: colors.text, fontSize: 12, fontFamily: fontFamily.bold }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderColor: colors.border, borderWidth: 1, borderRadius: radius.card, padding: 15 }, cardSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, cardIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.tealSoft, alignItems: 'center', justifyContent: 'center' }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: colors.text, fontFamily: fontFamily.bold, fontSize: 14 }, muted: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12, textAlign: 'right' }, configuration: { fontFamily: fontFamily.regular, color: colors.tealDark, fontSize: 12, textAlign: 'right', marginTop: 3 }, price: { color: colors.teal, fontSize: 12, fontFamily: fontFamily.bold, textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, rtlStrip: { flexGrow: 1, flexDirection: 'row', justifyContent: 'flex-end' }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: ui.divider, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, dateDay: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, dateNumber: { color: colors.text, fontFamily: fontFamily.bold }, slot: { minHeight: TOUCH_MIN, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, borderWidth: 1, borderColor: ui.divider, borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { justifyContent: 'center', minHeight: TOUCH_MIN, flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: ui.divider, alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: colors.teal, borderColor: colors.teal }, choiceText: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, choiceTextSelected: { color: colors.white, fontFamily: fontFamily.bold, fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: colors.tealSoft }, gpsText: { color: colors.tealDark, fontFamily: fontFamily.bold }, inputError: { borderColor: '#ef4444', borderWidth: 1 }, inputSuccess: { borderColor: '#10b981', borderWidth: 1 }, input: { fontFamily: fontFamily.regular, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.inputBorder, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: colors.text, textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, smallInput: { fontFamily: fontFamily.regular, flex: 1 }, chip: { justifyContent: 'center', minHeight: TOUCH_MIN, paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.divider }, chipSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
+  durationGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  durationChoice: {
+    width: '31%', minHeight: TOUCH_MIN, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, paddingHorizontal: 4, borderRadius: 12, borderWidth: 1,
+    borderColor: ui.divider, backgroundColor: '#fff',
+  },
+  slotGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  slotText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text, textAlign: 'center' },
+  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 20, paddingTop: 16, paddingBottom: 160 },
+  servicesContent: { paddingBottom: 24 },
+  centeredText: { textAlign: 'center' },
+  goldenOption: { alignSelf: 'center', width: '76%', maxWidth: 300 },
+  confirmButton: { alignSelf: 'center', minHeight: TOUCH_MIN, maxWidth: '90%', paddingHorizontal: 20, paddingVertical: 9 },
+  addressNumbers: { flexDirection: 'row-reverse', justifyContent: 'center', gap: 12 },
+  addressNumberField: { width: '30%', maxWidth: 104, minWidth: 72, gap: 5 },
+  addressNumberInput: { minHeight: TOUCH_MIN, paddingVertical: 5, paddingHorizontal: 0, textAlign: 'center', textAlignVertical: 'center' },
+  brandRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 24 }, brandIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.teal }, title: { textAlign: 'right', color: colors.text, fontSize: 22, fontFamily: fontFamily.bold }, subtitle: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 13 }, stepRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 26 }, stepItem: { alignItems: 'center', gap: 5 }, stepCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: ui.neutralBg, alignItems: 'center', justifyContent: 'center' }, stepCircleActive: { backgroundColor: colors.teal }, stepNumber: { color: colors.muted, fontFamily: fontFamily.bold }, stepNumberActive: { color: colors.white }, stepLabel: { fontFamily: fontFamily.regular, color: colors.mutedLight, fontSize: 12 }, stepLabelActive: { color: colors.teal, fontFamily: fontFamily.bold }, section: { gap: 12 }, optionBlock: { gap: 8 }, heading: { textAlign: 'right', color: colors.text, fontSize: 20, fontFamily: fontFamily.bold, marginBottom: 6 }, label: { textAlign: 'center', color: colors.text, fontSize: 13, fontFamily: fontFamily.bold, marginTop: 8 }, inputLabel: { textAlign: 'center', color: colors.text, fontSize: 12, fontFamily: fontFamily.bold }, serviceGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  card: {
+    width: '48.5%', minHeight: 64, justifyContent: 'center', gap: 3,
+    backgroundColor: '#fff', borderColor: colors.border, borderWidth: 1, borderRadius: radius.card,
+    paddingHorizontal: 10, paddingVertical: 8,
+    ...shadowSm,
+  }, cardSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, flex: { flex: 1 }, cardTitle: { textAlign: 'right', color: colors.text, fontFamily: fontFamily.bold, fontSize: 14 }, muted: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12, textAlign: 'right' }, price: { color: colors.teal, fontSize: 12, fontFamily: fontFamily.bold, textAlign: 'right' }, horizontalList: { gap: 8, paddingVertical: 4 }, rtlStrip: { flexGrow: 1, flexDirection: 'row', justifyContent: 'flex-end' }, dateCard: { width: 82, padding: 10, borderWidth: 1, borderColor: ui.divider, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', gap: 3 }, dateSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, dateDay: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, dateNumber: { color: colors.text, fontFamily: fontFamily.bold }, slot: { width: '48.5%', minHeight: TOUCH_MIN, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, paddingHorizontal: 8, borderWidth: 1, borderColor: ui.divider, borderRadius: 14, backgroundColor: '#fff' }, choiceRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }, choice: { justifyContent: 'center', minHeight: TOUCH_MIN, flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: ui.divider, alignItems: 'center', backgroundColor: '#fff' }, choiceSelected: { backgroundColor: colors.teal, borderColor: colors.teal }, choiceText: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, choiceTextSelected: { color: colors.white, fontFamily: fontFamily.bold, fontSize: 12 }, gpsButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, backgroundColor: colors.tealSoft }, gpsText: { color: colors.tealDark, fontFamily: fontFamily.bold }, inputError: { borderColor: '#ef4444', borderWidth: 1 }, inputSuccess: { borderColor: '#10b981', borderWidth: 1 }, input: { fontFamily: fontFamily.regular, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.inputBorder, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, color: colors.text, textAlign: 'right' }, textArea: { minHeight: 80, textAlignVertical: 'top' }, chip: { justifyContent: 'center', minHeight: TOUCH_MIN, paddingHorizontal: 13, paddingVertical: 8, marginRight: 6, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.divider }, chipSelected: { backgroundColor: colors.teal, borderColor: colors.teal },
   savedAddressBlock: { gap: 8 },
   savedAddressEmpty: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 12, lineHeight: 19, backgroundColor: ui.neutralBg, padding: 12, borderRadius: 12 },
   savedAddressCard: { minHeight: TOUCH_MIN, width: 200, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: ui.divider, backgroundColor: '#fff', gap: 4 },
@@ -769,5 +941,5 @@ const styles = StyleSheet.create({
   savedAddressMeta: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 12, lineHeight: 16 },
   saveAddressButton: { minHeight: TOUCH_MIN, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: ui.tealBorder, backgroundColor: colors.tealSoft },
   saveAddressButtonText: { color: colors.tealDark, fontFamily: fontFamily.bold, fontSize: 13 },
-  saveAddressMessage: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.tealDark, fontSize: 12 }, addressHint: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 16 }, chipText: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: radius.card, padding: 18, gap: 12, borderWidth: 1, borderColor: colors.border }, summaryTitle: { textAlign: 'right', color: colors.text, fontFamily: fontFamily.bold, fontSize: 16 }, summaryLine: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: ui.divider, paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: ui.inputBorder, paddingTop: 10 }, totalLabel: { color: colors.text, fontFamily: fontFamily.bold, fontSize: 14 }, total: { textAlign: 'right', color: colors.teal, fontFamily: fontFamily.bold, fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: ui.surfaceMuted, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: ui.divider }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.divider, borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, mockHint: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.tealDark, fontSize: 12, lineHeight: 18 }, pendingMessage: { color: colors.amberText, backgroundColor: colors.amberBg, padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: ui.dangerText, backgroundColor: ui.dangerBg, padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { minHeight: TOUCH_MIN + 4, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: colors.teal }, primaryText: { color: colors.white, fontFamily: fontFamily.bold }, disabled: { opacity: 0.45 }, back: { justifyContent: 'center', minHeight: TOUCH_MIN, padding: 13 }, backText: { color: colors.muted, fontFamily: fontFamily.bold },
+  saveAddressMessage: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.tealDark, fontSize: 12 }, fieldFeedback: { fontFamily: fontFamily.regular, color: ui.dangerText, fontSize: 12, lineHeight: 18, textAlign: 'right' }, chipText: { fontFamily: fontFamily.regular, color: colors.muted, fontSize: 12 }, summary: { backgroundColor: '#fff', borderRadius: radius.card, padding: 18, gap: 12, borderWidth: 1, borderColor: colors.border }, summaryTitle: { textAlign: 'center', color: colors.text, fontFamily: fontFamily.bold, fontSize: 16 }, summaryLine: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.muted, fontSize: 13 }, invoiceLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: ui.divider, paddingTop: 10 }, totalLine: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: ui.inputBorder, paddingTop: 10 }, totalLabel: { color: colors.text, fontFamily: fontFamily.bold, fontSize: 14 }, total: { textAlign: 'right', color: colors.teal, fontFamily: fontFamily.bold, fontSize: 22, marginTop: 8 }, paymentBox: { backgroundColor: ui.surfaceMuted, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: ui.divider }, paymentMethods: { gap: 8 }, paymentMethod: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: ui.divider, borderRadius: 13, padding: 13 }, paymentMethodSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft }, mockHint: { fontFamily: fontFamily.regular, textAlign: 'right', color: colors.tealDark, fontSize: 12, lineHeight: 18 }, pendingMessage: { color: colors.amberText, backgroundColor: colors.amberBg, padding: 12, borderRadius: 12, textAlign: 'right' }, errorMessage: { color: ui.dangerText, backgroundColor: ui.dangerBg, padding: 12, borderRadius: 12, textAlign: 'right' }, navigation: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }, primary: { minHeight: TOUCH_MIN + 4, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 13, backgroundColor: colors.teal }, primaryText: { color: colors.white, fontFamily: fontFamily.bold }, disabled: { opacity: 0.45 }, back: { justifyContent: 'center', minHeight: TOUCH_MIN, padding: 13 }, backText: { color: colors.muted, fontFamily: fontFamily.bold },
 });

@@ -1,4 +1,5 @@
-import { completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { extensionDeadlineText, scheduledCompletionInput, completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { STAIR_SERVICE } from '../../../server/pricing/staircase';
 import { previewActive } from './previewRuntime';
 import React, { useEffect, useState, useRef } from 'react';
 import {
@@ -59,6 +60,7 @@ interface NativeWorkerPortalProps {
   onSessionExpired?: () => void;
   /** تب اول هنگام باز شدن (از خانه یا نوار پایین). */
   initialTab?: 'available' | 'my_jobs';
+  initialOrderId?: string | null;
   /** منبع مشترک سفارش‌ها از پوستهٔ اپ متخصص (خانه، نشان نوار پایین و این پنل). */
   orders: WorkerOrdersHandle<NativeOrder>;
   contentBackRef?: WorkerContentBackRef;
@@ -70,10 +72,11 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
   onLogout,
   onSessionExpired,
   initialTab,
+  initialOrderId = null,
   orders,
   contentBackRef,
 }) => {
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(initialOrderId);
   useEffect(() => installWorkerContentBackNavigation(BackHandler, () => {
     if (selectedOrderId === null) return false;
     setSelectedOrderId(null);
@@ -190,16 +193,40 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     );
   };
 
+  const respondToExtension = async (order: NativeOrder, answer: "yes" | "no") => {
+    const pending = order.extension?.pending;
+    if (!pending || previewActive() || !beginOrderAction(order.id)) return;
+    try {
+      await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
+      const res = await apiFetch("/orders/" + encodeURIComponent(order.id) + "/extension-response", {
+        method: "PUT", body: JSON.stringify({ requestId: pending.id, answer }),
+      });
+      if (!res.success) showActionError(res.message || "ثبت پاسخ تمدید انجام نشد.");
+    } catch {
+      showActionError("نتیجهٔ درخواست مشخص نیست. سفارش را بازخوانی کنید.");
+    } finally {
+      endOrderAction(order.id);
+      void fetchOrders("after-action");
+    }
+  };
+
   const confirmCompleteOrder = (order: NativeOrder) => {
     if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus) || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey) return;
     if (busyOrderIds.includes(order.id)) return;
     const draft = completionDrafts[order.id];
-    if (!completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '')) {
+    const fixedStaircase = order.serviceId === STAIR_SERVICE;
+    if (order.extension && !scheduledCompletionInput(draft?.hours || '')) {
+      showActionError('ساعات واقعی کار را با حداکثر دو رقم اعشار وارد کنید.'); return;
+    }
+    if (!fixedStaircase && !order.extension && !completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '')) {
       showActionError('ساعات واقعی را با حداکثر دو رقم اعشار و مبلغ نهایی را به‌صورت عدد صحیح وارد کنید.'); return;
     }
     Alert.alert(
       'اتمام کار',
-      'آیا کار «' + order.serviceTitle + '» تمام شده و ساعات و مبلغ واردشده درست است؟ نتیجه طبق روش تأیید شرکت ثبت می‌شود.',
+      fixedStaircase
+        ? 'آیا کار «' + order.serviceTitle + '» با مبلغ ثبت‌شدهٔ سفارش تمام شده است؟'
+        : order.extension ? 'آیا کار تمام شده و ساعات واقعی درست است؟ مبلغ از رزرو و تمدیدهای تأییدشده محاسبه می‌شود.'
+        : 'آیا کار «' + order.serviceTitle + '» تمام شده و ساعات و مبلغ واردشده درست است؟ نتیجه طبق روش تأیید شرکت ثبت می‌شود.',
       [
         { text: 'انصراف', style: 'cancel' },
         { text: 'بله، تمام شد', onPress: () => void handleCompleteOrder(order) },
@@ -212,7 +239,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     if (!user?.id || !canCompleteWorkerOrder(order.status, order.startStatus) || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey) return;
     if (previewActive()) { showActionError('ثبت واقعی در پیش‌نمایش مجاز نیست.'); return; }
     const draft = completionDrafts[order.id];
-    const values = completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '');
+    const values = order.serviceId === STAIR_SERVICE ? {} : order.extension ? scheduledCompletionInput(draft?.hours || '') : completionInput((order.durationHours || 0) > 0, draft?.hours || '', draft?.amount || '');
     if (!values || !beginOrderAction(order.id)) return;
     try {
       await attachStoredAuthToken(appStorage, WORKER_TOKEN_KEY);
@@ -254,6 +281,7 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
     const active = isActiveWorkerJob(order.status);
     const tone = workerStatusTone(order.status);
     const busy = busyOrderIds.includes(order.id);
+    const deadlineNote = order.extension ? extensionDeadlineText(order.agreedStartAt, (order.durationHours || 0) + order.extension.approvedHours) : null;
     return (
       <View key={order.id} style={[styles.orderCard, active ? styles.myJobCard : styles.historyCard]}>
         <View style={styles.cardTop}>
@@ -298,6 +326,8 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
           </View>
         ) : null}
 
+        {order.publicTierBadge ? <Text style={styles.noteText}>سطح مشتری: {order.publicTierBadge.label}</Text> : null}
+        {order.publicTierBadge?.summary ? <Text style={styles.noteText}>{order.publicTierBadge.summary}</Text> : null}
         <View style={styles.cardFooter}>
           <View style={styles.wageBox}>
             <Text style={styles.wageValue}>
@@ -319,16 +349,47 @@ export const NativeWorkerPortal: React.FC<NativeWorkerPortalProps> = ({
         ) : active && order.startReported ? (
           <Text style={styles.startStatusText}>شروع کار اعلام شده است.</Text>
         ) : null}
+        {order.extension && (deadlineNote || order.extension.pending || order.extension.approvedHours > 0) && !order.completion ? (
+          <View>
+            {deadlineNote ? <Text style={[styles.noteText, styles.completionLabel]}>{deadlineNote}</Text> : null}
+            <Text style={[styles.noteText, styles.completionLabel]}>دستمزد ساعت اضافه: {formatStoredAmount(order.extension.rate, order.currencyUnit)}</Text>
+            {order.extension.approvedHours > 0 ? <Text style={[styles.noteText, styles.completionLabel]}>ساعت اضافهٔ تأییدشده: {toPersianDigits(order.extension.approvedHours)}</Text> : null}
+            {order.extension.pending ? (
+              <>
+                <Text style={[styles.noteText, styles.completionLabel]}>مشتری یک ساعت اضافه درخواست کرده است.</Text>
+                <View style={styles.extensionActions}>
+                  <Pressable accessibilityRole="button" disabled={busy} onPress={() => void respondToExtension(order, "yes")} style={[styles.completeButtonFull, styles.extensionAction, busy && styles.buttonDisabled]}>
+                    <Text style={styles.completeButtonText}>پذیرش تمدید</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" disabled={busy} onPress={() => void respondToExtension(order, "no")} style={[styles.completeButtonFull, styles.extensionAction, styles.extensionDecline, busy && styles.buttonDisabled]}>
+                    <Text style={[styles.completeButtonText, styles.extensionDeclineText]}>رد تمدید</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        ) : null}
         {order.completion ? <Text style={styles.startStatusText}>{completionStatusText(order.completion.status)}</Text> : null}
         {canCompleteWorkerOrder(order.status, order.startStatus) && (!order.completion || order.completion.status === 'rejected') && order.completionAcceptanceKey ? (
           <View>
+            {order.serviceId === STAIR_SERVICE ? (
+              <Text style={styles.noteText}>مبلغ نهایی طبق سفارش: {formatStoredAmount(order.rawPrice, order.currencyUnit)}</Text>
+            ) : <>
             {(order.durationHours || 0) > 0 ? (
-              <TextInput accessibilityLabel="ساعات واقعی کار" placeholder="ساعات واقعی کار" keyboardType="decimal-pad" editable={!busy}
-                value={completionDrafts[order.id]?.hours || ''} onChangeText={value => setCompletionDraft(order.id, 'hours', value)} style={styles.completionInput} />
+              <>
+                <Text style={[styles.noteText, styles.completionLabel]}>ساعات واقعی کار</Text>
+                <TextInput accessibilityLabel="ساعات واقعی کار" keyboardType="decimal-pad" editable={!busy}
+                  value={completionDrafts[order.id]?.hours || ''} onChangeText={value => setCompletionDraft(order.id, 'hours', value)} style={[styles.completionInput, styles.hoursInput]} />
+              </>
             ) : null}
-            <Text style={styles.noteText}>مبلغ نهایی کل کار ({order.currencyUnit || 'تومان'})، پیش از کسر کمیسیون</Text>
+            {order.extension ? (
+              <Text style={[styles.noteText, styles.completionLabel]}>مبلغ محاسبه‌شده: {formatStoredAmount(order.extension.total, order.currencyUnit)}</Text>
+            ) : <>
+            <Text style={[styles.noteText, styles.completionLabel]}>مبلغ نهایی کل کار ({order.currencyUnit || 'تومان'})، پیش از کسر کمیسیون</Text>
             <TextInput accessibilityLabel="مبلغ نهایی کل کار" placeholder="مبلغ نهایی" keyboardType="number-pad" editable={!busy}
               value={completionDrafts[order.id]?.amount || ''} onChangeText={value => setCompletionDraft(order.id, 'amount', value)} style={styles.completionInput} />
+            </>}
+            </>}
           <Pressable
             onPress={() => confirmCompleteOrder(order)}
             disabled={busy}
@@ -559,6 +620,12 @@ const fa = { writingDirection: 'rtl' as const, includeFontPadding: false };
 const styles = StyleSheet.create({
   hidden: { display: 'none' },
   availableListContent: { gap: 8, paddingTop: 12 },
+  extensionActions: { flexDirection: 'row-reverse', gap: 8 },
+  extensionAction: { flex: 1 },
+  extensionDecline: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.teal },
+  extensionDeclineText: { color: colors.teal },
+  completionLabel: { textAlign: 'center' },
+  hoursInput: { width: 116, maxWidth: '100%', alignSelf: 'center', minHeight: 44, textAlign: 'center' },
   completionInput: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, marginVertical: 6, textAlign: 'right', color: '#0f172a' },
   container: { flex: 1, backgroundColor: colors.bg
   },
@@ -748,7 +815,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     ...fa,
     fontWeight: '400',
-    color: colors.muted, fontSize: 12, textAlign: 'right', marginTop: 8
+    color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 8
   },
   buttonDisabled: { opacity: 0.6
   },

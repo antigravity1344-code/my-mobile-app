@@ -266,11 +266,17 @@ export const AdminPanelScreen: React.FC = () => {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-right space-y-1">
           <div className="flex justify-between items-center text-slate-400">
-            <span className="text-[10px]">درآمد کل</span>
+            <span className="text-[10px]">درآمد کل (تومان)</span>
             <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
           </div>
-          <p className="text-xs font-bold text-slate-800">
-            {stats ? (stats.totalRevenue || 0).toLocaleString('fa-IR') : '-'} تومان
+          <p className="min-w-0 font-bold text-slate-800" style={{ containerType: "inline-size" }}>
+            {stats ? (
+              <bdi className="block whitespace-nowrap text-right" dir="ltr" style={{
+                fontSize: "min(.875rem, calc(135cqi / " + Math.max(1, (stats.totalRevenue || 0).toLocaleString("fa-IR").length) + "))",
+              }}>
+                {(stats.totalRevenue || 0).toLocaleString("fa-IR")}
+              </bdi>
+            ) : "-"}
           </p>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-right space-y-1">
@@ -348,6 +354,12 @@ export const AdminPanelScreen: React.FC = () => {
                     <p><span className="text-slate-400">زمان تکمیل:</span> {ord.completedAt}</p>
                   )}
                 </div>
+                {ord.completion?.status === 'completed' && (
+                  <div className="text-center text-xs text-slate-700">
+                    <p>مبلغ نهایی: {formatStoredAmount(ord.completion.finalAmount, ord.currencyUnit || ord.pricing?.currencyUnit)}</p>
+                    {ord.completion.actualHours !== null && <p>ساعات واقعی کار: {ord.completion.actualHours.toLocaleString("fa-IR")} ساعت</p>}
+                  </div>
+                )}
                 {ord.completion?.status === 'disputed' && (
                   <div>
                   <p>مبلغ اعلام‌شده: {formatStoredAmount(ord.completion.finalAmount, ord.currencyUnit || ord.pricing?.currencyUnit)}؛ ساعات واقعی: {ord.completion.actualHours ?? 'غیرساعتی'}</p>

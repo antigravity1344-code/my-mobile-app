@@ -25,6 +25,16 @@ export interface ApiAdminUser extends ApiUser {
   hasIdDoc: boolean;
 }
 
+export interface ApiOrderExtension {
+  rate: number;
+  version: string;
+  approvedHours: number;
+  total: number;
+  pending: { id: string; amount: number; total: number } | null;
+  lastStatus: "pending" | "approved" | "denied" | "expired" | null;
+  canRequest: boolean;
+}
+
 export interface ApiOrderRatings {
   customerRating?: number;
   customerComment?: string;
@@ -45,6 +55,9 @@ export interface ApiCompletion {
 
 export interface ApiOrder {
   /** وضعیت قیمت از سرور (docs/PLAN-server-owned-price-status.fa.md). نسخه‌های قدیمی سرور ندارند. */
+  extension?: ApiOrderExtension | null;
+  minimumBaseAmount?: number;
+  publicTierBadge?: { tier: 'silver' | 'gold' | 'gold_plus'; label: string; summary?: string };
   priceStatus?: { status: 'locked'; lockedAmount: number } | { status: 'hourly_pending' } | { status: 'unknown' } | null;
   completion?: ApiCompletion | null;
   completionAcceptanceKey?: string | null;
@@ -79,6 +92,9 @@ export interface ApiOrder {
   } | null;
   address: string;
   date: string;
+  dateLabel?: string | null;
+  dateKey?: string | null;
+  agreedStartAt?: string | null;
   time: string;
   price: number;
   /** Stored order currency exposed without the customer's pricing breakdown. */

@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   errorText: { color: '#b91c1c', textAlign: 'right', fontSize: 12 },
   hintBox: { backgroundColor: colors.tealSoft, borderRadius: 10, padding: 10 },
   hintText: { color: colors.tealDark, textAlign: 'right', fontSize: 12 },
-  inputLabel: { color: colors.text, textAlign: 'right', fontSize: 12, fontWeight: '700' },
+  inputLabel: { color: colors.text, textAlign: 'center', fontSize: 12, fontWeight: '700' },
   roleRow: { flexDirection: 'row-reverse', gap: 8 },
   roleChip: {
     flexDirection: 'row-reverse',

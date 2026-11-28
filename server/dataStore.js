@@ -8,6 +8,7 @@ const { createOrderStart } = require('./orderStart');
 const { createCommissionPolicy } = require('./commissionPolicy');
 const { createCompletionPolicy } = require('./completionPolicy');
 const { createOrderCompletion } = require('./orderCompletion');
+const { createOrderSmsOutbox, readOrderSmsConfig } = require('./orderStatusSms');
 const { createWorkerWallet } = require('./workerWallet');
 const { createWorkerOffers } = require('./workerOffers');
 const { createCustomerRequests } = require('./customerRequests');
@@ -1611,6 +1612,10 @@ function createDataStore(filename) {
     return listSupportAll.all();
   }
 
+  const orderStatusSms = createOrderSmsOutbox({
+    database, transaction, getOrder, getUser, enabledKinds: readOrderSmsConfig()?.enabledKinds,
+  });
+
   function addNotification(userId, orderId, kind, title, body) {
     if (!userId) return null;
     const row = {
@@ -1622,7 +1627,10 @@ function createDataStore(filename) {
       body,
       createdAt: new Date().toISOString(),
     };
-    insertNotification.run(row.id, row.userId, row.orderId, row.kind, row.title, row.body, row.createdAt);
+    transaction(() => {
+      insertNotification.run(row.id, row.userId, row.orderId, row.kind, row.title, row.body, row.createdAt);
+      orderStatusSms.enqueue(row);
+    });
     return row;
   }
 
@@ -1745,6 +1753,7 @@ function createDataStore(filename) {
   const serviceAreas = createServiceAreas({ database, transaction });
   const workerServiceArea = createWorkerServiceArea({ database, transaction, areas: serviceAreas, getUser });
   const workerBank = createWorkerBank({ database, transaction, getUser, addNotification });
+  const staircaseTariffs = require('./staircaseStore').createStaircaseStore(database);
   const completionPolicy = createCompletionPolicy({ database, transaction });
   const commissionPolicy = createCommissionPolicy({ database, transaction });
   const workerWallet = createWorkerWallet({database,transaction,commissionPolicy});
@@ -1782,7 +1791,9 @@ function createDataStore(filename) {
     completionPolicy,
     ...orderStart,
     commissionPolicy,
+    staircaseTariffs,
     workerWallet,
+    orderStatusSms,
     workerOffers,
     customerRequests,
     customerRequestPolicy,

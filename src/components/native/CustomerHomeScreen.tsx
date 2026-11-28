@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   reorderBtn: {
-    alignSelf: 'flex-end',
+    alignSelf: 'center',
     backgroundColor: colors.teal,
     borderRadius: radius.button,
     minHeight: 44,

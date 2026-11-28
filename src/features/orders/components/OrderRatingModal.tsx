@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontFamily.bold,
     color: colors.text,
-    textAlign: 'right',
+    textAlign: 'center',
     alignSelf: 'stretch',
     marginBottom: 8,
   },

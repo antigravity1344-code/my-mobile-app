@@ -1,5 +1,6 @@
 import { readCompletion } from '../../features/orders/services/completionInput';
 import type { ApiOrder } from '../../api/types';
+import { workerOrderStartTimeLabel } from './workerHomeModel';
 import { classifyWorkerOrder, describeWorkerServiceFacts, type WorkerServiceCategory } from './workerServiceCategory';
 import { normalizeWorkerOrderStatus, workerOrderArea, type WorkerOrderStatus } from './workerOrderStatus';
 
@@ -32,6 +33,10 @@ export interface NativeOrder {
   rawPrice: number | null;
   /** وضعیت قیمت از سرور؛ null یعنی سرور نفرستاده (رفتار قبلی). */
   priceStatus: ApiOrder['priceStatus'] | null;
+  minimumBaseAmount?: number;
+  publicTierBadge?: ApiOrder['publicTierBadge'];
+  extension?: ApiOrder['extension'];
+  agreedStartAt?: string | null;
   /** تاریخ و ساعت خام سرور، بدون مقدار جایگزین. */
   rawDate: string;
   rawTime: string;
@@ -55,8 +60,8 @@ export function mapWorkerOrder(o: ApiOrder): NativeOrder {
     phone: o.customerPhone || '',
     district: workerOrderArea(o),
     address: o.address || '',
-    date: o.date || 'امروز',
-    timeSlot: o.time || 'نامشخص',
+    date: o.dateLabel || o.date || '—',
+    timeSlot: workerOrderStartTimeLabel(o.time) || 'ساعت نامشخص',
     grossOrderAmount: typeof o.price === 'number' ? o.price : 0,
     currencyUnit: o.currencyUnit,
     startReported: typeof o.startReported === 'boolean' ? o.startReported : null,
@@ -68,7 +73,11 @@ export function mapWorkerOrder(o: ApiOrder): NativeOrder {
     createdAt: o.createdAt || '',
     rawPrice: typeof o.price === 'number' && Number.isFinite(o.price) ? o.price : null,
     priceStatus: o.priceStatus ?? null,
-    rawDate: typeof o.date === 'string' ? o.date : '',
+    minimumBaseAmount: o.minimumBaseAmount,
+    publicTierBadge: o.publicTierBadge,
+    extension: o.extension,
+    agreedStartAt: o.agreedStartAt,
+    rawDate: o.dateKey || (typeof o.date === 'string' ? o.date : ''),
     rawTime: typeof o.time === 'string' ? o.time : '',
     serviceId: typeof o.serviceId === 'string' && o.serviceId.trim() ? o.serviceId.trim() : null,
     directRequest: typeof o.directRequestWorkerId === 'string' && o.directRequestWorkerId.length > 0,

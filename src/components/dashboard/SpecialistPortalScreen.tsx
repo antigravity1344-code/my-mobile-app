@@ -1,4 +1,7 @@
-import { completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { scheduledCompletionInput, completionInput, completionStatusText, readCompletion } from '../../features/orders/services/completionInput';
+import { STAIR_SERVICE } from '../../../server/pricing/staircase';
+import { formatStoredAmount } from '../../features/orders/services/money';
+import { describeServiceOptions } from '../native/workerServiceCategory';
 import { previewActive } from '../native/previewRuntime';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -31,6 +34,8 @@ interface OpenOrder {
   durationHours: number;
   currencyUnit?: string;
   completion: ApiOrder['completion'];
+  extension: ApiOrder['extension'];
+  publicTierBadge: ApiOrder['publicTierBadge'];
   completionAcceptanceKey: string | null;
   startStatus?: string | null;
   id: string;
@@ -85,7 +90,12 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
   }
   if (order.serviceOptions && typeof order.serviceOptions === 'object') {
     for (const [k, v] of Object.entries(order.serviceOptions)) {
-      if (v !== undefined && v !== null) details[k] = v as string | number | boolean;
+      if (serviceId === STAIR_SERVICE && k === 'noLift') {
+        const [elevator] = describeServiceOptions(serviceId, { noLift: v });
+        if (elevator) details[elevator.label] = elevator.value;
+      } else if (v !== undefined && v !== null) {
+        details[k] = v as string | number | boolean;
+      }
     }
   }
   if (order.addressNotes) details['یادداشت آدرس'] = String(order.addressNotes);
@@ -95,6 +105,8 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
     durationHours: order.durationHours || 0,
     currencyUnit: order.currencyUnit,
     completion: readCompletion(order.completion),
+    extension: order.extension,
+    publicTierBadge: order.publicTierBadge,
     completionAcceptanceKey: order.completionAcceptanceKey || null,
     startStatus: order.startStatus,
     serviceId,
@@ -110,7 +122,7 @@ function mapApiOrderToOpenOrder(order: ServerOrderLike): OpenOrder | null {
     phone: order.customerPhone || '—',
     district,
     address: addressText || '—',
-    date: order.date || '—',
+    date: order.dateLabel || order.date || '—',
     timeSlot: order.time || '—',
     priceTotal: order.price || 0,
     paymentMethod: order.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
@@ -208,12 +220,30 @@ export const SpecialistPortalScreen: React.FC = () => {
       .filter((order): order is OpenOrder => order != null && order.roleRequired === activeRole && order.status === 'OPEN');
   }, [availableOrdersRaw, activeRole]);
 
+  const respondToExtension = async (order: OpenOrder, answer: "yes" | "no") => {
+    const pending = order.extension?.pending;
+    if (!workerUserId || completingId || previewActive() || !pending) return;
+    setCompletingId(order.id);
+    setLoadError(null);
+    try {
+      const res = await apiFetch("/orders/" + encodeURIComponent(order.id) + "/extension-response", {
+        method: "PUT", body: JSON.stringify({ requestId: pending.id, answer }),
+      });
+      if (!res.success) setLoadError(res.message || "ثبت پاسخ تمدید انجام نشد.");
+    } catch {
+      setLoadError("نتیجهٔ درخواست مشخص نیست. سفارش را بازخوانی کنید.");
+    } finally {
+      setCompletingId(null);
+      void loadAvailable();
+    }
+  };
+
   const handleCompleteOrder = async (order: OpenOrder) => {
     const orderId = order.id;
     if (previewActive()) { setLoadError('ثبت واقعی در پیش‌نمایش مجاز نیست.'); return; }
     if (completingId || (order.completion && order.completion.status !== 'rejected') || !order.completionAcceptanceKey || order.startStatus === 'disputed') return;
     const draft = completionDrafts[orderId];
-    const values = completionInput(order.durationHours > 0, draft?.hours || '', draft?.amount || '');
+    const values = order.serviceId === STAIR_SERVICE ? {} : order.extension ? scheduledCompletionInput(draft?.hours || '') : completionInput(order.durationHours > 0, draft?.hours || '', draft?.amount || '');
     if (!values) { setLoadError('ساعات واقعی را با حداکثر دو رقم اعشار و مبلغ نهایی را به‌صورت عدد صحیح وارد کنید.'); return; }
     if (!workerUserId) {
       setLoadError('شناسه متخصص واقعی پیدا نشد. با حساب متخصص وارد شوید.');
@@ -398,13 +428,26 @@ export const SpecialistPortalScreen: React.FC = () => {
               </div>
               <p className="text-xs text-slate-700">{order.serviceTitle}</p>
               <p className="text-[11px] text-slate-500">{order.district} — {order.customerName}</p>
+              {order.publicTierBadge && <p>سطح مشتری: {order.publicTierBadge.label}</p>}
+              {order.publicTierBadge?.summary && <p>{order.publicTierBadge.summary}</p>}
               {order.status === 'CANCEL_REQUESTED' ? (
                 <p className="text-[11px] text-amber-800">درخواست لغو این سفارش در حال بررسی است. تا پایان بررسی کار را ادامه ندهید.</p>
               ) : order.completion && order.completion.status !== 'rejected' ? <p>{completionStatusText(order.completion.status)}</p> : order.completionAcceptanceKey && order.startStatus !== 'disputed' ? (
               <div>
+                {order.extension?.pending && <div>
+                  <p>مشتری یک ساعت اضافه درخواست کرده است. دستمزد: {formatStoredAmount(order.extension.pending.amount, order.currencyUnit)}</p>
+                  <button type="button" disabled={completingId !== null} onClick={() => void respondToExtension(order, "yes")}>پذیرش تمدید</button>
+                  <button type="button" disabled={completingId !== null} onClick={() => void respondToExtension(order, "no")}>رد تمدید</button>
+                </div>}
                 {order.completion ? <p>{completionStatusText(order.completion.status)}</p> : null}
-                {order.durationHours > 0 ? <label>ساعات واقعی کار<input aria-label="ساعات واقعی کار" inputMode="decimal" disabled={completingId !== null} value={completionDrafts[order.id]?.hours || ''} onChange={e => setCompletionDraft(order.id, 'hours', e.target.value)} /></label> : null}
+                {order.serviceId === STAIR_SERVICE ? (
+                  <p>مبلغ نهایی طبق سفارش: {formatStoredAmount(order.priceTotal, order.currencyUnit)}</p>
+                ) : <>
+                {order.durationHours > 0 ? <label className="flex flex-col items-center gap-1">ساعات واقعی کار<input aria-label="ساعات واقعی کار" className="min-h-11 w-[116px] max-w-full rounded-lg border border-slate-300 px-2 text-center" inputMode="decimal" disabled={completingId !== null} value={completionDrafts[order.id]?.hours || ''} onChange={e => setCompletionDraft(order.id, 'hours', e.target.value)} /></label> : null}
+                {order.extension ? <p>مبلغ محاسبه‌شده: {formatStoredAmount(order.extension.total, order.currencyUnit)}</p> : (
                 <label>مبلغ نهایی کل کار ({order.currencyUnit || 'تومان'})، پیش از کسر کمیسیون<input aria-label="مبلغ نهایی کل کار" inputMode="numeric" disabled={completingId !== null} value={completionDrafts[order.id]?.amount || ''} onChange={e => setCompletionDraft(order.id, 'amount', e.target.value)} /></label>
+                )}
+                </>}
               <button
                 type="button"
                 onClick={() => void handleCompleteOrder(order)}
@@ -458,6 +501,7 @@ export const SpecialistPortalScreen: React.FC = () => {
                     <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       {order.badge}
                     </span>
+                    {order.publicTierBadge && <span className="text-[10px]">سطح مشتری: {order.publicTierBadge.label}</span>}
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
@@ -513,7 +557,7 @@ export const SpecialistPortalScreen: React.FC = () => {
                   <div className="border-t border-slate-200/60 pt-1.5 grid grid-cols-2 gap-1 text-[11px] text-slate-600">
                     {Object.entries(order.details).map(([key, val]) => (
                       <div key={key} className="flex items-center gap-1">
-                        <span className="text-slate-400">• {key}:</span>
+                        <span className="text-slate-400">• {key}{key.endsWith('؟') ? '' : ':'}</span>
                         <span className="font-bold text-slate-800">{String(val)}</span>
                       </div>
                     ))}

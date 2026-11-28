@@ -30,12 +30,13 @@ export function formatSubmittedAddress(address?: Partial<AddressDetails> | null)
   return parts.join('، ').slice(0, 500);
 }
 
-/** متن ساعت ذخیره‌شده در سفارش: «صبح زود (۰۸:۰۰ تا ۱۰:۰۰)». */
+/** متن ساعت ذخیره‌شده، با حفظ بازه برای پیشنهادها و سفارش‌های قبلی. */
 export function submittedTimeText(slot?: Partial<TimeSlot> | null): string {
   if (!slot) return '';
   const label = typeof slot.label === 'string' ? slot.label.trim() : '';
   const start = typeof slot.startTime === 'string' ? slot.startTime.trim() : '';
   const end = typeof slot.endTime === 'string' ? slot.endTime.trim() : '';
+  if (start && !end) return 'ساعت ' + toPersianDigits(start);
   const hours = start && end ? `${toPersianDigits(start)} تا ${toPersianDigits(end)}` : toPersianDigits(start || end);
   // برچسب‌هایی که خودشان ساعت دارند (فرم وب) دوباره ساعت نمی‌گیرند.
   if (label && /[(（]/.test(label)) return label;

@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.border,
     padding: 14, gap: 8, ...shadowSm,
   },
-  sectionTitle: { ...type.bold, ...fa, fontSize: 15, lineHeight: 22, color: colors.text, textAlign: 'right' },
+  sectionTitle: { ...type.bold, ...fa, fontSize: 15, lineHeight: 22, color: colors.text, textAlign: 'center' },
   jobRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   jobText: { flex: 1, gap: 2 },
   jobTitle: { ...type.semibold, ...fa, fontSize: 14, lineHeight: 22, color: colors.text, textAlign: 'right' },

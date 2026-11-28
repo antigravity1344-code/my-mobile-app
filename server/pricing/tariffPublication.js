@@ -661,6 +661,7 @@ function establishInitialTariff(input, env = process.env) {
       model: service.model,
       rate,
       ...(service.exemptFromTierLock ? { exemptFromTierLock: true } : {}),
+      ...(service.id === 'staircase_common_areas' && input.staircaseKey ? { staircaseKey: input.staircaseKey } : {}),
     };
   }
   const now = input.now instanceof Date ? input.now : new Date();

@@ -106,7 +106,7 @@ export const NativeNotificationsScreen: React.FC<NativeNotificationsScreenProps>
 const workerStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0f172a' },
   content: { padding: 20, gap: 12 },
-  title: { color: '#ffffff' },
+  title: { color: '#ffffff', textAlign: 'center' },
   hint: { color: '#cbd5e1' },
   empty: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, color: '#64748b' },
   card: { borderRadius: 24, padding: 20, minHeight: 44 },

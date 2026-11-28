@@ -13,6 +13,9 @@ import {
   type QuoteSelection,
 } from './serverQuote';
 
+import { STAIR_SERVICE, DEFAULT_RATES, calculateStaircase } from '../../../../server/pricing/staircase';
+import { setPricingRules } from '../../../config/serviceAvailability';
+
 const quote = {
   quoteToken: 'signed-token',
   subtotal: 1050,
@@ -25,6 +28,22 @@ const quote = {
 };
 
 describe('server quote contract', () => {
+  it('prices one building from current database rates and fingerprints changing floors or pack', () => {
+    const rates = { ...DEFAULT_RATES, parkingFloor: 100000 };
+    setPricingRules([{ serviceId: STAIR_SERVICE, model: 'fixed', exemptFromTierLock: true, staircaseRates: rates }]);
+    try {
+      const selection = { serviceId: STAIR_SERVICE, pricingType: 'fixed', durationHours: 4,
+        serviceOptions: { floors: 5, unitsPerFloor: 4, parkingFloors: 2, noLift: true, detergent: true } };
+      const result = buildQuoteRequest(selection);
+      if (!result.ok) throw new Error(result.message);
+      expect(result.body.quantity).toBe(1);
+      expect(calculateStaircase(rates, result.body.options)?.total).toBe(1636100);
+      expect(quoteSelectionKey(selection)).not.toBe(quoteSelectionKey({ ...selection, serviceOptions: { ...selection.serviceOptions, floors: 6 } }));
+    } finally {
+      setPricingRules([]);
+    }
+  });
+
   it('asks the server for the selected service, duration and options', () => {
     const built = buildQuoteRequest({
       serviceId: 'home_unit_cleaning',

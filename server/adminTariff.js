@@ -16,8 +16,11 @@ const tariffInputClass = 'block w-full bg-slate-900 border border-slate-600 roun
 // خدماتی که پکیج مواد شوینده برایشان قابل قیمت‌گذاری است (تصمیم مالک، ۱۹ نوامبر ۲۰۲۶). مبل‌شویی جزو اینها نیست.
 const tariffDetergentServiceIds = new Set(['home_unit_cleaning', 'office_company_cleaning', 'staircase_common_areas']);
 
-function tariffMessage(text) {
-  document.getElementById('tariffMessage').textContent = text;
+function tariffMessage(text, buttonId) {
+  const message = document.getElementById('tariffMessage');
+  const button = buttonId && document.getElementById(buttonId);
+  if (button && button.nextElementSibling !== message) button.after(message);
+  message.textContent = text;
 }
 
 function tariffError(code) {
@@ -68,8 +71,9 @@ function tariffInstant(value) {
 function tariffRate(value) {
   const digits = value.trim().replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c)))
     .replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)));
-  const amount = Number(digits);
-  if (!/^\d+$/.test(digits) || !Number.isSafeInteger(amount)) throw new Error('نرخ باید عدد صحیح و نامنفی باشد.');
+  const normalized = /^\d{1,3}(?:[٬,]\d{3})+$/.test(digits) ? digits.replace(/[٬,]/g, '') : digits;
+  const amount = Number(normalized);
+  if (!/^\d+$/.test(normalized) || !Number.isSafeInteger(amount)) throw new Error('نرخ باید عدد صحیح و نامنفی باشد.');
   return amount;
 }
 
@@ -83,7 +87,7 @@ function tariffFactor(value) {
 
 function tariffField(parent, label, id, type, value) {
   const wrapper = adminElement('label', 'block text-sm', label);
-  const input = adminElement('input', tariffInputClass);
+  const input = adminElement('input', type === 'checkbox' ? '' : tariffInputClass);
   input.id = id;
   input.type = type;
   input.value = value;
@@ -113,12 +117,22 @@ function tariffAdjustments(parent, service) {
   for (const item of service.factors) details.push('ضریب ' + item.id + ': ' + (item.basisPoints / 10000));
   for (const item of service.discounts) details.push('تخفیف ' + item.id + ': ' + (item.basisPoints / 100) + '٪');
   if (service.minQuantity != null) details.push('حداقل مقدار: ' + service.minQuantity);
+  if (service.model === 'hourly') {
+    const baseHourlyRate = Math.max(service.rate, Math.ceil((service.minCharge ?? 0) / (service.minQuantity ?? 1)));
+    details.push('دستمزد ساعت اضافه: ' + (service.extraHourlyRate ?? (baseHourlyRate + Math.ceil(baseHourlyRate / 4))).toLocaleString('fa-IR'));
+  }
+  if (service.minCharge != null) details.push('حداقل مبلغ خدمت: ' + service.minCharge.toLocaleString('fa-IR'));
   if (service.maxQuantity != null) details.push('حداکثر مقدار: ' + service.maxQuantity);
+  if (service.staircaseKey && service.stairLabels) {
+    for (const [key, label] of Object.entries(service.stairLabels)) details.push(label + ' ' + service.staircaseRates[key].toLocaleString('fa-IR'));
+  }
   if (details.length) parent.append(adminElement('p', 'text-xs text-slate-300', details.join(' | ')));
 }
 
 async function loadAdminTariff() {
   if (tariffBusy || tariffAttempt) return;
+  // Keep the live status when the editor is replaced during a reload.
+  document.getElementById('tariffRefresh').before(document.getElementById('tariffMessage'));
   tariffBusy = true;
   tariffControls();
   const controller = new AbortController();
@@ -225,29 +239,68 @@ async function saveInitialTariff(inputs) {
   if (saved) await loadAdminTariff();
 }
 
+function staircaseFields(row, service, flatInput, detergent) {
+  if (!service.staircaseRates || !service.stairLabels) return null;
+  const toggle = tariffField(row, 'استفاده از تعرفهٔ محاسباتی راه‌پله در این پیش‌نویس', 'staircaseEnabled', 'checkbox', 'on');
+  toggle.checked = Boolean(service.staircaseKey);
+  const panel = adminElement('div', 'admin-field-grid admin-field-wide rounded-xl p-3');
+  const inputs = Object.entries(service.stairLabels).map(([key, label]) => {
+    const unit = key === 'noLiftPercent' ? ' (درصد)' :
+      ['includedFloors', 'liftFromFloor'].includes(key) ? '' : ' (تومان)';
+    const input = tariffField(panel, label + unit, 'stairRate-' + key, 'text', String(service.staircaseRates[key]));
+    input.inputMode = 'numeric';
+    return [key, input];
+  });
+  function update() {
+    panel.hidden = !toggle.checked;
+    flatInput.parentElement.hidden = toggle.checked;
+    if (detergent) detergent.parentElement.hidden = toggle.checked;
+  }
+  toggle.onchange = update;
+  row.append(panel);
+  update();
+  return () => toggle.checked ? Object.fromEntries(inputs.map(([key, input]) => [key, tariffRate(input.value)])) : null;
+}
+
 function renderAdminTariff() {
   const container = document.getElementById('tariffContent');
-  container.replaceChildren(adminElement('p', 'text-sm', 'شرکت: ' + tariffState.companyId + ' | واحد پول: ' + tariffState.currencyUnit));
+  container.replaceChildren(adminElement('p', 'text-center text-sm', 'شرکت: ' + tariffState.companyId + ' | واحد پول: ' + tariffState.currencyUnit));
   if (!tariffState.versions.length) {
     container.append(adminElement('p', 'text-sm', 'هنوز نسخه‌ای برای کپی‌کردن وجود ندارد. ثبت خدمات اولیه باید توسط پشتیبان انجام شود.'));
     return;
   }
   const editor = adminElement('fieldset', 'bg-slate-800 rounded-xl p-4 space-y-3');
-  editor.append(adminElement('legend', 'font-bold', 'ساخت پیش‌نویس با نرخ‌های تازه'));
+  const heading = adminElement('h4', 'font-bold', 'ساخت پیش‌نویس با نرخ‌های تازه');
+  heading.id = 'tariffDraftHeading';
+  editor.setAttribute('aria-labelledby', heading.id);
+  editor.append(heading);
   const source = tariffVersionSelect(editor, 'نسخه مبنا', 'tariffSource', tariffState.versions);
   const rates = adminElement('div', 'space-y-3');
   editor.append(rates);
-  const start = tariffField(editor, 'شروع اعتبار (به وقت دستگاه شما)', 'tariffDraftFrom', 'datetime-local', '');
+  const start = tariffField(editor, 'شروع اعتبار، الزامی (به وقت دستگاه شما)', 'tariffDraftFrom', 'datetime-local', '');
+  start.required = true;
   const end = tariffField(editor, 'پایان اعتبار، اختیاری (به وقت دستگاه شما)', 'tariffDraftTo', 'datetime-local', '');
   let serviceInputs = [];
   function selectSource() {
     const version = tariffState.versions.find((item) => item.id === source.value);
     rates.replaceChildren();
     serviceInputs = Object.entries(version.services).map(([id, service], index) => {
-      const row = adminElement('div', 'border-b border-slate-700 pb-2');
+      const row = adminElement('div', 'admin-field-grid admin-settings-group');
       const input = tariffField(row, (tariffServiceLabels[id] || id) + ' — ' + tariffModelLabels[service.model] + ' (' + tariffState.currencyUnit + ')',
         'tariffRate' + index, 'text', String(service.rate));
       input.inputMode = 'numeric';
+      let minHours = null;
+      let minCharge = null;
+      let extraHourlyRate = null;
+      if (service.model === 'hourly') {
+        minHours = tariffField(row, 'حداقل مدت سفارش (ساعت)', 'tariffMinHours' + index, 'text', String(service.minQuantity ?? ''));
+        minCharge = tariffField(row, 'حداقل مبلغ خدمت (' + tariffState.currencyUnit + ')', 'tariffMinCharge' + index, 'text', String(service.minCharge ?? ''));
+        minHours.inputMode = 'numeric';
+        minCharge.inputMode = 'numeric';
+        extraHourlyRate = tariffField(row, 'دستمزد هر ساعت اضافه (' + tariffState.currencyUnit + ')', 'tariffExtraHourlyRate' + index, 'text', String(service.extraHourlyRate ?? ''));
+        extraHourlyRate.inputMode = 'numeric';
+        extraHourlyRate.placeholder = 'پیش‌فرض: ۲۵٪ بیشتر از نرخ مؤثر ساعتی';
+      }
       const exempt = tariffField(row, 'معاف از قفل سطح — ' + (tariffServiceLabels[id] || id),
         'tariffTierExempt' + index, 'checkbox', 'on');
       exempt.checked = service.exemptFromTierLock === true;
@@ -284,7 +337,8 @@ function renderAdminTariff() {
       }
       tariffAdjustments(row, service);
       rates.append(row);
-      return { id, input, exempt, modeSelect, seat7, seat9, detergent };
+      const readStairs = id === 'staircase_common_areas' ? staircaseFields(row, service, input, detergent) : null;
+      return { id, input, exempt, modeSelect, seat7, seat9, detergent, readStairs, minHours, minCharge, extraHourlyRate };
     });
     start.value = '';
     end.value = tariffLocalInput(version.validTo);
@@ -292,25 +346,53 @@ function renderAdminTariff() {
   source.onchange = selectSource;
   source.value = tariffState.versions[tariffState.versions.length - 1].id;
   selectSource();
-  editor.append(adminElement('p', 'text-xs text-slate-300', 'نرخ پایه، معافیت هر خدمت از قفل سطح و قیمت افزودنی پکیج مواد شوینده قابل تغییرند. سایر شرایط از نسخه مبنا حفظ می‌شوند. هر شرکت می‌تواند قیمت متفاوتی برای افزودنی‌ها ثبت کند؛ این قیمت در هر نسخه تعرفه جدا تنظیم می‌شود.'));
+  editor.append(adminElement('p', 'text-xs text-slate-300', 'نرخ پایه، حداقل مدت و مبلغ خدمات ساعتی، معافیت سطح و قیمت پک شوینده قابل تغییرند. سایر شرایط از نسخه مبنا حفظ می‌شوند. هر شرکت می‌تواند قیمت متفاوتی برای افزودنی‌ها ثبت کند؛ این قیمت در هر نسخه تعرفه جدا تنظیم می‌شود.'));
   const save = adminElement('button', 'bg-sky-700 px-4 py-2 rounded-xl', 'ذخیره پیش‌نویس');
   save.id = 'tariffSave';
   save.type = 'button';
   save.onclick = () => {
+    if (!start.value) {
+      tariffMessage('تاریخ و ساعت شروع اعتبار را وارد کنید.', save.id);
+      start.focus();
+      return;
+    }
     try {
       const version = JSON.parse(JSON.stringify(tariffState.versions.find((item) => item.id === source.value)));
       version.id = tariffUniqueId('tariff-');
       delete version.status;
       version.validFrom = tariffInstant(start.value);
       version.validTo = end.value ? tariffInstant(end.value) : null;
-      for (const { id, input, exempt, modeSelect, seat7, seat9, detergent } of serviceInputs) {
+      for (const { id, input, exempt, modeSelect, seat7, seat9, detergent, readStairs, minHours, minCharge, extraHourlyRate } of serviceInputs) {
         version.services[id].rate = tariffRate(input.value);
+        if (minHours) {
+          if (minHours.value.trim()) version.services[id].minQuantity = tariffRate(minHours.value);
+          else delete version.services[id].minQuantity;
+        }
+        if (extraHourlyRate) {
+          if (extraHourlyRate.value.trim()) version.services[id].extraHourlyRate = tariffRate(extraHourlyRate.value);
+          else delete version.services[id].extraHourlyRate;
+        }
+        if (minCharge) {
+          if (minCharge.value.trim()) version.services[id].minCharge = tariffRate(minCharge.value);
+          else delete version.services[id].minCharge;
+        }
         version.services[id].exemptFromTierLock = exempt.checked;
         if (detergent) {
           const surcharges = (version.services[id].surcharges || []).filter((item) => item.optionId !== 'detergent');
           const amount = detergent.value.trim() === '' ? 0 : tariffRate(detergent.value);
           if (amount > 0) surcharges.push({ id: 'detergent', optionId: 'detergent', amount });
           version.services[id].surcharges = surcharges;
+        }
+        if (readStairs) {
+          const rates = readStairs();
+          delete version.services[id].stairLabels;
+          delete version.services[id].staircaseKey;
+          delete version.services[id].staircaseRates;
+          if (rates) {
+            version.services[id].staircaseEnabled = true;
+            version.services[id].staircaseRates = rates;
+            version.services[id].rate = rates.baseRate;
+          }
         }
         if (modeSelect) {
           const mode = modeSelect.value || null;
@@ -325,8 +407,8 @@ function renderAdminTariff() {
           }
         }
       }
-      beginAdminTariff('/api/admin/tariff-versions', { baseRevision: tariffState.revision, version }, 'پیش‌نویس ذخیره شد؛ هنوز منتشر نشده است.');
-    } catch (error) { tariffMessage(error.message); }
+      beginAdminTariff('/api/admin/tariff-versions', { baseRevision: tariffState.revision, version }, 'پیش‌نویس ذخیره شد؛ هنوز منتشر نشده است.', save.id);
+    } catch (error) { tariffMessage(error.message, save.id); }
   };
   editor.append(save);
   container.append(editor);
@@ -377,16 +459,16 @@ function renderAdminTariff() {
       beginAdminTariff('/api/admin/tariff-versions/' + encodeURIComponent(version.id) + '/publish', {
         baseRevision: tariffState.revision, validFrom, validTo: version.validTo,
         supersede: previous ? { versionId: previous.id, validTo: validFrom } : null,
-      }, 'پیش‌نویس منتشر شد. تعرفه از زمان تعیین‌شده مؤثر خواهد بود.');
-    } catch (error) { tariffMessage(error.message); }
+      }, 'پیش‌نویس منتشر شد. تعرفه از زمان تعیین‌شده مؤثر خواهد بود.', publish.id);
+    } catch (error) { tariffMessage(error.message, publish.id); }
   };
   publisher.append(publish);
   container.append(publisher);
 }
 
-function beginAdminTariff(path, body, successMessage) {
+function beginAdminTariff(path, body, successMessage, buttonId) {
   if (tariffBusy || tariffBlocked || tariffAttempt) return;
-  tariffAttempt = { path, body: { ...body, requestId: tariffUniqueId('admin-') }, successMessage };
+  tariffAttempt = { path, body: { ...body, requestId: tariffUniqueId('admin-') }, successMessage, buttonId };
   retryAdminTariff();
 }
 
@@ -395,10 +477,14 @@ async function retryAdminTariff() {
   tariffBusy = true;
   tariffControls();
   const attempt = tariffAttempt;
+  tariffMessage('در حال ارسال درخواست…', attempt.buttonId);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    if (!(await ensureAdmin())) return;
+    if (!(await ensureAdmin())) {
+      tariffMessage('برای بررسی نتیجه، ابتدا وارد حساب مدیر شوید و «بررسی نتیجه تلاش قبلی» را بزنید.', attempt.buttonId);
+      return;
+    }
     const response = await fetch(attempt.path, {
       method: 'POST', headers: adminHeaders(), body: JSON.stringify(attempt.body), signal: controller.signal,
     });
@@ -419,7 +505,8 @@ async function retryAdminTariff() {
     tariffAttempt = null;
     tariffBusy = false;
     await loadAdminTariff();
-    if (tariffState) tariffMessage(attempt.successMessage);
+    const reloadFeedback = tariffState ? '' : ' ' + document.getElementById('tariffMessage').textContent;
+    tariffMessage(attempt.successMessage + reloadFeedback, attempt.buttonId);
   } catch {
     tariffMessage('نتیجه ثبت مشخص نیست. با «بررسی نتیجه تلاش قبلی» همان درخواست را دوباره بررسی کنید.');
   } finally {

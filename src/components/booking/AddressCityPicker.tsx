@@ -45,7 +45,7 @@ export function AddressCityPicker({ value, onSelectCity, onSelectDistrict }: Pro
   </View>;
 }
 const styles = StyleSheet.create({
-  block: { gap: 8 }, label: { ...type.semibold, textAlign: 'right', color: colors.text },
+  block: { gap: 8 }, label: { ...type.semibold, textAlign: 'center', color: colors.text },
   note: { ...type.regular, textAlign: 'right', color: colors.muted, lineHeight: 22 },
   row: { flexDirection: 'row-reverse', gap: 8 }, chip: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.mutedLight },
   selected: { backgroundColor: colors.tealSoft, borderColor: colors.teal }, text: { ...type.medium, color: colors.text }, link: { ...type.medium, color: colors.teal },

@@ -199,7 +199,7 @@ export function WorkerAddressScreen({ name, avatar, onUpdateUser, onLogout, onOp
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { padding: 20, gap: 16 },
-  title: { ...type.bold, color: colors.text, fontSize: 22, textAlign: 'right' },
+  title: { ...type.bold, color: colors.text, fontSize: 22, textAlign: 'center' },
   identityRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: 48, height: 48, borderRadius: 24 },
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   name: { ...type.medium, color: colors.text, textAlign: 'right' },
   card: { backgroundColor: colors.white, borderRadius: 16, padding: 20, gap: 14 },
-  heading: { ...type.bold, fontSize: 18, color: colors.text, textAlign: 'right' },
+  heading: { ...type.bold, fontSize: 18, color: colors.text, textAlign: 'center' },
   description: { ...type.regular, color: colors.muted, textAlign: 'right', lineHeight: 24 },
   loading: { gap: 12, paddingVertical: 20 },
   input: {

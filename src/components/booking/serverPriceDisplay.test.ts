@@ -18,10 +18,9 @@ describe('booking screens do not present an unapproved amount', () => {
     expect(src).not.toContain('تومان');
   });
 
-  it('PricingTable does not calculate a client scenario price', () => {
-    const src = read('PricingTable.tsx');
-    expect(src).not.toContain('calculatePrice');
-    expect(src).not.toContain('تومان');
-    expect(src).toContain('قیمت را سرور اعلام می‌کند');
+  it('shows server starting prices in the service list without a separate tariff modal', () => {
+    const src = read('NativeBookingWizard.tsx');
+    expect(src).not.toContain('PricingTable');
+    expect(src).toContain('<ServiceStartingPrice service={service} />');
   });
 });

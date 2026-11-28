@@ -65,9 +65,10 @@ describe('worker home model', () => {
     expect(workerPriceLine('staircase_common_areas', 450000, f, { status: 'locked', lockedAmount: 450000 })).toBe('مبلغ سفارش: 450000 T');
   });
 
-  it('server price status: hourly_pending and unknown never show an amount', () => {
+  it('shows a stored hourly estimate and omits an unknown amount', () => {
     const f = (n: number) => `${n} T`;
-    expect(workerPriceLine('home_unit_cleaning', 450000, f, { status: 'hourly_pending' })).toBe(WORKER_PRICE_UNKNOWN);
+    expect(workerPriceLine('home_unit_cleaning', 450000, f, { status: 'hourly_pending' })).toBe('برآورد سفارش: 450000 T');
+    expect(workerPriceLine('home_unit_cleaning', 0, f, { status: 'hourly_pending' })).toBe(WORKER_PRICE_UNKNOWN);
     expect(workerPriceLine('home_unit_cleaning', 450000, f, { status: 'unknown' })).toBe(WORKER_PRICE_UNKNOWN);
   });
 

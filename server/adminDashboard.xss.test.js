@@ -239,6 +239,17 @@ test('order amount uses the order currency unit and falls back to toman for lega
   });
 });
 
+test('completed orders show the final amount and actual hours instead of the booking estimate', async () => {
+  await withPage(async (page) => {
+    await page.evaluate(row => renderOrders([row]), order({status:'COMPLETED',price:880000,
+      completion:{status:'completed',actualHours:5,finalAmount:1130000}}));
+    const text = await page.locator('#ordersList').textContent();
+    assert.ok(text.includes('مبلغ نهایی: ۱٬۱۳۰٬۰۰۰ تومان'));
+    assert.ok(text.includes('ساعات واقعی کار: ۵ ساعت'));
+    assert.ok(!text.includes('۸۸۰٬۰۰۰'));
+  });
+});
+
 test('worker text fields are literal text, not executable HTML', async (t) => {
   for (const field of ['name', 'phone', 'nationalId', 'bankSheba', 'address']) {
     await t.test(field, () => withPage(async (page) => {

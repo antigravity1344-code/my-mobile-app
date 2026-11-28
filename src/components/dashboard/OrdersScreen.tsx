@@ -1,6 +1,7 @@
 import React from 'react';
 import { PackageCheck, Clock, CheckCircle2, PlusCircle } from 'lucide-react';
 import { useBooking } from '../../context/BookingContext';
+import { toPersianDigits } from '../../utils/jalaliDateOptions';
 
 interface OrdersScreenProps {
   onStartBooking: () => void;
@@ -60,7 +61,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({ onStartBooking }) =>
           </div>
           <p className="text-xs text-slate-700">سرویس انتخاب شده: {selectedService.title}</p>
           {selectedDate && <p className="text-[11px] text-slate-600">تاریخ: {selectedDate.dayOfWeek} {selectedDate.dayOfMonth} {selectedDate.monthName}</p>}
-          {selectedTimeSlot && <p className="text-[11px] text-slate-600">ساعت: {selectedTimeSlot.label}</p>}
+          {selectedTimeSlot && <p className="text-[11px] text-slate-600">ساعت: {toPersianDigits(selectedTimeSlot.startTime)}</p>}
           <button
             onClick={onStartBooking}
             className="w-full mt-2 bg-sky-600 text-white text-xs font-bold py-1.5 rounded-lg text-center cursor-pointer"

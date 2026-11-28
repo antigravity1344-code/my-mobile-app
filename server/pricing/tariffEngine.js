@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const { STAIR_SERVICE, ADDONS, calculateStaircase } = require('./staircase');
 
 const MODELS = new Set(['hourly', 'fixed', 'count', 'area']);
 const PRICING_MODES = new Set(['units', 'mattress_seat']);
@@ -91,6 +92,10 @@ function copyAdjustments(service) {
   return { surcharges: copiedSurcharges, factors: copiedFactors, discounts: copiedDiscounts };
 }
 
+function hourlyBaseRate(service) {
+  return Math.max(service.rate, Math.ceil((service.minCharge ?? 0) / (service.minQuantity ?? 1)));
+}
+
 function validatePolicy(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('TARIFF_INVALID', 'سیاست تعرفه معتبر نیست.');
   if (typeof raw.companyId !== 'string' || raw.companyId.trim() === '') fail('TARIFF_INVALID', 'شناسه شرکت در پیکربندی استقرار نیست.');
@@ -115,6 +120,12 @@ function validatePolicy(raw) {
       if (!MODELS.has(service.model)) fail('TARIFF_INVALID', 'مدل محاسبه تعرفه معتبر نیست.');
       assertSafeInteger(service.rate, 'TARIFF_INVALID', 'نرخ تعرفه باید عدد صحیح باشد.');
       if (service.rate < 0) fail('TARIFF_INVALID', 'نرخ تعرفه منفی است.');
+      if (service.minCharge != null) {
+        assertSafeInteger(service.minCharge, 'TARIFF_INVALID', 'حداقل مبلغ باید عدد صحیح باشد.');
+        if (service.model !== 'hourly' || service.minCharge < 0) {
+          fail('TARIFF_INVALID', 'حداقل مبلغ فقط برای تعرفهٔ ساعتی مجاز است.');
+        }
+      }
       if (service.minQuantity != null) {
         assertSafeInteger(service.minQuantity, 'TARIFF_INVALID', 'حداقل مقدار باید عدد صحیح باشد.');
         if (service.minQuantity < 1) fail('TARIFF_INVALID', 'حداقل مقدار نامعتبر است.');
@@ -123,6 +134,12 @@ function validatePolicy(raw) {
         assertSafeInteger(service.maxQuantity, 'TARIFF_INVALID', 'حداکثر مقدار باید عدد صحیح باشد.');
         if (service.minQuantity != null && service.maxQuantity < service.minQuantity) {
           fail('TARIFF_INVALID', 'بازه مقدار خدمت نامعتبر است.');
+        }
+      }
+      if (service.extraHourlyRate != null) {
+        assertSafeInteger(service.extraHourlyRate, 'TARIFF_INVALID', 'دستمزد ساعت اضافه باید عدد صحیح باشد.');
+        if (service.model !== 'hourly' || service.extraHourlyRate <= hourlyBaseRate(service)) {
+          fail('TARIFF_INVALID', 'دستمزد ساعت اضافه باید از نرخ مؤثر ساعتی بیشتر باشد.');
         }
       }
       // exemptFromTierLock: خدمتی که قفل سطح متخصص روی آن اعمال نمی‌شود (مثلاً راه‌پله). پیش‌فرض خاموش.
@@ -147,11 +164,18 @@ function validatePolicy(raw) {
       } else if (service.seatFactors != null) {
         fail('TARIFF_INVALID', 'ضرایب نشیمن فقط برای حالت مبل‌شویی مجاز است.');
       }
+      if (service.staircaseKey != null && (serviceId !== STAIR_SERVICE || service.model !== 'fixed'
+        || typeof service.staircaseKey !== 'string' || !/^[a-f0-9]{64}$/.test(service.staircaseKey))) {
+        fail('TARIFF_INVALID', 'شناسه تعرفه راه‌پله معتبر نیست.');
+      }
       Object.defineProperty(services, serviceId, {
         value: {
         model: service.model,
         rate: service.rate,
+        ...(service.staircaseKey ? { staircaseKey: service.staircaseKey } : {}),
         minQuantity: service.minQuantity == null ? null : service.minQuantity,
+        ...(service.minCharge == null ? {} : { minCharge: service.minCharge }),
+        ...(service.extraHourlyRate == null ? {} : { extraHourlyRate: service.extraHourlyRate }),
         maxQuantity: service.maxQuantity == null ? null : service.maxQuantity,
         exemptFromTierLock: service.exemptFromTierLock === true,
         pricingMode: service.pricingMode == null ? null : service.pricingMode,
@@ -241,6 +265,13 @@ function quote(policy, input) {
   const options = input.options == null ? {} : input.options;
   if (!options || typeof options !== 'object' || Array.isArray(options)) fail('INPUT_INVALID', 'گزینه‌ها معتبر نیستند.');
   const allowed = allowedOptionIds(service);
+  let building;
+  if (service.staircaseKey) {
+    for (const key of ['floors', 'unitsPerFloor', 'parkingFloors', 'noLift', 'detergent', ...ADDONS]) allowed.add(key);
+    if (!input.staircaseRates) fail('TARIFF_INVALID', 'نرخ‌های راه‌پله در دسترس نیست.');
+    building = calculateStaircase(input.staircaseRates, options);
+    if (!building) fail('INPUT_INVALID', 'تعداد طبقات مسکونی، واحد در هر طبقه و طبقات پارکینگ را بررسی کنید.');
+  }
   for (const [key, value] of Object.entries(options)) {
     if (!allowed.has(key) && !NON_PRICING_OPTION_IDS.has(key)) fail('INPUT_INVALID', 'گزینه در تعرفه این خدمت نیست.');
     if (!isOptionValue(value)) fail('INPUT_INVALID', 'مقدار گزینه معتبر نیست.');
@@ -255,7 +286,7 @@ function quote(policy, input) {
     if (service.maxQuantity != null && input.quantity > service.maxQuantity) fail('INPUT_INVALID', 'مقدار از حداکثر تعرفه بیشتر است.');
     quantity = input.quantity;
   }
-  let subtotal = mulDivHalfUp(service.rate, quantity, 1);
+  let subtotal = mulDivHalfUp(building ? building.base : service.rate, quantity, 1);
   // مبل‌شویی حالت mattress_seat: نوع نشیمن (۷ یا ۹ نفره) از options.seatSize می‌آید و ضریب آن روی نرخ اعمال می‌شود.
   if (service.pricingMode === 'mattress_seat') {
     const seatSize = options.seatSize == null ? null : String(options.seatSize);
@@ -264,6 +295,7 @@ function quote(policy, input) {
   } else if (options.seatSize != null) {
     fail('INPUT_INVALID', 'نوع نشیمن فقط برای مبل‌شویی با این حالت مجاز است.');
   }
+  if (service.minCharge != null) subtotal = Math.max(subtotal, service.minCharge);
   // D-82: ضریب سطح فقط روی نرخ پایه است. هزینهٔ جانبی ثابت بعداً بدون ضریب اضافه می‌شود.
   // تعدیل پیشنهاد متخصص (priceAdjustment) جداست و همچنان روی جمع پس از هزینه‌های جانبی می‌نشیند.
   if (Object.prototype.hasOwnProperty.call(input, 'baseRateBasisPoints') && input.baseRateBasisPoints != null) {
@@ -272,6 +304,13 @@ function quote(policy, input) {
     subtotal = mulDivHalfUp(subtotal, input.baseRateBasisPoints, 10000);
   }
   const breakdown = [{ kind: 'base', amount: subtotal }];
+  if (building) {
+    for (const line of building.lines) {
+      subtotal += line.amount;
+      if (!Number.isSafeInteger(subtotal)) fail('CALCULATION_INVALID', 'جمع هزینه نامعتبر است.');
+      breakdown.push({ kind: 'surcharge', ...line });
+    }
+  }
   for (const factor of service.factors) {
     if (!Object.hasOwn(options, factor.optionId) || options[factor.optionId] !== factor.equals) continue;
     const next = mulDivHalfUp(subtotal, factor.basisPoints, 10000);
@@ -279,6 +318,7 @@ function quote(policy, input) {
     subtotal = next;
   }
   for (const surcharge of service.surcharges) {
+    if (building && [...ADDONS, 'detergent'].includes(surcharge.optionId)) continue;
     if (!Object.hasOwn(options, surcharge.optionId) || options[surcharge.optionId] !== true) continue;
     if (!Number.isSafeInteger(subtotal + surcharge.amount)) fail('CALCULATION_INVALID', 'جمع هزینه جانبی نامعتبر است.');
     breakdown.push({ kind: 'surcharge', id: surcharge.id, amount: surcharge.amount });
@@ -323,7 +363,10 @@ function quote(policy, input) {
     breakdown.push({ kind: 'discount', id: promo.id, amount: -amount });
   }
   if (discountTotal > subtotal) fail('CALCULATION_INVALID', 'تخفیف از مبلغ خدمت بیشتر است.');
+  const baseHourlyRate = service.model === "hourly" ? hourlyBaseRate(service) : 0;
+  const extraHourlyRate = service.extraHourlyRate ?? (baseHourlyRate + Math.ceil(baseHourlyRate / 4));
   return deepFreeze({
+    ...(service.model === 'hourly' && Number.isSafeInteger(extraHourlyRate) && extraHourlyRate > baseHourlyRate ? { extraHourlyRate } : {}),
     companyId: policy.companyId,
     currencyUnit: policy.currencyUnit,
     tariffVersionId: version.id,

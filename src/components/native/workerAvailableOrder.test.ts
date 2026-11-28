@@ -42,7 +42,7 @@ describe('compact available-order cards and details', () => {
     const card = WorkerAvailableOrderCard({ order, onOpen });
     const texts = elements(card).filter(node => node.type === Text);
     expect(texts.map(node => node.props.children)).toEqual([
-      'نظافت واحد', 'ونک', '۱۴۰۵/۰۸/۰۵ | ۰۹:۰۰ تا ۱۲:۰۰', WORKER_PRICE_UNKNOWN,
+      'نظافت واحد', 'ونک', '۱۴۰۵/۰۸/۰۵ | ساعت ۰۹:۰۰', WORKER_PRICE_UNKNOWN,
     ]);
     expect(texts.every(node => node.props.numberOfLines === 1)).toBe(true);
     expect(elements(card).filter(node => node.type === Pressable)).toHaveLength(1);
@@ -51,7 +51,7 @@ describe('compact available-order cards and details', () => {
   });
 
   it.each([
-    { serviceId: 'home_unit_cleaning', rawPrice: 450000, priceStatus: { status: 'hourly_pending' as const }, expected: WORKER_PRICE_UNKNOWN },
+    { serviceId: 'home_unit_cleaning', rawPrice: 450000, priceStatus: { status: 'hourly_pending' as const }, expected: 'برآورد سفارش: ' + formatStoredAmount(450000, order.currencyUnit) },
     { serviceId: 'staircase_common_areas', rawPrice: 450000, priceStatus: { status: 'locked' as const, lockedAmount: 450000 }, expected: `مبلغ سفارش: ${formatStoredAmount(450000, order.currencyUnit)}` },
     { serviceId: 'staircase_common_areas', rawPrice: 450000, priceStatus: null, expected: WORKER_PRICE_UNKNOWN },
   ])('shows a fixed amount only when the server locks it: $serviceId / $rawPrice', ({ serviceId, rawPrice, priceStatus, expected }) => {
@@ -64,6 +64,29 @@ describe('compact available-order cards and details', () => {
     expect(page).not.toContain('PRIVATE-');
     expect(page).not.toContain('09121111111');
     expect(page).toContain('مدت: ۳ ساعت');
+  });
+
+  it('shows the minimum base wage separately from the hourly order estimate', () => {
+    const hourly = { ...order, minimumBaseAmount: 300000, priceStatus: { status: 'hourly_pending' as const } };
+    const card = renderToStaticMarkup(createElement(WorkerAvailableOrderCard, { order: hourly, onOpen: vi.fn() }));
+    const page = renderToStaticMarkup(details({ order: hourly }));
+    for (const markup of [card, page]) {
+      expect(markup).toContain('حداقل دستمزد پایه: ' + formatStoredAmount(300000, order.currencyUnit));
+      expect(markup).toContain('برآورد سفارش: ' + formatStoredAmount(450000, order.currencyUnit));
+    }
+  });
+
+  it('shows only the start time of legacy orders and preserves the stored range', () => {
+    const time = 'صبح زود (08:00 تا 10:00)';
+    const legacy = mapWorkerOrder({ id: order.id, date: '1405/08/05', time } as ApiOrder);
+    const card = renderToStaticMarkup(createElement(WorkerAvailableOrderCard, { order: legacy, onOpen: vi.fn() }));
+    const page = renderToStaticMarkup(details({ order: legacy }));
+    for (const markup of [card, page]) {
+      expect(markup).toContain('ساعت ۰۸:۰۰');
+      expect(markup).not.toContain('۱۰:۰۰');
+      expect(markup).not.toContain('صبح زود');
+    }
+    expect(legacy.rawTime).toBe(time);
   });
 
   it('keeps complete details readable and routes the two buttons to back and the existing accept action', () => {

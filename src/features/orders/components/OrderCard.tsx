@@ -77,7 +77,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.specItem}>
           <Calendar size={13} color={colors.muted} />
           <Text style={styles.specText}>
-            {[
+            {order.dateLabel || [
               order.date?.dayOfWeek,
               order.date?.dayOfMonth,
               order.date?.monthName?.split(' ')[0] || '',
@@ -331,14 +331,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footerRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 10,
     borderTopWidth: 1,
     borderTopColor: ui.divider,
     paddingTop: 12,
   },
   priceWrap: {
+    gap: 3,
     alignItems: 'center',
   },
   priceLabel: {
@@ -355,13 +354,16 @@ const styles = StyleSheet.create({
   },
   actionsWrap: {
     flexDirection: 'row-reverse',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 8,
   },
   actionBtn: {
+    flex: 1,
+    minWidth: 0,
     minHeight: TOUCH_MIN,
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -371,6 +373,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tealSoft,
   },
   detailsBtnText: {
+    flexShrink: 1,
+    textAlign: 'center',
     fontSize: 12,
     fontFamily: fontFamily.bold,
     color: colors.teal,
@@ -381,6 +385,8 @@ const styles = StyleSheet.create({
     borderColor: '#fde68a',
   },
   rateBtnText: {
+    flexShrink: 1,
+    textAlign: 'center',
     fontSize: 12,
     fontFamily: fontFamily.bold,
     color: colors.amberText,
@@ -389,6 +395,8 @@ const styles = StyleSheet.create({
     backgroundColor: ui.dangerBg,
   },
   cancelBtnText: {
+    flexShrink: 1,
+    textAlign: 'center',
     fontSize: 12,
     fontFamily: fontFamily.bold,
     color: ui.dangerText,

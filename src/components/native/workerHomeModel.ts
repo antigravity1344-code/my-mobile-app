@@ -33,12 +33,15 @@ export function workerTabBadge(count: number | null | undefined): string | null 
  */
 export function workerPriceLine(
   _serviceId: string | null | undefined,
-  _rawPrice: number | null | undefined,
+  rawPrice: number | null | undefined,
   format: (amount: number) => string,
   priceStatus?: { status: string; lockedAmount?: number } | null,
 ): string {
   if (priceStatus && priceStatus.status === 'locked' && typeof priceStatus.lockedAmount === 'number' && Number.isFinite(priceStatus.lockedAmount) && priceStatus.lockedAmount > 0) {
     return `مبلغ سفارش: ${format(priceStatus.lockedAmount)}`;
+  }
+  if (priceStatus?.status === 'hourly_pending' && typeof rawPrice === 'number' && Number.isSafeInteger(rawPrice) && rawPrice > 0) {
+    return 'برآورد سفارش: ' + format(rawPrice);
   }
   return WORKER_PRICE_UNKNOWN;
 }
@@ -65,6 +68,14 @@ export function jalaliDayOf(date: Date): JalaliDay {
 
 const sameDay = (a: JalaliDay, b: JalaliDay) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
+/** ساعت شروع ثبت‌شده، شامل سفارش‌های قدیمی که بازه دارند. */
+export function workerOrderStartTimeLabel(rawTime: string | null | undefined): string {
+  if (typeof rawTime !== 'string') return '';
+  const time = toLatin(rawTime).match(/(?:^|[^\d])(\d{1,2}):(\d{2})(?!\d)/);
+  if (!time || Number(time[1]) > 23 || Number(time[2]) > 59) return '';
+  return 'ساعت ' + toPersianDigits(time[1].padStart(2, '0') + ':' + time[2]);
+}
+
 /** «امروز، ساعت ۱۴:۰۰» / «فردا، …» / «۱۴۰۵/۰۸/۱۰، …»؛ بدون داده چیزی ساخته نمی‌شود. */
 export function workerOrderTimeLabel(rawDate: string, rawTime: string, now: Date = new Date()): string {
   const day = parseOrderDay(rawDate);
@@ -74,11 +85,7 @@ export function workerOrderTimeLabel(rawDate: string, rawTime: string, now: Date
   if (day && sameDay(day, today)) dayText = 'امروز';
   else if (day && sameDay(day, jalaliDayOf(tomorrowDate))) dayText = 'فردا';
   else if ((rawDate || '').trim()) dayText = toPersianDigits(rawDate.trim());
-  // API time slots may begin with a label, e.g. «صبح (۱۰:۰۰ تا ۱۲:۰۰)».
-  // Keep showing the first clock value instead of requiring the string to begin with it.
-  const t = toLatin((rawTime || '').trim()).match(/(\d{1,2}):(\d{2})/);
-  const timeText = t ? `ساعت ${toPersianDigits(`${t[1].padStart(2, '0')}:${t[2]}`)}` : '';
-  return [dayText, timeText].filter(Boolean).join('، ');
+  return [dayText, workerOrderStartTimeLabel(rawTime)].filter(Boolean).join('، ');
 }
 
 /** کارهای امروزِ همین متخصص: کار فعال یا انجام‌شده با تاریخ امروز. */

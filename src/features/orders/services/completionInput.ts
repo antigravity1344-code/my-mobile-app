@@ -15,6 +15,17 @@ export function completionInput(hourly: boolean, hoursText: string, amountText: 
   return { actualHours: hourly ? Number(hours) : null, finalAmount: Number(amount) };
 }
 
+export function scheduledCompletionInput(hoursText: string): { actualHours: number } | null {
+  const value = completionInput(true, hoursText, "0");
+  return value?.actualHours == null ? null : { actualHours: value.actualHours };
+}
+
+export function extensionDeadlineText(start: string | null | undefined, hours: number, now = Date.now()): string | null {
+  const end = Date.parse(start || "") + hours * 3600000;
+  if (!Number.isFinite(end) || now < end - 15 * 60000) return null;
+  return now >= end ? 'زمان توافق‌شده به پایان رسیده است.' : 'کمتر از ۱۵ دقیقه تا پایان زمان توافق‌شده مانده است.';
+}
+
 /** Reject malformed server summaries rather than enabling an approval with missing facts. */
 export function readCompletion(value: unknown): ApiCompletion | null {
   if (!value || typeof value !== 'object') return null;

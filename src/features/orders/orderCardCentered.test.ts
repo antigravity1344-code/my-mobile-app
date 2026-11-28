@@ -21,8 +21,9 @@ describe('OrderCard text is centred', () => {
     for (const s of ['headerRow', 'specsContainer', 'cleanerStrip']) expect(style(s), s).toContain("justifyContent: 'center'");
     for (const s of ['serviceRow', 'priceWrap']) expect(style(s), s).toContain("alignItems: 'center'");
   });
-  it('buttons row is unchanged (price left, actions right)', () => {
-    expect(style('footerRow')).toContain("justifyContent: 'space-between'");
+  it('shows the price above evenly sized actions', () => {
+    expect(style('footerRow')).not.toContain('flexDirection');
+    expect(style('actionBtn')).toContain('flex: 1');
     expect(style('actionsWrap')).toContain("flexDirection: 'row-reverse'");
   });
 });

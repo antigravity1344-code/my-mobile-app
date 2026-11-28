@@ -230,6 +230,7 @@ const styles = StyleSheet.create({
     ...shadowMd,
   },
   header: {
+    justifyContent: 'center',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -239,13 +240,13 @@ const styles = StyleSheet.create({
     ...type.bold,
     fontSize: 17,
     color: colors.text,
-    textAlign: 'right',
+    textAlign: 'center',
   },
   subtitle: {
     ...type.regular,
     fontSize: 12,
     color: colors.muted,
-    textAlign: 'right',
+    textAlign: 'center',
     marginBottom: 18,
     lineHeight: 18,
   },
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     ...type.bold,
     fontSize: 13,
     color: colors.text,
-    textAlign: 'right',
+    textAlign: 'center',
     marginBottom: 8,
   },
   inputWrapper: {

@@ -61,7 +61,12 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
     request.current = null; setBusy(false); setMessage(result.message); setError(!result.ok);
   };
   const button = (label: string, onPress: () => void, disabled: boolean) => <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.button, disabled && styles.disabled]}><Text style={styles.buttonText}>{label}</Text></Pressable>;
-  const secretInput = (label: string, value: string, update: (value: string) => void, maxLength = 6) => <TextInput accessibilityLabel={label} placeholder={label} placeholderTextColor={colors.muted} value={value} onChangeText={value => update(bankDigits(value))} editable={enabled} keyboardType="number-pad" secureTextEntry autoCorrect={false} maxLength={maxLength} style={styles.input} />;
+  const secretInput = (label: string, value: string, update: (value: string) => void, maxLength = 6) => (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput accessibilityLabel={label} value={value} onChangeText={value => update(bankDigits(value))} editable={enabled} keyboardType="number-pad" secureTextEntry autoCorrect={false} maxLength={maxLength} style={styles.input} />
+    </View>
+  );
 
   return <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -93,7 +98,10 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
           <View style={styles.card}>
             <Text style={styles.heading}>تغییر شماره شبا</Text>
             {!bank.bankDetails.hasPin && <Text style={styles.description}>ابتدا رمز تغییر شبا را تعیین کنید.</Text>}
-            <TextInput accessibilityLabel="شماره شبای جدید" placeholder="IR و ۲۴ رقم" placeholderTextColor={colors.muted} value={bankSheba} onChangeText={value => setBankSheba(normalizeSheba(value))} editable={enabled && bank.bankDetails.hasPin} autoCapitalize="characters" autoCorrect={false} maxLength={26} style={styles.input} />
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>شماره شبای جدید</Text>
+              <TextInput accessibilityLabel="شماره شبای جدید" placeholder="IR و ۲۴ رقم" placeholderTextColor={colors.muted} value={bankSheba} onChangeText={value => setBankSheba(normalizeSheba(value))} editable={enabled && bank.bankDetails.hasPin} autoCapitalize="characters" autoCorrect={false} maxLength={26} style={styles.input} />
+            </View>
             {secretInput('رمز تغییر شبا', pin, setPin)}
             {bank.otpRequired && <>{button('ارسال کد تأیید تغییر شبا', () => void sendOtp('bank-details'), !enabled || !bank.bankDetails.hasPin)}{secretInput('کد پیامکی تغییر شبا', bankOtp, setBankOtp, 4)}</>}
             {button('ذخیره شبا', () => void runSave('bank'), !enabled || !!bank.bankDetails.pinTemporary || !bank.bankDetails.hasPin || !validBankSheba(normalizeSheba(bankSheba)) || !validBankPin(pin) || (bank.otpRequired && !/^\d{4}$/.test(bankOtp)))}
@@ -106,12 +114,14 @@ export function WorkerBankDetailsScreen({ onBack, onLogout }: { onBack: () => vo
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { padding: 20, gap: 16 },
   link: { ...type.medium, color: colors.teal, textAlign: 'right' },
-  title: { ...type.bold, color: colors.text, fontSize: 22, textAlign: 'right' },
-  heading: { ...type.bold, color: colors.text, fontSize: 18, textAlign: 'right' },
+  title: { ...type.bold, color: colors.text, fontSize: 22, textAlign: 'center' },
+  heading: { ...type.bold, color: colors.text, fontSize: 18, textAlign: 'center' },
   description: { ...type.regular, color: colors.muted, textAlign: 'right', lineHeight: 24 },
   card: { backgroundColor: colors.white, borderRadius: 16, padding: 20, gap: 14 },
+  field: { gap: 6 },
+  fieldLabel: { ...type.semibold, color: colors.text, textAlign: 'center' },
   input: { ...type.regular, borderWidth: 1, borderColor: colors.muted, borderRadius: 10, padding: 12, color: colors.text, textAlign: 'right' },
-  mask: { ...type.regular, color: colors.text, textAlign: 'left' },
+  mask: { ...type.regular, color: colors.text, textAlign: 'center' },
   button: { padding: 12, borderRadius: 10, backgroundColor: colors.teal, alignItems: 'center' },
   buttonText: { ...type.bold, color: colors.white }, disabled: { opacity: 0.45 }, error: { color: '#b91c1c' },
 });

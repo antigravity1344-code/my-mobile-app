@@ -1,4 +1,4 @@
-import type { ApiCompletion } from '../../../api/types';
+import type { ApiCompletion, ApiOrderExtension } from '../../../api/types';
 import type { JalaliDateOption, TimeSlot, AddressDetails, OrderPaymentStatus } from '../../../types/booking';
 import type { CustomerTier, RecurringFrequency, FinalPrice } from '../../../utils/pricing';
 import type { PricingType } from '../../../types/service';
@@ -56,6 +56,7 @@ export interface OrderRatingData {
 
 export interface OrderItem {
   completion?: ApiCompletion | null;
+  extension?: ApiOrderExtension | null;
   id: string;
   orderNumber: string;
   serviceId: string;
@@ -66,6 +67,7 @@ export interface OrderItem {
   paymentStatus: OrderPaymentStatus;
   paymentMethod: OrderPaymentMethod;
   date: JalaliDateOption;
+  dateLabel?: string | null;
   timeSlot: TimeSlot;
   durationHours: number;
   genderPreference: 'FEMALE' | 'MALE' | 'NO_PREFERENCE';

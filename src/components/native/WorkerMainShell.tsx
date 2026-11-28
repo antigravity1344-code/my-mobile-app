@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { refreshServiceAvailability } from '../../config/serviceAvailabilityApi';
-import { Alert, BackHandler, StatusBar, StyleSheet, View } from 'react-native';
+import { BackHandler, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView as EdgeSafeAreaView } from 'react-native-safe-area-context';
 import { WorkerHomeScreen } from './WorkerHomeScreen';
 import { WorkerHomeCardScreen } from './WorkerHomeCardScreens';
@@ -9,7 +9,6 @@ import { WorkerTabBar, type WorkerTab } from './WorkerTabBar';
 import { NativeWorkerPortal } from './NativeWorkerPortal';
 import { useWorkerOrders } from './useWorkerOrders';
 import { mapWorkerOrder, type NativeOrder } from './workerOrderMapper';
-import { requestWorkerAccept } from './workerAcceptOrder';
 import { WORKER_SESSION_EXPIRED_MESSAGE } from './workerOrdersFetch';
 import { workerTabBadge } from './workerHomeModel';
 import { WORKER_TIER_ENDPOINT, workerTierFromResponse, workerTierNextFromResponse, type WorkerTierKey, type WorkerTierNext } from './workerTier';
@@ -52,7 +51,10 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout, onUpda
   useEffect(() => installWorkerBackNavigation(BackHandler, mainView, onChangeView, () => contentBackRef.current?.() ?? false), [mainView, onChangeView]);
   const orders = useWorkerOrders<NativeOrder>(user.id, mapWorkerOrder);
   const { ordersState, hasLoaded, fetchOrders } = orders;
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [homeOrderId, setHomeOrderId] = useState<string | null>(null);
+  useEffect(() => {
+    if (mainView !== 'new_orders') setHomeOrderId(null);
+  }, [mainView]);
   const [unreadCount, setUnreadCount] = useState(0);
   // درجهٔ خود متخصص (D-71)؛ خطا یا پاسخ نامعتبر یعنی هیچ نشانی نمایش داده نشود.
   const [tierKey, setTierKey] = useState<WorkerTierKey | null>(null);
@@ -125,17 +127,6 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout, onUpda
     void loadWeeklyIncome();
   }, [mainView, loadUnread, loadTier, loadRating, loadWeeklyIncome]);
 
-  const handleAccept = async (order: NativeOrder) => {
-    if (acceptingId) return;
-    setAcceptingId(order.id);
-    const result = await requestWorkerAccept(order.id, user.id);
-    setAcceptingId(null);
-    if (result.ok) Alert.alert('پذیرش سفارش', 'سفارش «' + order.serviceTitle + '» با موفقیت پذیرفته شد.', [{ text: 'باشه' }]);
-    else if (result.message) Alert.alert('خطا', result.message, [{ text: 'باشه' }]);
-    // بعد از موفقیت یا خطا فهرست‌ها تازه می‌شوند تا شمارش‌ها و کارت بعدی به‌روز شوند.
-    void fetchOrders('after-action');
-  };
-
   const activeTab: WorkerTab = mainView === 'work_area' || mainView === 'bank_details' || mainView === 'offers' ? 'profile' : mainView === 'alerts' || isWorkerHomeCard(mainView) ? 'home' : mainView;
   const cardKnown = hasLoaded && !ordersState.sessionExpired && !(!!ordersState.error && ordersState.available.length === 0 && ordersState.mine.length === 0);
   const newOrdersBadge = hasLoaded && !ordersState.sessionExpired ? workerTabBadge(ordersState.available.length) : null;
@@ -157,8 +148,10 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout, onUpda
             weeklyIncomeLoading={weeklyIncomeLoading}
             ordersState={ordersState}
             hasLoaded={hasLoaded}
-            acceptingId={acceptingId}
-            onAccept={(order) => void handleAccept(order)}
+            onOpenAvailableOrder={(id) => {
+              setHomeOrderId(id);
+              onChangeView('new_orders');
+            }}
             onRetry={() => void fetchOrders('manual')}
             onOpenProfile={() => onChangeView('profile')}
             onOpenOrders={(tab) => onChangeView(tab === 'my_jobs' ? 'my_jobs' : 'new_orders')}
@@ -174,7 +167,7 @@ export function WorkerMainShell({ user, mainView, onChangeView, onLogout, onUpda
             onBack={() => onChangeView('home')}
           />
         ) : mainView === 'new_orders' ? (
-          <NativeWorkerPortal key="new_orders" initialTab="available" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
+          <NativeWorkerPortal key="new_orders" initialTab="available" orders={orders} initialOrderId={homeOrderId} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'my_jobs' ? (
           <NativeWorkerPortal key="my_jobs" initialTab="my_jobs" orders={orders} user={user} onSessionExpired={onLogout} contentBackRef={contentBackRef} />
         ) : mainView === 'profile' ? (

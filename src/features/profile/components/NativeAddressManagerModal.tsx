@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   closeBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   body: { padding: 16, gap: 12 },
   field: { gap: 6 },
-  label: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'right', color: '#334155', fontSize: 12 },
+  label: { ...type.bold, ...fa, fontWeight: '400', textAlign: 'center', color: '#334155', fontSize: 12 },
   input: { ...type.regular, ...fa, fontWeight: '400', backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, color: '#0f172a', textAlign: 'right' },
   textArea: { minHeight: 88, textAlignVertical: 'top' },
   error: { ...type.regular, ...fa, fontWeight: '400', color: '#b91c1c', textAlign: 'right', backgroundColor: '#fee2e2', padding: 10, borderRadius: 10 },

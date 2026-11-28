@@ -69,7 +69,7 @@ async function pageFor(t, initialToken = token, tab = 'Tariffs') {
   page.on('pageerror', (error) => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, []));
   await page.goto(origin + '/admin');
-  await page.locator('#tab' + tab + 'Btn').click();
+  if (initialToken === token) await page.locator('#tab' + tab + 'Btn').click();
   if (tab === 'Tariffs') {
     await page.waitForFunction(() => {
       const tariffMessage = document.getElementById('tariffMessage');
@@ -160,6 +160,26 @@ test('tariff read uses only the existing admin session and never exposes disk st
   assert.deepEqual(fs.readFileSync(process.env.PAKSHO_TARIFF_FILE), before);
 });
 
+test('saving a draft shows missing start and confirmation beside the button and preserves the entered rate', async (t) => {
+  fixture();
+  const { page } = await pageFor(t);
+  await page.setViewportSize({ width: 390, height: 760 });
+  const rate = page.getByLabel('نظافت داخل منزل / واحد — برای هر ساعت (minor)', { exact: true });
+  const message = page.locator('#tariffSave + #tariffMessage');
+  const start = page.locator('#tariffDraftFrom');
+  await rate.fill('۲۵۰٬۰۰۰');
+  await page.locator('#tariffSave').click();
+  await message.filter({ hasText: 'تاریخ و ساعت شروع اعتبار را وارد کنید.' }).waitFor();
+  assert.equal(await start.evaluate((input) => document.activeElement === input), true);
+  assert.equal(await rate.inputValue(), '۲۵۰٬۰۰۰');
+  assert.equal(readAdminTariff().versions.length, 1);
+  await start.fill(FUTURE_LOCAL);
+  await page.locator('#tariffSave').click();
+  await message.filter({ hasText: 'پیش‌نویس ذخیره شد' }).waitFor();
+  const draft = readAdminTariff().versions.find((version) => version.status === 'draft');
+  assert.equal(draft.services.home_unit_cleaning.rate, 250000);
+});
+
 test('the real admin form saves and publishes a priced clone without altering existing orders', async (t) => {
   fixture();
   const customer = await harness.login(server, '09120001203');
@@ -218,6 +238,49 @@ test('the real admin form saves and publishes a priced clone without altering ex
   const stored = harness.store.getOrder(created.json.order.id);
   assert.equal(stored.price, orderBefore.price);
   assert.deepEqual(stored.pricingJson, orderBefore.pricingJson);
+});
+
+test('staircase draft publishes SQLite rates, quotes the building and freezes the supplies line on the order', async (t) => {
+  const serviceId = 'staircase_common_areas';
+  fixture({ currencyUnit: 'تومان', versions: [{ id: 'old', status: 'published', validFrom: '2020-01-01T00:00:00Z',
+    validTo: null, services: { [serviceId]: { model: 'fixed', rate: 400000, exemptFromTierLock: true,
+      surcharges: [{ id: 'detergent', optionId: 'detergent', amount: 80000 }] } } }] });
+  const { page } = await pageFor(t);
+  await page.locator('#staircaseEnabled').check();
+  assert.equal(await page.locator('#stairRate-baseRate').inputValue(), '1070000');
+  await page.locator('#stairRate-extraFloor').fill('۵۰٬۰۰۰');
+  await page.locator('#tariffDraftFrom').fill(FUTURE_LOCAL);
+  await page.locator('#tariffSave').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس ذخیره شد'));
+  const draft = readAdminTariff().versions.find(v => v.status === 'draft');
+  assert.equal(harness.store.staircaseTariffs.read(draft.services[serviceId].staircaseKey).extraFloor, 50000);
+  const live = await request(server, { pathname: '/api/services/enabled' });
+  assert.equal(live.json.pricingRules.find(r => r.serviceId === serviceId).staircaseRates, undefined);
+  await page.locator('#tariffSupersede').selectOption('old');
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#tariffPublish').click();
+  await page.waitForFunction(() => document.getElementById('tariffMessage').textContent.includes('پیش‌نویس منتشر شد'));
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse(draft.validFrom) + 1000 });
+  const customer = await harness.login(server, '09120001642');
+  const body = { serviceId, quantity: 1, options: { floors: 5, unitsPerFloor: 3, parkingFloors: 1, noLift: true, detergent: true } };
+  const send = (pathname, data) => request(server, { method: 'POST', token: customer.token, pathname, body: data });
+  const published = (await request(server, { pathname: '/api/services/enabled' })).json.pricingRules.find(r => r.serviceId === serviceId);
+  assert.equal(published.staircaseRates.extraFloor, 50000);
+  const quoted = await send('/api/pricing/quote', body);
+  assert.equal(quoted.status, 200);
+  const price = quoted.json.quote;
+  assert.equal(price.total, 1500800);
+  assert.deepEqual(price.surcharges.filter(line => line.id === 'detergent'), [{ id: 'detergent', amount: 150000 }]);
+  const booking = { ...body, quoteToken: price.quoteToken, confirmedTotal: price.total,
+    address: 'نشانی آزمایشی', date: '1405-09-05', time: '10:00', clientRequestId: 'stair-form-order-01' };
+  const rejected = await send('/api/orders', { ...booking, confirmedTotal: 400000 });
+  assert.equal(rejected.json.code, 'PRICE_NOT_CONFIRMED', JSON.stringify(rejected.json));
+  const created = await send('/api/orders', booking);
+  assert.equal(created.status, 200, JSON.stringify(created.json));
+  const stored = harness.store.getOrder(created.json.order.id);
+  assert.equal(stored.serviceOptions.parkingFloors, 1);
+  assert.equal('staircaseTerms' in stored.pricing, false);
+  assert.ok(stored.pricing.surcharges.some(line => line.id === 'detergent' && line.amount === 150000));
 });
 
 test('published staircase exemption preserves the base rate and rejects higher tiers on new orders', async (t) => {
@@ -392,6 +455,7 @@ test('missing tariff stays unpublished until the admin types prices, and an expi
   }
   await expired.page.locator('#adminPassword').fill(harness.adminPassword);
   await expired.page.locator('#adminLogin button[type="submit"]').click();
+  await expired.page.locator('#tabTariffsBtn').click();
   await expired.page.waitForSelector('#tariffSave');
 });
 

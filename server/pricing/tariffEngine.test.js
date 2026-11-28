@@ -49,6 +49,20 @@ test('hourly, fixed, count and area quotes come only from the supplied tariff', 
   assert.equal(area.companyId, 'deployment-under-test');
 });
 
+test('hourly extension defaults to 25% above the base rate and accepts a higher override', () => {
+  const loaded = policy({
+    hour: line('hourly', { rate: 200000 }),
+    override: line('hourly', { rate: 200000, extraHourlyRate: 280000 }),
+    withFloor: line('hourly', { rate: 100000, minQuantity: 4, minCharge: 800000 }),
+    flat: line('fixed', { rate: 200000 }),
+  });
+  assert.equal(quote(loaded, { at, serviceId: 'hour', quantity: 4 }).extraHourlyRate, 250000);
+  assert.equal(quote(loaded, { at, serviceId: 'override', quantity: 4 }).extraHourlyRate, 280000);
+  assert.equal(quote(loaded, { at, serviceId: 'flat' }).extraHourlyRate, undefined);
+  assert.equal(quote(loaded, { at, serviceId: 'withFloor', quantity: 4 }).extraHourlyRate, 250000);
+  assert.throws(() => policy({ hour: line('hourly', { rate: 200000, extraHourlyRate: 200000 }) }), { code: 'TARIFF_INVALID' });
+});
+
 test('half-up integer rounding does not use binary floating point', () => {
   const loaded = policy({
     hour: line('hourly', { rate: 1, discounts: [{ id: 'half', basisPoints: 5000 }] }),

@@ -4,6 +4,11 @@ import { useBooking } from '../../context/BookingContext';
 import { addressCityFields } from '../../api/serviceAreas';
 import { CleaningService } from '../../types/service';
 import { ServiceSelector } from './ServiceSelector';
+import { quoteLineLabel } from '../../features/orders/services/quoteLineLabel';
+import { StaircaseWebForm } from './StaircaseWebForm';
+import { submittedTimeText } from '../../features/orders/services/orderPayload';
+import { getStaircaseRates, hourlyDurationChoices, isDetergentBookable, serviceMinimumHours } from '../../config/serviceAvailability';
+import { STAIR_SERVICE } from '../../../server/pricing/staircase';
 import { DateTimeSelector } from './DateTimeSelector';
 import { AddressLocationSelector } from './AddressLocationSelector';
 import { useOrders, type OrderItem } from '../../features/orders';
@@ -16,7 +21,6 @@ import {
 import {
   QUOTE_STALE_MESSAGE,
   buildQuoteRequest,
-  CUSTOMER_WORKER_TIERS,
   tierLockApplies,
   type CustomerWorkerTier,
   confirmableServerQuote,
@@ -63,6 +67,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
     customerTier,
     addressDetails,
     serviceOptions,
+    setServiceOption,
     updateAddressField,
     resetBooking,
     nextStep,
@@ -77,7 +82,8 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
       serviceId: selectedService.id,
       pricingType: selectedService.pricingType,
       durationHours,
-      serviceOptions,
+      serviceOptions: selectedService.id !== STAIR_SERVICE && serviceOptions.detergent && !isDetergentBookable(selectedService.id)
+        ? { ...serviceOptions, detergent: false } : serviceOptions,
       ...(tierLock ? { workerTier } : {}),
     }
     : null;
@@ -272,7 +278,9 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
           <ServiceSelector
             selectedService={selectedService}
             onSelectService={(svc: CleaningService) => {
+              if (selectedService?.id !== svc.id) setWorkerTier('gray');
               setSelectedService(svc);
+              if (svc.pricingType === 'hourly') setDurationHours(serviceMinimumHours(svc.id));
             }}
             onNext={nextStep}
             onPrev={onNavigateHome || prevStep}
@@ -281,10 +289,13 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
 
         {step === 2 && (
           <>
+            {selectedService?.id === STAIR_SERVICE && <StaircaseWebForm confirmedTotal={quoteView.status === 'ready' ? quoteView.quote.total : undefined} rates={getStaircaseRates()} values={serviceOptions} change={setServiceOption} />}
             <DateTimeSelector
               selectedDate={selectedDate}
               selectedTimeSlot={selectedTimeSlot}
               durationHours={durationHours}
+              showDuration={selectedService?.id !== STAIR_SERVICE}
+              durationOptions={selectedService ? hourlyDurationChoices(selectedService.id) : undefined}
               genderPreference={genderPreference}
               notes={notes}
               onSelectDate={setSelectedDate}
@@ -297,20 +308,16 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
             />
             {tierLock && (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
-                <div className="mb-1 text-sm font-bold text-slate-700">سطح متخصص</div>
-                <p className="mb-3 text-xs text-slate-500">قیمت همین سطح در لحظهٔ ثبت قفل می‌شود. هزینهٔ ثابت جانبی جدا می‌ماند.</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {CUSTOMER_WORKER_TIERS.map((tier) => (
-                    <button
-                      key={tier.id}
-                      type="button"
-                      onClick={() => setWorkerTier(tier.id)}
-                      className={`rounded-xl border px-3 py-2 text-sm ${workerTier === tier.id ? 'border-teal-600 bg-teal-50 font-bold text-teal-800' : 'border-slate-200 text-slate-600'}`}
-                    >
-                      {tier.label}
-                    </button>
-                  ))}
-                </div>
+                <div className="mb-1 text-center text-sm font-bold text-slate-700">متخصص طلایی (اختیاری)</div>
+                <p className="mb-3 text-xs text-slate-500">برای کارهای حساس و دقیق می‌توانید متخصص طلایی انتخاب کنید. تعرفهٔ طلایی بالاتر است.</p>
+                <label className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                  <input type="checkbox" checked={workerTier === 'gold'} onChange={event => setWorkerTier(event.target.checked ? 'gold' : 'gray')} />
+                  انتخاب متخصص طلایی
+                </label>
+                <p className="mt-2 text-center text-xs text-slate-600" role="status">
+                  {workerTier === 'gold' ? 'تعرفهٔ طلایی' : 'تعرفهٔ عادی'}
+                  {quoteView.status === 'ready' ? ' · ' + formatServerAmount(quoteView.quote.total, quoteView.quote.currencyUnit) : ''}
+                </p>
               </div>
             )}
             <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 text-right">
@@ -383,7 +390,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   <span className="text-xs font-bold text-slate-700">زمان اعزام:</span>
                 </div>
                 <span className="text-xs font-bold text-slate-900">
-                  {selectedDate?.dayOfWeek} {selectedDate?.dayOfMonth} {selectedDate?.monthName} ({selectedTimeSlot?.label})
+                  {selectedDate?.dayOfWeek} {selectedDate?.dayOfMonth} {selectedDate?.monthName} ({submittedTimeText(selectedTimeSlot)})
                 </span>
               </div>
 
@@ -393,7 +400,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                   <span className="text-xs font-bold text-slate-700">مدت زمان و تخصص:</span>
                 </div>
                 <span className="text-xs font-bold text-slate-900">
-                  {durationHours} ساعت نظافت (متخصص {genderPreference === 'FEMALE' ? 'خانم' : genderPreference === 'MALE' ? 'آقا' : 'بدون ترجیح'})
+                  {selectedService?.id === STAIR_SERVICE ? 'نظافت راه‌پله و مشاعات' : durationHours + ' ساعت نظافت'} (متخصص {genderPreference === 'FEMALE' ? 'خانم' : genderPreference === 'MALE' ? 'آقا' : 'بدون ترجیح'})
                 </span>
               </div>
 
@@ -438,7 +445,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                     </div>
                     {review.surcharges.map((line) => (
                       <div key={line.id} className="flex justify-between text-xs text-slate-700">
-                        <span>{line.id}</span>
+                        <span>{quoteLineLabel(line.id, 'surcharge', selectedService?.id)}</span>
                         <span>{formatServerAmount(line.amount, review.currencyUnit)}</span>
                       </div>
                     ))}
@@ -454,6 +461,7 @@ export const BookingWizardContainer: React.FC<BookingWizardContainerProps> = ({ 
                         {formatServerAmount(review.total, review.currencyUnit)}
                       </span>
                     </div>
+                    {freshQuote?.extraHourlyRate ? <p>هر ساعت اضافه با تأیید شما: {formatServerAmount(freshQuote.extraHourlyRate, freshQuote.currencyUnit)}</p> : null}
                   </>
                 ) : null}
                 {review.kind !== 'recovery' && (quoteView.status === 'unavailable' || quoteView.status === 'network') ? (

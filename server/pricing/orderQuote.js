@@ -5,7 +5,8 @@
 // A published version already stored on an order is never recalculated.
 
 const crypto = require('crypto');
-const { TariffError, quote } = require('./tariffEngine');
+const { TariffError, quote, selectVersion } = require('./tariffEngine');
+const { BASE_BUILDING } = require('./staircase');
 const { loadCommittedTariff } = require('./tariffPublication');
 
 // Technical quote lifetime, not a tariff and not a price.
@@ -159,6 +160,8 @@ let offerResolver = null;
 let tierResolver = null;
 let directRequestResolver = null;
 let promoResolver = null;
+let staircaseResolver = null;
+function setStaircaseResolver(resolve) { staircaseResolver = resolve; }
 const WORKER_TIERS = new Set(['gray', 'silver', 'gold']);
 // درخواست ساعت دلخواه مشتری: شناسهٔ CRQ- فقط در پذیرش متخصص (داخل withCustomerRequestAcceptance) قابل نقل‌قول است.
 let acceptingCustomerRequest = false;
@@ -223,12 +226,17 @@ function splitOfferOption(selection, now) {
 function previewOfferPrice(serviceId, basisPoints, now = new Date()) {
   try {
     const policy = loadCommittedTariff();
-    const version = require('./tariffEngine').selectVersion(policy, now);
+    const version = selectVersion(policy, now);
     const service = version.services[serviceId];
     if (!service) return null;
     const quantity = service.model === 'fixed' ? undefined : (service.minQuantity || 1);
-    const base = quote(policy, { serviceId, quantity, options: {}, at: now });
-    const offered = quote(policy, { serviceId, quantity, options: {}, at: now, priceAdjustment: { id: 'worker-offer', basisPoints } });
+    const input = { serviceId, quantity, at: now, options: {} };
+    if (service.staircaseKey) {
+      input.options = BASE_BUILDING;
+      input.staircaseRates = staircaseResolver(service.staircaseKey);
+    }
+    const base = quote(policy, input);
+    const offered = quote(policy, { ...input, priceAdjustment: { id: 'worker-offer', basisPoints } });
     return { currencyUnit: base.currencyUnit, quantity: quantity == null ? 1 : quantity, tariffTotal: base.total, total: offered.total };
   } catch (error) {
     return null;
@@ -250,7 +258,10 @@ function trustedQuote(selection, now) {
   const tier = direct ? null : tierForSelection(selection, split.adjustment, now);
   const basisPoints = direct ? direct.basisPoints : (tier && tier.basisPoints != null ? tier.basisPoints : null);
   const promo = promoForSelection(selection);
+  const stairKey = selectVersion(policy, now).services[selection.serviceId]?.staircaseKey;
+  const staircaseRates = stairKey ? staircaseResolver(stairKey) : null;
   const priced = quote(policy, {
+    ...(staircaseRates ? { staircaseRates } : {}),
     serviceId: selection.serviceId,
     quantity: selection.quantity,
     options: split.options,
@@ -259,7 +270,7 @@ function trustedQuote(selection, now) {
     ...(basisPoints != null ? { baseRateBasisPoints: basisPoints } : {}),
     ...(promo ? { promoDiscount: promo } : {}),
   });
-  return { priced, secret, tier, direct };
+  return { priced, secret, tier, direct, staircaseRates };
 }
 
 function publicQuote(priced, token, expiresAt) {
@@ -269,6 +280,7 @@ function publicQuote(priced, token, expiresAt) {
     surcharges: priced.breakdown.filter((line) => line.kind === 'surcharge').map((line) => ({ id: line.id, amount: line.amount })),
     discounts: priced.breakdown.filter((line) => line.kind === 'discount').map((line) => ({ id: line.id, amount: -line.amount })),
     total: priced.total,
+    ...(priced.extraHourlyRate == null ? {} : { extraHourlyRate: priced.extraHourlyRate }),
     currencyUnit: priced.currencyUnit,
     tariffVersionId: priced.tariffVersionId,
     expiresAt,
@@ -293,6 +305,7 @@ function issueOrderQuote(body, now = new Date()) {
     subtotal: priced.subtotal,
     discountTotal: priced.discountTotal,
     total: priced.total,
+    ...(priced.extraHourlyRate == null ? {} : { extraHourlyRate: priced.extraHourlyRate }),
     currencyUnit: priced.currencyUnit,
     issuedAt,
     expiresAt,
@@ -382,7 +395,7 @@ function matchExistingServerOrder(body, existing) {
 
 function confirmOrderQuote(body, now = new Date()) {
   const selection = selectionFromBody(body);
-  const { priced, secret } = trustedQuote(selection, now);
+  const { priced, secret, staircaseRates } = trustedQuote(selection, now);
   const signed = readSignedQuote(body.quoteToken, secret);
   if (!signed || !sameSelection(signed, selection)) {
     throw new QuoteError('PRICE_CHANGED', 'قیمت تغییر کرده است. مبلغ جدید را ببینید و دوباره تأیید کنید.');
@@ -394,7 +407,8 @@ function confirmOrderQuote(body, now = new Date()) {
     && priced.total === signed.total
     && priced.subtotal === signed.subtotal
     && priced.discountTotal === signed.discountTotal
-    && priced.currencyUnit === signed.currencyUnit;
+    && priced.currencyUnit === signed.currencyUnit
+    && (signed.extraHourlyRate == null || priced.extraHourlyRate === signed.extraHourlyRate);
   if (!unchanged) {
     throw new QuoteError('PRICE_CHANGED', 'قیمت تغییر کرده است. مبلغ جدید را ببینید و دوباره تأیید کنید.');
   }
@@ -403,6 +417,7 @@ function confirmOrderQuote(body, now = new Date()) {
   }
   return {
     price: priced.total,
+    ...(staircaseRates ? { isStaircase: true } : {}),
     pricing: {
       source: 'server',
       companyId: priced.companyId,
@@ -414,6 +429,7 @@ function confirmOrderQuote(body, now = new Date()) {
       subtotal: priced.subtotal,
       discountTotal: priced.discountTotal,
       total: priced.total,
+      ...(priced.extraHourlyRate == null ? {} : { extraHourlyRate: priced.extraHourlyRate }),
       surcharges: priced.breakdown.filter((line) => line.kind === 'surcharge'),
       discounts: priced.breakdown.filter((line) => line.kind === 'discount'),
       ...signedTierFields(signed),
@@ -485,6 +501,7 @@ module.exports = {
   setTierResolver,
   setDirectRequestResolver,
   setPromoResolver,
+  setStaircaseResolver,
   previewOfferPrice,
   QUOTE_TTL_MS,
   NO_TARIFF_MESSAGE,

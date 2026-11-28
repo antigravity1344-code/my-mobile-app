@@ -1,5 +1,8 @@
 function registerCompletionRoutes(app, {store, requireUser, requireAdmin, customerView, workerView}) {
   function send(res, result, view) {
+    if (result.code === 'unapproved-hours') {
+      return res.status(409).json({success:false,code:result.code,message:'ساعات کار از مدت رزرو و تمدیدهای تأییدشده بیشتر است.'});
+    }
     if (result.code !== 'ok') {
       const status = {missing:404, forbidden:403, invalid:400}[result.code] || 409;
       return res.status(status).json({success:false,code:result.code,message:'ثبت پایان کار انجام نشد؛ اطلاعات سفارش را بازخوانی کنید. در صورت اختلاف با پشتیبانی تماس بگیرید.'});
@@ -15,6 +18,16 @@ function registerCompletionRoutes(app, {store, requireUser, requireAdmin, custom
     if (user.role !== 'WORKER' || !['ACTIVE','APPROVED'].includes(user.status)) return res.status(403).json({success:false});
     if (!req.body || !Object.hasOwn(req.body,'acceptanceKey')) return res.status(409).json({success:false,code:'CLIENT_UPDATE_REQUIRED',message:'برای ثبت ساعات و مبلغ پایان کار، برنامه را به‌روز کنید.'});
     return send(res,store.reportCompletion(req.params.orderId,user,req.body),workerView);
+  }));
+  app.put('/api/orders/:orderId/extension-request', safe((req,res) => {
+    const user = requireUser(req,res); if (!user) return;
+    if (user.role !== 'CUSTOMER') return res.status(403).json({success:false});
+    return send(res,store.requestExtension(req.params.orderId,user.id,req.body),customerView);
+  }));
+  app.put('/api/orders/:orderId/extension-response', safe((req,res) => {
+    const user = requireUser(req,res); if (!user) return;
+    if (user.role !== 'WORKER' || !['ACTIVE','APPROVED'].includes(user.status)) return res.status(403).json({success:false});
+    return send(res,store.respondExtension(req.params.orderId,user.id,req.body),workerView);
   }));
   app.put('/api/orders/:orderId/completion-response', safe((req,res) => {
     const user = requireUser(req,res); if (!user) return;

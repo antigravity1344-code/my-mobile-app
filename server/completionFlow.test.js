@@ -5,7 +5,7 @@ const h=createTestHarness('paksho-completion-policy-flow-');
 const {store,request}=h;
 after(()=>h.close());
 let sequence=9100;
-async function fixture(t) {
+async function fixture(t, orderOverrides = {}) {
  const server=await h.serverFor(t);
  const customer=await h.login(server,'0912'+String(sequence++).padStart(7,'0'));
  const worker=await h.login(server,'0912'+String(sequence++).padStart(7,'0'),'WORKER');
@@ -13,13 +13,83 @@ async function fixture(t) {
  const admin=await h.adminLogin(server);
  store.completionPolicy.publish({mode:'customer_confirmation',expectedVersion:store.completionPolicy.read().version});
  const id='COMPLETION-'+sequence++;
- store.createOrder({id,customerId:customer.user.id,customerName:'test',customerPhone:'09120000000',date:'1405/08/01',time:'10:00',serviceTitle:'hourly',durationHours:2,address:'محله آزمون، نشانی خصوصی پلاک ۲',price:100,status:'PENDING',createdAt:new Date().toISOString()});
+ store.createOrder({id,customerId:customer.user.id,customerName:'test',customerPhone:'09120000000',date:'1405/08/01',time:'10:00',serviceTitle:'hourly',durationHours:2,address:'محله آزمون، نشانی خصوصی پلاک ۲',price:100,status:'PENDING',createdAt:new Date().toISOString(),...orderOverrides});
  store.tryAcceptOrder(id,store.getUser(worker.user.id));
  const put=(suffix,body,token=worker.token)=>request(server,{method:'PUT',pathname:'/api/orders/'+id+suffix,token,body});
  const body=()=>({acceptanceKey:store.completionAcceptanceKey(store.getOrder(id)),actualHours:3.5,finalAmount:150});
  const decide=(requestId,approve)=>request(server,{method:'PUT',pathname:'/api/admin/orders/'+id+'/completion-decision',token:admin,body:{requestId,approve}});
  return {server,customer,worker,admin,id,put,body,decide};
 }
+test('staircase completion takes the booked total for new and older worker clients', async t => {
+ const f = await fixture(t, { serviceId: 'staircase_common_areas', price: 1177000 });
+ const acceptanceKey = f.body().acceptanceKey;
+ const sent = await f.put('/complete', { acceptanceKey, actualHours: 3.5, finalAmount: 1 });
+ assert.equal(sent.status, 200);
+ assert.equal(sent.json.completion.actualHours, null);
+ assert.equal(sent.json.completion.finalAmount, 1177000);
+ const repeat = await f.put('/complete', { acceptanceKey });
+ assert.equal(repeat.status, 200);
+ assert.deepEqual(repeat.json.completion, sent.json.completion);
+ const privatePath = '/api/orders/' + f.id + '/customer-actions';
+ assert.equal((await request(f.server, { pathname: privatePath })).status, 401);
+ assert.equal((await request(f.server, { pathname: privatePath, token: f.worker.token })).status, 403);
+ const stranger = await h.login(f.server, '0912' + String(sequence++).padStart(7, '0'));
+ assert.equal((await request(f.server, { pathname: privatePath, token: stranger.token })).status, 404);
+ const owned = await request(f.server, { pathname: privatePath, token: f.customer.token });
+ assert.equal(owned.status, 200);
+ assert.equal(owned.json.details.completion.finalAmount, 1177000);
+ assert.equal(Object.hasOwn(owned.json.details, 'customerPhone'), false);
+ assert.equal(Object.hasOwn(owned.json.details, 'address'), false);
+ const answer = { requestId: sent.json.completion.requestId, answer: 'yes' };
+ assert.equal((await f.put('/completion-response', answer, f.customer.token)).status, 200);
+ assert.equal(store.getOrder(f.id).status, 'COMPLETED');
+ assert.equal(store.getOrder(f.id).price, 1177000);
+});
+test('confirmed extra hour adds exactly one rate to a booking that includes detergent', async t => {
+ const f = await fixture(t, { serviceId: 'home_unit_cleaning', durationHours: 4, price: 950000,
+   pricing: { source: 'server', currencyUnit: 'تومان', extraHourlyRate: 250000, surcharges: [{ id: 'detergent', amount: 150000 }] } });
+ const acceptanceKey = f.body().acceptanceKey;
+ const submission = { version: store.extensionFor(store.getOrder(f.id)).version, expectedTotal: 1200000 };
+ assert.equal((await f.put('/extension-request', submission)).status, 403);
+ assert.equal((await f.put('/extension-request', submission, f.customer.token)).status, 409);
+ const startKey = store.startAcceptanceKey(store.getOrder(f.id));
+ assert.equal((await f.put('/start', { acceptanceKey: startKey })).status, 200);
+ const promptEventId = store.startPromptEventId(store.getOrder(f.id));
+ assert.equal((await f.put('/start-response', { answer: 'yes', promptEventId }, f.customer.token)).status, 200);
+ assert.equal((await f.put('/extension-request', { ...submission, expectedTotal: 1 }, f.customer.token)).status, 409);
+ const result = await f.put('/extension-request', submission, f.customer.token);
+ assert.equal(result.status, 200);
+ const pending = result.json.order.extension.pending;
+ assert.equal(pending.amount, 250000);
+ assert.equal(pending.total, 1200000);
+ assert.equal((await f.put('/extension-request', submission, f.customer.token)).json.order.extension.pending.id, pending.id);
+ assert.equal((await f.put('/complete', { acceptanceKey, actualHours: 5 })).status, 409);
+ const answer = { requestId: pending.id, answer: 'yes' };
+ assert.equal((await f.put('/extension-response', answer, f.customer.token)).status, 403);
+ assert.equal((await f.put('/extension-response', answer)).json.order.extension.approvedHours, 1);
+ assert.equal((await f.put('/extension-response', answer)).json.order.extension.approvedHours, 1);
+ assert.equal((await f.put('/extension-request', submission, f.customer.token)).status, 409);
+ const completed = await f.put('/complete', { acceptanceKey, actualHours: 5, finalAmount: 1 });
+ assert.equal(completed.status, 200);
+ assert.equal(completed.json.completion.finalAmount, 1200000);
+ assert.equal((await f.put('/completion-response', { requestId: completed.json.completion.requestId, answer: 'yes' }, f.customer.token)).status, 200);
+});
+test('a declined extra hour and an unanswered request do not increase the booked total', async t => {
+ const f = await fixture(t, { serviceId: 'home_unit_cleaning', durationHours: 4, price: 950000,
+   pricing: { source: 'server', currencyUnit: 'تومان', extraHourlyRate: 250000 } });
+ await f.put('/start', { acceptanceKey: store.startAcceptanceKey(store.getOrder(f.id)) });
+ await f.put('/start-response', { answer: 'yes', promptEventId: store.startPromptEventId(store.getOrder(f.id)) }, f.customer.token);
+ const acceptanceKey = f.body().acceptanceKey;
+ const ask = () => f.put('/extension-request', { version: store.extensionFor(store.getOrder(f.id)).version, expectedTotal: 1200000 }, f.customer.token);
+ const first = (await ask()).json.order.extension.pending;
+ assert.equal((await f.put('/extension-response', { requestId: first.id, answer: 'no' })).status, 200);
+ const second = (await ask()).json.order.extension.pending;
+ const sent = await f.put('/complete', { acceptanceKey, actualHours: 4 });
+ assert.equal(sent.json.completion.finalAmount, 950000);
+ assert.equal(sent.json.order.extension.pending, null);
+ assert.equal((await f.put('/extension-response', { requestId: second.id, answer: 'yes' })).status, 409);
+});
+
 test('default waits for customer; captured policy survives admin switch; repeated approval earns once',async t=>{
  const f=await fixture(t);const draft=f.body();
  const sent=await f.put('/complete',draft);assert.equal(sent.status,200);assert.equal(sent.json.completion.status,'pending');
@@ -57,6 +127,24 @@ test('dispute needs admin; rejection permits new revision and stale responses ca
  assert.equal(store.getOrder(f.id).status,'COMPLETED');
  assert.equal(store.listOrderEvents(f.id).filter(e=>e.kind==='END_REPORTED_BY_WORKER').length,2);
 });
+test('the assigned specialist sees only the customer tier badge allowed by their own level', async t => {
+ const f = await fixture(t);
+ const level = tierKey => ({ levels: [{ tierKey, minPoints: 0, minCompleted: 0 }] });
+ store.ensureAccount(f.customer.user.id);
+ store.ensureAccount(f.worker.user.id);
+ assert.equal(store.publishRule({ ruleKey: 'tiers.customer', value: level('silver'), actor: 'system' }).code, 'ok');
+ assert.equal(store.recomputeTier(f.customer.user.id).tierKey, 'silver');
+ const job = async () => (await request(f.server, { pathname: '/api/orders', token: f.worker.token })).json.orders.find(row => row.id === f.id);
+ assert.equal((await job()).publicTierBadge, undefined);
+ assert.equal(store.publishRule({ ruleKey: 'tiers.worker', value: level('silver'), actor: 'system' }).code, 'ok');
+ assert.equal(store.recomputeTier(f.worker.user.id).tierKey, 'silver');
+ assert.deepEqual((await job()).publicTierBadge, { tier: 'silver', label: 'نقره‌ای' });
+ assert.equal(store.publishRule({ ruleKey: 'tiers.worker', value: level('gold'), actor: 'system' }).code, 'ok');
+ assert.equal(store.recomputeTier(f.worker.user.id).tierKey, 'gold');
+ const badge = (await job()).publicTierBadge;
+ assert.deepEqual(Object.keys(badge).sort(), ['label', 'summary', 'tier']);
+});
+
 test('auth, strict payloads, legacy clients and generic admin bypass fail without mutations',async t=>{
  const f=await fixture(t);const initial=store.getOrder(f.id);
  assert.equal((await f.put('/complete',{},f.worker.token)).status,409);

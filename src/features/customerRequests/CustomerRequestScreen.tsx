@@ -144,7 +144,7 @@ export function CustomerRequestScreen({ onBack }: { onBack: () => void }) {
         <Text style={styles.submitText}>{busy ? 'در حال ثبت…' : 'ثبت درخواست'}</Text>
       </Pressable>
 
-      <Text style={styles.label}>درخواست‌های من</Text>
+      <Text style={[styles.label, styles.listHeading]}>درخواست‌های من</Text>
       {requests.length === 0 ? <Text style={styles.body}>هنوز درخواستی ثبت نکرده‌اید.</Text> : null}
       {requests.map((request) => (
         <View key={request.id} style={styles.card}>
@@ -171,7 +171,8 @@ const styles = StyleSheet.create({
   link: { color: colors.teal, fontWeight: '600', textAlign: 'right' },
   title: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'right' },
   body: { color: colors.muted, textAlign: 'right', lineHeight: 22 },
-  label: { fontWeight: '700', color: colors.text, textAlign: 'right', marginTop: 8 },
+  listHeading: { textAlign: 'right' },
+  label: { fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 8 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   serviceGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.white },

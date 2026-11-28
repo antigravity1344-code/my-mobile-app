@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 13,
     color: '#334155',
-    textAlign: 'right',
+    textAlign: 'center',
     marginBottom: 8,
   },
   inputWrapper: {

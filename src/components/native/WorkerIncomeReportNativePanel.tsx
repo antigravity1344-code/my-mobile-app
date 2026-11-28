@@ -46,13 +46,13 @@ export const WorkerIncomeReportNativePanel: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 10 },
-  title: { fontSize: 20, fontWeight: '700', textAlign: 'right', color: '#0f172a' },
+  title: { fontSize: 20, fontWeight: '700', textAlign: 'center', color: '#0f172a' },
   note: { textAlign: 'right', color: '#475569', lineHeight: 22 },
   refresh: { padding: 10, alignItems: 'center' },
   refreshText: { color: colors.tealDark, fontWeight: '700' },
   error: { color: '#b91c1c', textAlign: 'right' },
   month: { gap: 8 },
-  section: { fontSize: 16, fontWeight: '700', textAlign: 'right', marginTop: 6, color: '#0f172a' },
+  section: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 6, color: '#0f172a' },
   card: { padding: 12, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, gap: 5 },
   label: { color: '#334155', textAlign: 'right' },
   meta: { textAlign: 'right', color: '#64748b', fontSize: 12 },

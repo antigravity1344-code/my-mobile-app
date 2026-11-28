@@ -16,14 +16,14 @@ import {
 import { Medal, Star } from 'lucide-react-native';
 import { toPersianDigits } from '../../utils/jalaliDateOptions';
 import { formatStoredAmount } from '../../features/orders/services/money';
-import { canAcceptWorkerOrder, partitionWorkerJobs, workerStatusLabel } from './workerOrderStatus';
+import { partitionWorkerJobs, workerStatusLabel } from './workerOrderStatus';
+import { WorkerAvailableOrderCard } from './WorkerAvailableOrder';
 import type { WorkerOrdersState } from './workerOrdersFetch';
 import type { NativeOrder } from './workerOrderMapper';
 import {
   WORKER_STAT_PLACEHOLDER,
   workerGreeting,
   workerOrderTimeLabel,
-  workerPriceLine,
   workerStatText,
   workerTodayJobsCount,
   workerWeeklyIncome,
@@ -55,8 +55,7 @@ type Props = {
   weeklyIncomeLoading?: boolean;
   ordersState: WorkerOrdersState<NativeOrder>;
   hasLoaded: boolean;
-  acceptingId: string | null;
-  onAccept: (order: NativeOrder) => void;
+  onOpenAvailableOrder: (id: string) => void;
   onRetry: () => void;
   onOpenProfile?: () => void;
   onOpenOrders?: (tab: WorkerHomeOrdersTab) => void;
@@ -75,22 +74,18 @@ function ServiceIcon({ category }: { category: NativeOrder['category'] }) {
   return <IconServiceHome />;
 }
 
-function SectionHeader({ title, count, onSeeAll }: { title: string; count?: string; onSeeAll?: () => void }) {
+function SectionHeader({ title, count }: { title: string; count?: string }) {
   return (
     <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleRow}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeaderSide}>
         {count ? (
           <View style={styles.countPill}>
             <Text style={styles.countPillText}>{count}</Text>
           </View>
         ) : null}
       </View>
-      {onSeeAll ? (
-        <Pressable accessibilityRole="link" onPress={onSeeAll} hitSlop={10} style={styles.seeAll}>
-          <Text style={styles.seeAllText}>مشاهدهٔ همه</Text>
-        </Pressable>
-      ) : null}
+      <Text style={[styles.sectionTitle, styles.centeredTitle]}>{title}</Text>
+      <View style={styles.sectionHeaderSide} />
     </View>
   );
 }
@@ -107,8 +102,7 @@ export function WorkerHomeScreen({
   weeklyIncomeLoading,
   ordersState,
   hasLoaded,
-  acceptingId,
-  onAccept,
+  onOpenAvailableOrder,
   onRetry,
   onOpenProfile,
   onOpenOrders,
@@ -122,7 +116,6 @@ export function WorkerHomeScreen({
   const known = ready && !failedEmpty;
   const available = ordersState.available;
   const preview = available.slice(0, 2);
-  const more = available.length - preview.length;
   const currentJob = partitionWorkerJobs(ordersState.mine).active[0] ?? null;
   const income = workerWeeklyIncome(weeklyIncome);
   const tierBadge = workerTierBadge(tierKey);
@@ -222,7 +215,6 @@ export function WorkerHomeScreen({
       <SectionHeader
         title="سفارش‌های جدید"
         count={known && available.length > 0 ? toPersianDigits(available.length) : undefined}
-        onSeeAll={() => onOpenOrders?.('available')}
       />
       {!hasLoaded ? (
         <View style={styles.stateCard}>
@@ -246,52 +238,14 @@ export function WorkerHomeScreen({
         </View>
       ) : (
         <>
-          {preview.map((order) => {
-            const busy = acceptingId === order.id;
-            const time = workerOrderTimeLabel(order.rawDate, order.rawTime);
-            return (
-              <View key={order.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.serviceIcon}>
-                    <ServiceIcon category={order.category} />
-                  </View>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{order.serviceTitle}</Text>
-                  <View style={styles.newChip}>
-                    <Text style={styles.newChipText}>جدید</Text>
-                  </View>
-                </View>
-                {order.district ? (
-                  <View style={styles.metaRow}>
-                    <IconPin />
-                    <Text style={styles.metaText}>{order.district}</Text>
-                  </View>
-                ) : null}
-                {time ? (
-                  <View style={styles.metaRow}>
-                    <IconClock />
-                    <Text style={styles.metaText}>{time}</Text>
-                  </View>
-                ) : null}
-                <Text style={styles.priceText}>
-                  {workerPriceLine(order.serviceId, order.rawPrice, (amount) => formatStoredAmount(amount, order.currencyUnit), order.priceStatus)}
-                </Text>
-                {canAcceptWorkerOrder(order.status) ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: !!acceptingId, busy }}
-                    disabled={!!acceptingId}
-                    onPress={() => onAccept(order)}
-                    style={({ pressed }) => [styles.primaryBtn, !!acceptingId && styles.disabled, pressed && styles.pressed]}
-                  >
-                    {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryBtnText}>پذیرش سفارش</Text>}
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
-          {more > 0 ? (
-            <Pressable accessibilityRole="link" onPress={() => onOpenOrders?.('available')} style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}>
-              <Text style={styles.seeAllText}>مشاهدهٔ {toPersianDigits(more)} سفارش دیگر</Text>
+          <View style={styles.orderPreview}>
+            {preview.map((order) => (
+              <WorkerAvailableOrderCard key={order.id} order={order} onOpen={onOpenAvailableOrder} />
+            ))}
+          </View>
+          {onOpenOrders ? (
+            <Pressable accessibilityRole="link" onPress={() => onOpenOrders('available')} style={({ pressed }) => [styles.moreLink, pressed && styles.pressed]}>
+              <Text style={styles.seeAllText}>مشاهدهٔ همه</Text>
             </Pressable>
           ) : null}
         </>
@@ -320,10 +274,10 @@ export function WorkerHomeScreen({
               <Text style={styles.metaText}>{currentJob.district}</Text>
             </View>
           ) : null}
-          {workerOrderTimeLabel(currentJob.rawDate, currentJob.rawTime) ? (
+          {workerOrderTimeLabel(currentJob.date, currentJob.rawTime) ? (
             <View style={styles.metaRow}>
               <IconClock />
-              <Text style={styles.metaText}>{workerOrderTimeLabel(currentJob.rawDate, currentJob.rawTime)}</Text>
+              <Text style={styles.metaText}>{workerOrderTimeLabel(currentJob.date, currentJob.rawTime)}</Text>
             </View>
           ) : null}
           <Pressable
@@ -442,15 +396,12 @@ const styles = StyleSheet.create({
   },
   statValue: { ...type.bold, ...fa, fontSize: 20, lineHeight: 28, color: colors.white, textAlign: 'center' },
   statLabel: { ...type.medium, ...fa, fontSize: 12, lineHeight: 18, color: 'rgba(255,255,255,0.9)', textAlign: 'center' },
-  sectionHeader: {
-    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
-    flexWrap: 'wrap', marginBottom: 10, gap: 8,
-  },
-  sectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
+  sectionHeaderSide: { flex: 1, alignItems: 'flex-start' },
+  centeredTitle: { textAlign: 'center', flexShrink: 1 },
   sectionTitle: { ...type.bold, ...fa, fontSize: 16, lineHeight: 24, color: colors.text, textAlign: 'right' },
   countPill: { minWidth: 26, height: 22, borderRadius: 11, backgroundColor: colors.teal, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
   countPillText: { ...type.bold, ...fa, fontSize: 12, lineHeight: 16, color: colors.white },
-  seeAll: { minHeight: 44, justifyContent: 'center' },
   seeAllText: { ...type.semibold, ...fa, fontSize: 13, lineHeight: 20, color: colors.teal, textAlign: 'center' },
   moreLink: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, marginBottom: 12 },
   card: {
@@ -460,26 +411,19 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   serviceIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.tealSoft, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { ...type.bold, ...fa, flex: 1, fontSize: 15, lineHeight: 22, color: colors.text, textAlign: 'right' },
-  newChip: { borderRadius: 999, backgroundColor: colors.tealSoft, paddingHorizontal: 10, paddingVertical: 3 },
-  newChipText: { ...type.semibold, ...fa, fontSize: 12, lineHeight: 18, color: colors.teal },
+  orderPreview: { gap: 8, marginBottom: 12 },
   statusChip: { borderRadius: 999, backgroundColor: colors.amberBg, paddingHorizontal: 10, paddingVertical: 3, maxWidth: '45%' },
   statusChipText: { ...type.semibold, ...fa, fontSize: 12, lineHeight: 18, color: colors.amberText, textAlign: 'center' },
   metaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   metaText: { ...type.regular, ...fa, flex: 1, fontSize: 13, lineHeight: 20, color: colors.muted, textAlign: 'right' },
   incomeRow: { gap: 4 },
   priceText: { ...type.semibold, ...fa, fontSize: 13.5, lineHeight: 21, color: colors.text, textAlign: 'right' },
-  primaryBtn: {
-    minHeight: 46, borderRadius: radius.button, backgroundColor: colors.teal,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 4,
-  },
-  primaryBtnText: { ...type.bold, ...fa, fontSize: 14, lineHeight: 20, color: colors.white, textAlign: 'center' },
   secondaryBtn: {
     minHeight: 44, borderRadius: radius.button, borderWidth: 1, borderColor: colors.teal, backgroundColor: colors.white,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, alignSelf: 'center',
   },
   fullBtn: { alignSelf: 'stretch', marginTop: 4 },
   secondaryBtnText: { ...type.bold, ...fa, fontSize: 14, lineHeight: 20, color: colors.teal, textAlign: 'center' },
-  disabled: { opacity: 0.6 },
   stateCard: {
     backgroundColor: colors.white, borderRadius: 18, borderWidth: 1, borderColor: colors.border,
     paddingVertical: 18, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center', gap: 10, ...shadowSm,

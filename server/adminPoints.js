@@ -75,7 +75,7 @@ function renderAdminPoints(data) {
   root.appendChild(current);
 
   const form = pointsEl('form', 'bg-slate-800 border border-slate-700 rounded-2xl p-4');
-  const fieldset = pointsEl('fieldset', 'space-y-3');
+  const fieldset = pointsEl('fieldset', 'admin-field-grid');
   fieldset.appendChild(pointsEl('h4', 'font-bold', 'ثبت نسخهٔ جدید'));
   pointsField(fieldset, 'امتیاز مشتری برای هر سفارش موفق', 'pointsCustomer', value ? value.customerAmount || 0 : '');
   pointsField(fieldset, 'امتیاز متخصص برای هر سفارش موفق', 'pointsWorker', value ? value.workerAmount || 0 : '');

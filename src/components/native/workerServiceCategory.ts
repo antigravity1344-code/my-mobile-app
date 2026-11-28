@@ -1,3 +1,4 @@
+import { STAIR_SERVICE } from '../../../server/pricing/staircase';
 import { SERVICES_CATALOG } from '../../config/servicesData';
 
 const GENDER_LABELS: Record<string, string> = {
@@ -76,7 +77,7 @@ export function describeServiceOptions(
   const rows: ServiceOptionRow[] = [];
   for (const [key, raw] of Object.entries(options)) {
     const label = optionLabel(id, key);
-    const value = optionValue(raw);
+    const value = optionValue(id === STAIR_SERVICE && key === 'noLift' && typeof raw === 'boolean' ? !raw : raw);
     if (label && value) rows.push({ key, label, value });
   }
   return rows;
@@ -96,7 +97,7 @@ export function describeWorkerServiceFacts(order: {
   }
   const serviceId = typeof order.serviceId === 'string' ? order.serviceId : '';
   for (const option of describeServiceOptions(serviceId, order.serviceOptions)) {
-    lines.push(`${option.label}: ${option.value}`);
+    lines.push(option.label + (option.label.endsWith('؟') ? ' ' : ': ') + option.value);
   }
   const gender = typeof order.genderPreference === 'string' ? GENDER_LABELS[order.genderPreference] : '';
   const optionGender = optionValue(order.serviceOptions?.gender);

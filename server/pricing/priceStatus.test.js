@@ -17,6 +17,7 @@ const seeded = seedCommittedPolicy(process.env, {
     validFrom: '2020-01-01T00:00:00.000Z',
     validTo: '2099-01-01T00:00:00.000Z',
     services: {
+      higher_minimum: { model: 'hourly', rate: 1000, minQuantity: 4, minCharge: 5000 },
       fixed_job: { model: 'fixed', rate: 1000000 },
       hourly_job: { model: 'hourly', rate: 1000, minQuantity: 1,
         surcharges: [{ id: 'detergent', optionId: 'detergent', amount: 30000 }] },
@@ -26,7 +27,15 @@ const seeded = seedCommittedPolicy(process.env, {
 });
 if (!seeded.ok) throw new Error(seeded.code);
 
-const { orderPriceStatus, currentPricingRules } = require('./priceStatus');
+const { orderPriceStatus, currentPricingRules, workerMinimumBaseAmount } = require('./priceStatus');
+
+test('worker minimum is the greater of the minimum charge and base rate for the minimum duration', () => {
+  const pricing = { source: 'server', tariffVersionId: 'v1', currencyUnit: 'toman' };
+  assert.equal(workerMinimumBaseAmount({ serviceId: 'higher_minimum', pricing }), 5000);
+  assert.equal(workerMinimumBaseAmount({ serviceId: 'hourly_job', pricing }), 1000);
+  assert.equal(workerMinimumBaseAmount({ serviceId: 'fixed_job', pricing }), null);
+  assert.equal(workerMinimumBaseAmount({ serviceId: 'hourly_job', pricing: { ...pricing, tariffVersionId: 'unknown' } }), null);
+});
 
 test('a tariff fixed model locks the stored amount, whatever the service id is', () => {
   assert.deepEqual(orderPriceStatus({ serviceId: 'fixed_job', price: 1000000 }), { status: 'locked', lockedAmount: 1000000 });

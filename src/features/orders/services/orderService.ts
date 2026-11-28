@@ -111,7 +111,7 @@ export const CANCELLABLE_ORDER_STATUSES: OrderStatus[] = [
 /** نگاشت سفارش سرور به شکل نمایش مشتری. فیلدهایی که سرور ندارد با مقدار امن پر می‌شوند. */
 export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
   const createdAt = o.createdAt || new Date().toISOString();
-  const rawDate = typeof o.date === 'string' ? o.date.trim() : '';
+  const rawDate = o.dateKey || (typeof o.date === 'string' ? o.date.trim() : '');
   const { dayOfMonth, monthName } = parseSubmittedDate(rawDate);
   const timeLabel = typeof o.time === 'string' && o.time.trim() ? o.time.trim() : '—';
   const fullAddress = typeof o.address === 'string' ? o.address.trim() : '';
@@ -144,16 +144,18 @@ export function mapApiOrderForCustomer(o: ApiOrder): OrderItem {
     pricingType: 'hourly',
     status: normalizeOrderStatus(o.status),
     completion: readCompletion(o.completion),
+    extension: o.extension,
     startPrompt,
     startPromptEventId: startPrompt ? o.startPromptEventId! : null,
     paymentStatus: o.paymentStatus === 'PAID' ? 'PAID' : 'PENDING',
     paymentMethod: o.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH',
     date: {
-      dateString: o.date || '',
+      dateString: rawDate,
       dayOfWeek: '',
       dayOfMonth,
       monthName,
     },
+    dateLabel: o.dateLabel,
     timeSlot: {
       id: `api-time-${o.id}`,
       label: timeLabel,
@@ -412,6 +414,15 @@ export const orderService = {
     }
     if (!updatedOrder) return { success: false, error: 'ثبت پاسخ شروع کار انجام نشد.' };
     return { success: true, order: updatedOrder };
+  },
+
+  async requestExtension(orderId: string, version: string, expectedTotal: number): Promise<{ success: boolean; error?: string }> {
+    if (previewActive()) return { success: false, error: 'ثبت واقعی در پیش‌نمایش مجاز نیست.' };
+    await attachStoredAuthToken(appStorage, CUSTOMER_TOKEN_KEY);
+    const res = await apiFetch('/orders/' + encodeURIComponent(orderId) + '/extension-request', {
+      method: 'PUT', body: JSON.stringify({ version, expectedTotal }),
+    });
+    return res.success ? { success: true } : { success: false, error: res.message || 'ارسال درخواست تمدید انجام نشد.' };
   },
 
   async respondToCompletion(orderId: string, answer: 'yes' | 'no', requestId: string):

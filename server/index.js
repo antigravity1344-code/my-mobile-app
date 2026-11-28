@@ -1,4 +1,4 @@
-const { orderPriceStatus, currentPricingRules } = require('./pricing/priceStatus');
+const { orderPriceStatus, currentPricingRules, workerMinimumBaseAmount } = require('./pricing/priceStatus');
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -37,6 +37,7 @@ const {
   quantityForWindow,
 } = require('./pricing/orderQuote');
 const { tehranWallParts } = require('./jalaliMonth');
+const { orderScheduleDate } = require('./orderScheduleDate');
 const { gregorianToJalali } = require('./jalaliMonth');
 const { OfferError, validateOfferInput } = require('./workerOffers');
 const { workerMeetsRequestedTier } = require('./tierPricingPolicy');
@@ -961,6 +962,8 @@ setOfferResolver(({ offerId, serviceId, now }) => {
 });
 setTierResolver((tier) => store.tierPricingPolicy.basisPointsFor(tier));
 // کد تخفیف درصدی: اعتبار هنگام نقل‌قول و تأیید سفارش بررسی می‌شود؛ مصرف در ثبت سفارش انجام می‌شود.
+const { STAIR_SERVICE, RATE_LABELS: stairLabels, validRates: validStairRates } = require('./pricing/staircase');
+require('./pricing/orderQuote').setStaircaseResolver(key => store.staircaseTariffs.read(key));
 setPromoResolver((code) => {
   const row = store.discountCodes.find(code);
   if (!row || row.active !== 1) throw new QuoteError('PROMO_INVALID', 'کد تخفیف معتبر نیست.');
@@ -1295,7 +1298,8 @@ function anonQuoteAllowed(req) {
 // پکیج مواد شوینده فقط وقتی کلیدش روشن است پذیرفته می‌شود (پیش‌فرض خاموش؛ مدیر از پنل روشن می‌کند).
 function detergentBlocked(body) {
   const options = body && typeof body === 'object' && body.options && typeof body.options === 'object' ? body.options : null;
-  return Boolean(options && options.detergent === true && !store.featureSwitches.isGlobalEnabled('detergent_package'));
+  if (!options?.detergent || store.featureSwitches.isGlobalEnabled('detergent_package')) return false;
+  return !(body.serviceId === STAIR_SERVICE && currentPricingRules().some(rule => rule.serviceId === STAIR_SERVICE && rule.staircaseKey));
 }
 
 app.post('/api/pricing/quote', (req, res) => {
@@ -1364,6 +1368,7 @@ app.get('/api/track/:code', (req, res) => {
       status: order.status,
       serviceTitle: order.serviceTitle,
       date: order.date ?? null,
+      dateLabel: orderScheduleDate(order).dateLabel,
       time: order.time ?? null,
       area: orderAreaFromAddress(order.address) || null,
       createdAt: order.createdAt ?? null,
@@ -1488,7 +1493,8 @@ app.post('/api/orders', (req, res) => {
   const storedDuration = Number.isInteger(parsedDuration) && parsedDuration >= 1 && parsedDuration <= 24
     ? parsedDuration
     : null;
-  const storedOptions = sanitizeServiceOptions(serviceOptions);
+  const storedOptions = sanitizeServiceOptions(serverPriced?.isStaircase
+    ? serverPriced.pricing.options : serviceOptions);
   const storedAddressNotes = typeof addressNotes === 'string' ? addressNotes.trim().slice(0, 300) : '';
   const frequencies = ['ONE_TIME', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'];
   const tiers = ['NEW', 'SILVER', 'GOLD', 'VIP'];
@@ -1632,7 +1638,7 @@ function customerOrderView(order) {
   if (!order) return order;
   const { cleanerPhone, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   const completion = store.completionFor(order);
-  return { ...rest, priceStatus: orderPriceStatus(order, undefined, completion), completion, startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
+  return { ...rest, ...orderScheduleDate(order), priceStatus: orderPriceStatus(order, undefined, completion), completion, extension: store.extensionFor(order), startPrompt: store.startPromptFor(order), startPromptEventId: store.startPromptEventId(order) };
 }
 
 // ------------------- نمای سفارش برای متخصص (حریم خصوصی مشتری) -------------------
@@ -1651,9 +1657,32 @@ function workerOrderCurrencyView(order) {
   return typeof unit === 'string' && unit.trim() ? { currencyUnit: unit } : {};
 }
 
+const CUSTOMER_PUBLIC_LEVELS = Object.freeze({
+  silver: { label: 'نقره‌ای', summary: 'سطح نقره‌ای در برنامهٔ وفاداری پاک‌شو' },
+  gold: { label: 'طلایی', summary: 'سطح طلایی در برنامهٔ وفاداری پاک‌شو' },
+  gold_plus: { label: 'طلایی پلاس', summary: 'سطح ویژه در برنامهٔ وفاداری پاک‌شو' },
+});
+
+function publicTierBadge(order, workerId) {
+  if (!workerId) return {};
+  const viewer = workerTierKey(workerId);
+  const defaultVisibility = viewer === 'silver' ? 'color' : ['gold', 'gold_plus'].includes(viewer) ? 'summary' : 'none';
+  if (defaultVisibility === 'none') return {};
+  const rule = store.rulesFor('visibility.customerTier');
+  const configured = rule?.active ? rule.value?.[viewer] : undefined;
+  const visibility = ['none', 'color', 'summary'].includes(configured) ? configured : defaultVisibility;
+  if (visibility === 'none') return {};
+  const tier = store.getUserPoints(order.customerId)?.tierKey;
+  if (!Object.hasOwn(CUSTOMER_PUBLIC_LEVELS, tier)) return {};
+  const { label, summary } = CUSTOMER_PUBLIC_LEVELS[tier];
+  return { publicTierBadge: { tier, label, ...(visibility === 'summary' && defaultVisibility === 'summary' ? { summary } : {}) } };
+}
+
 /** سفارش باز برای فهرست «سفارش‌های جدید»: فقط اطلاعات لازم برای تصمیم پذیرش. */
-function workerAvailableOrderView(order) {
+function workerAvailableOrderView(order, workerId) {
   const area = orderAreaFromAddress(order.address);
+  const priceStatus = orderPriceStatus(order);
+  const minimumBaseAmount = priceStatus.status === 'hourly_pending' ? workerMinimumBaseAmount(order) : null;
   return {
     id: order.id,
     status: order.status,
@@ -1664,13 +1693,16 @@ function workerAvailableOrderView(order) {
     serviceOptions: order.serviceOptions ?? null,
     recurringFrequency: order.recurringFrequency ?? null,
     date: order.date,
+    ...orderScheduleDate(order),
     time: order.time,
     price: order.price,
     ...workerOrderCurrencyView(order),
     paymentMethod: order.paymentMethod,
     requestedWorkerTier: order.requestedWorkerTier || null,
     directRequestWorkerId: order.directRequestWorkerId || null,
-    priceStatus: orderPriceStatus(order),
+    priceStatus,
+    ...(minimumBaseAmount == null ? {} : { minimumBaseAmount }),
+    ...publicTierBadge(order, workerId),
     // notes (متن آزاد مشتری) قبل از پذیرش فرستاده نمی‌شود؛ ممکن است شماره یا اطلاعات خصوصی داشته باشد.
     createdAt: order.createdAt,
     area,
@@ -1700,7 +1732,7 @@ function workerAssignedOrderView(order) {
   const { notes, ratings, customerId, customerTier, pricing, cancelledBy, cancelQuote, cancelInitiator, cancelFault, ...rest } = order;
   // priceStatus همان مبلغی را نشان می‌دهد که completion.finalAmount (ورودی خود متخصص) یا فهرست سفارش‌های باز از قبل برای او دارد.
   const completion = store.completionFor(order);
-  const workerVisible = { ...rest, ...workerOrderCurrencyView(order), priceStatus: orderPriceStatus(order, undefined, completion), completion, completionAcceptanceKey: store.completionAcceptanceKey(order) };
+  const workerVisible = { ...rest, ...publicTierBadge(order, order.cleanerId), ...orderScheduleDate(order), ...workerOrderCurrencyView(order), priceStatus: orderPriceStatus(order, undefined, completion), completion, extension: store.extensionFor(order), completionAcceptanceKey: store.completionAcceptanceKey(order) };
   if (ratings !== undefined) workerVisible.ratings = workerVisibleRatings(ratings);
   if (WORKER_ACTIVE_ORDER_STATUSES.includes(order.status)) {
     return { ...workerVisible, area, startReported: store.workerStartReported(order), startAcceptanceKey: store.startAcceptanceKey(order) };
@@ -1765,6 +1797,33 @@ app.get('/api/orders', (req, res) => {
   return res.status(403).json({ success: false, message: 'دسترسی مجاز نیست.', orders: [] });
 });
 
+app.get('/api/orders/:orderId/customer-actions', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (user.role !== 'CUSTOMER') {
+    return res.status(403).json({ success: false, message: 'این بخش فقط برای مشتری سفارش است.' });
+  }
+  const order = store.getOrder(req.params.orderId);
+  if (!order || order.customerId !== user.id) {
+    return res.status(404).json({ success: false, message: 'این سفارش برای حساب واردشده پیدا نشد. با شمارهٔ رزرو وارد شوید.' });
+  }
+  const startPrompt = store.startPromptFor(order);
+  const startPromptEventId = store.startPromptEventId(order);
+  return res.json({
+    success: true,
+    details: {
+      status: order.status,
+      startStatus: order.startStatus,
+      agreedStartAt: order.agreedStartAt,
+      start: startPrompt && startPromptEventId ? { kind: startPrompt, eventId: startPromptEventId } : null,
+      completion: store.completionFor(order),
+      extension: store.extensionFor(order),
+      currencyUnit: order.pricing?.currencyUnit ?? null,
+    },
+  });
+});
+
 app.get('/api/orders/available', (req, res) => {
   const authUser = requireUser(req, res);
   if (!authUser) return;
@@ -1780,7 +1839,7 @@ app.get('/api/orders/available', (req, res) => {
     (!order.directRequestWorkerId || order.directRequestWorkerId === authUser.id) &&
     workerQualifiedFor(order.serviceId, authUser) &&
     workerMeetsRequestedTier(workerTierKey(authUser.id), order.requestedWorkerTier)
-  )).map(workerAvailableOrderView);
+  )).map((order) => workerAvailableOrderView(order, authUser.id));
   res.json({ success: true, orders: availableOrders });
 });
 
@@ -2263,11 +2322,14 @@ app.get('/api/services/enabled', (req, res) => {
       unavailable.add(serviceId);
     }
   }
+  const detergentEnabled = store.featureSwitches.isGlobalEnabled('detergent_package');
   res.json({
     success: true,
     disabledServiceIds: [...hidden],
     unavailableServiceIds: [...unavailable],
-    pricingRules: currentPricingRules(),
+    pricingRules: currentPricingRules().map(({ staircaseKey, ...rule }) => staircaseKey
+      ? { ...rule, detergentBookable: true, staircaseRates: store.staircaseTariffs.read(staircaseKey) }
+      : { ...rule, detergentBookable: detergentEnabled && rule.detergentAvailable }),
   });
 });
 app.get('/api/admin/service-switches', requireAdmin, (req, res) => {
@@ -2363,7 +2425,13 @@ app.get('/api/admin/tariff-versions', (req, res) => {
     }
     return res.status(409).json(body);
   }
-  const { revision, companyId, currencyUnit, versions } = result;
+  const { revision, companyId, currencyUnit } = result;
+  const versions = result.versions.map(version => {
+    const service = version.services[STAIR_SERVICE];
+    if (service?.model !== 'fixed') return version;
+    const staircaseRates = store.staircaseTariffs.read(service.staircaseKey || store.staircaseTariffs.defaultId);
+    return { ...version, services: { ...version.services, [STAIR_SERVICE]: { ...service, staircaseRates, stairLabels } } };
+  });
   return res.json({ success: true, revision, companyId, currencyUnit, versions });
 });
 
@@ -2382,7 +2450,11 @@ function sendTariffPublication(res, result) {
 
 app.post('/api/admin/tariff-setup', (req, res) => {
   const body = req.body || {};
+  const baseRate = body.rates?.[STAIR_SERVICE];
+  const staircaseKey = Number.isSafeInteger(baseRate) && baseRate > 0
+    ? store.staircaseTariffs.save({ ...store.staircaseTariffs.read(store.staircaseTariffs.defaultId), baseRate }) : null;
   return sendTariffPublication(res, establishInitialTariff({
+    staircaseKey,
     requestId: body.requestId,
     rates: body.rates,
     actor: 'admin',
@@ -2392,6 +2464,25 @@ app.post('/api/admin/tariff-setup', (req, res) => {
 
 app.post('/api/admin/tariff-versions', (req, res) => {
   const body = req.body || {};
+  const stairs = body.version?.services?.[STAIR_SERVICE];
+  if (stairs && typeof stairs === 'object') {
+    delete stairs.stairLabels;
+    if (stairs.staircaseEnabled === true || (stairs.staircaseKey && stairs.staircaseRates != null)) {
+      if (stairs.model !== 'fixed' || !validStairRates(stairs.staircaseRates)) {
+        return sendTariffPublication(res, { ok: false, code: 'INPUT_INVALID' });
+      }
+      stairs.staircaseKey = store.staircaseTariffs.save(stairs.staircaseRates);
+      stairs.rate = stairs.staircaseRates.baseRate;
+      if (stairs.surcharges != null && !Array.isArray(stairs.surcharges)) return sendTariffPublication(res, { ok: false, code: 'INPUT_INVALID' });
+      stairs.surcharges = (stairs.surcharges || []).filter(item => item?.optionId !== 'detergent');
+    } else if (stairs.staircaseKey) {
+      // A reference supplied without its settings must already exist in this installation.
+      try { store.staircaseTariffs.read(stairs.staircaseKey); }
+      catch { return sendTariffPublication(res, { ok: false, code: 'INPUT_INVALID' }); }
+    }
+    delete stairs.staircaseRates;
+    delete stairs.staircaseEnabled;
+  }
   return sendTariffPublication(res, registerDraft({
     baseRevision: body.baseRevision,
     requestId: body.requestId,
@@ -2585,7 +2676,7 @@ app.put('/api/admin/approve-worker/:userId', (req, res) => {
 app.get('/api/admin/orders', (req, res) => {
   store.finalizeDueCancelRequests();
   store.expireDueDirectRequests();
-  res.json({ success: true, orders: store.listOrders().map(order => ({...order,completion:store.completionFor(order)})) });
+  res.json({ success: true, orders: store.listOrders().map(order => ({...order,...orderScheduleDate(order),completion:store.completionFor(order)})) });
 });
 
 // قوانین امتیاز فقط از مسیر مدیر و فقط با نسخه جدید ثبت می‌شوند (D-04). ویرایش و حذف وجود ندارد.
@@ -2844,6 +2935,7 @@ app.delete('/api/admin/orders/:orderId', (_req, res) => {
 
 // ------------------- مسیر وب داشبورد ادمین (ADMIN WEB DASHBOARD) -------------------
 app.get('/admin/tariff.js', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.type('application/javascript').sendFile(path.join(__dirname, 'adminTariff.js'));
 });
 
@@ -2883,6 +2975,7 @@ app.get('/admin/points.js', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const identityJson = sourceIdentityScriptJson(SOURCE_IDENTITY);
   res.send(`
 <!DOCTYPE html>
@@ -2949,6 +3042,13 @@ app.get('/admin', (req, res) => {
       position: relative;
       -webkit-text-fill-color: transparent;
     }
+    #totalRevenue { container-type: inline-size; }
+    #totalRevenue .admin-revenue-value {
+      display: block; direction: ltr; white-space: nowrap; overflow-wrap: normal;
+      font-size: min(1em, calc(100cqi / var(--revenue-length) * 1.35));
+    }
+    #totalRevenue .admin-revenue-unit { display: block; font-size: .75rem; color: #6B7370; }
+    #totalRevenue .admin-revenue-row + .admin-revenue-row { margin-block-start: 8px; }
     #statsGrid .admin-stat-zero::after {
       content: '';
       position: absolute;
@@ -2961,7 +3061,50 @@ app.get('/admin', (req, res) => {
     }
     .admin-layout :is(div, section, header, form, fieldset, li):is(.rounded-xl, .rounded-2xl) { border-radius: 16px; }
     .admin-layout [class~="text-[10px]"] { font-size: 12px; }
-    .admin-layout > section { min-width: 0; }
+    .admin-layout .admin-panel { min-width: 0; margin-block-start: 26px; }
+    .admin-panel > :is(h2, h3) { text-align: center; font-size: 1.2rem; line-height: 1.5; }
+    .admin-panel :is(h4, legend) { text-align: center; }
+    .admin-panel legend { padding-inline: 8px; }
+    .admin-panel > p, .admin-settings-group > p { max-width: 62ch; margin-inline: auto; line-height: 1.8; }
+    .admin-panel [role="status"]:empty { display: none; }
+    .admin-panel [role="status"] { text-align: center; }
+    .admin-settings-group { margin-block-start: 18px; padding: 16px; border: 1px solid #D8DEDB; border-radius: 16px; background: #fff; }
+    .admin-settings-group:not(.admin-field-grid) > * + * { margin-block-start: 12px; }
+    .admin-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 48rem; margin-inline: auto; }
+    .admin-field-grid-single { max-width: 24rem; grid-template-columns: minmax(0, 1fr); }
+    .admin-field-grid > :is(p, h4, div.admin-field-grid, button), .admin-field-wide { grid-column: 1 / -1; }
+    .admin-panel :is(label, .admin-field) { min-width: 0; }
+    .admin-field, .admin-panel label:has(:is(input:not([type="checkbox"], [type="radio"]), select, textarea)) {
+      display: grid; gap: 6px; align-content: end; text-align: center; font-size: .875rem; line-height: 1.5;
+    }
+    .admin-panel label:has(input[type="checkbox"]) {
+      display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px;
+      border: 1px solid #D8DEDB; border-radius: 12px; background: #fff; text-align: start;
+    }
+    .admin-panel label:has(input[type="checkbox"]) input { width: 18px; height: 18px; margin: 0; flex: 0 0 18px; accent-color: #11766F; }
+    .admin-panel :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), select, textarea) {
+      display: block; width: 100%; min-height: 44px; padding: 8px 12px; margin-block: 0;
+      border: 1px solid #D8DEDB; border-radius: 12px; font-size: .9375rem; text-align: center;
+    }
+    .admin-panel textarea { text-align: start; resize: vertical; }
+    .admin-panel input[type="datetime-local"] { direction: ltr; }
+    .admin-panel select { text-align-last: center; text-overflow: ellipsis; }
+    .admin-panel input:focus-visible, .admin-panel select:focus-visible, .admin-panel textarea:focus-visible, .admin-panel button:focus-visible { outline: 2px solid #11766F; outline-offset: 2px; }
+    .admin-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 8px; }
+    .admin-panel button { padding: 8px 14px; line-height: 1.4; text-align: center; }
+    .admin-panel :is(.admin-settings-group, fieldset) { min-inline-size: 0; }
+    .admin-card-list > *, .admin-panel pre { min-width: 0; overflow-wrap: anywhere; }
+    .admin-panel pre { white-space: pre-wrap; }
+    .admin-order-details { width: 100%; min-width: 0; }
+    .admin-order-heading { flex-wrap: wrap; justify-content: center; }
+    .admin-order-code { flex: 0 0 100%; direction: ltr; unicode-bidi: isolate; text-align: center; }
+    .admin-order-actions { width: 100%; align-items: center; }
+    .admin-order-amount { width: 100%; text-align: center; }
+    @media (max-width: 640px) {
+      .admin-layout .admin-panel { margin-block-start: 22px; }
+      .admin-field-grid { grid-template-columns: minmax(0, 1fr); }
+      .admin-settings-group { padding: 12px; }
+    }
     .admin-layout > section :is(h2, h3) { font-size: 1.125rem; font-weight: 700; line-height: 1.6; }
     .admin-layout :is(fieldset, input, select, textarea, button, img) { min-width: 0; max-width: 100%; }
     .admin-layout section .flex > * { min-width: 0; }
@@ -3003,7 +3146,7 @@ app.get('/admin', (req, res) => {
 </head>
 <body class="min-h-screen p-4 md:p-8">
   <div class="admin-layout max-w-6xl mx-auto space-y-6">
-    
+
     <!-- هدر -->
     <header id="adminHeader" hidden class="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex justify-between items-center shadow-lg">
       <div>
@@ -3044,7 +3187,7 @@ app.get('/admin', (req, res) => {
     <div id="adminDesk" hidden>
     <p id="statsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
     <!-- کارت‌های آمار -->
-    <div class="grid gap-2" id="statsGrid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="grid gap-2" id="statsGrid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
       <div class="bg-slate-800 border border-slate-700 p-2 rounded-lg text-center">
         <span class="block text-[9px] leading-tight text-slate-400">کل سفارش‌ها</span>
         <h2 id="totalOrders" class="text-base font-black text-sky-400 mt-0">-</h2>
@@ -3093,64 +3236,80 @@ app.get('/admin', (req, res) => {
     </div>
 
     <!-- محتوای متخصصین -->
-    <div id="tabWorkers" class="space-y-4">
+    <div id="tabWorkers" class="admin-panel space-y-4">
       <h3 class="text-lg font-bold text-white">لیست متخصصین و درخواست‌های احراز هویت</h3>
       <p id="workersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <p id="workersActionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <div id="workersList" class="space-y-3">
+      <div id="workersList" class="admin-card-list space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
     </div>
 
     <!-- محتوای سفارش‌ها -->
-    <div id="tabOrders" class="space-y-4 hidden">
+    <div id="tabOrders" class="admin-panel space-y-4 hidden">
       <h3 class="text-lg font-bold text-white">لیست تمامی سفارش‌ها</h3>
       <p id="ordersMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <p id="ordersActionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <div id="ordersList" class="space-y-3">
+      <div id="ordersList" class="admin-card-list space-y-3">
         <p class="text-xs text-slate-400">در حال بارگذاری...</p>
       </div>
     </div>
 
-    <section id="tabTariffs" class="space-y-4 hidden" hidden>
+    <section id="tabTariffs" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">تعرفه خدمات</h3>
       <p class="text-sm text-slate-300">نرخ‌های تازه را ابتدا در پیش‌نویس ذخیره کنید و سپس زمان انتشار را تأیید کنید. مبلغ سفارش‌های ثبت‌شده تغییر نمی‌کند.</p>
       <p id="tariffMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="tariffRefresh" type="button" onclick="loadAdminTariff()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تعرفه</button>
-      <button id="tariffRetry" type="button" onclick="retryAdminTariff()" hidden class="bg-amber-700 px-4 py-2 rounded-xl">بررسی نتیجه تلاش قبلی</button>
+      <div class="admin-actions">
+        <button id="tariffRefresh" type="button" onclick="loadAdminTariff()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تعرفه</button>
+        <button id="tariffRetry" type="button" onclick="retryAdminTariff()" hidden class="bg-amber-700 px-4 py-2 rounded-xl">بررسی نتیجه تلاش قبلی</button>
+      </div>
       <div id="tariffContent" class="space-y-4"></div>
     </section>
 
-    <section id="tabTiers" class="space-y-4 hidden" hidden>
+    <section id="tabTiers" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قانون درجه‌های متخصص</h3>
       <p class="text-sm text-slate-300">تا وقتی نسخهٔ فعالی ثبت نشده، پیش‌فرض سامانه به کار می‌رود: نقره‌ای با ۲۰ سفارش موفق و میانگین ستارهٔ حداقل ۴، طلایی با ۱۰۰ سفارش موفق و میانگین حداقل ۴٫۵. متخصصی که هنوز ستاره‌ای نگرفته شرط میانگین را ندارد. هر تغییر نسخهٔ جدید می‌سازد و نسخه‌های قبلی می‌مانند. درجهٔ متخصص پایین نمی‌آید و با تکمیل سفارش بعدی‌اش به‌روز می‌شود.</p>
       <p id="tierMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="tierRefresh" type="button" onclick="loadAdminTiers()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون درجه‌ها</button>
+      <div class="admin-actions">
+        <button id="tierRefresh" type="button" onclick="loadAdminTiers()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون درجه‌ها</button>
+      </div>
       <div id="tierContent" class="space-y-4"></div>
     </section>
 
-    <section id="tabCompletion" class="space-y-4 hidden" hidden>
+    <section id="tabCompletion" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">سیاست پایان کار</h3>
       <p>پیش‌فرض: ثبت متخصص و تأیید مشتری؛ اختلاف با مدیر. تغییر سیاست فقط برای درخواست‌های پایان کار جدید است.</p>
-      <label for="completionMode">روش تأیید پایان کار</label>
-      <select id="completionMode" disabled class="bg-slate-900 border rounded p-2">
-        <option value="customer_confirmation">ثبت متخصص و تأیید مشتری</option>
-        <option value="worker_only">فقط تأیید متخصص</option>
-      </select>
+      <div class="admin-field-grid admin-field-grid-single">
+        <div class="admin-field">
+          <label for="completionMode">روش تأیید پایان کار</label>
+          <select id="completionMode" disabled class="bg-slate-900 border rounded p-2">
+            <option value="customer_confirmation">ثبت متخصص و تأیید مشتری</option>
+            <option value="worker_only">فقط تأیید متخصص</option>
+          </select>
+        </div>
+      </div>
       <p id="completionMessage" role="status" aria-live="polite"></p>
-      <button id="completionRefresh" onclick="loadAdminCompletion()">بازخوانی سیاست جاری</button>
-      <button id="completionSave" disabled onclick="saveAdminCompletion()">ذخیره سیاست</button>
+      <div class="admin-actions">
+        <button id="completionRefresh" type="button" onclick="loadAdminCompletion()" class="bg-sky-700">بازخوانی سیاست جاری</button>
+        <button id="completionSave" type="button" disabled onclick="saveAdminCompletion()" class="bg-emerald-700">ذخیره سیاست</button>
+      </div>
     </section>
-    <section id="tabCommission" class="space-y-4 hidden" hidden>
+    <section id="tabCommission" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">کمیسیون شرکت</h3>
       <p class="text-sm text-slate-300">درصد کمیسیون همه خدمات این شرکت را ثبت کنید. پیش‌فرض ۲۵٪ است. گزارش دستمزد و واریز در این مرحله هنوز فعال نیست.</p>
-      <label for="commissionRate" class="block text-sm">درصد کمیسیون</label>
-      <input id="commissionRate" type="text" inputmode="decimal" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <div class="admin-field-grid admin-field-grid-single">
+        <div class="admin-field">
+          <label for="commissionRate" class="block text-sm">درصد کمیسیون</label>
+          <input id="commissionRate" type="text" inputmode="decimal" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+        </div>
+      </div>
       <p id="commissionMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
-      <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
+      <div class="admin-actions">
+        <button id="commissionRefresh" type="button" onclick="loadAdminCommission()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی درصد جاری</button>
+        <button id="commissionSave" type="button" onclick="saveAdminCommission()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درصد</button>
+      </div>
     </section>
-    <section id="tabSiteFeatures" class="space-y-4 hidden" hidden>
+    <section id="tabSiteFeatures" class="admin-panel space-y-4 hidden" hidden>
       <h2 class="text-lg font-bold">قابلیت‌های سایت</h2>
       <p id="siteFeaturesMessage" role="status"></p>
       <fieldset id="siteFeatureControls" class="space-y-3" disabled>
@@ -3158,114 +3317,182 @@ app.get('/admin', (req, res) => {
         <label class="block"><input type="checkbox" id="detergent_package"> بستهٔ مواد شوینده</label>
       </fieldset>
     </section>
-    <section id="tabDiscountCodes" class="space-y-4 hidden" hidden>
+    <section id="tabDiscountCodes" class="admin-panel space-y-4 hidden" hidden>
       <h2 class="text-lg font-bold">کدهای تخفیف</h2>
       <p id="discountCodesMessage" role="status"></p>
       <fieldset id="discountCodeControls" class="space-y-4" disabled>
         <form id="discountCodeForm" onsubmit="createAdminDiscountCode(event)" class="space-y-3 bg-slate-800 rounded-xl p-4">
-          <label class="block">کد تخفیف <input name="code" required dir="ltr" class="bg-slate-900 rounded p-2"></label>
-          <label class="block">درصد تخفیف <input name="percent" type="number" required min="1" max="100" step="1" class="bg-slate-900 rounded p-2"></label>
-          <label class="block">انقضا (اختیاری، به وقت دستگاه شما) <input name="expiresAt" type="datetime-local" class="bg-slate-900 rounded p-2"></label>
-          <label class="block">سقف استفاده (اختیاری) <input name="maxUses" type="number" min="1" step="1" class="bg-slate-900 rounded p-2"></label>
-          <button class="bg-sky-700 px-4 py-2 rounded-xl">ساخت کد تخفیف</button>
+          <div class="admin-field-grid">
+            <label class="block">کد تخفیف <input name="code" required dir="ltr" class="bg-slate-900 rounded p-2"></label>
+            <label class="block">درصد تخفیف <input name="percent" type="number" required min="1" max="100" step="1" class="bg-slate-900 rounded p-2"></label>
+            <label class="block">انقضا (اختیاری، به وقت دستگاه شما) <input name="expiresAt" type="datetime-local" class="bg-slate-900 rounded p-2"></label>
+            <label class="block">سقف استفاده (اختیاری) <input name="maxUses" type="number" min="1" step="1" class="bg-slate-900 rounded p-2"></label>
+          </div>
+          <div class="admin-actions"><button class="bg-sky-700 px-4 py-2 rounded-xl">ساخت کد تخفیف</button></div>
         </form>
         <ul id="discountCodeList" class="space-y-2"></ul>
       </fieldset>
     </section>
-    <section id="tabServices" class="space-y-4 hidden" hidden>
+    <section id="tabServices" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">خدمات فعال</h3>
       <p class="text-sm text-slate-300">هر خدمتی را که خاموش کنید در اپ مشتری و متخصص دیده نمی‌شود و سفارش تازه برای آن ثبت نمی‌شود. سفارش‌های قبلی تغییر نمی‌کنند و با روشن‌کردن دوباره همه‌چیز برمی‌گردد.</p>
       <p id="servicesMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
       <ul id="servicesList" class="space-y-2"></ul>
     </section>
-    <section id="tabOfferPolicy" class="space-y-4 hidden" hidden>
+    <section id="tabOfferPolicy" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قیمت پیشنهاد متخصص</h3>
       <p class="text-sm text-slate-300">هر متخصص می‌تواند زیر ۱۰۰٪ تعرفه قیمت بگذارد، تا همین حداقل مشترک. سقف بالاتر از تعرفه به درجه بستگی دارد: خاکستری صفر درصد اضافه (سقف ۱۰۰)، نقره‌ای ۱۱۰ و طلایی ۱۳۰. ترتیب ذخیره‌شده حداقل ≤ خاکستری ≤ نقره‌ای ≤ طلایی است. پیشنهادهای قبلاً ثبت‌شده تغییر نمی‌کنند. حدود مشتری جداست و پایین همین برگه است.</p>
-      <label for="offerPolicyMin" class="block text-sm">حداقل درصد تعرفه (همهٔ متخصصان؛ زیر ۱۰۰٪)</label>
-      <input id="offerPolicyMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="offerPolicyMax" class="block text-sm">حداکثر درصد تعرفه (متخصص خاکستری)</label>
-      <input id="offerPolicyMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="offerPolicySilver" class="block text-sm">حداکثر درصد تعرفه (متخصص نقره‌ای)</label>
-      <input id="offerPolicySilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="offerPolicyGold" class="block text-sm">حداکثر درصد تعرفه (متخصص طلایی و طلایی پلاس)</label>
-      <input id="offerPolicyGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+      <div class="admin-field-grid">
+        <div class="admin-field">
+          <label for="offerPolicyMin" class="block text-sm">حداقل درصد تعرفه (همهٔ متخصصان؛ زیر ۱۰۰٪)</label>
+          <input id="offerPolicyMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+        </div>
+        <div class="admin-field">
+          <label for="offerPolicyMax" class="block text-sm">حداکثر درصد تعرفه (متخصص خاکستری)</label>
+          <input id="offerPolicyMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+        </div>
+        <div class="admin-field">
+          <label for="offerPolicySilver" class="block text-sm">حداکثر درصد تعرفه (متخصص نقره‌ای)</label>
+          <input id="offerPolicySilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+        </div>
+        <div class="admin-field">
+          <label for="offerPolicyGold" class="block text-sm">حداکثر درصد تعرفه (متخصص طلایی و طلایی پلاس)</label>
+          <input id="offerPolicyGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+        </div>
+      </div>
       <p id="offerPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
-      <button id="offerPolicySave" type="button" onclick="saveAdminOfferPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
-      <h3 class="font-bold pt-4">حدود درخواست ساعت دلخواه مشتری</h3>
-      <label for="customerRequestMin" class="block text-sm">حداقل درصد تعرفه (مشتری)</label>
-      <input id="customerRequestMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="customerRequestMax" class="block text-sm">حداکثر درصد تعرفه (مشتری)</label>
-      <input id="customerRequestMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <p id="customerRequestPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="customerRequestPolicyRefresh" type="button" onclick="loadAdminCustomerRequestPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم مشتری</button>
-      <button id="customerRequestPolicySave" type="button" onclick="saveAdminCustomerRequestPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره حدود مشتری</button>
-      <h4 class="text-base font-bold pt-4">کلید کلی قابلیت</h4>
-      <p class="text-sm text-slate-300">با خاموش‌کردن این کلید، فهرست پیشنهادها برای مشتریان خالی می‌شود و هیچ پیشنهاد تازه‌ای رزرو نمی‌شود. سفارش‌های ثبت‌شده تغییر نمی‌کنند. برای یک متخصص مشخص، دکمهٔ «غیرفعال‌سازی قیمت پیشنهاد» را در کارت او در تب متخصصان بزنید.</p>
-      <p id="offerGlobalState" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="offerGlobalToggle" type="button" onclick="toggleGlobalOffers()" disabled class="bg-amber-700 px-4 py-2 rounded-xl">…</button>
-      <h4 class="text-base font-bold pt-4">گزارش متخصص‌های مشکوک (فقط نمایشی)</h4>
-      <p class="text-sm text-slate-300">این گزارش هیچ محدودیتی اعمال نمی‌کند و فقط برای بررسی مدیر است. پرچم «قیمت نزدیک حداقل»: دست‌کم ۳ رزرو با قیمتی تا ۱۰٪ بالاتر از حداقل. پرچم «مشتری تکراری با قیمت پایین»: دست‌کم ۳ رزرو یک مشتری با قیمت ≤ ۸۵٪ تعرفه. مشتری تکراری به‌خودیِ‌خود خلاف نیست.</p>
-      <p id="offerReportMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <ul id="offerReportList" class="space-y-2"></ul>
-      <button id="offerReportRefresh" type="button" onclick="loadAdminOfferReport()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی گزارش</button>
-    </section>
-    <section id="tabTierLock" class="space-y-4 hidden" hidden>
-      <h3 class="text-lg font-bold">قفل سطح سفارش معمولی</h3>
-      <p class="text-sm text-slate-300">این تنظیم جدا از «قیمت پیشنهاد متخصص» است. مشتری در سفارش معمولی سطح را انتخاب می‌کند و قیمت همان لحظه قفل می‌شود. خاکستری همیشه ۱۰۰٪ تعرفه است و فیلد ندارد. نقره‌ای و طلایی را اینجا تعیین کنید. ضریب فقط روی نرخ پایه می‌نشیند؛ هزینهٔ ثابت جانبی ضرب نمی‌شود. نظافت راه‌پله و مشاعات قیمت ثابت می‌ماند. سفارش‌های قبلی با تغییر این تنظیم عوض نمی‌شوند.</p>
-      <p class="text-sm">خاکستری: ۱۰۰٪ (ثابت)</p>
-      <label for="tierLockSilver" class="block text-sm">درصد تعرفه برای سطح نقره‌ای</label>
-      <input id="tierLockSilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="tierLockGold" class="block text-sm">درصد تعرفه برای سطح طلایی</label>
-      <input id="tierLockGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <p id="tierLockMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="tierLockRefresh" type="button" onclick="loadAdminTierLock()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
-      <button id="tierLockSave" type="button" onclick="saveAdminTierLock()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
-      <h3 class="text-base font-bold pt-4">درخواست طلایی</h3>
-      <p class="text-sm text-slate-300">این درصد مستقل از درصد طلایی بالاست. قیمت درخواست مستقیم یک متخصص همیشه همین درصدِ نرخ پایه است، حتی اگر آن متخصص خاکستری باشد و حتی برای نظافت راه‌پله. مهلت پاسخ جدا ذخیره می‌شود. ذخیرهٔ این بخش درصد سطح سفارش را عوض نمی‌کند.</p>
-      <label for="goldenRequestPercent" class="block text-sm">درصد درخواست طلایی</label>
-      <input id="goldenRequestPercent" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="goldenRequestWindow" class="block text-sm">مهلت پاسخ متخصص (دقیقه)</label>
-      <input id="goldenRequestWindow" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <button id="goldenRequestSave" type="button" onclick="saveAdminGoldenRequest()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درخواست طلایی</button>
-    </section>
-    <section id="tabAreas" class="space-y-4 hidden" hidden>
-      <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
-      <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. فهرست در فرم نشانی مشتری و محدوده فعالیت متخصص نمایش داده می‌شود. تغییر شهر پیش‌فرض، نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
-      <p id="areasMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="areasRefresh" type="button" onclick="loadAdminAreas()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی فهرست</button>
-      <label class="block">شهر <select id="areasCity" onchange="selectAdminArea()" disabled class="bg-slate-800 border p-2 rounded-xl"></select></label>
-      <button id="areasAdd" type="button" onclick="newAdminArea()" disabled class="bg-sky-700 px-4 py-2 rounded-xl">افزودن شهر</button>
-      <label class="block">نام شهر <input id="areasName" maxlength="80" disabled class="bg-slate-800 border p-2 rounded-xl" /></label>
-      <label class="block">محله‌ها؛ هر محله در یک خط <textarea id="areasNeighborhoods" rows="8" disabled class="block w-full bg-slate-800 border p-2 rounded-xl"></textarea></label>
-      <label class="block"><input id="areasDefault" type="checkbox" disabled /> این شهر پیش‌فرض باشد</label>
-      <button id="areasSave" type="button" onclick="saveAdminArea()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره شهر و محله‌ها</button>
-    </section>
+      <div class="admin-actions">
+        <button id="offerPolicyRefresh" type="button" onclick="loadAdminOfferPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
+        <button id="offerPolicySave" type="button" onclick="saveAdminOfferPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+      </div>
+      <div class="admin-settings-group">
+        <h3 class="font-bold pt-4">حدود درخواست ساعت دلخواه مشتری</h3>
+        <div class="admin-field-grid">
+          <div class="admin-field">
+            <label for="customerRequestMin" class="block text-sm">حداقل درصد تعرفه (مشتری)</label>
+            <input id="customerRequestMin" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+          </div>
+          <div class="admin-field">
+            <label for="customerRequestMax" class="block text-sm">حداکثر درصد تعرفه (مشتری)</label>
+            <input id="customerRequestMax" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+          </div>
+        </div>
+        <p id="customerRequestPolicyMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+        <div class="admin-actions">
+          <button id="customerRequestPolicyRefresh" type="button" onclick="loadAdminCustomerRequestPolicy()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم مشتری</button>
+          <button id="customerRequestPolicySave" type="button" onclick="saveAdminCustomerRequestPolicy()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره حدود مشتری</button>
+        </div></div>
+        <div class="admin-settings-group">
+          <h4 class="text-base font-bold pt-4">کلید کلی قابلیت</h4>
+          <p class="text-sm text-slate-300">با خاموش‌کردن این کلید، فهرست پیشنهادها برای مشتریان خالی می‌شود و هیچ پیشنهاد تازه‌ای رزرو نمی‌شود. سفارش‌های ثبت‌شده تغییر نمی‌کنند. برای یک متخصص مشخص، دکمهٔ «غیرفعال‌سازی قیمت پیشنهاد» را در کارت او در تب متخصصان بزنید.</p>
+          <p id="offerGlobalState" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+          <div class="admin-actions">
+            <button id="offerGlobalToggle" type="button" onclick="toggleGlobalOffers()" disabled class="bg-amber-700 px-4 py-2 rounded-xl">…</button>
+          </div>
+        </div>
+          <div class="admin-settings-group">
+            <h4 class="text-base font-bold pt-4">گزارش متخصص‌های مشکوک (فقط نمایشی)</h4>
+            <p class="text-sm text-slate-300">این گزارش هیچ محدودیتی اعمال نمی‌کند و فقط برای بررسی مدیر است. پرچم «قیمت نزدیک حداقل»: دست‌کم ۳ رزرو با قیمتی تا ۱۰٪ بالاتر از حداقل. پرچم «مشتری تکراری با قیمت پایین»: دست‌کم ۳ رزرو یک مشتری با قیمت ≤ ۸۵٪ تعرفه. مشتری تکراری به‌خودیِ‌خود خلاف نیست.</p>
+            <p id="offerReportMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+            <ul id="offerReportList" class="space-y-2"></ul>
+            <div class="admin-actions">
+              <button id="offerReportRefresh" type="button" onclick="loadAdminOfferReport()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی گزارش</button>
+            </div>
+          </div>
+        </section>
+        <section id="tabTierLock" class="admin-panel space-y-4 hidden" hidden>
+          <h3 class="text-lg font-bold">قفل سطح سفارش معمولی</h3>
+          <p class="text-sm text-slate-300">این تنظیم جدا از «قیمت پیشنهاد متخصص» است. مشتری در سفارش معمولی سطح را انتخاب می‌کند و قیمت همان لحظه قفل می‌شود. خاکستری همیشه ۱۰۰٪ تعرفه است و فیلد ندارد. نقره‌ای و طلایی را اینجا تعیین کنید. ضریب فقط روی نرخ پایه می‌نشیند؛ هزینهٔ ثابت جانبی ضرب نمی‌شود. نظافت راه‌پله و مشاعات قیمت ثابت می‌ماند. سفارش‌های قبلی با تغییر این تنظیم عوض نمی‌شوند.</p>
+          <p class="text-sm">خاکستری: ۱۰۰٪ (ثابت)</p>
+          <div class="admin-field-grid">
+            <div class="admin-field">
+              <label for="tierLockSilver" class="block text-sm">درصد تعرفه برای سطح نقره‌ای</label>
+              <input id="tierLockSilver" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+            <div class="admin-field">
+              <label for="tierLockGold" class="block text-sm">درصد تعرفه برای سطح طلایی</label>
+              <input id="tierLockGold" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+          </div>
+          <p id="tierLockMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+          <div class="admin-actions">
+            <button id="tierLockRefresh" type="button" onclick="loadAdminTierLock()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیم جاری</button>
+            <button id="tierLockSave" type="button" onclick="saveAdminTierLock()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیم</button>
+          </div>
+          <div class="admin-settings-group">
+            <h3 class="text-base font-bold pt-4">درخواست طلایی</h3>
+            <p class="text-sm text-slate-300">این درصد مستقل از درصد طلایی بالاست. قیمت درخواست مستقیم یک متخصص همیشه همین درصدِ نرخ پایه است، حتی اگر آن متخصص خاکستری باشد و حتی برای نظافت راه‌پله. مهلت پاسخ جدا ذخیره می‌شود. ذخیرهٔ این بخش درصد سطح سفارش را عوض نمی‌کند.</p>
+            <div class="admin-field-grid">
+              <div class="admin-field">
+                <label for="goldenRequestPercent" class="block text-sm">درصد درخواست طلایی</label>
+                <input id="goldenRequestPercent" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+              </div>
+              <div class="admin-field">
+                <label for="goldenRequestWindow" class="block text-sm">مهلت پاسخ متخصص (دقیقه)</label>
+                <input id="goldenRequestWindow" type="text" inputmode="numeric" dir="ltr" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+              </div>
+            </div>
+            <div class="admin-actions">
+              <button id="goldenRequestSave" type="button" onclick="saveAdminGoldenRequest()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره درخواست طلایی</button>
+            </div>
+          </div>
+        </section>
+        <section id="tabAreas" class="admin-panel space-y-4 hidden" hidden>
+          <h3 class="text-lg font-bold">شهرها و محله‌های تحت پوشش شرکت</h3>
+          <p class="text-sm text-slate-300">شهرها و محله‌های شرکت خود را وارد کنید. فهرست در فرم نشانی مشتری و محدوده فعالیت متخصص نمایش داده می‌شود. تغییر شهر پیش‌فرض، نشانی قبلی کاربران و سفارش‌ها را تغییر نمی‌دهد.</p>
+          <p id="areasMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+          <div class="admin-actions">
+            <button id="areasRefresh" type="button" onclick="loadAdminAreas()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی فهرست</button>
+          </div>
+          <div class="admin-field-grid admin-field-grid-single">
+            <label class="block">شهر <select id="areasCity" onchange="selectAdminArea()" disabled class="bg-slate-800 border p-2 rounded-xl"></select></label>
+            <button id="areasAdd" type="button" onclick="newAdminArea()" disabled class="bg-sky-700 px-4 py-2 rounded-xl">افزودن شهر</button>
+            <label class="block">نام شهر <input id="areasName" maxlength="80" disabled class="bg-slate-800 border p-2 rounded-xl" /></label>
+            <label class="block">محله‌ها؛ هر محله در یک خط <textarea id="areasNeighborhoods" rows="8" disabled class="block w-full bg-slate-800 border p-2 rounded-xl"></textarea></label>
+            <label class="block"><input id="areasDefault" type="checkbox" disabled /> این شهر پیش‌فرض باشد</label>
+          </div>
+          <div class="admin-actions"><button id="areasSave" type="button" onclick="saveAdminArea()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره شهر و محله‌ها</button>
+          </div>
+        </section>
 
-    <section id="tabPayment" class="space-y-4 hidden" hidden>
-      <h3 class="text-lg font-bold">تنظیمات پرداخت شرکت</h3>
-      <p class="text-sm text-slate-300">هر استقرار تنظیم درگاه و حساب تسویه خودش را جدا نگه می‌دارد. تا وقتی درگاه پیاده‌سازی‌شده‌ای انتخاب و نزد همان درگاه تأیید نشده باشد، شارژ کیف پول متخصص انجام نمی‌شود. وارد کردن شماره حساب، مقصد تسویه بانکی را عوض نمی‌کند. رمز اتصال پس از ذخیره نمایش داده نمی‌شود و نباید در کد یا مخزن قرار بگیرد.</p>
-      <p id="paymentState" class="text-sm text-slate-300"></p>
-      <label for="paymentMerchantId" class="block text-sm">شناسه پذیرنده</label>
-      <input id="paymentMerchantId" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentSettlementLabel" class="block text-sm">عنوان حساب تسویه اعلام‌شده</label>
-      <input id="paymentSettlementLabel" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentSettlementReference" class="block text-sm">شماره حساب اعلام‌شده</label>
-      <input id="paymentSettlementReference" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentConnectionSecret" class="block text-sm">اطلاعات محرمانه اتصال</label>
-      <input id="paymentConnectionSecret" type="password" dir="ltr" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
-      <label for="paymentClearSecret" class="block text-sm"><input id="paymentClearSecret" type="checkbox" disabled /> حذف رمز ذخیره‌شده</label>
-      <label for="paymentIsDefault" class="block text-sm"><input id="paymentIsDefault" type="checkbox" disabled /> پیش‌فرض سراسری این استقرار</label>
-      <p id="paymentMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات پرداخت</button>
-      <button id="paymentSave" type="button" onclick="saveAdminPayment()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیمات پرداخت</button>
-    </section>
+        <section id="tabPayment" class="admin-panel space-y-4 hidden" hidden>
+          <h3 class="text-lg font-bold">تنظیمات پرداخت شرکت</h3>
+          <p class="text-sm text-slate-300">هر استقرار تنظیم درگاه و حساب تسویه خودش را جدا نگه می‌دارد. تا وقتی درگاه پیاده‌سازی‌شده‌ای انتخاب و نزد همان درگاه تأیید نشده باشد، شارژ کیف پول متخصص انجام نمی‌شود. وارد کردن شماره حساب، مقصد تسویه بانکی را عوض نمی‌کند. رمز اتصال پس از ذخیره نمایش داده نمی‌شود و نباید در کد یا مخزن قرار بگیرد.</p>
+          <p id="paymentState" class="text-sm text-slate-300"></p>
+          <div class="admin-field-grid">
+            <div class="admin-field">
+              <label for="paymentMerchantId" class="block text-sm">شناسه پذیرنده</label>
+              <input id="paymentMerchantId" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+            <div class="admin-field">
+              <label for="paymentSettlementLabel" class="block text-sm">عنوان حساب تسویه اعلام‌شده</label>
+              <input id="paymentSettlementLabel" type="text" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+            <div class="admin-field">
+              <label for="paymentSettlementReference" class="block text-sm">شماره حساب اعلام‌شده</label>
+              <input id="paymentSettlementReference" type="text" dir="ltr" autocomplete="off" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+            <div class="admin-field">
+              <label for="paymentConnectionSecret" class="block text-sm">اطلاعات محرمانه اتصال</label>
+              <input id="paymentConnectionSecret" type="password" dir="ltr" autocomplete="new-password" disabled class="block bg-slate-900 border border-slate-600 rounded-lg p-2" />
+            </div>
+          </div>
+          <label for="paymentClearSecret" class="block text-sm"><input id="paymentClearSecret" type="checkbox" disabled /> حذف رمز ذخیره‌شده</label>
+          <label for="paymentIsDefault" class="block text-sm"><input id="paymentIsDefault" type="checkbox" disabled /> پیش‌فرض سراسری این استقرار</label>
+          <p id="paymentMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
+          <div class="admin-actions">
+            <button id="paymentRefresh" type="button" onclick="loadAdminPayment()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی تنظیمات پرداخت</button>
+            <button id="paymentSave" type="button" onclick="saveAdminPayment()" disabled class="bg-emerald-700 px-4 py-2 rounded-xl">ذخیره تنظیمات پرداخت</button>
+          </div>
+        </section>
 
-    <section id="tabPoints" class="space-y-4 hidden" hidden>
+    <section id="tabPoints" class="admin-panel space-y-4 hidden" hidden>
       <h3 class="text-lg font-bold">قانون امتیاز</h3>
       <p class="text-sm text-slate-300">تا وقتی نسخهٔ فعالی ثبت نشده، پیش‌فرض سامانه به کار می‌رود: هر سفارش موفق ۵ امتیاز برای مشتری و ۵ امتیاز برای متخصص، و ۲ امتیاز اضافه برای متخصص وقتی مشتری ۵ ستاره بدهد. هر تغییر نسخهٔ جدید می‌سازد و امتیازهای قبلی عوض نمی‌شوند.</p>
       <p id="pointsMessage" role="status" aria-live="polite" class="text-sm text-amber-300"></p>
-      <button id="pointsRefresh" type="button" onclick="loadAdminPoints()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون امتیاز</button>
+      <div class="admin-actions">
+        <button id="pointsRefresh" type="button" onclick="loadAdminPoints()" class="bg-sky-700 px-4 py-2 rounded-xl">بازخوانی قانون امتیاز</button>
+      </div>
       <div id="pointsContent" class="space-y-4"></div>
     </section>
 
@@ -3518,6 +3745,27 @@ app.get('/admin', (req, res) => {
       }
     }
 
+    function renderRevenueStats(stats) {
+      const label = document.getElementById('revenueLabel');
+      const target = document.getElementById('totalRevenue');
+      const singleUnit = stats.revenueUnit;
+      label.textContent = singleUnit ? 'درآمد کل (' + singleUnit + ')' : 'درآمد کل (به تفکیک واحد)';
+      const rows = singleUnit ? [[singleUnit, stats.totalRevenue]] : Object.entries(stats.revenueByUnit || {});
+      if (rows.length === 0 || (singleUnit && Number(stats.totalRevenue) === 0)) {
+        renderStat('totalRevenue', 0);
+        return;
+      }
+      target.replaceChildren(...rows.map(([unit, amount]) => {
+        const row = adminElement('span', 'admin-revenue-row block');
+        const digits = Number(amount).toLocaleString('fa-IR');
+        const number = adminElement('bdi', 'admin-revenue-value', digits);
+        number.style.setProperty('--revenue-length', String(Math.max(1, digits.length)));
+        row.append(number);
+        if (!singleUnit) row.append(adminElement('span', 'admin-revenue-unit', unit));
+        return row;
+      }));
+    }
+
     function loadAllData() {
       const generation = ++adminLoadGeneration;
       const refresh = document.getElementById('dashboardRefresh');
@@ -3532,14 +3780,7 @@ app.get('/admin', (req, res) => {
               renderStat('totalOrders', s.totalOrders);
               renderStat('pendingWorkers', s.pendingWorkersCount);
               renderStat('totalWorkers', s.totalWorkers);
-              if (s.revenueUnit) {
-                document.getElementById('revenueLabel').innerText = 'درآمد کل (' + s.revenueUnit + ')';
-                renderStat('totalRevenue', s.totalRevenue === 0 ? 0 : s.totalRevenue.toLocaleString('fa-IR'));
-              } else {
-                document.getElementById('revenueLabel').innerText = 'درآمد کل (به تفکیک واحد)';
-                renderStat('totalRevenue', Object.entries(s.revenueByUnit || {})
-                  .map(([unit, amount]) => Number(amount).toLocaleString('fa-IR') + ' ' + unit).join(' + ') || 0);
-              }
+              renderRevenueStats(s);
             }),
             loadDashboardSection('workers', '/api/admin/users?role=WORKER', (data) => renderWorkers(data.users)),
             loadDashboardSection('orders', '/api/admin/orders', (data) => renderOrders(data.orders)),
@@ -3732,23 +3973,23 @@ app.get('/admin', (req, res) => {
 
       const rows = document.createDocumentFragment();
       for (const o of orders) {
-        const card = adminElement('div', 'bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
-        const details = adminElement('div', '');
-        const heading = adminElement('div', 'flex items-center gap-2');
+        const card = adminElement('div', 'bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col gap-4');
+        const details = adminElement('div', 'admin-order-details');
+        const heading = adminElement('div', 'admin-order-heading flex items-center gap-2');
         heading.append(
-          adminElement('span', 'font-bold text-sky-400 font-mono', o.id),
+          adminElement('span', 'admin-order-code font-bold text-sky-400 font-mono', o.id),
           adminElement('span', 'font-bold text-white', o.serviceTitle),
           adminElement('span', 'text-[10px] px-2 py-0.5 rounded-full font-bold ' + getOrderStatusBadge(o.status), getOrderStatusTitle(o.status))
         );
         details.append(
           heading,
           adminElement('p', 'text-xs text-slate-400 mt-1', 'مشتری: ' + o.customerName + ' (' + o.customerPhone + ')'),
-          adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + o.address + ' | تاریخ: ' + o.date + ' ساعت ' + o.time)
+          adminElement('p', 'text-xs text-slate-400', 'آدرس: ' + o.address + ' | تاریخ: ' + (o.dateLabel || '—') + ' ساعت ' + o.time)
         );
         if (o.cleanerName) {
           details.append(adminElement('p', 'text-xs text-emerald-400 mt-1', 'متخصص پذیرنده: ' + o.cleanerName));
         }
-        const actions = adminElement('div', 'flex flex-col items-end gap-2');
+        const actions = adminElement('div', 'admin-order-actions flex flex-col gap-2');
         if (o.completion?.status === 'disputed') {
           details.append(adminElement('p','text-amber-300','اختلاف پایان کار — ساعات: '+(o.completion.actualHours ?? 'غیرساعتی')+' | مبلغ اعلام‌شده: '+o.completion.finalAmount));
           for (const approve of [true,false]) {
@@ -3769,7 +4010,13 @@ app.get('/admin', (req, res) => {
           button.disabled = adminActions.has(button.dataset.adminAction);
           actions.append(button);
         }
-        actions.append(adminElement('div', 'text-left font-bold text-purple-400 text-sm', (o.price || 0).toLocaleString('fa-IR') + ' ' + ((o.pricing && typeof o.pricing.currencyUnit === 'string' && o.pricing.currencyUnit.trim()) || 'تومان')));
+        const currency = (typeof o.pricing?.currencyUnit === 'string' && o.pricing.currencyUnit.trim()) || 'تومان';
+        const completed = o.completion?.status === 'completed' && Number.isSafeInteger(o.completion.finalAmount);
+        if (completed && Number.isFinite(o.completion.actualHours)) {
+          details.append(adminElement('p', 'text-xs text-slate-400 mt-1', 'ساعات واقعی کار: ' + o.completion.actualHours.toLocaleString('fa-IR') + ' ساعت'));
+        }
+        const total = completed ? o.completion.finalAmount : (o.price || 0);
+        actions.append(adminElement('div', 'admin-order-amount font-bold text-purple-400 text-sm', (completed ? 'مبلغ نهایی: ' : 'مبلغ رزرو: ') + total.toLocaleString('fa-IR') + ' ' + currency));
         card.append(details, actions);
         rows.append(card);
       }
@@ -3901,6 +4148,7 @@ if (require.main === module) {
     process.exit(1);
   }
   app.listen(PORT, host, () => {
+    require('./orderStatusSms').startOrderSmsScheduler(store.orderStatusSms);
     console.log(`Paksho Secure Backend & Admin Dashboard running on http://${host}:${PORT}`);
   });
 }
