@@ -129,6 +129,11 @@ test('worker offers: create, list, book through signed quote, tamper resistance'
   assert.equal(booked.json.order.price, 2100);
   assert.equal(booked.json.order.status, 'ACCEPTED');
   assert.equal(booked.json.order.cleanerId, workerLogin.user.id);
+  assert.equal(
+    harness.store.listNotifications(customer.user.id)
+      .filter((note) => note.orderId === booked.json.order.id && note.kind === 'ORDER_CREATED').length,
+    1,
+  );
 
   // رزرو دوم همان پیشنهاد (مشتری دیگر) ناموفق و بدون سفارش اضافی
   const quote2 = await request(server, {

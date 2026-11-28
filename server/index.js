@@ -1593,6 +1593,15 @@ app.post('/api/orders', (req, res) => {
     }
     const order = store.createOrder(newOrder);
     if (offerId !== undefined) {
+      store.addNotification(
+        user.id,
+        order.id,
+        'ORDER_CREATED',
+        'سفارش جدید ثبت شد',
+        'سفارش شما با موفقیت ثبت شد و برای پذیرش متخصصان ارسال گردید.'
+      );
+    }
+    if (offerId !== undefined) {
       if (!offerWorker || !store.workerOffers.book(offerId, order.id)) throw new OfferBookingFailed('OFFER_UNAVAILABLE');
       const accepted = store.tryAcceptOrder(order.id, offerWorker);
       if (accepted.code !== 'ok') throw new OfferBookingFailed(accepted.code === 'wallet-debt' ? 'WORKER_WALLET_DEBT' : 'OFFER_UNAVAILABLE');
