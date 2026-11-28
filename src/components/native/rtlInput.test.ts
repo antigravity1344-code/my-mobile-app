@@ -20,12 +20,17 @@ describe('RTL inputs keep caret and placeholder visible', () => {
     for (const tag of inputs) expect(tag).toMatch(/\{\.\.\.RTL_SINGLE_LINE_INPUT\}|multiline/);
     expect(inputs.filter((t) => t.includes('{...RTL_SINGLE_LINE_INPUT}'))).toHaveLength(6);
   });
-  it('wizard step 3: plaque, unit, name and mobile use it', () => {
+  it('wizard step 3: centered address numbers and text inputs keep their focus behavior', () => {
     for (const field of ['plaque', 'unit', 'recipientName', 'contactPhone']) {
       const at = wizard.indexOf(`setSelectedSavedAddressId(null); booking.updateAddressField('${field}'`);
       expect(at).toBeGreaterThan(-1);
       const open = wizard.lastIndexOf('<TextInput', at);
-      expect(wizard.slice(open, at)).toContain('{...RTL_SINGLE_LINE_INPUT}');
+      const input = wizard.slice(open, at);
+      if (field === 'plaque' || field === 'unit') {
+        expect(input).toContain('textAlign="center"');
+      } else {
+        expect(input).toContain('{...RTL_SINGLE_LINE_INPUT}');
+      }
     }
   });
 });

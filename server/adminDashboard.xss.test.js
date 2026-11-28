@@ -69,7 +69,7 @@ function order(overrides = {}) {
   return {
     id: 'ORDER-TEST', customerId: 'CUSTOMER-TEST', customerName: 'مشتری آزمایشی',
     customerPhone: '09120000102', serviceTitle: 'نظافت منزل', address: 'تهران، پلاک ۱۲',
-    date: '۲۰ مهر', time: 'صبح', cleanerName: 'متخصص پذیرنده', price: 800000,
+    date: '۲۰ مهر', dateLabel: 'دوشنبه ۲۰ مهر ۱۴۰۵', time: 'صبح', cleanerName: 'متخصص پذیرنده', price: 800000,
     status: 'PENDING', createdAt: '2026-10-11T08:00:00.000Z', ...overrides,
   };
 }
@@ -262,7 +262,7 @@ test('worker text fields are literal text, not executable HTML', async (t) => {
 });
 
 test('order text and nonnumeric amount cannot inject HTML', async (t) => {
-  for (const field of ['id', 'serviceTitle', 'customerName', 'customerPhone', 'address', 'date', 'time', 'cleanerName', 'price']) {
+  for (const field of ['id', 'serviceTitle', 'customerName', 'customerPhone', 'address', 'dateLabel', 'time', 'cleanerName', 'price']) {
     await t.test(field, () => withPage(async (page) => {
       await page.evaluate((row) => renderOrders([row]), order({ [field]: TEXT_ATTACK }));
       await assertSafeMarkup(page, 'ordersList');
@@ -408,9 +408,13 @@ test('ordinary content, dashboard classes, empty states and existing button oper
       };
     });
     await page.evaluate(({ w, o }) => { renderWorkers([w]); renderOrders([o]); }, { w, o });
-    assert.equal(await page.locator('#workersList > div').getAttribute('class'), 'bg-slate-800 border border-amber-500/50 bg-amber-950/10 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
+    assert.match(await page.locator('#workersList > div').getAttribute('class'), /\bflex-col md:flex-row\b.*\bitems-stretch md:items-center\b/);
     assert.equal(await page.locator('#workersList img').getAttribute('class'), 'w-12 h-12 rounded-full border-2 border-emerald-500 object-cover');
-    assert.equal(await page.locator('#ordersList > div').getAttribute('class'), 'bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4');
+    const orderCard = page.locator('#ordersList > div');
+    assert.match(await orderCard.getAttribute('class'), /\bflex-col\b/);
+    assert.equal(await orderCard.locator('.admin-order-details').count(), 1);
+    assert.equal(await orderCard.locator('.admin-order-actions .admin-order-amount').count(), 1);
+    assert.match(await orderCard.textContent(), /دوشنبه ۲۰ مهر ۱۴۰۵/);
     assert.match(await page.locator('#workersList').textContent(), /متخصص & «آزمایشی»/);
     assert.match(await page.locator('#ordersList').textContent(), /۸۰۰٬۰۰۰ تومان/);
     const approved = page.waitForResponse((response) => response.url() === origin + '/api/admin/users/WORKER-NORMAL/status' && response.request().method() === 'PUT');
